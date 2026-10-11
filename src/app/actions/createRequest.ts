@@ -12,11 +12,22 @@ interface CreateRequestPayload {
 }
 
 export async function createRequest(payload: CreateRequestPayload) {
+  const requestData: RequestData = {
+    ...payload.data,
+    startsAt: payload.startsAt.toISOString(),
+    endsAt: payload.endsAt.toISOString(),
+    details: {
+      ...(payload.data?.details || {}),
+      startsAt: payload.startsAt.toISOString(),
+      endsAt: payload.endsAt.toISOString(),
+    }
+  };
+
   const [newRequest] = await db.insert(requests).values({
     title: payload.title,
     status: 'draft',
     createdAt: payload.startsAt,
-    data: payload.data
+    data: requestData
   }).returning({ id: requests.id });
 
   revalidatePath('/requests');

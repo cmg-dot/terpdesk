@@ -12,6 +12,16 @@ interface CreateOfferPayload {
 }
 
 export async function createOffer(payload: CreateOfferPayload) {
+  const [request] = await db.select().from(requests).where(eq(requests.id, payload.requestId));
+  if (!request) throw new Error("Request not found");
+
+  if (payload.expiresAt <= new Date()) {
+    throw new Error("Expiry must be in the future");
+  }
+  
+  if (payload.expiresAt >= request.createdAt) {
+    throw new Error("Expiry must be before appointment start");
+  }
   const [newOffer] = await db.insert(offers).values({
     requestId: payload.requestId,
     interpreterId: payload.interpreterId,

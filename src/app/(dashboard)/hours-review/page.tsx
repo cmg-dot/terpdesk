@@ -2,13 +2,38 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { ChevronDown, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
+import { approveHours, requestHoursCorrection } from "@/app/actions/reviewHours";
+import { fetchLiveRequests } from "@/app/actions/getRequests";
+
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={label ? `Copy ${label}` : "Copy to clipboard"}
+      className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors shrink-0"
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+      {copied && <span className="text-[11px] text-green-600 font-medium">Copied</span>}
+    </button>
+  );
+}
 
 export interface ServiceRecord {
   id: string;
   appointmentId: string;
   interpreterName: string;
-  state: 'not_started' | 'draft' | 'submitted' | 'changes_requested' | 'approved';
+  state: 'not_started' | 'draft' | 'submitted' | 'awaiting_review' | 'changes_requested' | 'correction_requested' | 'approved';
   scheduledStart: string;
   scheduledEnd: string;
   actualStart: string;
@@ -18,6 +43,13 @@ export interface ServiceRecord {
   approvedMileage: number | null;
   reviewMessage: string | null;
   version: number;
+  isOdhh?: boolean;
+  travelStart?: string;
+  travelEnd?: string;
+  serviceCompleted?: string | boolean;
+  mileageNote?: string;
+  serviceNote?: string;
+  history?: any[];
 }
 
 function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpdate: (r: ServiceRecord) => void }) {
@@ -45,11 +77,21 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
   const scheduledEndDt = new Date(record.scheduledEnd);
   const formattedScheduled = `${scheduledStartDt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric'})} · ${scheduledStartDt.toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit'})} – ${scheduledEndDt.toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', timeZoneName: 'short'})}`;
 
+  const formattedTravel = record.travelStart && record.travelEnd ? (() => {
+    try {
+      const ts = new Date(record.travelStart);
+      const te = new Date(record.travelEnd);
+      return `${ts.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${te.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`;
+    } catch (e) {
+      return `${record.travelStart} – ${record.travelEnd}`;
+    }
+  })() : "None reported";
+
   const diffMs = actualEndDt.getTime() - actualStartDt.getTime();
-  const serviceMinutes = Math.max(0, (diffMs / 60000) - record.breakMinutes);
+  const serviceMinutes = Math.max(0, (diffMs / 60000) - (record.breakMinutes || 0));
   const serviceHours = (serviceMinutes / 60).toFixed(1);
 
-  const handleApprove = () => {
+  const handleApprove = async () => {
     if (!hasException) {
       setShowSignatureError(true);
       return;
@@ -62,24 +104,63 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     setShowSignatureError(false);
     setShowMileageError(false);
     
+    try {
+      await approveHours(record.appointmentId, mileageNum);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const prevHistory = Array.isArray(record.history) ? record.history : [];
+    const approveEntry = {
+      id: Math.random().toString(36).substring(7),
+      type: 'approved',
+      title: 'Hours approved and finalized',
+      actor: 'Agency Staff',
+      timestamp: new Date().toISOString(),
+      version: record.version || 1,
+      details: {
+        approvedMileage: mileageNum,
+      }
+    };
+
     onUpdate({
       ...record,
       state: 'approved',
       approvedMileage: mileageNum,
+      reviewMessage: null,
+      history: [...prevHistory, approveEntry]
     });
   };
 
-  const handleRequestCorrection = () => {
+  const handleRequestCorrection = async () => {
     if (!correctionText.trim()) {
       setShowCorrectionError(true);
       return;
     }
     setShowCorrectionError(false);
     
+    try {
+      await requestHoursCorrection(record.appointmentId, correctionText);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const prevHistory = Array.isArray(record.history) ? record.history : [];
+    const corrEntry = {
+      id: Math.random().toString(36).substring(7),
+      type: 'correction_requested',
+      title: 'Correction requested by agency',
+      actor: 'Agency Staff',
+      timestamp: new Date().toISOString(),
+      version: record.version || 1,
+      message: correctionText,
+    };
+
     onUpdate({
       ...record,
-      state: 'changes_requested',
-      reviewMessage: correctionText
+      state: 'correction_requested',
+      reviewMessage: correctionText,
+      history: [...prevHistory, corrEntry]
     });
   };
 
@@ -94,14 +175,17 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           <Link href={`/requests/${record.appointmentId}`} className="text-sm underline text-gray-700 hover:text-[var(--ink)] transition-colors">
             Open appointment
           </Link>
-          {record.state === 'submitted' && (
+          {(record.state === 'submitted' || record.state === 'awaiting_review') && (
              <span className="px-3 py-1 text-[12px] font-medium rounded-full bg-purple-100 text-purple-700">Awaiting review</span>
           )}
           {record.state === 'approved' && (
              <span className="px-3 py-1 text-[12px] font-medium rounded-full bg-green-100 text-green-700">Approved</span>
           )}
-          {record.state === 'changes_requested' && (
-             <span className="px-3 py-1 text-[12px] font-medium rounded-full bg-orange-100 text-orange-700">Changes requested</span>
+          {(record.state === 'changes_requested' || record.state === 'correction_requested') && (
+             <span className="px-3 py-1 text-[12px] font-medium rounded-full bg-orange-100 text-orange-700">Correction requested</span>
+          )}
+          {record.state === 'draft' && (
+             <span className="px-3 py-1 text-[12px] font-medium rounded-full bg-gray-100 text-gray-700">Draft</span>
           )}
         </div>
       </div>
@@ -112,23 +196,60 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
             <div className="text-[var(--sage)] mb-1">Scheduled booking</div>
             <div className="text-[var(--ink)]">{formattedScheduled}</div>
           </div>
+
+          {record.isOdhh ? (
+            <>
+              <div>
+                <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+                  <span>Travel time</span>
+                  {record.travelStart && (
+                    <CopyButton text={formattedTravel} label="travel time" />
+                  )}
+                </div>
+                <div className="text-[var(--ink)]">{formattedTravel}</div>
+              </div>
+              <div>
+                <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+                  <span>Service completion</span>
+                  <CopyButton
+                    text={record.serviceCompleted === 'no' || record.serviceCompleted === false ? "No" : "Yes"}
+                    label="service completion"
+                  />
+                </div>
+                <div className="text-[var(--ink)] font-medium">
+                  {record.serviceCompleted === 'no' || record.serviceCompleted === false ? "Not completed (No)" : "Completed (Yes)"}
+                </div>
+              </div>
+            </>
+          ) : (
+            <div>
+              <div className="text-[var(--sage)] mb-1">Unpaid break</div>
+              <div className="text-[var(--ink)]">{record.breakMinutes > 0 ? `${record.breakMinutes} min` : 'None'}</div>
+            </div>
+          )}
+
           <div>
-            <div className="text-[var(--sage)] mb-1">Unpaid break</div>
-            <div className="text-[var(--ink)]">{record.breakMinutes > 0 ? `${record.breakMinutes} min` : 'None'}</div>
-          </div>
-          <div>
-            <div className="text-[var(--sage)] mb-1">Mileage reported</div>
+            <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+              <span>Mileage reported</span>
+              <CopyButton text={`${record.reportedMileage.toFixed(1)} mi`} label="mileage reported" />
+            </div>
             <div className="text-[var(--ink)]">{record.reportedMileage.toFixed(1)} mi</div>
           </div>
         </div>
         
         <div className="space-y-4">
           <div>
-            <div className="text-[var(--sage)] mb-1">Reported actual time</div>
+            <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+              <span>Reported actual time</span>
+              <CopyButton text={formattedActual} label="reported actual time" />
+            </div>
             <div className="text-[var(--ink)]">{formattedActual}</div>
           </div>
           <div>
-            <div className="text-[var(--sage)] mb-1">Service time</div>
+            <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+              <span>Service time</span>
+              <CopyButton text={`${serviceHours} hr`} label="service time" />
+            </div>
             <div className="text-[var(--ink)]">{serviceHours} hr</div>
           </div>
           <div>
@@ -137,6 +258,33 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           </div>
         </div>
       </div>
+
+      {(record.mileageNote || record.serviceNote) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6 border-t border-gray-100 pt-4">
+          {record.mileageNote && (
+            <div>
+              <div className="text-[var(--sage)] text-xs mb-1 flex items-center justify-between">
+                <span>Mileage note</span>
+                <CopyButton text={record.mileageNote} label="mileage note" />
+              </div>
+              <div className="text-[var(--ink)] text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                {record.mileageNote}
+              </div>
+            </div>
+          )}
+          {record.serviceNote && (
+            <div>
+              <div className="text-[var(--sage)] text-xs mb-1 flex items-center justify-between">
+                <span>Service note</span>
+                <CopyButton text={record.serviceNote} label="service note" />
+              </div>
+              <div className="text-[var(--ink)] text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                {record.serviceNote}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {record.state === 'approved' && (
         <div className="text-sm text-gray-600 mb-6 border-t border-gray-200 pt-4">
@@ -152,13 +300,22 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           {isHistoryExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />} Version history ({record.version})
         </button>
         {isHistoryExpanded && (
-          <div className="text-xs text-[var(--sage)] mb-4 pl-4 space-y-2">
-            <div>v{record.version} · submitted by {record.interpreterName} · {actualEndDt.toLocaleDateString('en-US')}</div>
+          <div className="text-xs text-[var(--sage)] mb-4 pl-4 space-y-2 border-l-2 border-gray-200">
+            {Array.isArray(record.history) && record.history.length > 0 ? (
+              record.history.map((evt: any, i: number) => (
+                <div key={evt.id || i} className="text-gray-700">
+                  <span className="font-semibold">{evt.title}</span> (v{evt.version || 1}) · by {evt.actor || 'System'}
+                  {evt.message && <p className="text-amber-800 text-[11px] mt-0.5">"{evt.message}"</p>}
+                </div>
+              ))
+            ) : (
+              <div>v{record.version} · submitted by {record.interpreterName} · {actualEndDt.toLocaleDateString('en-US')}</div>
+            )}
           </div>
         )}
       </div>
 
-      {record.state === 'submitted' ? (
+      {(record.state === 'submitted' || record.state === 'awaiting_review') ? (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mb-6">
           <h4 className="text-sm font-medium text-[var(--ink)] mb-1">Service-verification signature</h4>
           <p className="text-sm text-[var(--sage)]">No signature has been collected yet.</p>
@@ -179,7 +336,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
         </div>
       )}
 
-      {record.state === 'submitted' && (
+      {(record.state === 'submitted' || record.state === 'awaiting_review') && (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl">
           <label className="flex items-start gap-3 cursor-pointer mb-6">
             <input 
@@ -245,19 +402,75 @@ export default function HoursReviewPage() {
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   
   useEffect(() => {
-    const loadRecords = () => {
+    const loadRecords = async () => {
+      let localRecords: ServiceRecord[] = [];
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('terpdesk_service_records');
         if (stored) {
           try {
-            setRecords(JSON.parse(stored));
+            localRecords = JSON.parse(stored);
           } catch (e) {
             console.error('Failed to parse records', e);
-            setRecords([]);
           }
-        } else {
-            setRecords([]);
         }
+      }
+      try {
+        const dbRequests = await fetchLiveRequests();
+        const merged = [...localRecords];
+        for (const req of dbRequests) {
+          const hoursSub = req.data?.hoursSubmission;
+          const isEligibleStatus = ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
+          if (hoursSub || isEligibleStatus) {
+            const existingIdx = merged.findIndex(r => r.appointmentId === req.id);
+            const isOdhh = req.data?.intake?.program === 'WA ODHH' || req.data?.intake?.program === 'wa_odhh' || req.requester?.org === 'WA ODHH';
+            const acceptedOffer = req.offers?.find((o: any) => o.status === 'accepted');
+            const state: ServiceRecord['state'] = req.status === 'approved' 
+              ? 'approved' 
+              : req.status === 'correction_requested' 
+                ? 'correction_requested' 
+                : 'awaiting_review';
+            const mappedRecord: ServiceRecord = {
+              id: req.id,
+              appointmentId: req.id,
+              interpreterName: acceptedOffer?.interpreterName || "Jamie Fictional",
+              state: state,
+              scheduledStart: req.startsAt,
+              scheduledEnd: req.endsAt,
+              actualStart: hoursSub?.actualStartTime || req.startsAt,
+              actualEnd: hoursSub?.actualEndTime || req.endsAt,
+              breakMinutes: hoursSub?.breakMinutes || 0,
+              reportedMileage: hoursSub?.miles || 0,
+              approvedMileage: hoursSub?.approvedMileage ?? null,
+              reviewMessage: hoursSub?.reviewMessage ?? null,
+              version: hoursSub?.version || 1,
+              isOdhh: isOdhh,
+              travelStart: req.travelStartTime || hoursSub?.travelStartTime || req.startsAt,
+              travelEnd: req.travelEndTime || hoursSub?.travelEndTime || req.endsAt,
+              serviceCompleted: req.serviceCompleted ?? hoursSub?.serviceCompleted ?? true,
+              mileageNote: hoursSub?.mileageNote || "",
+              serviceNote: hoursSub?.note || "",
+              history: hoursSub?.history || []
+            };
+            if (existingIdx > -1) {
+              merged[existingIdx] = {
+                ...mappedRecord,
+                ...merged[existingIdx],
+                state: merged[existingIdx].state || state,
+                isOdhh: merged[existingIdx].isOdhh ?? isOdhh,
+                history: hoursSub?.history?.length ? hoursSub.history : (merged[existingIdx].history || mappedRecord.history),
+              };
+            } else {
+              merged.push(mappedRecord);
+            }
+          }
+        }
+        setRecords(merged);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('terpdesk_service_records', JSON.stringify(merged));
+        }
+      } catch (e) {
+        console.error("Failed to fetch live requests for hours review", e);
+        setRecords(localRecords);
       }
     };
     loadRecords();
@@ -270,10 +483,11 @@ export default function HoursReviewPage() {
     setRecords(newRecords);
     if (typeof window !== 'undefined') {
       localStorage.setItem('terpdesk_service_records', JSON.stringify(newRecords));
+      window.dispatchEvent(new Event('storage'));
     }
   };
   
-  const awaitingRecords = records.filter(r => r.state === 'submitted');
+  const awaitingRecords = records.filter(r => r.state === 'submitted' || r.state === 'awaiting_review');
   const submittedCount = awaitingRecords.length;
   const allCount = records.length;
   

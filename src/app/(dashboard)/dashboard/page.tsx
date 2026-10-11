@@ -3,13 +3,26 @@ import React from "react";
 import Link from "next/link";
 import { useRequests } from "@/context/RequestsContext";
 import { motion } from "framer-motion";
+import { MapPin } from "lucide-react";
+import { formatInTimeZone } from "date-fns-tz";
 import { getStatusFilters, getStaffingLabel, getStaffingRatio } from "@/utils/statusEngine";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
 import EmailIngestTester from "@/components/agency/EmailIngestTester";
+import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
+import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { getIanaZone } from "@/utils/timezone";
 
 export default function DashboardPage() {
  const [requests, setRequests] = React.useState<any[]>([]);
  const [interpreterJobs, setInterpreterJobs] = React.useState<any[]>([]);
+ const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
+
+ React.useEffect(() => {
+   const timer = setInterval(() => {
+     setCurrentTime(Date.now());
+   }, 60000);
+   return () => clearInterval(timer);
+ }, []);
 
  // Re-callable so client-side consumers (e.g. the ODHH ingest tester) can force a reload from PostgreSQL.
  const loadRequests = React.useCallback(async (): Promise<void> => {
@@ -37,22 +50,72 @@ export default function DashboardPage() {
    return () => window.removeEventListener('storage', loadJobs);
  }, [loadRequests]);
 
- const formatEventTime = (startsAt?: string, endsAt?: string, fallback?: string) => {
-   if (!startsAt) return fallback || "Time not specified";
-   const start = new Date(startsAt);
-   const end = endsAt ? new Date(endsAt) : new Date(start.getTime() + 3600000);
-   const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-   const timeStart = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-   const timeEnd = end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-   return `${dateStr} · ${timeStart} – ${timeEnd}`;
+ const parseSafeDate = (dateVal: any) => {
+   if (!dateVal) return null;
+   let d = new Date(dateVal);
+   if (!isNaN(d.getTime())) return d;
+   if (typeof dateVal === 'string') {
+     d = new Date(dateVal.replace(' ', 'T'));
+     if (!isNaN(d.getTime())) return d;
+     if (/^\d+$/.test(dateVal)) {
+       d = new Date(parseInt(dateVal, 10));
+       if (!isNaN(d.getTime())) return d;
+     }
+   }
+   return null;
  };
 
- const totalAppointments = requests.filter(r => !getStatusFilters(r as any).isCancelled).length;
- const needingCoverage = requests.filter(r => getStatusFilters(r as any).needingCoverage).length;
- const pendingOffersCount = requests.filter(r => getStatusFilters(r as any).hasPendingOffer).length;
- const staffFollowUpCount = requests.filter(r => getStatusFilters(r as any).staffFollowUp).length;
- const awaitingReviewCount = requests.filter(r => r.status === 'awaiting_review').length;
- const needsReplacementCount = requests.filter(r => getStatusFilters(r as any).needsReplacement).length;
+ const formatEventTime = (startsAt?: string, endsAt?: string, timeZone?: string) => {
+   if (!startsAt) return "Time not specified";
+   try {
+     const start = parseSafeDate(startsAt);
+     if (!start) return "Time not specified";
+     const safeZone = getIanaZone(timeZone);
+     const end = parseSafeDate(endsAt);
+     const dateStr = formatInTimeZone(start, safeZone, "EEE, MMM d");
+     const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
+     const timeEnd = end
+       ? formatInTimeZone(end, safeZone, "h:mm a zzz")
+       : formatInTimeZone(start, safeZone, "h:mm a zzz");
+     return `${dateStr} · ${timeStart} – ${timeEnd}`;
+   } catch (e) {
+     return "Time not specified";
+   }
+ };
+
+ const formatStatusBadge = (status: string) => {
+   if (!status) return "Assigned";
+   const s = status.trim().toLowerCase();
+   if (s === "booked") return "Booked";
+   if (s === "assigned") return "Assigned";
+   if (s.includes("partially")) return "Partially staffed";
+   if (s.includes("fully")) return "Fully staffed";
+   return status.replace(/_/g, " ").replace(/\b\w/g, l => l.toUpperCase());
+ };
+
+ const enrichedRequests = React.useMemo(() => {
+   return requests.map(req => {
+     const reqJobs = interpreterJobs.filter(j => j.id === req.id || j.requestId === req.id);
+     const bookedJob = reqJobs.find(j => j.status === 'booked' || j.status === 'accepted');
+     if (bookedJob) {
+       return {
+         ...req,
+         status: req.status === 'Cancelled' ? 'Cancelled' : (req.status === 'booked' ? 'booked' : 'assigned'),
+         hasAcceptedOffer: true,
+         acceptedInterpretersCount: Math.max(req.acceptedInterpretersCount || 0, 1),
+         assignedInterpreterName: bookedJob.interpreterName || 'Booked'
+       };
+     }
+     return req;
+   });
+ }, [requests, interpreterJobs]);
+
+ const totalAppointments = enrichedRequests.filter(r => !getStatusFilters(r as any).isCancelled).length;
+ const needingCoverage = enrichedRequests.filter(r => getStatusFilters(r as any).needingCoverage).length;
+ const pendingOffersCount = enrichedRequests.filter(r => getStatusFilters(r as any).hasPendingOffer).length;
+ const staffFollowUpCount = enrichedRequests.filter(r => getStatusFilters(r as any).staffFollowUp).length;
+ const awaitingReviewCount = enrichedRequests.filter(r => r.status === 'awaiting_review').length;
+ const needsReplacementCount = enrichedRequests.filter(r => getStatusFilters(r as any).needsReplacement).length;
 
  const getNeedsAttentionPriority = (status: string) => {
    const s = status.toLowerCase();
@@ -63,7 +126,7 @@ export default function DashboardPage() {
    return 5;
  };
 
- const needsAttentionJobs = [...requests]
+ const needsAttentionJobs = [...enrichedRequests]
    .filter(r => {
      const filters = getStatusFilters(r as any);
      if (filters.isCancelled) return false;
@@ -76,32 +139,90 @@ export default function DashboardPage() {
    .map(r => ({ ...r, displayStatus: getStaffingLabel(r as any) }))
    .sort((a, b) => getNeedsAttentionPriority(a.displayStatus) - getNeedsAttentionPriority(b.displayStatus));
 
- const upcomingBookingsJobs = [...requests]
-   .filter(r => {
+ const upcomingBookingsJobs = sortUpcomingWithHappeningNow(
+   [...enrichedRequests].filter(r => {
      const s = r.status.toLowerCase();
      if (s.includes('cancel')) return false;
      
      const reqJobs = interpreterJobs.filter(j => j.id === r.id);
      const acceptedCount = reqJobs.filter(j => j.status === 'booked' || j.status === 'accepted').length;
      
-     // a) UTC start time in the future
-     if (r.startsAt && Date.now() >= new Date(r.startsAt).getTime()) return false;
+     // Booking remains categorized under upcoming until its endsAt time has completely passed
+     if (!isAppointmentUpcoming(r, currentTime)) return false;
      
-     // b) Active staffing
+     // Active staffing
      const hasStaffing = acceptedCount > 0 || s.includes('staffed') || s.includes('booked') || s.includes('assigned');
      return hasStaffing;
-   })
-   .sort((a, b) => {
-     const timeA = a.startsAt ? new Date(a.startsAt).getTime() : 0;
-     const timeB = b.startsAt ? new Date(b.startsAt).getTime() : 0;
-     return timeA - timeB;
-   })
-   .slice(0, 6);
+   }),
+   currentTime
+ ).slice(0, 6);
+
+ const happeningNowJobs = enrichedRequests.filter(r => isAppointmentHappeningNow(r, currentTime));
+ const upcomingHappeningNowCount = upcomingBookingsJobs.filter(j => isAppointmentHappeningNow(j, currentTime)).length;
 
   return (
   <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2">
  
- {/* Banners & Inputs */}
+ {/* Persistent Live Appointment Status Banner */}
+  {happeningNowJobs.length > 0 ? (
+    <div className="bg-gradient-to-r from-[#0F3830] via-[#1B433C] to-[#24544B] border border-emerald-500/50 text-white rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <span className="relative flex h-3 w-3 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+        </span>
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Live Appointment Status</span>
+            <span className="bg-emerald-500/30 text-emerald-200 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">Happening now</span>
+          </div>
+          <p className="text-[15px] font-semibold text-white">
+            {happeningNowJobs.length === 1 
+              ? happeningNowJobs[0].title 
+              : `${happeningNowJobs.length} active appointments in progress`}
+          </p>
+          {happeningNowJobs.length === 1 ? (
+            <p className="text-[13px] text-emerald-200/80 mt-0.5">
+              {formatEventTime(
+                happeningNowJobs[0].startsAt,
+                happeningNowJobs[0].endsAt,
+                happeningNowJobs[0].details?.timeZone || happeningNowJobs[0].data?.details?.timeZone
+              )}
+              {happeningNowJobs[0].onsite?.venue || happeningNowJobs[0].location ? ` · ${happeningNowJobs[0].onsite?.venue || happeningNowJobs[0].location}` : ''}
+            </p>
+          ) : (
+            <p className="text-[13px] text-emerald-200/80 mt-0.5">
+              {happeningNowJobs.length} booked assignments are active right now across your agency roster.
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        <Link
+          href={happeningNowJobs.length === 1 ? `/requests/${happeningNowJobs[0].id}` : `/requests?filter=happening-now`}
+          className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[#1B433C] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
+        >
+          {happeningNowJobs.length === 1 ? 'Open active booking →' : 'View live requests →'}
+        </Link>
+      </div>
+    </div>
+  ) : (
+    <div className="bg-[#F8F7F4] border border-[#EBE8DF] text-[var(--ink)] rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-stone-400"></span>
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--sage)]">Live Appointment Status</span>
+          </div>
+          <p className="text-[14px] text-gray-600 font-medium">
+            No active bookings right now
+          </p>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* Banners & Inputs */}
  <div className="space-y-6">
  <div className="space-y-1.5 w-full">
  <label className="pl-5 text-[13px] font-medium text-[var(--sage)]">Agency</label>
@@ -199,7 +320,7 @@ export default function DashboardPage() {
    <div className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${dotColor}`}></div>
    <div className="flex flex-col">
    <p className="text-[15px] font-medium text-slate-800">{(request as any).displayStatus} — {request.title}</p>
-   <p className="mt-0.5 text-[13px] text-[var(--sage)]">{formatEventTime(request.startsAt, request.endsAt, request.dateString)}</p>
+   <p className="mt-0.5 text-[13px] text-[var(--sage)]">{formatEventTime(request.startsAt, request.endsAt, request.details?.timeZone || request.data?.details?.timeZone)}</p>
    {request.pendingOffer && <p className="text-xs text-[#AF4A3F] mt-1 font-medium">Offer expires soon</p>}
    </div>
    </div>
@@ -214,29 +335,104 @@ export default function DashboardPage() {
 
  {/* Upcoming bookings */}
  <section className="space-y-5">
- <div className="rounded-2xl border border-gray-200 bg-white p-8 border border-neutral-100/50">
- <div className="flex items-center justify-between mb-6">
- <h2 className="text-[17px] font-semibold text-[var(--ink)]">Upcoming bookings</h2>
+ <div>
+ <div className="flex items-center justify-between mb-4 px-1">
+ <div className="flex items-center gap-3">
+   <h2 className="text-[17px] font-semibold text-[var(--ink)]">Upcoming bookings</h2>
+   {upcomingHappeningNowCount > 0 && (
+     <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+       <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+       {upcomingHappeningNowCount} active now
+     </span>
+   )}
+ </div>
  <Link href="/calendar" className="text-sm font-medium text-slate-600 hover:text-[var(--ink)] transition-colors">Open calendar →</Link>
  </div>
 
- <div className="space-y-6">
- {upcomingBookingsJobs.length === 0 && <p className="text-sm text-[var(--sage)]">No upcoming bookings.</p>}
- {upcomingBookingsJobs.map(job => (
-  <Link href={`/requests/${job.id}`} key={job.id} className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 border-b border-neutral-100 pb-6 last:border-0 last:pb-0 hover:bg-gray-50 transition-colors cursor-pointer">
-  <div className="space-y-1">
-  <p className="text-[15px] font-medium text-[var(--ink)]">{job.title}</p>
-  <p className="text-[13px] text-[var(--sage)]">{formatEventTime(job.startsAt, job.endsAt, job.dateString)}</p>
-  <p className="text-[13px] text-[var(--sage)]">{job.location || 'Virtual details pending'}</p>
-  </div>
-  <div className="shrink-0 mt-1 sm:mt-0">
-    <span className={`whitespace-nowrap rounded-full px-3 py-1 text-xs font-medium ${job.status.includes('Partially') ? 'bg-[#E8F3EE] text-[#466960]' : 'bg-[#E6EFEA] text-[#385B52]'}`}>
-    {job.status}
-    </span>
-  </div>
-  </Link>
- ))}
- </div>
+ {upcomingBookingsJobs.length === 0 ? (
+   <div className="bg-white rounded-2xl border border-gray-200 p-8 text-sm text-[var(--sage)]">
+     No upcoming bookings right now.
+   </div>
+ ) : (
+   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+     {upcomingBookingsJobs.map((job) => {
+       const isHappening = isAppointmentHappeningNow(job, currentTime);
+       const tz = job.details?.timeZone || job.data?.details?.timeZone;
+       const format = job.details?.format || job.setting || "Virtual";
+       const venue = job.onsite?.venue || job.location || "Virtual";
+       const org = job.requester?.org;
+       const formattedBadge = formatStatusBadge(job.status);
+       
+       return (
+         <Link
+           key={job.id}
+           href={`/requests/${job.id}`}
+           className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all cursor-pointer ${
+             isHappening
+               ? 'border-emerald-500/60 ring-2 ring-emerald-500/10 bg-emerald-50/20'
+               : 'border-gray-200'
+           }`}
+         >
+           <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
+             <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
+               {(() => {
+                 try {
+                   const s = parseSafeDate(job.startsAt);
+                   if (!s) return "Date TBD";
+                   const safeZone = getIanaZone(tz);
+                   const e = parseSafeDate(job.endsAt);
+                   const dateStr = formatInTimeZone(s, safeZone, "EEE, MMM d").toUpperCase();
+                   const timeStart = formatInTimeZone(s, safeZone, "h:mm a");
+                   const timeEnd = e
+                     ? formatInTimeZone(e, safeZone, "h:mm a zzz")
+                     : formatInTimeZone(s, safeZone, "h:mm a zzz");
+                   return `${dateStr} · ${timeStart} – ${timeEnd}`;
+                 } catch (e) {
+                   return "Date TBD";
+                 }
+               })()}
+             </div>
+             <div className="flex items-center gap-2 flex-wrap">
+               {isHappening && (
+                 <HappeningNowBadge size="sm" />
+               )}
+               <div className={`text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0 ${
+                 formattedBadge.toLowerCase().includes('partially') 
+                   ? 'bg-[#E8F3EE] text-[#466960]' 
+                   : 'bg-[#E2EBE5] text-[#1B433C]'
+               }`}>
+                 {formattedBadge}
+               </div>
+             </div>
+           </div>
+           
+           <h3 className="text-lg font-semibold text-[var(--ink)] my-2">
+             {job.title}
+           </h3>
+
+           <div className="flex items-start gap-2 mb-4">
+             <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
+             <div className="text-[14px]">
+               <span className="text-[var(--ink)] block">{venue}</span>
+               {org && <span className="text-[var(--sage)]">{org}</span>}
+             </div>
+           </div>
+
+           <div className="flex flex-wrap gap-2 mt-4">
+             <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+               {format}
+             </span>
+             {org && (
+               <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                 {org}
+               </span>
+             )}
+           </div>
+         </Link>
+       );
+     })}
+   </div>
+ )}
  </div>
  </section>
 

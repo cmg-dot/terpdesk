@@ -5,12 +5,84 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useRequests } from "@/context/RequestsContext";
 import { useGlobalState } from "@/context/GlobalContext";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Copy, Check } from "lucide-react";
 import { fetchLiveRequestById } from "@/app/actions/getRequests";
 import { getInterpreters } from "@/app/actions/getInterpreters";
 import { createOffer } from "@/app/actions/createOffer";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { cancelRequest } from "@/app/actions/cancelRequest";
+import { wallClockToUtc, getIanaZone } from "@/utils/timezone";
+import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { isAppointmentHappeningNow } from "@/utils/happeningNow";
+import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { formatReference } from "@/utils/statusEngine";
+
+function CopyButton({ text, label }: { text: string; label?: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (typeof navigator !== 'undefined' && navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      title={label ? `Copy ${label}` : "Copy to clipboard"}
+      className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors shrink-0"
+    >
+      {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
+      {copied && <span className="text-[11px] text-green-600 font-medium">Copied</span>}
+    </button>
+  );
+}
+
+const parseSafeDate = (dateVal: any) => {
+  if (!dateVal) return null;
+  let d = new Date(dateVal);
+  if (!isNaN(d.getTime())) return d;
+  if (typeof dateVal === 'string') {
+    d = new Date(dateVal.replace(' ', 'T'));
+    if (!isNaN(d.getTime())) return d;
+    if (/^\d+$/.test(dateVal)) {
+      d = new Date(parseInt(dateVal, 10));
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+};
+
+const mapSafeZone = (tz?: string) => getIanaZone(tz);
+
+const formatDetailsDate = (startStr?: string | Date | null, endStr?: string | Date | null, timeZone?: string) => {
+  try {
+    if (!startStr) return "Date TBD";
+    const start = parseSafeDate(startStr);
+    if (!start) return "Date TBD";
+    const safeZone = getIanaZone(timeZone);
+    
+    const dateStart = formatInTimeZone(start, safeZone, "EEE, MMM d");
+    const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
+    
+    let timeEnd = "";
+    if (endStr) {
+      const end = parseSafeDate(endStr);
+      if (end) {
+        timeEnd = formatInTimeZone(end, safeZone, "h:mm a zzz");
+      }
+    }
+    if (!timeEnd) {
+      timeEnd = formatInTimeZone(start, safeZone, "h:mm a zzz");
+    }
+    
+    return `${dateStart} · ${timeStart} – ${timeEnd}`;
+  } catch (e) {
+    return "Date TBD";
+  }
+};
 
 function getMockInterpreterDetails(id: string) {
   if (id === 'terp-1') return { name: "Active Interpreter" };
@@ -38,6 +110,14 @@ export default function AssignmentDetailPage() {
   const id = params?.id as string;
   const { updateRequest } = useRequests();
   const { currentUser, memberships } = useGlobalState();
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   const [dbInterpreters, setDbInterpreters] = useState<any[]>([]);
 
@@ -166,8 +246,12 @@ export default function AssignmentDetailPage() {
       return;
     }
     
-    const expiry = new Date(`${expiryDate}T${expiryTime}`);
-    if (expiry <= new Date()) {
+    const jobTimeZone = mapSafeZone(foundRequest?.details?.timeZone);
+    const inputValue = `${expiryDate}T${expiryTime}`;
+    const expiryUtc = new Date(fromZonedTime(inputValue, jobTimeZone).toISOString());
+    const startUtc = parseSafeDate(foundRequest?.startsAt) || new Date();
+
+    if (expiryUtc <= new Date() || expiryUtc >= startUtc) {
       setErrorMessage('Expiry must be in the future and before appointment start.');
       return;
     }
@@ -176,7 +260,7 @@ export default function AssignmentDetailPage() {
       await createOffer({
         requestId: id,
         interpreterId: recipient,
-        expiresAt: expiry
+        expiresAt: expiryUtc
       });
 
       // Refetch the request to get updated offers list
@@ -212,7 +296,7 @@ export default function AssignmentDetailPage() {
 
  const assignment = {
  ...foundRequest,
- overview: foundRequest.overview || { location: "Fictional Clinic", reference: foundRequest.id, status: isCancelled ? "Cancelled" : foundRequest.status },
+ overview: foundRequest.overview || { location: "Fictional Clinic", reference: formatReference(foundRequest.id), status: isCancelled ? "Cancelled" : foundRequest.status },
  details: foundRequest.details || { setting: foundRequest.setting, purpose: "Routine checkup", format: "In person", timeZone: "Pacific Time — Seattle, Los Angeles", deafParticipant: "1", peopleNeeding: "1", commPreferences: "ASL", qualifications: "Medical certified" },
  onsite: foundRequest.onsite || { venue: "Fictional Clinic", address: "71, 13th ave Cubao, Quezon City", building: "Room 302", parking: "Visitor parking in front", entrance: "Main lobby", contact: "Ralph Chrysler Silva", contactMethod: "Text message" },
  requester: foundRequest.requester || { name: "Ralph Chrysler Silva", org: "Freshflow", email: "ralphchryslersilva65@gmail.com", phone: "09218648143", prefContact: "Text message", reqInterpreter: "No preference", teamSuggested: "Team suggested", billOrg: "Fictional clinic", billContact: "Billing Dept", billEmail: "ralphchryslersilva65@gmail.com", poNumber: "PO-9921" },
@@ -241,9 +325,12 @@ export default function AssignmentDetailPage() {
  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
  <div>
  <h1 className="text-[28px] font-medium tracking-tight text-[var(--ink)]">{assignment.title}</h1>
- <p className="text-[var(--sage)] mt-1">{assignment.dateString}</p>
+ <p className="text-[var(--sage)] mt-1">{formatDetailsDate(assignment.startsAt, assignment.endsAt, assignment.details?.timeZone || assignment.timeZone)}</p>
  </div>
  <div className="flex flex-wrap items-center gap-3">
+ {isAppointmentHappeningNow(assignment, currentTime) && (
+   <HappeningNowBadge />
+ )}
  {isCancelled && (
  <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
  )}
@@ -269,7 +356,15 @@ export default function AssignmentDetailPage() {
  {isCancelled && (
  <div className="space-y-4 mb-6">
  <div className="bg-[#FEF2F2] border border-[#FCA5A5]/30 text-[#991B1B] px-6 py-4 rounded-2xl border border-gray-200 text-[14px] leading-relaxed">
- This appointment was cancelled {cancelDate ? new Date(cancelDate).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short' }) : ''}. Every position was released and any pending offer was closed. {clientRequested && "The client requested cancellation. "}The record is kept; the scheduled times are unchanged.
+ This appointment was cancelled {cancelDate ? (() => {
+   try {
+     const d = parseSafeDate(cancelDate);
+     if (!d) return '';
+     return formatInTimeZone(d, mapSafeZone(assignment.details?.timeZone), "MMM d, yyyy h:mm a zzz");
+   } catch (e) {
+     return '';
+   }
+ })() : ''}. Every position was released and any pending offer was closed. {clientRequested && "The client requested cancellation. "}The record is kept; the scheduled times are unchanged.
  </div>
  <div className="bg-[#F5F4F0] text-gray-600 px-6 py-4 rounded-2xl border border-gray-200 text-sm">
  Internal reason (agency only): {cancelReason || "No reason provided"}
@@ -314,17 +409,25 @@ export default function AssignmentDetailPage() {
  </p>
  </div>
 
- {foundRequest?.data?.intake?.program === 'WA ODHH' && foundRequest?.data?.intake?.odhhSrn && (
+ {Boolean((foundRequest?.data?.intake?.program === 'WA ODHH' || foundRequest?.data?.intake?.program === 'wa_odhh' || foundRequest?.program === 'WA ODHH' || foundRequest?.program === 'wa_odhh') && foundRequest?.data?.intake?.odhhSrn) && (
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-4">WA ODHH</h2>
  <div className="flex flex-col">
  <div className="flex justify-between items-center py-3 border-b border-gray-100">
  <span className="text-sm text-gray-500">Service Request Number (SRN)</span>
- <span className="text-sm text-gray-800">{foundRequest.data.intake.odhhSrn}</span>
+ <div className="flex items-center gap-2">
+   <span className="text-sm text-gray-800 font-medium">{foundRequest.data.intake.odhhSrn}</span>
+   <CopyButton text={foundRequest.data.intake.odhhSrn} label="SRN" />
+ </div>
  </div>
  <div className="flex justify-between items-center py-3 border-b border-gray-100">
  <span className="text-sm text-gray-500">Access code</span>
- <span className="text-sm text-gray-800">{foundRequest.data.intake.odhhAccessCode || 'Not provided'}</span>
+ <div className="flex items-center gap-2">
+   <span className="text-sm text-gray-800 font-medium">{foundRequest.data.intake.odhhAccessCode || 'Not provided'}</span>
+   {foundRequest.data.intake.odhhAccessCode && (
+     <CopyButton text={foundRequest.data.intake.odhhAccessCode} label="Access code" />
+   )}
+ </div>
  </div>
  </div>
  <a 
@@ -376,6 +479,180 @@ export default function AssignmentDetailPage() {
  </label>
  </div>
 
+ {(() => {
+   const isOdhh = foundRequest?.data?.intake?.program === 'WA ODHH' || foundRequest?.data?.intake?.program === 'wa_odhh' || foundRequest?.program === 'WA ODHH' || foundRequest?.program === 'wa_odhh';
+   const hoursSub = foundRequest?.data?.hoursSubmission;
+   const hasReportedHours = Boolean(hoursSub || ['awaiting_review', 'correction_requested', 'approved'].includes(foundRequest?.status));
+   if (!hasReportedHours) return null;
+
+   const actualStart = hoursSub?.actualStartTime || foundRequest?.startsAt;
+   const actualEnd = hoursSub?.actualEndTime || foundRequest?.endsAt;
+   const tz = mapSafeZone(assignment.details?.timeZone);
+
+   const formatRange = (startIso?: string | null, endIso?: string | null) => {
+     try {
+       if (!startIso) return 'Not reported';
+       const s = parseSafeDate(startIso);
+       if (!s) return 'Not reported';
+       const e = endIso ? parseSafeDate(endIso) : null;
+       const dStr = formatInTimeZone(s, tz, 'EEE, MMM d');
+       const stStr = formatInTimeZone(s, tz, 'h:mm a');
+       const etStr = e ? formatInTimeZone(e, tz, 'h:mm a zzz') : 'TBD';
+       return `${dStr} · ${stStr} - ${etStr}`;
+     } catch (e) {
+       return 'Not reported';
+     }
+   };
+
+   const statusBadge = foundRequest.status === 'approved' 
+     ? { label: 'Approved', bg: 'bg-green-100 text-green-700' }
+     : foundRequest.status === 'correction_requested'
+       ? { label: 'Correction requested', bg: 'bg-orange-100 text-orange-700' }
+       : { label: 'Awaiting review', bg: 'bg-purple-100 text-purple-700' };
+
+   let serviceTimeStr = "-";
+   if (actualStart && actualEnd) {
+     const s = parseSafeDate(actualStart);
+     const e = parseSafeDate(actualEnd);
+     if (s && e) {
+       const mins = Math.max(0, ((e.getTime() - s.getTime()) / 60000) - (hoursSub?.breakMinutes || 0));
+       serviceTimeStr = `${(mins / 60).toFixed(1)} hr`;
+     }
+   }
+
+   const travelStr = isOdhh && (foundRequest.travelStartTime || hoursSub?.travelStartTime)
+     ? formatRange(foundRequest.travelStartTime || hoursSub?.travelStartTime, foundRequest.travelEndTime || hoursSub?.travelEndTime)
+     : 'None reported';
+
+   const actualStr = formatRange(actualStart, actualEnd);
+
+   return (
+     <div className={cardClass}>
+       <div className="flex justify-between items-center mb-4">
+         <h2 className="text-[18px] font-medium text-[var(--ink)]">Reported service hours</h2>
+         <span className={`px-3 py-1 text-[12px] font-medium rounded-full ${statusBadge.bg}`}>
+           {statusBadge.label}
+         </span>
+       </div>
+
+       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm mb-6">
+         <div className="space-y-4">
+           <div>
+             <div className="text-[var(--sage)] mb-1">Scheduled booking</div>
+             <div className="text-[var(--ink)] font-medium">
+               {formatRange(foundRequest.startsAt, foundRequest.endsAt)}
+             </div>
+           </div>
+
+           {isOdhh ? (
+             <>
+               <div>
+                 <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+                   <span>Travel time</span>
+                   {travelStr !== 'None reported' && (
+                     <CopyButton text={travelStr} label="travel time" />
+                   )}
+                 </div>
+                 <div className="text-[var(--ink)] font-medium">{travelStr}</div>
+               </div>
+               <div>
+                 <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+                   <span>Service completion</span>
+                   <CopyButton
+                     text={foundRequest.serviceCompleted === false || hoursSub?.serviceCompleted === 'no' || hoursSub?.serviceCompleted === false ? 'No' : 'Yes'}
+                     label="service completion"
+                   />
+                 </div>
+                 <div className="text-[var(--ink)] font-medium">
+                   {foundRequest.serviceCompleted === false || hoursSub?.serviceCompleted === 'no' || hoursSub?.serviceCompleted === false ? 'Not completed (No)' : 'Completed (Yes)'}
+                 </div>
+               </div>
+             </>
+           ) : (
+             <div>
+               <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+                 <span>Unpaid break</span>
+                 <CopyButton text={hoursSub?.breakMinutes ? `${hoursSub.breakMinutes} min` : 'None'} label="unpaid break" />
+               </div>
+               <div className="text-[var(--ink)] font-medium">
+                 {hoursSub?.breakMinutes ? `${hoursSub.breakMinutes} min` : 'None'}
+               </div>
+             </div>
+           )}
+
+           <div>
+             <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+               <span>Mileage reported</span>
+               <CopyButton text={`${(hoursSub?.miles ?? 0).toFixed(1)} mi`} label="mileage reported" />
+             </div>
+             <div className="text-[var(--ink)] font-medium">
+               {(hoursSub?.miles ?? 0).toFixed(1)} mi
+             </div>
+           </div>
+         </div>
+
+         <div className="space-y-4">
+           <div>
+             <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+               <span>Reported actual time</span>
+               <CopyButton text={actualStr} label="reported actual time" />
+             </div>
+             <div className="text-[var(--ink)] font-medium">{actualStr}</div>
+           </div>
+           <div>
+             <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
+               <span>Service time</span>
+               <CopyButton text={serviceTimeStr} label="service time" />
+             </div>
+             <div className="text-[var(--ink)] font-medium">{serviceTimeStr}</div>
+           </div>
+           <div>
+             <div className="text-[var(--sage)] mb-1">Mileage approved by agency</div>
+             <div className="text-[var(--ink)] font-medium">
+               {hoursSub?.approvedMileage !== null && hoursSub?.approvedMileage !== undefined
+                 ? `${Number(hoursSub.approvedMileage).toFixed(1)} mi approved`
+                 : 'Not approved yet'}
+             </div>
+           </div>
+         </div>
+       </div>
+
+       {(hoursSub?.mileageNote || hoursSub?.note) && (
+         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-6 border-t border-gray-100 pt-4">
+           {hoursSub.mileageNote && (
+             <div>
+               <div className="text-[var(--sage)] text-xs mb-1 flex items-center justify-between">
+                 <span>Mileage note</span>
+                 <CopyButton text={hoursSub.mileageNote} label="mileage note" />
+               </div>
+               <div className="text-[var(--ink)] text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                 {hoursSub.mileageNote}
+               </div>
+             </div>
+           )}
+           {hoursSub.note && (
+             <div>
+               <div className="text-[var(--sage)] text-xs mb-1 flex items-center justify-between">
+                 <span>Service note</span>
+                 <CopyButton text={hoursSub.note} label="service note" />
+               </div>
+               <div className="text-[var(--ink)] text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                 {hoursSub.note}
+               </div>
+             </div>
+           )}
+         </div>
+       )}
+
+       <div className="pt-2">
+         <Link href="/hours-review" className="text-sm font-medium text-[var(--forest)] hover:underline inline-flex items-center gap-1">
+           Open in Hours Review queue →
+         </Link>
+       </div>
+     </div>
+   );
+ })()}
+
  {!isCancelled && (
  <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 border border-gray-200/50 shadow-none mb-4">
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-4">Staffing</h2>
@@ -409,7 +686,15 @@ export default function AssignmentDetailPage() {
  <span className="text-xs sm:text-sm text-gray-600">{offer.interpreterName} ·</span>
  <span className="bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2 py-0.5 rounded-full capitalize">{offer.state}</span>
  </div>
- <div className="text-xs sm:text-sm text-[var(--sage)] pl-6 mt-1 text-wrap">{offer.state} {new Date(offer.expiresAt).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</div>
+ <div className="text-xs sm:text-sm text-[var(--sage)] pl-6 mt-1 text-wrap">{offer.state} {(() => {
+   try {
+     const d = parseSafeDate(offer.expiresAt);
+     if (!d) return '';
+     return formatInTimeZone(d, mapSafeZone(assignment.details?.timeZone), 'MMM d, h:mm a');
+   } catch (e) {
+     return '';
+   }
+ })()}</div>
  </div>
  ))}
  </div>
@@ -422,7 +707,15 @@ export default function AssignmentDetailPage() {
  <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-semibold capitalize">{dbActiveOffer.state}</span>
  </div>
  <p className="text-sm text-[var(--sage)] mt-2 mb-4">
- Response due {new Date(dbActiveOffer.expiresAt).toLocaleDateString()} at {new Date(dbActiveOffer.expiresAt).toLocaleTimeString()}
+ Response due {(() => {
+   try {
+     const d = parseSafeDate(dbActiveOffer.expiresAt);
+     if (!d) return 'Unknown';
+     return formatInTimeZone(d, mapSafeZone(assignment.details?.timeZone), 'MM/dd/yyyy h:mm:ss a');
+   } catch (e) {
+     return 'Unknown';
+   }
+ })()}
  </p>
  <button 
  onClick={async () => {

@@ -4,6 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import { useRequests } from "@/context/RequestsContext";
 import { useRouter, useParams } from "next/navigation";
 import { fromZonedTime } from "date-fns-tz";
+import { fetchLiveRequestById } from "@/app/actions/getRequests";
 
 function CustomSelect({ options, value, onChange }: { options: string[], value?: string, onChange?: (val: string) => void }) {
  const [isOpen, setIsOpen] = useState(false);
@@ -109,12 +110,27 @@ function Field({
 }
 
 export default function EditRequestPage() {
- const { requests, updateRequest } = useRequests();
+ const { updateRequest } = useRequests();
  const router = useRouter();
  const params = useParams();
  const requestId = params.id as string;
  
- const existingRequest = requests.find(r => String(r.id) === String(requestId));
+ const [existingRequest, setExistingRequest] = useState<any>(null);
+ const [isLoading, setIsLoading] = useState(true);
+
+ useEffect(() => {
+   if (requestId) {
+     fetchLiveRequestById(requestId)
+       .then(data => {
+         setExistingRequest(data);
+         setIsLoading(false);
+       })
+       .catch(err => {
+         console.error(err);
+         setIsLoading(false);
+       });
+   }
+ }, [requestId]);
 
  const TIMEZONE_MAP: Record<string, string> = {
  "Pacific Time — Seattle, Los Angeles": "America/Los_Angeles",
@@ -129,59 +145,90 @@ export default function EditRequestPage() {
  const [formData, setFormData] = useState({
  client: "New or one-time requester — no saved client",
  requesterOrgOrContact: "New organization or contact",
- requesterName: existingRequest?.requester?.name || "",
- requesterOrg: existingRequest?.requester?.org || "",
- email: existingRequest?.requester?.email || "",
- phone: existingRequest?.requester?.phone || "",
- prefContact: existingRequest?.requester?.prefContact || "No preference given",
+ requesterName: "",
+ requesterOrg: "",
+ email: "",
+ phone: "",
+ prefContact: "No preference given",
  saveOrg: false,
- deafParticipant: existingRequest?.details?.deafParticipant || "",
- peopleNeeding: existingRequest?.details?.peopleNeeding || "",
- commPreferences: existingRequest?.details?.commPreferences || "",
- setting: existingRequest?.setting || "Choose a setting",
- purpose: existingRequest?.details?.purpose || "",
- timeZone: existingRequest?.details?.timeZone || "Pacific Time — Seattle, Los Angeles",
+ deafParticipant: "",
+ peopleNeeding: "",
+ commPreferences: "",
+ setting: "Choose a setting",
+ purpose: "",
+ timeZone: "Pacific Time — Seattle, Los Angeles",
  startDate: "",
  startTime: "",
  endDate: "",
  endTime: "",
- modality: existingRequest?.details?.format || "In person",
- appointmentTitle: existingRequest?.title || "",
+ modality: "In person",
+ appointmentTitle: "",
  repeats: false,
- venue: existingRequest?.onsite?.venue || "",
- address: existingRequest?.onsite?.address || "",
- building: existingRequest?.onsite?.building || "",
- onsiteContactName: existingRequest?.onsite?.contact || "",
- onsiteContactPhone: existingRequest?.onsite?.contactMethod || "",
- parking: existingRequest?.onsite?.parking || "",
- entrance: existingRequest?.onsite?.entrance || "",
+ venue: "",
+ address: "",
+ building: "",
+ onsiteContactName: "",
+ onsiteContactPhone: "",
+ parking: "",
+ entrance: "",
  shortLabel: "",
- prefInterpreter: existingRequest?.requester?.reqInterpreter || "",
- teamSuggested: existingRequest?.requester?.teamSuggested || "Not sure",
- qualifications: existingRequest?.details?.qualifications || "",
- billOrg: existingRequest?.requester?.billOrg || "",
- billContact: existingRequest?.requester?.billContact || "",
- billEmail: existingRequest?.requester?.billEmail || "",
- poNumber: existingRequest?.requester?.poNumber || "",
- prepNotes: existingRequest?.prepNotes || "",
- privateNotes: existingRequest?.privateNotes || "",
- positions: (existingRequest?.requiredPositions === 2 || existingRequest?.positions === "Team — two independent positions") ? "Team — two independent positions" : (existingRequest?.positions || "One interpreter"),
- program: existingRequest?.data?.intake?.program || "General",
- odhhSrn: existingRequest?.data?.intake?.odhhSrn || "",
- odhhAccessCode: existingRequest?.data?.intake?.odhhAccessCode || "",
- providerOneNumber: existingRequest?.data?.intake?.providerOneNumber || ""
+ prefInterpreter: "",
+ teamSuggested: "Not sure",
+ qualifications: "",
+ billOrg: "",
+ billContact: "",
+ billEmail: "",
+ poNumber: "",
+ prepNotes: "",
+ privateNotes: "",
+ positions: "One interpreter",
+ program: "General",
+ odhhSrn: "",
+ odhhAccessCode: "",
+ providerOneNumber: ""
  });
 
- if (!existingRequest) {
- return (
- <div className="max-w-[1200px] mx-auto p-6 flex flex-col items-center justify-center h-[50vh]">
- <h1 className="text-2xl font-bold text-gray-800 mb-4">Request not found</h1>
- <button onClick={() => router.push("/dashboard")} className="bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full font-medium transition-opacity hover:opacity-90">
- Return to dashboard
- </button>
- </div>
- );
- }
+ useEffect(() => {
+   if (existingRequest) {
+     setFormData(prev => ({
+       ...prev,
+       requesterName: existingRequest?.requester?.name || "",
+       requesterOrg: existingRequest?.requester?.org || "",
+       email: existingRequest?.requester?.email || "",
+       phone: existingRequest?.requester?.phone || "",
+       prefContact: existingRequest?.requester?.prefContact || "No preference given",
+       deafParticipant: existingRequest?.details?.deafParticipant || "",
+       peopleNeeding: existingRequest?.details?.peopleNeeding || "",
+       commPreferences: existingRequest?.details?.commPreferences || "",
+       setting: existingRequest?.setting || "Choose a setting",
+       purpose: existingRequest?.details?.purpose || "",
+       timeZone: existingRequest?.details?.timeZone || "Pacific Time — Seattle, Los Angeles",
+       modality: existingRequest?.details?.format || "In person",
+       appointmentTitle: existingRequest?.title || "",
+       venue: existingRequest?.onsite?.venue || "",
+       address: existingRequest?.onsite?.address || "",
+       building: existingRequest?.onsite?.building || "",
+       onsiteContactName: existingRequest?.onsite?.contact || "",
+       onsiteContactPhone: existingRequest?.onsite?.contactMethod || "",
+       parking: existingRequest?.onsite?.parking || "",
+       entrance: existingRequest?.onsite?.entrance || "",
+       prefInterpreter: existingRequest?.requester?.reqInterpreter || "",
+       teamSuggested: existingRequest?.requester?.teamSuggested || "Not sure",
+       qualifications: existingRequest?.details?.qualifications || "",
+       billOrg: existingRequest?.requester?.billOrg || "",
+       billContact: existingRequest?.requester?.billContact || "",
+       billEmail: existingRequest?.requester?.billEmail || "",
+       poNumber: existingRequest?.requester?.poNumber || "",
+       prepNotes: existingRequest?.prepNotes || "",
+       privateNotes: existingRequest?.privateNotes || "",
+       positions: (existingRequest?.requiredPositions === 2 || existingRequest?.positions === "Team — two independent positions") ? "Team — two independent positions" : (existingRequest?.positions || "One interpreter"),
+       program: existingRequest?.data?.intake?.program || "General",
+       odhhSrn: existingRequest?.data?.intake?.odhhSrn || "",
+       odhhAccessCode: existingRequest?.data?.intake?.odhhAccessCode || "",
+       providerOneNumber: existingRequest?.data?.intake?.providerOneNumber || ""
+     }));
+   }
+ }, [existingRequest]);
 
  useEffect(() => {
  if (existingRequest?.startsAt && existingRequest?.endsAt) {
@@ -271,7 +318,7 @@ export default function EditRequestPage() {
  title: formData.appointmentTitle || "Interpreting request",
  setting: formData.setting,
  overview: { location: formData.venue || "TBD", reference: existingRequest.id, status: existingRequest.status },
- details: { setting: formData.setting, purpose: formData.purpose, format: formData.modality, timeZone: formData.timeZone, deafParticipant: formData.deafParticipant, peopleNeeding: formData.peopleNeeding, commPreferences: formData.commPreferences, qualifications: formData.qualifications },
+ details: { setting: formData.setting, purpose: formData.purpose, format: formData.modality, timeZone: formData.timeZone, startDate: formData.startDate, startTime: formData.startTime, endDate: formData.endDate, endTime: formData.endTime, startsAt: startsAtStr, endsAt: endsAtStr, deafParticipant: formData.deafParticipant, peopleNeeding: formData.peopleNeeding, commPreferences: formData.commPreferences, qualifications: formData.qualifications },
  onsite: { venue: formData.venue, address: formData.address, building: formData.building, parking: formData.parking, entrance: formData.entrance, contact: formData.onsiteContactName, contactMethod: formData.onsiteContactPhone },
  requester: { name: formData.requesterName, org: formData.requesterOrg, email: formData.email, phone: formData.phone, prefContact: formData.prefContact, reqInterpreter: formData.prefInterpreter, teamSuggested: formData.teamSuggested, billOrg: formData.billOrg, billContact: formData.billContact, billEmail: formData.billEmail, poNumber: formData.poNumber },
  prepNotes: formData.prepNotes,
@@ -282,6 +329,8 @@ export default function EditRequestPage() {
   positions: formData.positions,
   requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
   data: {
+    startsAt: startsAtStr,
+    endsAt: endsAtStr,
     brief: { hearingIdentity: "deaf" },
     intake: {
       program: formData.program,
@@ -300,6 +349,25 @@ export default function EditRequestPage() {
  const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] resize-none outline-none transition-shadow";
  const cardClass = "bg-white rounded-2xl border border-gray-200 p-6 border border-gray-200/50 shadow-none space-y-6";
  const sectionTitleClass = "text-[18px] font-medium text-[var(--ink)] mb-4";
+
+ if (isLoading) {
+ return (
+ <div className="max-w-[1200px] mx-auto p-6 flex flex-col items-center justify-center h-[50vh]">
+ <h1 className="text-2xl font-bold text-gray-800 mb-4">Loading request...</h1>
+ </div>
+ );
+ }
+
+ if (!existingRequest) {
+ return (
+ <div className="max-w-[1200px] mx-auto p-6 flex flex-col items-center justify-center h-[50vh]">
+ <h1 className="text-2xl font-bold text-gray-800 mb-4">Request not found</h1>
+ <button onClick={() => router.push("/dashboard")} className="bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full font-medium transition-opacity hover:opacity-90">
+ Return to dashboard
+ </button>
+ </div>
+ );
+ }
 
  return (
  <div className="max-w-[1200px] mx-auto p-6 space-y-6 pb-24 antialiased">

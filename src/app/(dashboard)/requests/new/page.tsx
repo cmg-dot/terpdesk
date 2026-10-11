@@ -293,7 +293,20 @@ export default function NewRequestPage() {
      providerOneNumber: formData.program === "WA Apple Health" ? formData.providerOneNumber : undefined
    },
    overview: { location: formData.venue || "TBD", status: "Unfilled / draft" },
-   details: { setting: formData.setting, purpose: formData.purpose, format: formData.modality, timeZone: formData.timeZone, deafParticipant: formData.deafParticipant, peopleNeeding: formData.peopleNeeding, commPreferences: formData.commPreferences, qualifications: formData.qualifications },
+   details: { 
+      setting: formData.setting, 
+      purpose: formData.purpose, 
+      format: formData.modality, 
+      timeZone: formData.timeZone, 
+      startDate: formData.startDate,
+      startTime: formData.startTime,
+      endDate: formData.endDate,
+      endTime: formData.endTime,
+      deafParticipant: formData.deafParticipant, 
+      peopleNeeding: formData.peopleNeeding, 
+      commPreferences: formData.commPreferences, 
+      qualifications: formData.qualifications 
+    },
    onsite: { venue: formData.venue, address: formData.address, building: formData.building, parking: formData.parking, entrance: formData.entrance, contact: formData.onsiteContactName, contactMethod: formData.onsiteContactPhone },
    requester: { name: formData.requesterName, org: formData.requesterOrg, email: formData.email, phone: formData.phone, prefContact: formData.prefContact, reqInterpreter: formData.prefInterpreter, teamSuggested: formData.teamSuggested, billOrg: formData.billOrg, billContact: formData.billContact, billEmail: formData.billEmail, poNumber: formData.poNumber },
    prepNotes: formData.prepNotes,

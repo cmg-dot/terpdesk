@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uuid } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
 export type Program = 'General' | 'WA ODHH' | 'WA Apple Health';
@@ -16,6 +16,8 @@ export interface RequestData {
   [key: string]: any;
 }
 
+export const billingStatusEnum = pgEnum('billing_status', ['completed', 'cancelled_billable', 'cancelled_not_billable']);
+
 export const requests = pgTable('requests', {
   id: uuid('id').defaultRandom().primaryKey(),
   title: text('title').notNull(),
@@ -25,7 +27,15 @@ export const requests = pgTable('requests', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   canceledAt: timestamp('canceled_at'),
   cancelReason: text('cancel_reason'),
+  travelStartTime: timestamp('travel_start_time'),
+  travelEndTime: timestamp('travel_end_time'),
+  serviceCompleted: boolean('service_completed'),
+  cancellationReason: text('cancellation_reason'),
+  billingStatus: billingStatusEnum('billing_status'),
 });
+
+export type SelectRequest = typeof requests.$inferSelect;
+export type InsertRequest = typeof requests.$inferInsert;
 
 export const interpreters = pgTable('interpreters', {
   id: uuid('id').defaultRandom().primaryKey(),

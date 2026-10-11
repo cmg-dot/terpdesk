@@ -7,8 +7,12 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Suspense } from "react";
 import { RefreshCw, Building2, MapPin, Users2, ChevronDown } from "lucide-react";
-import { getStaffingLabel, getStaffingRatio, getStatusFilters } from "@/utils/statusEngine";
+import { getStaffingLabel, getStaffingRatio, getStatusFilters, formatReference } from "@/utils/statusEngine";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
+import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
+import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { formatInTimeZone } from "date-fns-tz";
+import { getIanaZone } from "@/utils/timezone";
 
 function CustomSelect({ options, value, onChange }: { options: string[], value: string, onChange: (val: string) => void }) {
  const [isOpen, setIsOpen] = useState(false);
@@ -77,6 +81,20 @@ function StatusBadge({ status }: { status: string }) {
  </span>
  );
  }
+ if (status === "Fully staffed" || status === "Booked" || status === "Assigned") {
+ return (
+ <span className="rounded-full bg-[#E6EFEA] px-3 py-1 text-[11px] font-semibold text-[#385B52]">
+ {status}
+ </span>
+ );
+ }
+ if (status === "Partially staffed") {
+ return (
+ <span className="rounded-full bg-[#E8F3EE] px-3 py-1 text-[11px] font-semibold text-[#466960]">
+ Partially staffed
+ </span>
+ );
+ }
  return (
  <span className="rounded-full bg-[#E9E4D6] px-3 py-1 text-[11px] font-semibold text-[#665D46]">
  {status}
@@ -84,14 +102,37 @@ function StatusBadge({ status }: { status: string }) {
  );
 }
 
-const formatJobDate = (startsAt?: string, endsAt?: string, fallback?: string) => {
-  if (!startsAt) return fallback || "Time not specified";
-  const start = new Date(startsAt);
-  const end = endsAt ? new Date(endsAt) : new Date(start.getTime() + 3600000);
-  const dateStr = start.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-  const timeStart = start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-  const timeEnd = end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' });
-  return `${dateStr} · ${timeStart} – ${timeEnd}`;
+const parseSafeDate = (dateVal: any) => {
+  if (!dateVal) return null;
+  let d = new Date(dateVal);
+  if (!isNaN(d.getTime())) return d;
+  if (typeof dateVal === 'string') {
+    d = new Date(dateVal.replace(' ', 'T'));
+    if (!isNaN(d.getTime())) return d;
+    if (/^\d+$/.test(dateVal)) {
+      d = new Date(parseInt(dateVal, 10));
+      if (!isNaN(d.getTime())) return d;
+    }
+  }
+  return null;
+};
+
+const formatJobDate = (startsAt?: string, endsAt?: string, timeZone?: string) => {
+  if (!startsAt) return "Time not specified";
+  try {
+    const start = parseSafeDate(startsAt);
+    if (!start) return "Time not specified";
+    const safeZone = getIanaZone(timeZone);
+    const end = parseSafeDate(endsAt);
+    const dateStr = formatInTimeZone(start, safeZone, "EEE, MMM d");
+    const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
+    const timeEnd = end
+      ? formatInTimeZone(end, safeZone, "h:mm a zzz")
+      : formatInTimeZone(start, safeZone, "h:mm a zzz");
+    return `${dateStr} · ${timeStart} – ${timeEnd}`;
+  } catch (e) {
+    return "Time not specified";
+  }
 };
 
 function RequestsPageContent() {
@@ -103,12 +144,21 @@ function RequestsPageContent() {
     fetchLiveRequests().then(data => setRequests(data)).catch(console.error);
   }, []);
 
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [orgFilter, setOrgFilter] = useState("All organizations");
   const [formatFilter, setFormatFilter] = useState("All formats");
 
   let initialStatus = "Appointments";
-  if (filterParam === "needing-coverage") initialStatus = "Needing coverage";
+  if (filterParam === "happening-now") initialStatus = "Happening now";
+  else if (filterParam === "needing-coverage") initialStatus = "Needing coverage";
   else if (filterParam === "pending-offers") initialStatus = "Pending offers";
   else if (filterParam === "staff-follow-up") initialStatus = "Staff follow-up";
   else if (filterParam === "needs-replacement") initialStatus = "Needs replacement";
@@ -125,44 +175,65 @@ function RequestsPageContent() {
     }
   }, []);
 
-  const filteredRequests = requests.filter(req => {
-    const searchLower = searchQuery.toLowerCase();
- const titleMatch = req.title.toLowerCase().includes(searchLower);
- const refMatch = req.id.toLowerCase().includes(searchLower);
- const orgMatch = req.requester?.org?.toLowerCase().includes(searchLower) || false;
- 
- if (searchQuery && !titleMatch && !refMatch && !orgMatch) return false;
- 
- if (orgFilter !== "All organizations") {
- const org = req.requester?.org || "Organization not provided";
- if (org !== orgFilter && !(orgFilter === "Fictional clinic" && org === "Freshflow")) return false;
- }
- 
- if (formatFilter !== "All formats") {
- const format = req.details?.format || "Virtual";
- if (format !== formatFilter && !(formatFilter === "In Person" && format === "In person")) return false;
- }
- 
+  const enrichedRequests = React.useMemo(() => {
+    return requests.map(req => {
+      const reqJobs = interpreterJobs.filter(j => j.id === req.id || j.requestId === req.id);
+      const bookedJob = reqJobs.find(j => j.status === 'booked' || j.status === 'accepted');
+      if (bookedJob) {
+        return {
+          ...req,
+          status: req.status === 'Cancelled' ? 'Cancelled' : (req.status === 'booked' ? 'booked' : 'assigned'),
+          hasAcceptedOffer: true,
+          acceptedInterpretersCount: Math.max(req.acceptedInterpretersCount || 0, 1),
+          assignedInterpreterName: bookedJob.interpreterName || 'Booked'
+        };
+      }
+      return req;
+    });
+  }, [requests, interpreterJobs]);
 
-  const filters = getStatusFilters(req as any);
+  const filteredRequests = enrichedRequests.filter(req => {
+    const searchLower = searchQuery.toLowerCase();
+    const titleMatch = req.title.toLowerCase().includes(searchLower);
+    const cleanRef = formatReference(req.id).toLowerCase();
+    const refMatch = req.id.toLowerCase().includes(searchLower) || cleanRef.includes(searchLower);
+    const orgMatch = req.requester?.org?.toLowerCase().includes(searchLower) || false;
+ 
+    if (searchQuery && !titleMatch && !refMatch && !orgMatch) return false;
+ 
+    if (orgFilter !== "All organizations") {
+      const org = req.requester?.org || "Organization not provided";
+      if (org !== orgFilter && !(orgFilter === "Fictional clinic" && org === "Freshflow")) return false;
+    }
+ 
+    if (formatFilter !== "All formats") {
+      const format = req.details?.format || "Virtual";
+      if (format !== formatFilter && !(formatFilter === "In Person" && format === "In person")) return false;
+    }
+
+    const filters = getStatusFilters(req as any);
   
-  if (statusFilter === "Cancelled") return filters.isCancelled;
-  if (filters.isCancelled) return false;
+    if (statusFilter === "Cancelled") return filters.isCancelled;
+    if (filters.isCancelled) return false;
   
-  if (statusFilter !== "Appointments") {
-    if (statusFilter === "Needing coverage") return filters.needingCoverage;
-    if (statusFilter === "Pending offers") return filters.hasPendingOffer;
-    if (statusFilter === "Fully staffed") return filters.fullyStaffed;
-    if (statusFilter === "Needs replacement") return filters.needsReplacement;
-    if (statusFilter === "Staff follow-up") return filters.staffFollowUp;
-    return false;
-  }
+    if (statusFilter !== "Appointments") {
+      if (statusFilter === "Happening now") return isAppointmentHappeningNow(req, currentTime);
+      if (statusFilter === "Needing coverage") return filters.needingCoverage;
+      if (statusFilter === "Pending offers") return filters.hasPendingOffer;
+      if (statusFilter === "Fully staffed") return filters.fullyStaffed;
+      if (statusFilter === "Needs replacement") return filters.needsReplacement;
+      if (statusFilter === "Staff follow-up") return filters.staffFollowUp;
+      return false;
+    }
   
-  return true;
+    return true;
   });
 
-  const upcomingRequests = filteredRequests.filter((r) => !r.startsAt || Date.now() < new Date(r.startsAt).getTime());
-  const pastRequests = filteredRequests.filter((r) => r.startsAt && Date.now() >= new Date(r.startsAt).getTime());
+  const upcomingRequests = sortUpcomingWithHappeningNow(
+    filteredRequests.filter((r) => isAppointmentUpcoming(r, currentTime)),
+    currentTime
+  );
+  const pastRequests = filteredRequests.filter((r) => !isAppointmentUpcoming(r, currentTime));
 
  return (
  <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-6 pt-2">
@@ -218,7 +289,7 @@ function RequestsPageContent() {
  </div>
  <CustomSelect options={["All organizations", "Fictional clinic"]} value={orgFilter} onChange={setOrgFilter} />
  <CustomSelect options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
- <CustomSelect options={["Appointments", "Needing coverage", "Needs replacement", "Pending offers", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
+ <CustomSelect options={["Appointments", "Happening now", "Needing coverage", "Needs replacement", "Pending offers", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
  </div>
  </div>
 
@@ -250,9 +321,12 @@ function RequestsPageContent() {
  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
  <div className="space-y-1">
  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
- <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.dateString)}</p>
+ <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
  </div>
- <div className="flex items-center gap-2">
+ <div className="flex items-center gap-2 flex-wrap">
+ {isAppointmentHappeningNow(req, currentTime) && (
+   <HappeningNowBadge size="sm" />
+ )}
  <StatusBadge status={statusLabel} />
  </div>
  </div>
@@ -273,7 +347,7 @@ function RequestsPageContent() {
  <span className="text-[13px] text-[var(--sage)]">
  {format} · {location}
  </span>
- <span className="text-[13px] text-slate-400">{req.id}</span>
+ <span className="text-[13px] text-slate-400 font-medium">{formatReference(req.id)}</span>
  </div>
  </div>
  {/* Col 3 */}
@@ -321,7 +395,7 @@ function RequestsPageContent() {
  <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
  <div className="space-y-1">
  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
- <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.dateString)}</p>
+ <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
  </div>
  <div className="flex items-center gap-2">
  <StatusBadge status={statusLabel} />
@@ -344,7 +418,7 @@ function RequestsPageContent() {
  <span className="text-[13px] text-[var(--sage)]">
  {format} · {location}
  </span>
- <span className="text-[13px] text-slate-400">{req.id}</span>
+ <span className="text-[13px] text-slate-400 font-medium">{formatReference(req.id)}</span>
  </div>
  </div>
  {/* Col 3 */}

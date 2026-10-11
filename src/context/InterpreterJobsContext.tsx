@@ -18,6 +18,12 @@ export interface Job {
   startsAt?: string;
   endsAt?: string;
   serviceRecordState?: 'not_started' | 'submitted' | 'approved';
+  program?: string;
+  timeZone?: string;
+  hoursSubmission?: any;
+  travelStartTime?: string | null;
+  travelEndTime?: string | null;
+  serviceCompleted?: boolean | null;
 }
 
 interface InterpreterJobsContextType {
@@ -49,7 +55,13 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           location: o.agencyName || "Remote",
           isVirtual: true,
           startsAt: o.startsAt,
-          endsAt: o.endsAt
+          endsAt: o.endsAt,
+          program: o.program,
+          timeZone: o.timeZone,
+          hoursSubmission: (o as any).hoursSubmission,
+          travelStartTime: (o as any).travelStartTime,
+          travelEndTime: (o as any).travelEndTime,
+          serviceCompleted: (o as any).serviceCompleted,
         }));
         setJobs(mappedJobs);
         setIsMounted(true);

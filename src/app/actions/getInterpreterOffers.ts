@@ -19,15 +19,37 @@ export async function fetchInterpreterOffers(interpreterEmail: string = 'interpr
   .innerJoin(requests, eq(offers.requestId, requests.id))
   .where(eq(offers.interpreterId, interpreter.id));
 
-  return offersData.map(row => ({
-    id: row.offer.id,
-    requestId: row.request.id,
-    title: row.request.title,
-    startsAt: row.request.createdAt.toISOString(),
-    endsAt: new Date(row.request.createdAt.getTime() + 3600000).toISOString(),
-    status: row.offer.status,
-    requestStatus: row.request.status,
-    agencyName: "Fictional Agency", // Placeholder
-    interpreterId: row.offer.interpreterId,
-  }));
+  return offersData.map(row => {
+    const rowData = (row.request.data as any) || {};
+    const startsAt = rowData.startsAt || row.request.createdAt.toISOString();
+    let endsAt = rowData.endsAt || rowData.details?.endsAt;
+
+    if (!endsAt && rowData.details?.endDate && rowData.details?.endTime) {
+      try {
+        endsAt = new Date(`${rowData.details.endDate}T${rowData.details.endTime}`).toISOString();
+      } catch (e) {}
+    }
+
+    if (!endsAt) {
+      endsAt = new Date(new Date(startsAt).getTime() + 3600000).toISOString();
+    }
+
+    return {
+      id: row.offer.id,
+      requestId: row.request.id,
+      title: row.request.title,
+      startsAt,
+      endsAt,
+      status: row.offer.status,
+      requestStatus: row.request.status,
+      agencyName: "Fictional Agency", // Placeholder
+      interpreterId: row.offer.interpreterId,
+      program: rowData?.intake?.program || "General",
+      timeZone: rowData?.details?.timeZone || "America/Los_Angeles",
+      hoursSubmission: rowData?.hoursSubmission || null,
+      travelStartTime: row.request.travelStartTime ? row.request.travelStartTime.toISOString() : null,
+      travelEndTime: row.request.travelEndTime ? row.request.travelEndTime.toISOString() : null,
+      serviceCompleted: row.request.serviceCompleted,
+    };
+  });
 }

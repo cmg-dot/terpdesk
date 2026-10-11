@@ -8,6 +8,9 @@ import { useGlobalState } from "@/context/GlobalContext";
 import { motion } from "framer-motion";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
+import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 
 type Tab = "upcoming" | "past";
 
@@ -16,8 +19,16 @@ export default function InterpreterJobsPage() {
   
   const { currentUser } = useGlobalState();
   const [offers, setOffers] = useState<any[]>([]);
+  const [currentTime, setCurrentTime] = useState<number>(Date.now());
 
   const [serviceRecords, setServiceRecords] = useState<any[]>([]);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     if (currentUser?.email) {
@@ -30,15 +41,15 @@ export default function InterpreterJobsPage() {
   const [activeTab, setActiveTab] = useState<Tab>("upcoming");
   const [pastFilter, setPastFilter] = useState("All past jobs");
 
-  const upcomingBooked = jobs.filter(job => job.status === 'booked' && (!job.endsAt || new Date(job.endsAt) > new Date()));
+  const upcomingBooked = jobs.filter(job => job.status === 'booked' && isAppointmentUpcoming(job, currentTime));
   const upcomingOffers = offers.filter(o => o.status === 'pending');
-  const upcomingJobs = [...upcomingOffers, ...upcomingBooked];
+  const upcomingJobs = sortUpcomingWithHappeningNow([...upcomingOffers, ...upcomingBooked], currentTime);
   const declinedReleasedJobs = jobs.filter(job => job.status === 'declined' || job.status === 'released');
   
   const upcomingCount = upcomingJobs.length;
   
-  // Compute past booked jobs
-  const pastBookedJobs = jobs.filter(j => j.status === 'booked' && j.endsAt && new Date(j.endsAt) <= new Date());
+  // Compute past booked jobs (only jobs whose endsAt has passed)
+  const pastBookedJobs = jobs.filter(j => j.status === 'booked' && !isAppointmentUpcoming(j, currentTime));
   let displayedPastJobs: any[] = [];
   
   if (pastFilter === "Needs hours") {
@@ -69,14 +80,37 @@ export default function InterpreterJobsPage() {
   const pastCount = pastBookedJobs.length + declinedReleasedJobs.length;
   const totalCount = upcomingCount + pastCount;
 
-  const formatJobDate = (startStr?: string, endStr?: string) => {
-    if (!startStr) return "Date TBD";
-    const start = new Date(startStr);
-    const end = endStr ? new Date(endStr) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-    const dateStr = format(start, "EEE, MMM d").toUpperCase();
-    const timeStart = format(start, "h:mm a");
-    const timeEnd = format(end, "h:mm a");
-    return `${dateStr} · ${timeStart} – ${timeEnd}`;
+  const mapSafeZone = (tz: any) => {
+    if (!tz || typeof tz !== 'string') return 'America/Los_Angeles';
+    const lower = tz.toLowerCase();
+    if (lower.includes('hawaii')) return 'Pacific/Honolulu';
+    if (lower.includes('alaska')) return 'America/Anchorage';
+    if (lower.includes('pacific')) return 'America/Los_Angeles';
+    if (lower.includes('arizona')) return 'America/Phoenix';
+    if (lower.includes('mountain')) return 'America/Denver';
+    if (lower.includes('central')) return 'America/Chicago';
+    if (lower.includes('eastern')) return 'America/New_York';
+    return 'America/Los_Angeles';
+  };
+
+  const formatJobDate = (startStr?: string | Date | null, endStr?: string | Date | null, timeZone?: string) => {
+    try {
+      if (!startStr) return "Date TBD";
+      const start = new Date(startStr);
+      if (isNaN(start.getTime())) return "Date TBD";
+      const safeZone = mapSafeZone(timeZone);
+      
+      const end = endStr ? new Date(endStr) : null;
+      const dateStr = formatInTimeZone(start, safeZone, "EEE, MMM d").toUpperCase();
+      const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
+      const timeEnd = end && !isNaN(end.getTime()) 
+        ? formatInTimeZone(end, safeZone, "h:mm a zzz") 
+        : formatInTimeZone(start, safeZone, "h:mm a zzz");
+      
+      return `${dateStr} · ${timeStart} - ${timeEnd}`;
+    } catch (error) {
+      return "Date TBD";
+    }
   };
 
   return (
@@ -135,15 +169,23 @@ export default function InterpreterJobsPage() {
               const locationText = isOffer ? job.agencyName : job.location;
               const locPrimary = locationText?.split('·')[0]?.trim() || locationText;
               const locSecondary = locationText?.split('·')[1]?.trim();
-              const dateText = job.startsAt ? formatJobDate(job.startsAt, job.endsAt) : job.dateString;
+              const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
+              const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
+              const tz = (job as any).details?.timeZone || job.timeZone;
+              const dateText = startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+              
+              const isHappening = isAppointmentHappeningNow(job, currentTime);
               
               return (
-                <Link key={job.id} href={`/jobs/${job.id}`} className="block bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
+                <Link key={job.id} href={`/jobs/${job.id}`} className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : 'border-gray-200'}`}>
                   <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
                     <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
                       {dateText}
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      {isHappening && (
+                        <HappeningNowBadge />
+                      )}
                       {job.status === 'pending' && (
                         <div className="bg-[#F5F3FF] text-[#6D28D9] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
                           Offer received
@@ -228,7 +270,12 @@ export default function InterpreterJobsPage() {
                   <Link key={job.id} href={`/jobs/${job.id}`} className="block bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
                     <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
                       <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
-                        {job.startsAt ? formatJobDate(job.startsAt, job.endsAt) : job.dateString}
+                        {(() => {
+                           const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
+                           const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
+                           const tz = (job as any).details?.timeZone || job.timeZone;
+                           return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+                        })()}
                       </div>
                       <div className="flex gap-2">
                         <div className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
@@ -268,7 +315,14 @@ export default function InterpreterJobsPage() {
                declinedReleasedJobs.map(job => (
                  <div key={job.id} className="bg-white rounded-2xl border border-gray-200 p-6 w-full">
                    <h3 className="font-semibold text-[var(--ink)] mb-1">{job.title}</h3>
-                   <p className="text-sm text-[var(--sage)] mb-3">{job.startsAt ? formatJobDate(job.startsAt, job.endsAt) : job.dateString} · {job.location}</p>
+                   <p className="text-sm text-[var(--sage)] mb-3">
+                     {(() => {
+                        const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
+                        const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
+                        const tz = (job as any).details?.timeZone || job.timeZone;
+                        return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+                     })()} · {job.location}
+                   </p>
                    <p className="text-[14px] text-gray-800 mb-2">
                      {job.status === 'declined' ? 'You declined this offer.' : 'You gave this assignment back.'}
                    </p>

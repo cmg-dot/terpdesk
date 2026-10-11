@@ -8,11 +8,22 @@ import { useGlobalState } from "@/context/GlobalContext";
 import { motion } from "framer-motion";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
+import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 
 export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
   const { currentUser } = useGlobalState();
   const [offers, setOffers] = React.useState<any[]>([]);
+  const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
+
+  React.useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
 
   React.useEffect(() => {
     if (currentUser?.email) {
@@ -34,26 +45,117 @@ export default function InterpreterHomePage() {
     });
   };
 
- const visibleAppointments = jobs.filter((job) => job.status !== "declined" && job.status !== "released").length;
- const upcomingBookings = jobs.filter((job) => job.status === "booked" && (!job.endsAt || new Date(job.endsAt) > new Date())).length;
+  const visibleAppointments = jobs.filter((job) => job.status !== "declined" && job.status !== "released").length;
+  const upcomingBookedJobs = jobs.filter((job) => job.status === "booked" && isAppointmentUpcoming(job, currentTime));
+  const sortedUpcomingBookings = sortUpcomingWithHappeningNow(upcomingBookedJobs, currentTime);
+  const upcomingBookings = sortedUpcomingBookings.length;
+  const happeningNowJobs = upcomingBookedJobs.filter(job => isAppointmentHappeningNow(job, currentTime));
   const pendingOffersList = offers.filter(o => o.status === 'pending');
   const pendingOffers = pendingOffersList.length;
- const hoursToSubmit = jobs.filter((job) => job.status === "booked" && job.endsAt && new Date(job.endsAt) <= new Date() && job.serviceRecordState === "not_started").length;
+  const hoursToSubmit = jobs.filter((job) => job.status === "booked" && job.endsAt && new Date(job.endsAt).getTime() <= currentTime && job.serviceRecordState === "not_started").length;
 
-  const formatJobDate = (startStr?: string, endStr?: string) => {
+  const parseSafeDate = (dateVal: any) => {
+    if (!dateVal) return null;
+    let d = new Date(dateVal);
+    if (!isNaN(d.getTime())) return d;
+    if (typeof dateVal === 'string') {
+      d = new Date(dateVal.replace(' ', 'T'));
+      if (!isNaN(d.getTime())) return d;
+      if (/^\d+$/.test(dateVal)) {
+        d = new Date(parseInt(dateVal, 10));
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+    return null;
+  };
+
+  const getIanaZone = (tz?: string) => {
+    if (!tz || typeof tz !== 'string') return 'America/Los_Angeles';
+    const lower = tz.toLowerCase();
+    if (lower.includes('hawaii')) return 'Pacific/Honolulu';
+    if (lower.includes('alaska')) return 'America/Anchorage';
+    if (lower.includes('pacific')) return 'America/Los_Angeles';
+    if (lower.includes('arizona')) return 'America/Phoenix';
+    if (lower.includes('mountain')) return 'America/Denver';
+    if (lower.includes('central')) return 'America/Chicago';
+    if (lower.includes('eastern')) return 'America/New_York';
+    return 'America/Los_Angeles';
+  };
+
+  const formatJobDate = (startStr?: string, endStr?: string, timeZone?: string) => {
     if (!startStr) return "Date TBD";
-    const start = new Date(startStr);
-    const end = endStr ? new Date(endStr) : new Date(start.getTime() + 2 * 60 * 60 * 1000);
-    const dateStr = format(start, "EEE, MMM d").toUpperCase();
-    const timeStart = format(start, "h:mm a");
-    const timeEnd = format(end, "h:mm a");
-    return `${dateStr} · ${timeStart} – ${timeEnd}`;
+    try {
+      const start = parseSafeDate(startStr);
+      if (!start) return "Date TBD";
+      const safeZone = getIanaZone(timeZone);
+      const end = parseSafeDate(endStr);
+      const dateStr = formatInTimeZone(start, safeZone, "EEE, MMM d").toUpperCase();
+      const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
+      const timeEnd = end ? formatInTimeZone(end, safeZone, "h:mm a zzz") : formatInTimeZone(start, safeZone, "h:mm a zzz");
+      return `${dateStr} · ${timeStart} – ${timeEnd}`;
+    } catch (e) {
+      return "Date TBD";
+    }
   };
 
  return (
  <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-[1200px] mx-auto p-4 md:p-8 w-full space-y-8 pb-24 antialiased">
- {/* Banner */}
- {/* Header */}
+  {/* Persistent Live Appointment Status Banner */}
+  {happeningNowJobs.length > 0 ? (
+    <div className="bg-gradient-to-r from-[#0F3830] via-[#1B433C] to-[#24544B] border border-emerald-500/50 text-white rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <span className="relative flex h-3 w-3 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-400"></span>
+        </span>
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Live Appointment Status</span>
+            <span className="bg-emerald-500/30 text-emerald-200 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">Happening now</span>
+          </div>
+          <p className="text-[15px] font-semibold text-white">
+            {happeningNowJobs.length === 1 
+              ? happeningNowJobs[0].title 
+              : `${happeningNowJobs.length} active bookings in progress`}
+          </p>
+          {happeningNowJobs.length === 1 && (
+            <p className="text-[13px] text-emerald-200/80 mt-0.5">
+              {formatJobDate(
+                happeningNowJobs[0].startsAt || ((happeningNowJobs[0] as any).details?.startDate ? `${(happeningNowJobs[0] as any).details.startDate}T${(happeningNowJobs[0] as any).details.startTime || '00:00'}` : undefined),
+                happeningNowJobs[0].endsAt || ((happeningNowJobs[0] as any).details?.endDate ? `${(happeningNowJobs[0] as any).details.endDate}T${(happeningNowJobs[0] as any).details.endTime || '00:00'}` : undefined),
+                (happeningNowJobs[0] as any).details?.timeZone || happeningNowJobs[0].timeZone
+              )}
+              {happeningNowJobs[0].location ? ` · ${happeningNowJobs[0].location}` : ''}
+            </p>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2.5 w-full sm:w-auto">
+        <Link
+          href={`/jobs/${happeningNowJobs[0].id}`}
+          className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[#1B433C] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
+        >
+          Open active booking &rarr;
+        </Link>
+      </div>
+    </div>
+  ) : (
+    <div className="bg-[#F8F7F4] border border-[#EBE8DF] text-[var(--ink)] rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4">
+      <div className="flex items-center gap-3.5">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-stone-400"></span>
+        <div>
+          <div className="flex items-center gap-2 mb-0.5">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--sage)]">Live Appointment Status</span>
+          </div>
+          <p className="text-[14px] text-gray-600 font-medium">
+            No active bookings right now
+          </p>
+        </div>
+      </div>
+    </div>
+  )}
+
+  {/* Header */}
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
  <div>
  <h1 className="text-4xl font-semibold tracking-tight text-[var(--ink)] mb-2">
@@ -153,7 +255,18 @@ export default function InterpreterHomePage() {
     Offer received — {job.title}
     </h3>
     <p className="text-[13px] text-[var(--sage)]">
-    Expires {job.endsAt ? new Date(job.endsAt).toLocaleDateString() : 'Unknown date'} · Pending offers do not reserve time.
+    Expires {(() => {
+      try {
+        const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
+        if (!endStr) return 'Date TBD';
+        const d = parseSafeDate(endStr);
+        if (!d) return 'Date TBD';
+        const tz = (job as any).details?.timeZone || job.timeZone;
+        return formatInTimeZone(d, getIanaZone(tz), "MMM d, yyyy");
+      } catch (e) {
+        return 'Date TBD';
+      }
+    })()} · Pending offers do not reserve time.
     </p>
     </div>
     </div>
@@ -197,10 +310,14 @@ export default function InterpreterHomePage() {
  </Link>
  </div>
 
+ {sortedUpcomingBookings.length === 0 ? (
+   <div className="bg-white rounded-2xl border border-gray-200 p-6 text-[14px] text-[var(--sage)]">
+     No upcoming bookings right now.
+   </div>
+ ) : (
  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
- {jobs
- .filter((job) => job.status === "booked" && (!job.endsAt || new Date(job.endsAt) > new Date()))
- .map((job) => {
+ {sortedUpcomingBookings.map((job) => {
+ const isHappening = isAppointmentHappeningNow(job, currentTime);
  const locationParts = job.location.split("·");
  const locPrimary = locationParts[0]?.trim();
  const locSecondary = locationParts[1]?.trim();
@@ -209,13 +326,21 @@ export default function InterpreterHomePage() {
  <Link
  key={job.id}
  href={`/jobs/${job.id}`}
- className="block bg-white rounded-2xl border border-gray-200 p-6 border border-gray-200 hover: transition-shadow"
+ className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : 'border-gray-200'}`}
  >
  <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
  <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
- {job.startsAt ? formatJobDate(job.startsAt, job.endsAt) : job.dateString}
+ {(() => {
+    const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
+    const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
+    const tz = (job as any).details?.timeZone || job.timeZone;
+    return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+ })()}
  </div>
- <div className="flex gap-2">
+ <div className="flex items-center gap-2 flex-wrap">
+ {isHappening && (
+   <HappeningNowBadge />
+ )}
  <div className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
  Booked
  </div>
@@ -257,6 +382,7 @@ export default function InterpreterHomePage() {
  );
  })}
  </div>
+ )}
  </div>
 
  {/* Unavailable card */}
