@@ -1,44 +1,32 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useCallback } from "react";
+import { 
+  getClientsAction, 
+  createClientAction, 
+  updateClientAction, 
+  archiveClientAction, 
+  deleteClientAction,
+  addClientContactAction,
+  updateClientContactAction,
+  deleteClientContactAction,
+  addClientLocationAction,
+  updateClientLocationAction,
+  deleteClientLocationAction,
+  type ClientWithStats
+} from "@/app/actions/clients";
+import type { ClientContact, ClientLocation, ClientAuditLog } from "@/db/schema";
 
-export interface ContactItem {
-  id: string;
-  type: 'Requester contact' | 'Billing contact';
-  name: string;
-  role: string;
-  email: string;
-  phone: string;
-  isDefault: boolean;
-  isArchived?: boolean;
-}
-
-export interface LocationItem {
-  id: string;
-  name: string;
-  address: string;
-  room: string;
-  parking: string;
-  entrance: string;
-  instructions: string;
-  isDefault: boolean;
-  isArchived?: boolean;
-}
-
-export interface AuditLog {
-  id: string;
-  timestamp: string;
-  user: string;
-  action: string;
-  details: string;
-}
+export type ContactItem = ClientContact;
+export type LocationItem = ClientLocation;
+export type AuditLog = ClientAuditLog;
 
 export interface ClientItem {
   id: string;
   name: string;
   type: string;
-  contact: string;
-  stats: string;
+  contact?: string;
+  stats?: string;
   contacts?: ContactItem[];
   locations?: LocationItem[];
   isArchived?: boolean;
@@ -48,230 +36,204 @@ export interface ClientItem {
   billingAddress?: string;
   privateNotes?: string;
   auditLogs?: AuditLog[];
+  linkedJobsCount?: number;
 }
 
 interface ClientsContextType {
   clients: ClientItem[];
-  addClient: (client: ClientItem) => void;
-  updateClient: (clientId: string, updates: Partial<ClientItem>) => void;
-  archiveClient: (clientId: string) => void;
-  restoreClient: (clientId: string) => void;
-  deleteClient: (clientId: string) => void;
-  addContact: (clientId: string, newContact: ContactItem) => void;
-  archiveContact: (clientId: string, contactId: string) => void;
-  restoreContact: (clientId: string, contactId: string) => void;
-  deleteContact: (clientId: string, contactId: string) => void;
-  makeContactDefault: (clientId: string, contactId: string) => void;
-  addLocation: (clientId: string, newLocation: LocationItem) => void;
-  archiveLocation: (clientId: string, locationId: string) => void;
-  restoreLocation: (clientId: string, locationId: string) => void;
-  deleteLocation: (clientId: string, locationId: string) => void;
-  makeLocationDefault: (clientId: string, locationId: string) => void;
+  isLoading: boolean;
+  refreshClients: () => Promise<void>;
+  addClient: (client: { id?: string; name: string; type?: string; generalEmail?: string; generalPhone?: string; billingOrg?: string; billingAddress?: string; privateNotes?: string }) => Promise<string>;
+  updateClient: (clientId: string, updates: Partial<ClientItem>) => Promise<void>;
+  archiveClient: (clientId: string) => Promise<void>;
+  restoreClient: (clientId: string) => Promise<void>;
+  deleteClient: (clientId: string) => Promise<void>;
+  addContact: (clientId: string, newContact: ContactItem) => Promise<void>;
+  archiveContact: (clientId: string, contactId: string) => Promise<void>;
+  restoreContact: (clientId: string, contactId: string) => Promise<void>;
+  deleteContact: (clientId: string, contactId: string) => Promise<void>;
+  makeContactDefault: (clientId: string, contactId: string) => Promise<void>;
+  addLocation: (clientId: string, newLocation: LocationItem) => Promise<void>;
+  archiveLocation: (clientId: string, locationId: string) => Promise<void>;
+  restoreLocation: (clientId: string, locationId: string) => Promise<void>;
+  deleteLocation: (clientId: string, locationId: string) => Promise<void>;
+  makeLocationDefault: (clientId: string, locationId: string) => Promise<void>;
 }
-
-const defaultClients: ClientItem[] = [
-  { 
-    id: '1', 
-    name: 'Fictional clinic', 
-    type: 'Organization', 
-    contact: 'vegan4me@gmail.com · 2533943781', 
-    stats: '0 contacts · 0 locations · 0 linked jobs' 
-  }
-];
 
 const ClientsContext = createContext<ClientsContextType | undefined>(undefined);
 
 export function ClientsProvider({ children }: { children: ReactNode }) {
-  const [clients, setClients] = useState<ClientItem[]>(defaultClients);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [clients, setClients] = useState<ClientItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    const saved = localStorage.getItem("terpdesk_clients");
-    if (saved) {
-      try {
-        setClients(JSON.parse(saved));
-      } catch (e) {
-        console.error("Failed to parse clients from local storage", e);
-      }
+  const fetchFromDb = useCallback(async () => {
+    try {
+      const dbClients = await getClientsAction();
+      const mapped: ClientItem[] = dbClients.map(c => ({
+        id: c.id,
+        name: c.name,
+        type: c.type,
+        contact: c.contactSummary,
+        stats: c.stats,
+        contacts: c.contacts,
+        locations: c.locations,
+        isArchived: c.isArchived,
+        generalEmail: c.generalEmail,
+        generalPhone: c.generalPhone,
+        billingOrg: c.billingOrg,
+        billingAddress: c.billingAddress,
+        privateNotes: c.privateNotes,
+        auditLogs: c.auditLogs,
+        linkedJobsCount: c.linkedJobsCount
+      }));
+      setClients(mapped);
+    } catch (err) {
+      console.error("Failed to load clients from PostgreSQL:", err);
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoaded(true);
   }, []);
 
   useEffect(() => {
-    if (isLoaded) {
-      localStorage.setItem("terpdesk_clients", JSON.stringify(clients));
-    }
-  }, [clients, isLoaded]);
+    fetchFromDb();
+  }, [fetchFromDb]);
 
-  const createAuditLog = (action: string, details: string): AuditLog => ({
-    id: Date.now().toString() + Math.random().toString(36).substring(7),
-    timestamp: new Date().toISOString(),
-    user: "Avery North",
-    action,
-    details
-  });
+  const addClient = async (clientData: {
+    id?: string;
+    name: string;
+    type?: string;
+    generalEmail?: string;
+    generalPhone?: string;
+    billingOrg?: string;
+    billingAddress?: string;
+    privateNotes?: string;
+  }): Promise<string> => {
+    const createdId = await createClientAction({
+      name: clientData.name,
+      type: clientData.type || "Organization",
+      generalEmail: clientData.generalEmail,
+      generalPhone: clientData.generalPhone,
+      billingOrganization: clientData.billingOrg,
+      billingAddress: clientData.billingAddress,
+      privateNotes: clientData.privateNotes
+    });
 
-  const addClient = (client: ClientItem) => {
-    const log = createAuditLog("Client created", `Client created - ${client.name}`);
-    const clientWithLog = { ...client, auditLogs: [log, ...(client.auditLogs || [])] };
-    setClients((prev) => [clientWithLog, ...prev]);
+    await fetchFromDb();
+    return createdId;
   };
 
-  const addContact = (clientId: string, newContact: ContactItem) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId) {
-        let contacts = client.contacts ? [...client.contacts] : [];
-        if (newContact.isDefault) {
-          contacts = contacts.map(c => c.type === newContact.type ? { ...c, isDefault: false } : c);
-        }
-        contacts.push(newContact);
-        return { ...client, contacts };
-      }
-      return client;
-    }));
+  const updateClient = async (clientId: string, updates: Partial<ClientItem>) => {
+    // Optimistic update
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...updates } : c));
+
+    await updateClientAction(clientId, {
+      name: updates.name,
+      type: updates.type,
+      archived: updates.isArchived,
+      generalEmail: updates.generalEmail,
+      generalPhone: updates.generalPhone,
+      billingOrganization: updates.billingOrg,
+      billingOrg: updates.billingOrg,
+      billingAddress: updates.billingAddress,
+      privateNotes: updates.privateNotes
+    });
+
+    await fetchFromDb();
   };
 
-  const archiveContact = (clientId: string, contactId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.contacts) {
-        return { 
-          ...client, 
-          contacts: client.contacts.map(c => 
-            c.id === contactId ? { ...c, isArchived: true, isDefault: false } : c
-          )
-        };
-      }
-      return client;
-    }));
+  const archiveClient = async (clientId: string) => {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, isArchived: true } : c));
+    await archiveClientAction(clientId, true);
+    await fetchFromDb();
   };
 
-  const restoreContact = (clientId: string, contactId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.contacts) {
-        return { 
-          ...client, 
-          contacts: client.contacts.map(c => 
-            c.id === contactId ? { ...c, isArchived: false } : c
-          )
-        };
-      }
-      return client;
-    }));
+  const restoreClient = async (clientId: string) => {
+    setClients(prev => prev.map(c => c.id === clientId ? { ...c, isArchived: false } : c));
+    await archiveClientAction(clientId, false);
+    await fetchFromDb();
   };
 
-  const deleteContact = (clientId: string, contactId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.contacts) {
-        return { ...client, contacts: client.contacts.filter(c => c.id !== contactId) };
-      }
-      return client;
-    }));
-  };
-
-  const makeContactDefault = (clientId: string, contactId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.contacts) {
-        const targetContact = client.contacts.find(c => c.id === contactId);
-        if (targetContact) {
-          const updatedContacts = client.contacts.map(c => 
-            c.type === targetContact.type
-              ? { ...c, isDefault: c.id === contactId }
-              : c
-          );
-          return { ...client, contacts: updatedContacts };
-        }
-      }
-      return client;
-    }));
-  };
-
-  const addLocation = (clientId: string, newLocation: LocationItem) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId) {
-        let locations = client.locations ? [...client.locations] : [];
-        if (newLocation.isDefault) {
-          locations = locations.map(l => ({ ...l, isDefault: false }));
-        }
-        locations.push(newLocation);
-        return { ...client, locations };
-      }
-      return client;
-    }));
-  };
-
-  const archiveLocation = (clientId: string, locationId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.locations) {
-        return { 
-          ...client, 
-          locations: client.locations.map(l => 
-            l.id === locationId ? { ...l, isArchived: true, isDefault: false } : l
-          )
-        };
-      }
-      return client;
-    }));
-  };
-
-  const restoreLocation = (clientId: string, locationId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.locations) {
-        return { 
-          ...client, 
-          locations: client.locations.map(l => 
-            l.id === locationId ? { ...l, isArchived: false } : l
-          )
-        };
-      }
-      return client;
-    }));
-  };
-
-  const deleteLocation = (clientId: string, locationId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.locations) {
-        return { ...client, locations: client.locations.filter(l => l.id !== locationId) };
-      }
-      return client;
-    }));
-  };
-
-  const makeLocationDefault = (clientId: string, locationId: string) => {
-    setClients(prev => prev.map(client => {
-      if (client.id === clientId && client.locations) {
-        const updatedLocations = client.locations.map(l => 
-          ({ ...l, isDefault: l.id === locationId })
-        );
-        return { ...client, locations: updatedLocations };
-      }
-      return client;
-    }));
-  };
-
-  const archiveClient = (clientId: string) => {
-    const log = createAuditLog("Client archived", "Client was archived");
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, isArchived: true, auditLogs: [log, ...(c.auditLogs || [])] } : c));
-  };
-
-  const restoreClient = (clientId: string) => {
-    const log = createAuditLog("Client restored", "Client was restored from archive");
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, isArchived: false, auditLogs: [log, ...(c.auditLogs || [])] } : c));
-  };
-
-  const deleteClient = (clientId: string) => {
+  const deleteClient = async (clientId: string) => {
     setClients(prev => prev.filter(c => c.id !== clientId));
+    await deleteClientAction(clientId);
+    await fetchFromDb();
   };
 
-  const updateClient = (clientId: string, updates: Partial<ClientItem>) => {
-    const log = createAuditLog("Client updated", "Client details were updated");
-    setClients(prev => prev.map(c => c.id === clientId ? { ...c, ...updates, auditLogs: [log, ...(c.auditLogs || [])] } : c));
+  const addContact = async (clientId: string, newContact: ContactItem) => {
+    await addClientContactAction(clientId, {
+      type: newContact.type,
+      name: newContact.name,
+      role: newContact.role,
+      email: newContact.email,
+      phone: newContact.phone,
+      isDefault: newContact.isDefault,
+      isArchived: false
+    });
+    await fetchFromDb();
   };
 
-  if (!isLoaded) return null;
+  const archiveContact = async (clientId: string, contactId: string) => {
+    await updateClientContactAction(clientId, contactId, { isArchived: true, isDefault: false });
+    await fetchFromDb();
+  };
+
+  const restoreContact = async (clientId: string, contactId: string) => {
+    await updateClientContactAction(clientId, contactId, { isArchived: false });
+    await fetchFromDb();
+  };
+
+  const deleteContact = async (clientId: string, contactId: string) => {
+    await deleteClientContactAction(clientId, contactId);
+    await fetchFromDb();
+  };
+
+  const makeContactDefault = async (clientId: string, contactId: string) => {
+    await updateClientContactAction(clientId, contactId, { isDefault: true });
+    await fetchFromDb();
+  };
+
+  const addLocation = async (clientId: string, newLocation: LocationItem) => {
+    await addClientLocationAction(clientId, {
+      name: newLocation.name,
+      streetAddress: newLocation.streetAddress || newLocation.address || "",
+      address: newLocation.streetAddress || newLocation.address || "",
+      roomOrSuite: newLocation.roomOrSuite || newLocation.room || "",
+      room: newLocation.roomOrSuite || newLocation.room || "",
+      parking: newLocation.parking || "",
+      entrance: newLocation.entrance || "",
+      checkInInstructions: newLocation.checkInInstructions || newLocation.instructions || "",
+      instructions: newLocation.checkInInstructions || newLocation.instructions || "",
+      isDefault: newLocation.isDefault,
+      isArchived: false
+    });
+    await fetchFromDb();
+  };
+
+  const archiveLocation = async (clientId: string, locationId: string) => {
+    await updateClientLocationAction(clientId, locationId, { isArchived: true, isDefault: false });
+    await fetchFromDb();
+  };
+
+  const restoreLocation = async (clientId: string, locationId: string) => {
+    await updateClientLocationAction(clientId, locationId, { isArchived: false });
+    await fetchFromDb();
+  };
+
+  const deleteLocation = async (clientId: string, locationId: string) => {
+    await deleteClientLocationAction(clientId, locationId);
+    await fetchFromDb();
+  };
+
+  const makeLocationDefault = async (clientId: string, locationId: string) => {
+    await updateClientLocationAction(clientId, locationId, { isDefault: true });
+    await fetchFromDb();
+  };
 
   return (
     <ClientsContext.Provider value={{ 
-      clients, 
+      clients,
+      isLoading,
+      refreshClients: fetchFromDb,
       addClient, 
       updateClient,
       archiveClient,

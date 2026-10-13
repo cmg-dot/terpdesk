@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useTransition, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Copy, Check, Building2 } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Copy, Check, Building2, ExternalLink, Video, Lock } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { format } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
@@ -12,6 +12,7 @@ import { submitInterpreterHours } from "@/app/actions/submitInterpreterHours";
 import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
+import { resolveRequestTimes } from "@/utils/timezone";
 
 const mapSafeZone = (tz: any) => {
   if (!tz || typeof tz !== 'string') return 'America/Los_Angeles';
@@ -433,9 +434,12 @@ function ServiceTimeBlock({ job }: { job: any }) {
 
   if (job.status !== 'booked') return null;
 
-  // TODO: Restore date lock after demo.
-  // const isPastEndTime = job.endsAt ? Date.now() > new Date(job.endsAt).getTime() : false;
-  const isPastEndTime = true;
+  const { startsAt: resolvedStartsAt, endsAt: resolvedEndsAt } = resolveRequestTimes(job);
+  const startsAtMs = new Date(resolvedStartsAt).getTime();
+  const endsAtMs = new Date(resolvedEndsAt).getTime();
+  const nowMs = Date.now();
+  const isFutureAppointment = nowMs < startsAtMs;
+  const isPastEndTime = nowMs > endsAtMs;
 
   const totalMileage = mileageLegs.reduce((acc, leg) => {
     const dist = parseFloat(leg.distance as string) || 0;
@@ -444,6 +448,11 @@ function ServiceTimeBlock({ job }: { job: any }) {
   }, 0);
 
   const handleSaveDraft = () => {
+    if (Date.now() < startsAtMs) {
+      alert("Actual service time can be entered once the appointment starts.");
+      return;
+    }
+
     const draftRecord = {
       id: serviceRecord?.id || Math.random().toString(36).substring(7),
       appointmentId: job.requestId || job.id,
@@ -484,6 +493,10 @@ function ServiceTimeBlock({ job }: { job: any }) {
   };
 
   const handleSubmit = () => {
+    if (Date.now() < startsAtMs) {
+      alert("Actual service time can be entered once the appointment starts.");
+      return;
+    }
     const isCorrection = serviceRecord?.state === 'approved' || serviceRecord?.state === 'changes_requested' || serviceRecord?.state === 'correction_requested' || job.requestStatus === 'correction_requested';
     const nextVersion = isCorrection ? (serviceRecord?.version || 1) + 1 : (serviceRecord?.version || 1);
 
@@ -571,6 +584,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
         note: note,
         version: nextVersion,
         history: updatedHistory,
+        positionIndex: (job as any).positionIndex || 1,
       });
 
       if (typeof window !== 'undefined') {
@@ -656,17 +670,24 @@ function ServiceTimeBlock({ job }: { job: any }) {
           <button onClick={() => setIsFormOpen(false)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium mb-6 transition-colors hover:bg-[#14332D]">Close</button>
           
           <div className="bg-[#F5F4F0] p-6 rounded-xl">
+             {isFutureAppointment && (
+               <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3.5 text-xs flex items-center gap-2 mb-6">
+                 <Lock className="w-4 h-4 text-amber-700 shrink-0" />
+                 <span>Actual service time can be entered once the appointment starts.</span>
+               </div>
+             )}
+
              <p className="text-sm text-gray-600 mb-6">The scheduled times are filled in as a starting point. Nothing is recorded until you submit, and they are not treated as confirmed until you do. Changing these times does not move the booking in anyone's calendar.</p>
              
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label className="block text-[13px] text-gray-600 mb-2">Actual start</label>
-                  <input type="datetime-local" value={actualStart} onChange={e => setActualStart(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
+                  <input type="datetime-local" disabled={isFutureAppointment} value={actualStart} onChange={e => setActualStart(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                   <p className="text-[11px] text-gray-500 mt-1">9:21 AM PDT - Pacific Time — Seattle, Los Angeles (UTC-07:00)</p>
                 </div>
                 <div>
                   <label className="block text-[13px] text-gray-600 mb-2">Actual end</label>
-                  <input type="datetime-local" value={actualEnd} onChange={e => setActualEnd(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
+                  <input type="datetime-local" disabled={isFutureAppointment} value={actualEnd} onChange={e => setActualEnd(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                   <p className="text-[11px] text-gray-500 mt-1">12:21 PM PDT - Pacific Time — Seattle, Los Angeles (UTC-07:00)</p>
                 </div>
              </div>
@@ -674,18 +695,18 @@ function ServiceTimeBlock({ job }: { job: any }) {
              {!isOdhh ? (
                <div className="mb-6">
                   <label className="block text-[13px] text-gray-600 mb-2">Unpaid break, in minutes (leave at 0 if none)</label>
-                  <input type="number" value={breakMinutes} onChange={e => setBreakMinutes(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
+                  <input type="number" disabled={isFutureAppointment} value={breakMinutes} onChange={e => setBreakMinutes(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                </div>
              ) : (
                <>
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                     <div>
                       <label className="block text-[13px] text-gray-600 mb-2">Travel start</label>
-                      <input type="datetime-local" value={travelStart} onChange={e => setTravelStart(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
+                      <input type="datetime-local" disabled={isFutureAppointment} value={travelStart} onChange={e => setTravelStart(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                     </div>
                     <div>
                       <label className="block text-[13px] text-gray-600 mb-2">Travel end</label>
-                      <input type="datetime-local" value={travelEnd} onChange={e => setTravelEnd(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
+                      <input type="datetime-local" disabled={isFutureAppointment} value={travelEnd} onChange={e => setTravelEnd(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
                     </div>
                  </div>
                  
@@ -694,11 +715,11 @@ function ServiceTimeBlock({ job }: { job: any }) {
                     <p className="text-xs text-[var(--sage)] mb-4">Was this service completed?</p>
                     <div className="flex gap-4">
                       <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                        <input type="radio" value="yes" checked={serviceCompleted === "yes"} onChange={(e) => setServiceCompleted(e.target.value)} className="text-[var(--forest)] focus:ring-[#0B3B32]" />
+                        <input type="radio" disabled={isFutureAppointment} value="yes" checked={serviceCompleted === "yes"} onChange={(e) => setServiceCompleted(e.target.value)} className="text-[var(--forest)] focus:ring-[#0B3B32] disabled:opacity-50" />
                         Yes
                       </label>
                       <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                        <input type="radio" value="no" checked={serviceCompleted === "no"} onChange={(e) => setServiceCompleted(e.target.value)} className="text-[var(--forest)] focus:ring-[#0B3B32]" />
+                        <input type="radio" disabled={isFutureAppointment} value="no" checked={serviceCompleted === "no"} onChange={(e) => setServiceCompleted(e.target.value)} className="text-[var(--forest)] focus:ring-[#0B3B32] disabled:opacity-50" />
                         No
                       </label>
                     </div>
@@ -720,14 +741,14 @@ function ServiceTimeBlock({ job }: { job: any }) {
                   return (
                     <div key={leg.id} className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
                       <div className="flex flex-col md:flex-row md:items-center gap-3 mb-3">
-                        <input type="text" placeholder="From" value={leg.from} onChange={e => updateMileageLeg(leg.id, 'from', e.target.value)} className="w-full md:w-auto md:flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
-                        <input type="text" placeholder="To" value={leg.to} onChange={e => updateMileageLeg(leg.id, 'to', e.target.value)} className="w-full md:w-auto md:flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
-                        <input type="number" placeholder="Distance" value={leg.distance} onChange={e => updateMileageLeg(leg.id, 'distance', e.target.value)} className="w-full md:w-24 md:flex-none min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]" />
-                        <select value={leg.type} onChange={e => updateMileageLeg(leg.id, 'type', e.target.value)} className="w-full md:w-auto md:flex-[1.5] min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] truncate text-ellipsis">
+                        <input type="text" disabled={isFutureAppointment} placeholder="From" value={leg.from} onChange={e => updateMileageLeg(leg.id, 'from', e.target.value)} className="w-full md:w-auto md:flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                        <input type="text" disabled={isFutureAppointment} placeholder="To" value={leg.to} onChange={e => updateMileageLeg(leg.id, 'to', e.target.value)} className="w-full md:w-auto md:flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                        <input type="number" disabled={isFutureAppointment} placeholder="Distance" value={leg.distance} onChange={e => updateMileageLeg(leg.id, 'distance', e.target.value)} className="w-full md:w-24 md:flex-none min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
+                        <select disabled={isFutureAppointment} value={leg.type} onChange={e => updateMileageLeg(leg.id, 'type', e.target.value)} className="w-full md:w-auto md:flex-[1.5] min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] truncate text-ellipsis disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
                           <option value="total">Total distance already travelled</option>
                           <option value="round_trip">One-way distance + return on same route</option>
                         </select>
-                        <button onClick={() => removeMileageLeg(leg.id)} className="text-sm font-medium text-gray-500 hover:text-red-600 self-end md:self-auto shrink-0 transition-colors px-1">Remove</button>
+                        <button type="button" disabled={isFutureAppointment} onClick={() => removeMileageLeg(leg.id)} className="text-sm font-medium text-gray-500 hover:text-red-600 self-end md:self-auto shrink-0 transition-colors px-1 disabled:opacity-50 disabled:cursor-not-allowed">Remove</button>
                       </div>
                       <p className="text-xs text-gray-600">Calculated total for this leg: <span className="font-semibold">{legTotal.toFixed(1)} mi</span> {legTotal === 0 ? '— no distance added' : ''}</p>
                     </div>
@@ -735,13 +756,13 @@ function ServiceTimeBlock({ job }: { job: any }) {
                 })}
                 
                 <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-                   <button onClick={addMileageLeg} className="bg-white border border-gray-300 text-gray-700 rounded-full px-4 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors">Add a travel leg</button>
+                   <button type="button" disabled={isFutureAppointment} onClick={addMileageLeg} className="bg-white border border-gray-300 text-gray-700 rounded-full px-4 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Add a travel leg</button>
                    <span className="text-sm text-gray-700">Calculated total mileage: <span className="font-bold">{totalMileage.toFixed(1)} mi</span></span>
                 </div>
 
                 <div className="mb-4">
                   <label className="block text-[13px] text-gray-600 mb-2">Mileage note (optional)</label>
-                  <textarea rows={2} value={mileageNote} onChange={e => setMileageNote(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]"></textarea>
+                  <textarea rows={2} disabled={isFutureAppointment} value={mileageNote} onChange={e => setMileageNote(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"></textarea>
                 </div>
 
                 <p className="text-xs text-[var(--sage)]">Automatic driving distance is not switched on. No mapping service is connected to this workspace yet, so nothing can be calculated from an address today.</p>
@@ -749,7 +770,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
              
              <div className="mb-6">
                 <label className="block text-[13px] text-gray-600 mb-2">Service note (optional)</label>
-                <textarea rows={3} value={note} onChange={e => setNote(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32]"></textarea>
+                <textarea rows={3} disabled={isFutureAppointment} value={note} onChange={e => setNote(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"></textarea>
                 <p className="text-xs text-[var(--sage)] mt-2">Keep this about timing only — start, end, breaks and waiting. Do not enter participant names, health details or anything said during the assignment.</p>
              </div>
              
@@ -757,20 +778,20 @@ function ServiceTimeBlock({ job }: { job: any }) {
                 <h4 className="text-sm font-medium text-[var(--ink)] mb-3">Before you submit</h4>
                 <div className="space-y-2">
                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={timeChecked} onChange={e => setTimeChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32]" />
+                      <input type="checkbox" disabled={isFutureAppointment} checked={timeChecked} onChange={e => setTimeChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
                       <span className="text-sm text-gray-700">Actual service time — {serviceTimeHours}</span>
                    </label>
                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={mileageChecked} onChange={e => setMileageChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32]" />
+                      <input type="checkbox" disabled={isFutureAppointment} checked={mileageChecked} onChange={e => setMileageChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
                       <span className="text-sm text-gray-700">Mileage — {totalMileage.toFixed(1)} mi reported (leave this empty if there was no travel to report)</span>
                    </label>
                    <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" checked={signatureChecked} onChange={e => setSignatureChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32]" />
+                      <input type="checkbox" disabled={isFutureAppointment} checked={signatureChecked} onChange={e => setSignatureChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
                       <span className="text-sm text-gray-700">No verification signature is asked for on this assignment</span>
                    </label>
                    {isOdhh && (
                      <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" checked={completionChecked} onChange={e => setCompletionChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32]" />
+                        <input type="checkbox" disabled={isFutureAppointment} checked={completionChecked} onChange={e => setCompletionChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
                         <span className="text-sm text-gray-700">Service completion answered</span>
                      </label>
                    )}
@@ -778,8 +799,8 @@ function ServiceTimeBlock({ job }: { job: any }) {
              </div>
              
              <div className="flex flex-wrap gap-3">
-                <button onClick={handleSubmit} disabled={isSubmitting || !timeChecked || !mileageChecked || !signatureChecked || (isOdhh && !completionChecked)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{isSubmitting ? "Submitting..." : "Submit actual hours"}</button>
-                <button onClick={handleSaveDraft} className="bg-white border border-gray-300 text-gray-700 rounded-full px-5 py-2 text-sm font-medium hover:bg-gray-50 transition-colors">Save draft</button>
+                <button type="button" onClick={handleSubmit} disabled={isSubmitting || isFutureAppointment || !timeChecked || !mileageChecked || !signatureChecked || (isOdhh && !completionChecked)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{isSubmitting ? "Submitting..." : "Submit actual hours"}</button>
+                <button type="button" onClick={handleSaveDraft} disabled={isFutureAppointment} className="bg-white border border-gray-300 text-gray-700 rounded-full px-5 py-2 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Save draft</button>
                 {isOdhh && (
                   <button className="bg-white border border-gray-300 text-[var(--forest)] rounded-full px-5 py-2 text-sm font-medium hover:bg-gray-50 transition-colors sm:ml-auto">
                     Open ODHH Portal
@@ -848,10 +869,26 @@ function ServiceTimeBlock({ job }: { job: any }) {
              <span className="bg-[#F5F4F0] text-gray-600 px-3 py-1 rounded-full text-[12px] font-medium shrink-0 ml-4">Not submitted</span>
           </div>
           
-          {isPastEndTime ? (
-            <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] transition-colors">Submit actual hours</button>
+          {isFutureAppointment ? (
+            <div className="space-y-3">
+              <button
+                type="button"
+                disabled
+                className="bg-gray-200 text-gray-400 rounded-full px-5 py-2 text-sm font-medium cursor-not-allowed"
+              >
+                Submit actual hours
+              </button>
+              <div>
+                <div className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                  <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  <span>Actual service time can be entered once the appointment starts.</span>
+                </div>
+              </div>
+            </div>
           ) : (
-            <p className="text-sm text-gray-500 font-medium">Not submitted (Awaiting end of assignment)</p>
+            <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] transition-colors">
+              Submit actual hours
+            </button>
           )}
         </div>
       ) : (
@@ -1046,14 +1083,50 @@ function ServiceTimeBlock({ job }: { job: any }) {
           </div>
           
           {currentState === 'draft' && (
-            <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
-              Edit draft / Submit actual hours
-            </button>
+            isFutureAppointment ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  disabled
+                  className="bg-gray-200 text-gray-400 rounded-full px-5 py-2 text-sm font-medium cursor-not-allowed"
+                >
+                  Edit draft / Submit actual hours
+                </button>
+                <div>
+                  <div className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Actual service time can be entered once the appointment starts.</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
+                Edit draft / Submit actual hours
+              </button>
+            )
           )}
           {currentState === 'correction_requested' && (
-            <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
-              Submit a correction
-            </button>
+            isFutureAppointment ? (
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  disabled
+                  className="bg-gray-200 text-gray-400 rounded-full px-5 py-2 text-sm font-medium cursor-not-allowed"
+                >
+                  Submit a correction
+                </button>
+                <div>
+                  <div className="inline-flex items-center gap-2 text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    <Lock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                    <span>Actual service time can be entered once the appointment starts.</span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
+                Submit a correction
+              </button>
+            )
           )}
         </div>
       )}
@@ -1066,12 +1139,13 @@ export default function JobDetailPage() {
   const { id } = useParams<{ id: string }>();
   const router = useRouter();
   const { jobs, acceptJobOffer, declineOffer, markJobReleased } = useInterpreterJobs();
-  const [isOffersOpen, setIsOffersOpen] = useState(true);
+  const [isOffersOpen, setIsOffersOpen] = useState(false);
   const [showGiveBackModal, setShowGiveBackModal] = useState(false);
   const [giveBackReason, setGiveBackReason] = useState("");
   const [isPending, startTransition] = React.useTransition();
   const [actingAction, setActingAction] = useState<'accept' | 'decline' | null>(null);
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
+  const [actionError, setActionError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -1081,22 +1155,41 @@ export default function JobDetailPage() {
   }, []);
 
   const handleAccept = () => {
+    setActionError(null);
     setActingAction('accept');
     startTransition(async () => {
-      await acceptJobOffer(job!.id);
-      setActingAction(null);
+      try {
+        await acceptJobOffer(job!.id);
+      } catch (err: any) {
+        console.error(err);
+        setActionError(err?.message || "This offer has expired because the scheduled appointment time has already ended.");
+      } finally {
+        setActingAction(null);
+      }
     });
   };
 
   const handleDecline = () => {
+    setActionError(null);
     setActingAction('decline');
     startTransition(async () => {
-      await declineOffer(id);
-      setActingAction(null);
+      try {
+        await declineOffer(id);
+      } catch (err: any) {
+        console.error(err);
+        setActionError(err?.message || "Failed to decline offer.");
+      } finally {
+        setActingAction(null);
+      }
     });
   };
 
   const handleGiveBack = () => {
+    if (!isEntirelyFuture) {
+      alert("Assignments cannot be given back once the appointment has started or passed.");
+      setShowGiveBackModal(false);
+      return;
+    }
     setActingAction('decline'); // Reuse 'decline' or create a new 'giveBack' state, but 'decline' disables buttons which is good
     startTransition(async () => {
       if (job) {
@@ -1116,6 +1209,16 @@ export default function JobDetailPage() {
 
   const isOdhh = job.program === 'wa_odhh' || job.program === 'WA ODHH' || (job as any).data?.intake?.program === 'WA ODHH' || (job as any).data?.intake?.program === 'wa_odhh';
   const programLabel = isOdhh ? 'WA ODHH (State Agency)' : 'Private Hospital / Standard Agency';
+
+  const { startsAt: resolvedStartsAt, endsAt: resolvedEndsAt } = resolveRequestTimes(job);
+  const startsAtDate = new Date(resolvedStartsAt);
+  const endsAtDate = new Date(resolvedEndsAt);
+  const now = new Date(currentTime);
+
+  // Strict condition: only show "Give back this assignment" if new Date() < startsAt (appointment is entirely in the future)
+  const isEntirelyFuture = !isNaN(startsAtDate.getTime()) && (new Date() < startsAtDate) && (now < startsAtDate);
+  const isJobPassed = !isNaN(endsAtDate.getTime()) ? now > endsAtDate : false;
+  const isJobExpired = job.status === 'expired' || (job.status === 'pending' && isJobPassed);
 
   if (job.status === 'declined') {
     return (
@@ -1189,11 +1292,15 @@ export default function JobDetailPage() {
             {isAppointmentHappeningNow(job, currentTime) && (
               <HappeningNowBadge />
             )}
-            {job.status === 'pending' && (
+            {isJobExpired ? (
+              <span className="bg-amber-100 text-amber-900 border border-amber-300 text-sm px-3 py-1 rounded-full font-semibold">
+                Offer expired
+              </span>
+            ) : job.status === 'pending' ? (
               <span className="bg-blue-50 text-blue-700 text-sm px-3 py-1 rounded-full font-medium">
                 Offers / draft
               </span>
-            )}
+            ) : null}
             {job.status === 'booked' && (
               <span className="bg-[#E2EBE5] text-[#1B433C] text-[12px] px-3 py-1.5 rounded-full font-medium">
                 Booked
@@ -1272,12 +1379,149 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          {/* Virtual meeting details */}
-          {job.isVirtual && (
-            <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
-              <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-4">Virtual meeting details</h2>
-              <p className="text-[var(--ink)] text-sm mb-1">Not provided yet.</p>
-              <p className="text-[var(--sage)] text-sm">Treat meeting links and access codes as restricted assignment information.</p>
+          {/* Location & Virtual Meeting Details Card */}
+          {job.isVirtual ? (() => {
+            const meetingLink = job.meetingLink || (job as any).details?.meetingLink || (job as any).virtualLink || (job as any).details?.virtualLink;
+            const meetingId = job.meetingId || (job as any).details?.meetingId;
+            const passcode = job.passcode || (job as any).details?.passcode || (job as any).accessCode || (job as any).details?.accessCode;
+            const platform = job.platform || (job as any).details?.platform || (meetingLink?.toLowerCase().includes('zoom') ? 'Zoom' : meetingLink?.toLowerCase().includes('teams') ? 'Microsoft Teams' : meetingLink?.toLowerCase().includes('meet.google') ? 'Google Meet' : 'Virtual meeting');
+            const virtualNotes = (job as any).virtualInstructions || (job as any).details?.virtualInstructions || (job as any).details?.instructions;
+            const isOffer = job.status === 'pending';
+            const hasCredentials = Boolean(meetingLink || meetingId || passcode);
+
+            return (
+              <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+                  <div>
+                    <h2 className="text-[16px] font-semibold text-[var(--ink)]">Virtual meeting details</h2>
+                    <p className="text-xs text-[var(--sage)] mt-0.5">Platform: <span className="font-medium text-gray-700">{platform}</span></p>
+                  </div>
+                  {meetingLink && !isOffer && (
+                    <a
+                      href={meetingLink.startsWith('http') ? meetingLink : `https://${meetingLink}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1B433C] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm self-start sm:self-auto"
+                    >
+                      Open meeting link <ExternalLink className="w-3.5 h-3.5" />
+                    </a>
+                  )}
+                </div>
+
+                {isOffer && hasCredentials ? (
+                  <div className="space-y-3">
+                    <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-4 text-xs text-amber-900 flex items-start gap-3">
+                      <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+                      <div className="space-y-1">
+                        <p className="font-semibold text-amber-900">Virtual credentials locked</p>
+                        <p className="text-amber-800 leading-relaxed">Exact meeting join URL, passcode, and room credentials are masked until you accept this offer. Accept the offer below to unlock immediate access.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2 text-sm bg-gray-50 p-4 rounded-xl border border-gray-100">
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--sage)] text-xs">Meeting link:</span>
+                        <span className="font-mono text-gray-400 text-xs">https://••••••••••••/j/••••••••</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[var(--sage)] text-xs">Passcode / Access code:</span>
+                        <span className="font-mono text-gray-400 text-xs">••••••••</span>
+                      </div>
+                    </div>
+                  </div>
+                ) : !isOffer && hasCredentials ? (
+                  <div className="space-y-3">
+                    {meetingLink && (
+                      <div className="bg-[#F8FAF9] p-3.5 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-3">
+                        <div className="min-w-0 flex-1">
+                          <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Meeting Link</span>
+                          <span className="text-xs font-mono text-[#0B3B32] truncate block break-all">{meetingLink}</span>
+                        </div>
+                        <CopyButton text={meetingLink} label="meeting link" />
+                      </div>
+                    )}
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {meetingId && (
+                        <div className="bg-[#F8FAF9] p-3 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Meeting ID</span>
+                            <span className="text-xs font-mono font-medium text-[var(--ink)]">{meetingId}</span>
+                          </div>
+                          <CopyButton text={meetingId} label="meeting ID" />
+                        </div>
+                      )}
+                      {passcode && (
+                        <div className="bg-[#F8FAF9] p-3 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-2">
+                          <div className="min-w-0">
+                            <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Passcode</span>
+                            <span className="text-xs font-mono font-medium text-[var(--ink)]">{passcode}</span>
+                          </div>
+                          <CopyButton text={passcode} label="passcode" />
+                        </div>
+                      )}
+                    </div>
+
+                    {virtualNotes && (
+                      <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-xs text-gray-700">
+                        <span className="font-semibold block text-[11px] text-[var(--sage)] uppercase tracking-wider mb-1">Virtual Instructions</span>
+                        <p className="leading-relaxed whitespace-pre-line">{virtualNotes}</p>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200/80 text-sm">
+                    <p className="text-[var(--ink)] font-medium mb-1">Virtual details pending</p>
+                    <p className="text-[var(--sage)] text-xs">Meeting join link and credentials will be posted by the agency prior to appointment start.</p>
+                  </div>
+                )}
+
+                <p className="text-[12px] text-[var(--sage)] pt-1">
+                  Treat meeting links and access codes as restricted assignment information.
+                </p>
+              </div>
+            );
+          })() : (
+            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
+              <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-2">On-site location details</h2>
+              <div className="space-y-3">
+                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-100">
+                  <div>
+                    <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Venue / Address</span>
+                    <span className="text-xs font-medium text-[var(--ink)]">
+                      {(job.onsite?.venue || job.location) + (job.onsite?.address ? ` · ${job.onsite.address}` : '')}
+                    </span>
+                  </div>
+                  {(job.onsite?.address || job.location) && (
+                    <CopyButton text={`${job.onsite?.venue || ''} ${job.onsite?.address || job.location}`.trim()} label="address" />
+                  )}
+                </div>
+                {job.onsite?.building && (
+                  <div className="flex items-center justify-between py-2 border-b border-gray-50 text-xs">
+                    <span className="text-[var(--sage)]">Building / Room</span>
+                    <span className="font-medium text-[var(--ink)]">{job.onsite.building}</span>
+                  </div>
+                )}
+                {job.onsite?.contact && (
+                  <div className="flex items-center justify-between py-2 border-b border-gray-50 text-xs">
+                    <span className="text-[var(--sage)]">Onsite Contact</span>
+                    <span className="font-medium text-[var(--ink)]">
+                      {job.onsite.contact} {job.onsite.contactMethod ? `(${job.onsite.contactMethod})` : ''}
+                    </span>
+                  </div>
+                )}
+                {job.onsite?.parking && (
+                  <div className="py-2 border-b border-gray-50 text-xs">
+                    <span className="text-[var(--sage)] block mb-1">Parking Instructions</span>
+                    <span className="text-[var(--ink)]">{job.onsite.parking}</span>
+                  </div>
+                )}
+                {job.onsite?.entrance && (
+                  <div className="py-2 text-xs">
+                    <span className="text-[var(--sage)] block mb-1">Entrance & Check-in</span>
+                    <span className="text-[var(--ink)]">{job.onsite.entrance}</span>
+                  </div>
+                )}
+              </div>
             </div>
           )}
 
@@ -1302,11 +1546,15 @@ export default function JobDetailPage() {
             <p className="text-[14px] text-[var(--sage)] mb-8">Pending offers do not reserve time.</p>
 
             <h3 className="text-[16px] font-semibold text-[var(--ink)] mb-4">
-              Your position · interpreter
+              {job.positionIndex ? `Position ${job.positionIndex} · interpreter` : "Your position · interpreter"}
             </h3>
 
             <div className="flex flex-wrap items-center gap-3 mb-6">
-              {job.status === 'pending' ? (
+              {isJobExpired ? (
+                <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[12px] font-medium px-3 py-1 rounded-full">
+                  Booking: Offer expired
+                </span>
+              ) : job.status === 'pending' ? (
                 <span className="bg-[#FEF3C7] text-[#92400E] text-[12px] font-medium px-3 py-1 rounded-full">
                   Booking: Unfilled
                 </span>
@@ -1322,11 +1570,36 @@ export default function JobDetailPage() {
 
             <p className="text-[14px] text-gray-700 mb-6">
               Assigned interpreter: <span className="text-[var(--sage)]">
-                {job.status === 'pending' ? 'Unfilled' : 'You'}
+                {job.status === 'pending' || isJobExpired ? 'Unfilled' : 'You'}
               </span>
             </p>
 
-            {job.status === 'pending' ? (
+            {actionError && (
+              <div className="bg-red-50 border border-red-200 text-red-800 rounded-xl p-3.5 text-xs flex items-center justify-between gap-2 mb-4">
+                <span>{actionError}</span>
+                <button
+                  type="button"
+                  onClick={() => setActionError(null)}
+                  className="text-red-600 hover:text-red-800 p-1"
+                >
+                  ✕
+                </button>
+              </div>
+            )}
+
+            {isJobExpired ? (
+              <div className="bg-amber-50/90 border border-amber-300 rounded-xl p-5 md:p-6 mt-4">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-[14px] font-medium text-amber-950">Your offer ·</span>
+                  <span className="bg-amber-200 text-amber-900 text-[11px] font-semibold px-2.5 py-0.5 rounded-full border border-amber-300">
+                    Expired
+                  </span>
+                </div>
+                <p className="text-[13px] text-amber-900 leading-relaxed">
+                  This offer expired because the appointment ended on {formatJobDate(job.startsAt, job.endsAt, (job as any).details?.timeZone || job.timeZone)} before a response was submitted. It has been removed from active offers and can no longer be accepted.
+                </p>
+              </div>
+            ) : job.status === 'pending' ? (
               <div className="bg-[var(--canvas)] border border-gray-200 rounded-xl p-5 md:p-6 mt-4">
                 <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-6">
                   <div className="flex flex-col gap-2">
@@ -1377,19 +1650,25 @@ export default function JobDetailPage() {
               <div className="mt-4 flex flex-col gap-4">
                 <div className="bg-[#F5F4F0] rounded-xl p-4">
                   <button 
+                    type="button"
                     onClick={() => setIsOffersOpen(!isOffersOpen)}
-                    className="w-full flex items-center gap-2 text-left focus:outline-none"
+                    className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer group"
                   >
-                    {isOffersOpen ? (
-                      <ChevronDown className="w-4 h-4 text-gray-700" />
-                    ) : (
-                      <ChevronRight className="w-4 h-4 text-gray-700" />
-                    )}
-                    <span className="font-medium text-sm text-[var(--ink)]">Previous offers (1)</span>
+                    <div className="flex items-center gap-2">
+                      <ChevronDown
+                        className={`w-4 h-4 text-gray-700 transition-transform duration-200 ${
+                          isOffersOpen ? "rotate-0" : "-rotate-90"
+                        }`}
+                      />
+                      <span className="font-medium text-sm text-[var(--ink)]">Previous offers (1)</span>
+                    </div>
+                    <span className="text-xs text-[var(--sage)] font-normal group-hover:text-gray-700 transition-colors">
+                      {isOffersOpen ? "Hide" : "Show"}
+                    </span>
                   </button>
                   
                   {isOffersOpen && (
-                    <div className="mt-4 flex items-center gap-2 pl-6">
+                    <div className="mt-3.5 flex items-center gap-2 pl-6 pt-3 border-t border-gray-200/60">
                       <span className="text-[14px] text-gray-600">Your offer ·</span>
                       <span className="bg-white border border-gray-200 text-gray-600 text-[11px] font-medium px-2 py-0.5 rounded-full ">
                         Closed
@@ -1398,14 +1677,17 @@ export default function JobDetailPage() {
                   )}
                 </div>
 
-                <div className="flex justify-start gap-3 flex-wrap mt-2">
-                  <button 
-                    onClick={() => setShowGiveBackModal(true)}
-                    className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-[13px] font-medium px-5 py-2 rounded-full transition-colors cursor-pointer"
-                  >
-                    Give back this assignment
-                  </button>
-                </div>
+                {isEntirelyFuture && (
+                  <div className="flex justify-start gap-3 flex-wrap mt-2">
+                    <button 
+                      type="button"
+                      onClick={() => setShowGiveBackModal(true)}
+                      className="bg-white hover:bg-gray-50 text-gray-700 border border-gray-200 text-[13px] font-medium px-5 py-2 rounded-full transition-colors cursor-pointer"
+                    >
+                      Give back this assignment
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 

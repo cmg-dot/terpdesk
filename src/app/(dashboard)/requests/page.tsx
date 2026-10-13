@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRequests } from "@/context/RequestsContext";
 import { useSearchParams } from "next/navigation";
@@ -88,6 +88,13 @@ function StatusBadge({ status }: { status: string }) {
  </span>
  );
  }
+ if (status === "Needs replacement") {
+ return (
+ <span className="rounded-full bg-[#FEF3C7] px-3 py-1 text-[11px] font-semibold text-[#92400E] border border-[#FDE68A]/60">
+ Needs replacement
+ </span>
+ );
+ }
  if (status === "Partially staffed") {
  return (
  <span className="rounded-full bg-[#E8F3EE] px-3 py-1 text-[11px] font-semibold text-[#466960]">
@@ -162,6 +169,7 @@ function RequestsPageContent() {
   else if (filterParam === "pending-offers") initialStatus = "Pending offers";
   else if (filterParam === "staff-follow-up") initialStatus = "Staff follow-up";
   else if (filterParam === "needs-replacement") initialStatus = "Needs replacement";
+  else if (filterParam === "partially-staffed") initialStatus = "Partially staffed";
 
   const [statusFilter, setStatusFilter] = useState(initialStatus);
 
@@ -192,6 +200,17 @@ function RequestsPageContent() {
     });
   }, [requests, interpreterJobs]);
 
+  const orgOptions = useMemo(() => {
+    const orgs = new Set<string>();
+    enrichedRequests.forEach(req => {
+      const org = req.requester?.org || req.data?.requester?.org || req.data?.client;
+      if (org && typeof org === 'string' && org.trim()) {
+        orgs.add(org.trim());
+      }
+    });
+    return ["All organizations", ...Array.from(orgs).sort()];
+  }, [enrichedRequests]);
+
   const filteredRequests = enrichedRequests.filter(req => {
     const searchLower = searchQuery.toLowerCase();
     const titleMatch = req.title.toLowerCase().includes(searchLower);
@@ -202,8 +221,8 @@ function RequestsPageContent() {
     if (searchQuery && !titleMatch && !refMatch && !orgMatch) return false;
  
     if (orgFilter !== "All organizations") {
-      const org = req.requester?.org || "Organization not provided";
-      if (org !== orgFilter && !(orgFilter === "Fictional clinic" && org === "Freshflow")) return false;
+      const org = req.requester?.org || req.data?.requester?.org || req.data?.client || "Organization not provided";
+      if (org.toLowerCase() !== orgFilter.toLowerCase()) return false;
     }
  
     if (formatFilter !== "All formats") {
@@ -220,6 +239,7 @@ function RequestsPageContent() {
       if (statusFilter === "Happening now") return isAppointmentHappeningNow(req, currentTime);
       if (statusFilter === "Needing coverage") return filters.needingCoverage;
       if (statusFilter === "Pending offers") return filters.hasPendingOffer;
+      if (statusFilter === "Partially staffed") return filters.partiallyStaffed || getStaffingLabel(req as any) === "Partially staffed";
       if (statusFilter === "Fully staffed") return filters.fullyStaffed;
       if (statusFilter === "Needs replacement") return filters.needsReplacement;
       if (statusFilter === "Staff follow-up") return filters.staffFollowUp;
@@ -287,9 +307,9 @@ function RequestsPageContent() {
  className="w-full rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[14px] text-slate-700 placeholder:text-[var(--sage)] border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[#0B3B32]/30"
  />
  </div>
- <CustomSelect options={["All organizations", "Fictional clinic"]} value={orgFilter} onChange={setOrgFilter} />
+ <CustomSelect options={orgOptions} value={orgFilter} onChange={setOrgFilter} />
  <CustomSelect options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
- <CustomSelect options={["Appointments", "Happening now", "Needing coverage", "Needs replacement", "Pending offers", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
+ <CustomSelect options={["Appointments", "Happening now", "Needing coverage", "Needs replacement", "Pending offers", "Partially staffed", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
  </div>
  </div>
 
@@ -302,8 +322,9 @@ function RequestsPageContent() {
  {upcomingRequests.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">No upcoming requests match your filters.</p>}
  {upcomingRequests.map((req) => {
  const org = req.requester?.org || "Organization not provided";
- const format = req.details?.format || req.setting || "Virtual";
- const location = req.onsite?.venue || "Fictional Meet";
+ const setting = req.setting || req.details?.setting || "Medical";
+ const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
+ const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
  const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
  const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(req as any);
  const statusLabel = getStaffingLabel(req as any);
@@ -337,7 +358,7 @@ function RequestsPageContent() {
  <Building2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
  <div className="flex flex-col gap-1">
  <span className="text-[13px] text-[var(--sage)]">{org}</span>
- <span className="text-[13px] text-slate-400">{req.setting}</span>
+ <span className="text-[13px] text-slate-400">{setting}</span>
  </div>
  </div>
  {/* Col 2 */}
@@ -347,7 +368,7 @@ function RequestsPageContent() {
  <span className="text-[13px] text-[var(--sage)]">
  {format} · {location}
  </span>
- <span className="text-[13px] text-slate-400 font-medium">{formatReference(req.id)}</span>
+ <span className="text-[13px] text-slate-400 font-medium">{req.data?.intake?.odhhSrn ? `SRN: ${req.data.intake.odhhSrn}` : formatReference(req.id)}</span>
  </div>
  </div>
  {/* Col 3 */}
@@ -376,8 +397,9 @@ function RequestsPageContent() {
  {pastRequests.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">No past requests match your filters.</p>}
  {pastRequests.map((req) => {
  const org = req.requester?.org || "Organization not provided";
- const format = req.details?.format || req.setting || "Virtual";
- const location = req.onsite?.venue || "Fictional Meet";
+ const setting = req.setting || req.details?.setting || "Medical";
+ const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
+ const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
  const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
  const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(req as any);
  const statusLabel = getStaffingLabel(req as any);
@@ -408,7 +430,7 @@ function RequestsPageContent() {
  <Building2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
  <div className="flex flex-col gap-1">
  <span className="text-[13px] text-[var(--sage)]">{org}</span>
- <span className="text-[13px] text-slate-400">{req.setting}</span>
+ <span className="text-[13px] text-slate-400">{setting}</span>
  </div>
  </div>
  {/* Col 2 */}
@@ -418,7 +440,7 @@ function RequestsPageContent() {
  <span className="text-[13px] text-[var(--sage)]">
  {format} · {location}
  </span>
- <span className="text-[13px] text-slate-400 font-medium">{formatReference(req.id)}</span>
+ <span className="text-[13px] text-slate-400 font-medium">{req.data?.intake?.odhhSrn ? `SRN: ${req.data.intake.odhhSrn}` : formatReference(req.id)}</span>
  </div>
  </div>
  {/* Col 3 */}

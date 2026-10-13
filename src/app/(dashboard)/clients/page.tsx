@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useClients } from "@/context/ClientsContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -67,8 +67,12 @@ function CustomSelect({ options, value, onChange, variant = "default" }: { optio
 }
 
 export default function ClientsPage() {
- const { clients, addClient } = useClients();
+ const { clients, addClient, refreshClients } = useClients();
  const router = useRouter();
+
+ useEffect(() => {
+   refreshClients();
+ }, [refreshClients]);
  const [isCreating, setIsCreating] = useState(false);
  const [newName, setNewName] = useState("");
  const [newType, setNewType] = useState("Organization");
@@ -103,23 +107,19 @@ export default function ClientsPage() {
  return true;
  });
 
- const handleCreate = () => {
+ const handleCreate = async () => {
  if (!newName.trim()) return;
  
- const newId = Date.now().toString();
- addClient({
- id: newId,
- name: newName,
+ const createdId = await addClient({
+ name: newName.trim(),
  type: newType,
- contact: "No contact info",
- stats: "0 contacts · 0 locations · 0 linked jobs"
  });
  
  setNewName("");
  setNewType("Organization");
  setIsCreating(false);
  
- router.push(`/clients/${newId}`);
+ router.push(`/clients/${createdId}`);
  };
 
  return (
@@ -230,12 +230,20 @@ export default function ClientsPage() {
  <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
  <span className="text-[var(--sage)] shrink-0">On file</span>
  <span className="text-[var(--ink)] font-medium sm:text-right">
- {`${client.contacts?.length || 0} contacts · ${client.locations?.length || 0} locations · 0 linked jobs`}
+ {client.stats || `${client.contacts?.length || 0} contacts · ${client.locations?.length || 0} locations · ${client.linkedJobsCount ?? 0} linked jobs`}
  </span>
  </div>
  </div>
  </div>
  ))}
+ {filteredClients.length === 0 && (
+ <div className="col-span-full bg-white rounded-2xl border border-gray-200 p-12 text-center">
+ <p className="text-[15px] font-medium text-[var(--ink)] mb-1">No clients found</p>
+ <p className="text-sm text-[var(--sage)]">
+ {searchQuery ? "Try adjusting your search terms." : "Add your first client to start organizing contacts and locations."}
+ </p>
+ </div>
+ )}
  </div>
  </motion.div>
  );

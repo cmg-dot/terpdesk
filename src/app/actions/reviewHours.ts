@@ -7,7 +7,8 @@ import { revalidatePath } from "next/cache";
 
 export async function approveHours(
   requestId: string,
-  approvedMileage: number
+  approvedMileage: number,
+  positionIndex: 1 | 2 = 1
 ): Promise<{ success: boolean }> {
   await db.transaction(async (tx) => {
     const [existing] = await tx
@@ -19,34 +20,57 @@ export async function approveHours(
       throw new Error("Request not found");
     }
 
-    const existingHours = (existing.data as any)?.hoursSubmission || {};
+    const posIdx = positionIndex || 1;
+    const existingData = (existing.data as any) || {};
+    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? existingData.hoursSubmission : {}) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
 
     const approveHistoryEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'approved',
-      title: 'Hours approved and finalized',
+      title: `Hours approved and finalized (Position ${posIdx})`,
       actor: 'Agency Staff',
       timestamp: new Date().toISOString(),
       version: existingHours.version || 1,
+      positionIndex: posIdx,
       details: {
         approvedMileage,
       }
     };
 
+    const updatedPosHours = {
+      ...existingHours,
+      positionIndex: posIdx,
+      status: 'approved',
+      approvedMileage,
+      approvedAt: new Date().toISOString(),
+      reviewMessage: null,
+      history: [...existingHistory, approveHistoryEntry],
+    };
+
+    const updatedHoursSubmissions = {
+      ...(existingData.hoursSubmissions || {}),
+      [posIdx]: updatedPosHours
+    };
+
+    // Check if other position is awaiting review or correction
+    const otherPos = posIdx === 1 ? 2 : 1;
+    const otherPosHours = updatedHoursSubmissions[otherPos];
+    let overallStatus = "approved";
+    if (otherPosHours && otherPosHours.status === 'awaiting_review') {
+      overallStatus = "awaiting_review";
+    } else if (otherPosHours && otherPosHours.status === 'correction_requested') {
+      overallStatus = "correction_requested";
+    }
+
     await tx
       .update(requests)
       .set({
-        status: "approved",
+        status: overallStatus,
         data: {
-          ...existing.data,
-          hoursSubmission: {
-            ...existingHours,
-            approvedMileage,
-            approvedAt: new Date().toISOString(),
-            reviewMessage: null,
-            history: [...existingHistory, approveHistoryEntry],
-          },
+          ...existingData,
+          hoursSubmissions: updatedHoursSubmissions,
+          hoursSubmission: posIdx === 1 ? updatedPosHours : (existingData.hoursSubmission || updatedPosHours),
         },
         updatedAt: new Date(),
       })
@@ -64,7 +88,8 @@ export async function approveHours(
 
 export async function requestHoursCorrection(
   requestId: string,
-  reviewMessage: string
+  reviewMessage: string,
+  positionIndex: 1 | 2 = 1
 ): Promise<{ success: boolean }> {
   await db.transaction(async (tx) => {
     const [existing] = await tx
@@ -76,17 +101,34 @@ export async function requestHoursCorrection(
       throw new Error("Request not found");
     }
 
-    const existingHours = (existing.data as any)?.hoursSubmission || {};
+    const posIdx = positionIndex || 1;
+    const existingData = (existing.data as any) || {};
+    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? existingData.hoursSubmission : {}) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
 
     const corrReqHistoryEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'correction_requested',
-      title: 'Correction requested by agency',
+      title: `Correction requested by agency (Position ${posIdx})`,
       actor: 'Agency Staff',
       timestamp: new Date().toISOString(),
       version: existingHours.version || 1,
+      positionIndex: posIdx,
       message: reviewMessage,
+    };
+
+    const updatedPosHours = {
+      ...existingHours,
+      positionIndex: posIdx,
+      status: 'correction_requested',
+      reviewMessage,
+      correctionRequestedAt: new Date().toISOString(),
+      history: [...existingHistory, corrReqHistoryEntry],
+    };
+
+    const updatedHoursSubmissions = {
+      ...(existingData.hoursSubmissions || {}),
+      [posIdx]: updatedPosHours
     };
 
     await tx
@@ -94,13 +136,9 @@ export async function requestHoursCorrection(
       .set({
         status: "correction_requested",
         data: {
-          ...existing.data,
-          hoursSubmission: {
-            ...existingHours,
-            reviewMessage,
-            correctionRequestedAt: new Date().toISOString(),
-            history: [...existingHistory, corrReqHistoryEntry],
-          },
+          ...existingData,
+          hoursSubmissions: updatedHoursSubmissions,
+          hoursSubmission: posIdx === 1 ? updatedPosHours : (existingData.hoursSubmission || updatedPosHours),
         },
         updatedAt: new Date(),
       })

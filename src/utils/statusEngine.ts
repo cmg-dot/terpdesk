@@ -38,20 +38,22 @@ export function isNeedsReplacementStatus(status?: string | null): boolean {
 }
 
 export function getStaffingRatio(appointment: Appointment) {
+  const totalSlots = appointment.totalPositions || appointment.slotCount || (appointment.requiredPositions || (appointment.positions === "Team — two independent positions" ? 2 : 1));
   const activeSlots = appointment.slots?.filter(s => s.active) || [];
-  const totalSlots = activeSlots.length || (appointment.requiredPositions || 1); // fallback to legacy
-  let bookedSlots = activeSlots.filter(s => s.reservedBy !== null);
-  let bookedCount = bookedSlots.length || (appointment.acceptedInterpretersCount || 0);
 
-  // Check offers for accepted state
-  if (bookedCount === 0 && appointment.offers && Array.isArray(appointment.offers)) {
+  let bookedSlots: Slot[] = [];
+  if (activeSlots.length > 0) {
+    bookedSlots = activeSlots.filter(s => s.reservedBy !== null);
+  }
+
+  // Check offers for accepted state if bookedSlots has fewer
+  if (appointment.offers && Array.isArray(appointment.offers)) {
     const acceptedOffers = appointment.offers.filter(
       (o: any) => o.status === 'accepted' || o.state === 'accepted'
     );
-    if (acceptedOffers.length > 0) {
-      bookedCount = acceptedOffers.length;
-      bookedSlots = acceptedOffers.map((o: any) => ({
-        id: o.id || 'accepted-offer',
+    if (acceptedOffers.length > bookedSlots.length) {
+      bookedSlots = acceptedOffers.map((o: any, idx: number) => ({
+        id: o.id || `accepted-offer-${idx}`,
         active: true,
         reservedBy: o.interpreterId || 'interpreter',
         interpreterName: o.interpreterName || 'Booked',
@@ -61,7 +63,10 @@ export function getStaffingRatio(appointment: Appointment) {
     }
   }
 
-  // Check appointment.hasAcceptedOffer, booked/assigned status, or assigned interpreter
+  let bookedCount = appointment.staffedCount !== undefined 
+    ? appointment.staffedCount 
+    : (bookedSlots.length || (appointment.acceptedInterpretersCount || 0));
+
   const statusLower = (appointment.status || appointment.requestStatus || '').toLowerCase();
   const isBookedOrAssigned = 
     appointment.hasAcceptedOffer === true ||
@@ -84,7 +89,13 @@ export function getStaffingRatio(appointment: Appointment) {
     }
   }
 
-  return { bookedCount, totalSlots, bookedSlots };
+  const isAllFilled = bookedCount >= totalSlots && totalSlots > 0;
+  const isReplacement = !isAllFilled && (
+    isNeedsReplacementStatus(appointment.status) ||
+    activeSlots.some(s => s.needsReplacement && !s.reservedBy)
+  );
+
+  return { bookedCount, totalSlots, bookedSlots, isReplacement };
 }
 
 export function getStaffingLabel(appointment: Appointment, now: number = Date.now()): string {
@@ -92,25 +103,24 @@ export function getStaffingLabel(appointment: Appointment, now: number = Date.no
     return 'Cancelled';
   }
   
-  const { bookedCount, totalSlots } = getStaffingRatio(appointment);
+  const { bookedCount, totalSlots, isReplacement } = getStaffingRatio(appointment);
   const filters = getStatusFilters(appointment, now);
-  
-  if (isNeedsReplacementStatus(appointment.status)) return 'Needs replacement';
 
   if (bookedCount >= totalSlots && totalSlots > 0) {
     const s = appointment.status?.toLowerCase();
     if (s === 'booked') return 'Booked';
     return 'Fully staffed';
   }
+  
+  if (isReplacement || filters.needsReplacement) return 'Needs replacement';
   if (filters.hasPendingOffer) return 'Offer awaiting response';
-  if (filters.needsReplacement) return 'Needs replacement';
-  if (bookedCount > 0) return 'Partially staffed';
+  if (bookedCount > 0 && bookedCount < totalSlots) return 'Partially staffed';
   
   return 'Unfilled / draft';
 }
 
 export function getStatusFilters(appointment: Appointment, now: number = Date.now()) {
-  const { bookedCount, totalSlots } = getStaffingRatio(appointment);
+  const { bookedCount, totalSlots, isReplacement } = getStaffingRatio(appointment);
   
   const isPastStart = appointment.startsAt ? now >= new Date(appointment.startsAt).getTime() : false;
   const isPastEnd = appointment.endsAt ? now > new Date(appointment.endsAt).getTime() : false;
@@ -118,21 +128,27 @@ export function getStatusFilters(appointment: Appointment, now: number = Date.no
   
   const activeSlots = appointment.slots?.filter(s => s.active) || [];
   
-  // A pending offer must be active (not expired)
-  const hasPendingOffer = (appointment.offers || []).some(o => 
-    o.state === 'pending' && (new Date(o.expiresAt).getTime() > now)
-  ) || (appointment.pendingOffer === true) || (appointment.status?.toLowerCase().includes('awaiting response'));
+  // A pending offer must be active (not expired and before appointment end)
+  const hasPendingOffer = !isPastEnd && (
+    (appointment.offers || []).some(o => 
+      (o.state === 'pending' || o.status === 'pending') && 
+      o.state !== 'expired' &&
+      o.status !== 'expired' &&
+      (new Date(o.expiresAt).getTime() > now)
+    ) || (appointment.pendingOffer === true) || (appointment.status?.toLowerCase().includes('awaiting response'))
+  );
   
-  const needingCoverage = !isPastStart && !isCancelled && bookedCount < totalSlots && !hasPendingOffer;
+  const fullyStaffed = !isCancelled && bookedCount >= totalSlots && totalSlots > 0;
   
-  const needsReplacement = !isCancelled && (
+  const needsReplacement = !isCancelled && !fullyStaffed && (
+    isReplacement ||
     isNeedsReplacementStatus(appointment.status) ||
     (activeSlots.some(s => s.needsReplacement && !s.reservedBy) && bookedCount < totalSlots)
   );
-  
-  const staffFollowUp = !isCancelled && isPastEnd && activeSlots.some(s => s.followUp);
 
-  const fullyStaffed = !isCancelled && bookedCount >= totalSlots && totalSlots > 0;
+  const partiallyStaffed = !isCancelled && !needsReplacement && bookedCount > 0 && bookedCount < totalSlots;
+  const needingCoverage = !isPastStart && !isCancelled && bookedCount < totalSlots && !hasPendingOffer && !needsReplacement;
+  const staffFollowUp = !isCancelled && isPastEnd && activeSlots.some(s => s.followUp);
 
   return {
     isCancelled,
@@ -140,6 +156,7 @@ export function getStatusFilters(appointment: Appointment, now: number = Date.no
     isPastEnd,
     needingCoverage,
     hasPendingOffer,
+    partiallyStaffed,
     fullyStaffed,
     needsReplacement,
     staffFollowUp

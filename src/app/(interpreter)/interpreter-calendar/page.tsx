@@ -3,37 +3,86 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock, X, AlertTriangle } from "lucide-react";
+import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { format } from "date-fns";
+import { formatInTimeZone } from "date-fns-tz";
+import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
+import { getIanaZone } from "@/utils/timezone";
+import { isAppointmentHappeningNow } from "@/utils/happeningNow";
+import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { useGlobalState } from "@/context/GlobalContext";
+import { td_availability_view } from "@/app/actions/availability";
+import ConnectedAvailability from "@/connected/availability";
 
 type ViewType = 'month' | 'week' | 'day';
 
-interface Rule { weekday: number; startMinute: number; endMinute: number; }
-interface Exception { date: string; available: boolean; startMinute?: number; endMinute?: number; }
-interface Appointment { id: string; start: Date; end: Date; title: string; agencyName: string; }
+interface Appointment {
+  id: string;
+  requestId?: string;
+  start: Date;
+  end: Date;
+  startsAt: string;
+  endsAt: string;
+  title: string;
+  agencyName: string;
+  timeZone?: string;
+  status?: string;
+  raw?: any;
+}
 interface BusyBlock { id: string; label: string; timeZone: string; isAllDay: boolean; start: string; end: string; }
-
-const timeStringToMinutes = (time: string): number => {
-  if (!time) return 0;
-  const [h, m] = time.split(':').map(Number);
-  return h * 60 + m;
-};
-
-const minutesToTimeString = (minutes: number): string => {
-  if (minutes == null) return '';
-  const h = Math.floor(minutes / 60).toString().padStart(2, '0');
-  const m = (minutes % 60).toString().padStart(2, '0');
-  return `${h}:${m}`;
-};
 
 export default function InterpreterCalendarPage() {
   const router = useRouter();
+  const { jobs: contextJobs } = useInterpreterJobs();
+  const { currentUser } = useGlobalState();
+  const interpreterId = currentUser?.id || 'terp-1';
   const [view, setView] = useState<ViewType>('month');
-  const [currentDate, setCurrentDate] = useState(() => new Date());
 
-  const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-  const formatBadge = (d: Date) => d.toLocaleDateString('en-US', { month: '2-digit', day: '2-digit', year: 'numeric' });
-  const formatMonthYear = (d: Date) => d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
-  const formatDayViewSubtitle = (d: Date) => d.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  // UTC provides a hydration-safe initial value. The persisted profile timezone
+  // replaces it after mount; the calendar never blocks on that request.
+  const [baseTimezone, setBaseTimezone] = useState<string>('UTC');
+  const [isTimezoneLoading, setIsTimezoneLoading] = useState(true);
+  const safeBaseTimezone = getIanaZone(baseTimezone);
+
+  // Return a Date representing today at 12:00:00 in the interpreter's base timezone
+  const getTodayInBaseTimezone = React.useCallback((tz: string) => {
+    const safeZone = getIanaZone(tz);
+    const dateStr = formatInTimeZone(new Date(), safeZone, 'yyyy-MM-dd');
+    const [y, m, d] = dateStr.split('-').map(Number);
+    return new Date(y, m - 1, d, 12, 0, 0);
+  }, []);
+
+  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+
+  const handleTimezoneChange = React.useCallback((newTz: string) => {
+    const resolvedTimezone = getIanaZone(newTz);
+    setBaseTimezone(resolvedTimezone);
+    setCurrentDate(getTodayInBaseTimezone(resolvedTimezone));
+    setIsTimezoneLoading(false);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(`terpdesk_timezone_${interpreterId}`, newTz);
+        localStorage.setItem('terpdesk_interpreter_timezone', newTz);
+        const stored = localStorage.getItem('terpdesk_availability');
+        const parsed = stored ? JSON.parse(stored) : {};
+        parsed.baseTimezone = newTz;
+        localStorage.setItem('terpdesk_availability', JSON.stringify(parsed));
+      } catch (err) {}
+    }
+  }, [getTodayInBaseTimezone, interpreterId]);
+  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+
+  // 60-second tick for live status engine
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  const formatBadge = (d: Date) => format(d, 'MM/dd/yyyy');
+  const formatMonthYear = (d: Date) => format(d, 'MMMM yyyy');
+  const formatDayViewSubtitle = (d: Date) => format(d, 'EEEE, MMMM d, yyyy');
 
   const handlePrev = () => {
     const newDate = new Date(currentDate);
@@ -52,197 +101,134 @@ export default function InterpreterCalendarPage() {
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date());
+    setCurrentDate(getTodayInBaseTimezone(safeBaseTimezone));
   };
 
-  const [rules, setRules] = useState<Rule[]>([]);
-  const [exceptions, setExceptions] = useState<Exception[]>([]);
-  const [baseTimezone, setBaseTimezone] = useState('America/Los_Angeles');
-  const [isLoaded, setIsLoaded] = useState(false);
   const [busyBlocks, setBusyBlocks] = useState<BusyBlock[]>([]);
-
   const [acceptedAppointments, setAcceptedAppointments] = useState<Appointment[]>([]);
-  const [conflicts, setConflicts] = useState<Appointment[]>([]);
 
-  // Private Busy Time Handlers
-  const [busyLabel, setBusyLabel] = useState('Busy');
-  const [busyTimeZone, setBusyTimeZone] = useState('Pacific Time — Seattle, Los Angeles');
-  const [busyAllDay, setBusyAllDay] = useState(false);
-  const [busyStartDate, setBusyStartDate] = useState(new Date().toISOString().split('T')[0]);
-  const [busyStartTime, setBusyStartTime] = useState('09:00');
-  const [busyEndDate, setBusyEndDate] = useState(new Date().toISOString().split('T')[0]);
-  const [busyEndTime, setBusyEndTime] = useState('10:00');
-
-  const handleSlotClick = (day: Date, hour: number) => {
-    const dStr = new Date(day.getTime() - day.getTimezoneOffset() * 60000).toISOString().split('T')[0];
-    setBusyStartDate(dStr);
-    setBusyEndDate(dStr);
-    setBusyStartTime(`${hour.toString().padStart(2, '0')}:00`);
-    setBusyEndTime(`${(hour + 1).toString().padStart(2, '0')}:00`);
+  const handleSlotClick = (day?: Date, hour?: number) => {
     document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  useEffect(() => {
-    const avail = localStorage.getItem('terpdesk_availability');
-    if (avail) {
-      try {
-        const parsed = JSON.parse(avail);
-        if (parsed.rules) setRules(parsed.rules);
-        if (parsed.exceptions) setExceptions(parsed.exceptions);
-        if (parsed.baseTimezone) setBaseTimezone(parsed.baseTimezone);
-      } catch (e) { }
+  const parseSafeDate = (dateVal: any): string | null => {
+    if (!dateVal) return null;
+    let d = new Date(dateVal);
+    if (!isNaN(d.getTime())) return d.toISOString();
+    if (typeof dateVal === 'string') {
+      d = new Date(dateVal.replace(' ', 'T'));
+      if (!isNaN(d.getTime())) return d.toISOString();
     }
-    const busy = localStorage.getItem('terpdesk_busy_blocks');
-    if (busy) {
-      try {
-        setBusyBlocks(JSON.parse(busy));
-      } catch (e) { }
-    }
+    return null;
+  };
 
-    const loadJobs = () => {
-      const storedJobs = localStorage.getItem('terpdesk_interpreter_jobs');
-      if (storedJobs) {
-        try {
-          const parsedJobs = JSON.parse(storedJobs);
-          const bookedJobs = parsedJobs
-            .filter((j: any) => j.status === 'booked' && !j.id.includes('fictional') && !(j.title || '').includes('Fictional'))
-            .map((j: any) => ({
-              id: j.id,
-              start: new Date(j.startsAt || new Date().toISOString()),
-              end: new Date(j.endsAt || new Date(Date.now() + 3600000).toISOString()),
-              title: j.title || 'Interpreting request',
-              agencyName: j.agencyName || 'QA Fixture Agency'
-            }));
-          setAcceptedAppointments(bookedJobs);
-        } catch (e) { }
+  const reloadAvailability = React.useCallback(async () => {
+    try {
+      const data = await td_availability_view(interpreterId);
+      if (data.profile?.timeZone) {
+        const profileTimezone = getIanaZone(data.profile.timeZone);
+        setBaseTimezone(profileTimezone);
+        setCurrentDate(getTodayInBaseTimezone(profileTimezone));
       }
+      if (data.busyBlocks) {
+        setBusyBlocks(data.busyBlocks.map(b => ({
+          id: b.id,
+          label: b.title || 'Busy',
+          timeZone: b.timeZone || data.profile?.timeZone || 'UTC',
+          isAllDay: false,
+          start: b.startsAt,
+          end: b.endsAt,
+        })));
+      }
+    } catch (error) {
+      console.error(error);
+    } finally {
+      setIsTimezoneLoading(false);
+    }
+  }, [getTodayInBaseTimezone, interpreterId]);
+
+  useEffect(() => {
+    void reloadAvailability();
+  }, [reloadAvailability]);
+
+  useEffect(() => {
+    const loadJobs = () => {
+      let sourceList: any[] = [];
+      if (contextJobs && contextJobs.length > 0) {
+        sourceList = contextJobs;
+      } else {
+        const storedJobs = localStorage.getItem('terpdesk_interpreter_jobs');
+        if (storedJobs) {
+          try {
+            sourceList = JSON.parse(storedJobs);
+          } catch (e) { }
+        }
+      }
+
+      const bookedJobs = sourceList
+        .filter((j: any) => {
+          const status = String(j.status || '').toLowerCase();
+          return (status === 'booked' || status === 'accepted') &&
+            !String(j.id).includes('fictional') &&
+            !(j.title || '').includes('Fictional');
+        })
+        .map((j: any) => {
+          const startsAt = j.startsAt || parseSafeDate(j.details?.startDate ? `${j.details.startDate}T${j.details.startTime || '00:00'}` : null) || new Date().toISOString();
+          let endsAt = j.endsAt || parseSafeDate(j.details?.endDate ? `${j.details.endDate}T${j.details.endTime || '00:00'}` : null);
+          if (!endsAt) {
+            endsAt = new Date(new Date(startsAt).getTime() + 3600000).toISOString();
+          }
+
+          return {
+            id: j.id,
+            requestId: j.requestId || j.id,
+            start: new Date(startsAt),
+            end: new Date(endsAt),
+            startsAt,
+            endsAt,
+            title: j.title || 'Interpreting request',
+            agencyName: j.agencyName || j.location || 'QA Fixture Agency',
+            timeZone: j.timeZone || j.details?.timeZone,
+            status: j.status,
+            raw: j
+          };
+        });
+
+      setAcceptedAppointments(bookedJobs);
     };
 
     loadJobs();
     window.addEventListener('storage', loadJobs);
-    setIsLoaded(true);
     return () => window.removeEventListener('storage', loadJobs);
-  }, []);
+  }, [contextJobs]);
 
-  const daysOfWeek = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-
-  // Rule Handlers
-  const addRule = (weekday: number) => {
-    setRules(prev => {
-      if (prev.some(r => r.weekday === weekday)) return prev;
-      return [...prev, { weekday, startMinute: 540, endMinute: 1020 }].sort((a, b) => a.weekday - b.weekday);
-    });
+  // Clean time format helpers respecting interpreter's base timezone
+  const formatEventTimes = (startsAt: string | Date, endsAt: string | Date) => {
+    const s = new Date(startsAt);
+    const e = new Date(endsAt);
+    const startStr = formatInTimeZone(s, safeBaseTimezone, 'h:mm a');
+    const endStr = formatInTimeZone(e, safeBaseTimezone, 'h:mm a zzz');
+    return `${startStr} – ${endStr}`;
   };
 
-  const updateRule = (weekday: number, field: 'startMinute' | 'endMinute', value: number) => {
-    setRules(prev => prev.map(r => r.weekday === weekday ? { ...r, [field]: value } : r));
-  };
-
-  const removeRule = (weekday: number) => {
-    setRules(prev => prev.filter(r => r.weekday !== weekday));
-  };
-
-  // Exception Handlers
-  const addException = () => {
-    const today = new Date().toISOString().split('T')[0];
-    setExceptions(prev => [...prev, { date: today, available: false }]);
-  };
-
-  const updateException = (idx: number, updates: Partial<Exception>) => {
-    setExceptions(prev => prev.map((ex, i) => i === idx ? { ...ex, ...updates } : ex));
-  };
-
-  const removeException = (idx: number) => {
-    setExceptions(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  // Save / Undo / Conflict Engine
-  useEffect(() => {
-    if (!isLoaded) return;
-    
-    const weeklySchedule: any = {};
-    for (const rule of rules) {
-      weeklySchedule[rule.weekday] = {
-        available: true,
-        startMinute: rule.startMinute,
-        endMinute: rule.endMinute
-      };
+  const formatBusyBlockTimes = (block: BusyBlock) => {
+    const s = new Date(block.start);
+    const e = new Date(block.end);
+    const startH = parseInt(formatInTimeZone(s, safeBaseTimezone, 'H'), 10);
+    const startM = parseInt(formatInTimeZone(s, safeBaseTimezone, 'm'), 10);
+    const endH = parseInt(formatInTimeZone(e, safeBaseTimezone, 'H'), 10);
+    const endM = parseInt(formatInTimeZone(e, safeBaseTimezone, 'm'), 10);
+    const isAllDay = block.isAllDay || (startH === 0 && startM === 0 && endH === 0 && endM === 0);
+    const tzAbbr = formatInTimeZone(s, safeBaseTimezone, 'zzz');
+    if (isAllDay) {
+      return `All day · ${tzAbbr}`;
     }
-    const dateOverrides = exceptions.map(ex => ({
-      date: ex.date,
-      available: ex.available,
-      startMinute: ex.startMinute,
-      endMinute: ex.endMinute
-    }));
-    
-    const payload = {
-      baseTimezone,
-      weeklySchedule,
-      dateOverrides,
-      rules,
-      exceptions
-    };
-    
-    localStorage.setItem('terpdesk_availability', JSON.stringify(payload));
-
-    const newConflicts: Appointment[] = [];
-    for (const appt of acceptedAppointments) {
-      const apptDateObj = appt.start;
-      const dateStr = apptDateObj.getFullYear() + '-' + String(apptDateObj.getMonth() + 1).padStart(2, '0') + '-' + String(apptDateObj.getDate()).padStart(2, '0');
-      const weekday = apptDateObj.getDay();
-
-      const startM = apptDateObj.getHours() * 60 + apptDateObj.getMinutes();
-      const endM = appt.end.getHours() * 60 + appt.end.getMinutes();
-
-      const ex = exceptions.find(e => e.date === dateStr);
-      if (ex) {
-        if (!ex.available || (ex.startMinute != null && startM < ex.startMinute) || (ex.endMinute != null && endM > ex.endMinute)) {
-          newConflicts.push(appt);
-        }
-        continue;
-      }
-
-      const r = rules.find(x => x.weekday === weekday);
-      if (!r) {
-        newConflicts.push(appt);
-      } else {
-        if (startM < r.startMinute || endM > r.endMinute) {
-          newConflicts.push(appt);
-        }
-      }
-    }
-    setConflicts(newConflicts);
-  }, [rules, exceptions, baseTimezone, isLoaded, acceptedAppointments]);
-
-  // (Busy Time State Moved up)
-
-  const saveBusyTime = () => {
-    const newBlock: BusyBlock = {
-      id: Math.random().toString(36).substring(2, 9),
-      label: busyLabel,
-      timeZone: busyTimeZone,
-      isAllDay: busyAllDay,
-      start: `${busyStartDate}T${busyStartTime}`,
-      end: `${busyEndDate}T${busyEndTime}`
-    };
-
-    const updatedBlocks = [...busyBlocks, newBlock];
-    setBusyBlocks(updatedBlocks);
-    localStorage.setItem('terpdesk_busy_blocks', JSON.stringify(updatedBlocks));
-
-    setBusyLabel('Busy');
-    setBusyAllDay(false);
-  };
-
-  const cancelBusyTime = () => {
-    setBusyLabel('Busy');
-    setBusyAllDay(false);
+    return `${formatInTimeZone(s, safeBaseTimezone, 'h:mm a')} – ${formatInTimeZone(e, safeBaseTimezone, 'h:mm a zzz')}`;
   };
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: 'easeOut' }} className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased">
 
-      {/* Banner */}
       {/* Header */}
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-[var(--ink)] mb-2">
@@ -292,80 +278,116 @@ export default function InterpreterCalendarPage() {
       </div>
 
       <p className="text-[13px] text-[var(--sage)] mt-4 mb-4">
-        {view === 'day' ? formatDayViewSubtitle(currentDate) : view === 'week' ? `Week of ${formatBadge(currentDate)}` : formatMonthYear(currentDate)} · Calendar time zone: {timeZone}
+        {view === 'day' ? formatDayViewSubtitle(currentDate) : view === 'week' ? `Week of ${formatBadge(currentDate)}` : formatMonthYear(currentDate)} · {isTimezoneLoading ? 'Loading calendar time zone…' : `Calendar time zone: ${safeBaseTimezone}`}
       </p>
-
-      {/* Conditional Views */}
 
       {/* MONTH VIEW */}
       {view === 'month' && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-12 w-full overflow-x-auto">
           <div className="min-w-[700px]">
             {/* Header */}
-          <div className="grid grid-cols-7 border-b border-gray-200">
-            {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-              <div key={day} className="text-center py-4 text-[12px] font-semibold text-[var(--ink)]">
-                {day}
-              </div>
-            ))}
-          </div>
-
-          {/* Grid Body */}
-          <div className="flex flex-col">
-            {(() => {
-              const year = currentDate.getFullYear();
-              const month = currentDate.getMonth(); // 0-11
-              const firstDay = new Date(year, month, 1).getDay(); // 0 = Sun
-              const daysInMonth = new Date(year, month + 1, 0).getDate();
-              const rows = Math.ceil((firstDay + daysInMonth) / 7);
-
-              return Array.from({ length: rows }).map((_, rowIdx) => (
-                <div key={rowIdx} className="grid grid-cols-7 h-32 border-b border-gray-200 last:border-0">
-                  {Array.from({ length: 7 }).map((_, colIdx) => {
-                    const cellIndex = rowIdx * 7 + colIdx;
-                    const dayNumber = cellIndex - firstDay + 1;
-                    const isCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
-
-                    if (!isCurrentMonth) {
-                      return <div key={colIdx} className="p-2 border-r border-gray-200 bg-[#F5F4F0] last:border-r-0"></div>;
-                    }
-
-                    const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${dayNumber.toString().padStart(2, '0')}`;
-
-                    return (
-                      <div key={colIdx} className="p-2 border-r border-gray-200 text-[12px] font-medium text-[var(--ink)] last:border-r-0 relative overflow-y-auto">
-                        {dayNumber}
-                        <div className="mt-1 flex flex-col gap-1">
-                          {acceptedAppointments.filter(a => a.start.getFullYear() === year && a.start.getMonth() === month && a.start.getDate() === dayNumber).map(appt => {
-                            const startStr = appt.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                            const endStr = appt.end.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                            return (
-                              <div key={appt.id} onClick={() => router.push(`/jobs/${appt.id}`)} className="px-2 py-1.5 bg-[#E8EFEA] text-[#0B3B32] rounded-md cursor-pointer transition-opacity hover:opacity-80 border border-[#D5E3DB]">
-                                <div className="text-[11px] font-semibold truncate leading-tight">{appt.title}</div>
-                                <div className="text-[10px] opacity-90 leading-tight mt-0.5">{startStr}</div>
-                                <div className="text-[10px] opacity-90 leading-tight mt-0.5">Reserved</div>
-                                <div className="text-[10px] opacity-90 leading-tight mt-0.5 truncate">{appt.agencyName}</div>
-                              </div>
-                            );
-                          })}
-                          {busyBlocks.filter(b => b.start.startsWith(dateStr)).map(block => {
-                            const startStr = new Date(block.start).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                            const endStr = new Date(block.end).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                            return (
-                              <div key={block.id} className="px-1.5 py-1 bg-gray-100 text-gray-700 rounded-md">
-                                <div className="text-[11px] font-medium truncate leading-tight">{block.label || 'Busy'}</div>
-                                <div className="text-[10px] opacity-80 leading-tight mt-0.5">{startStr} - {endStr}</div>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
+            <div className="grid grid-cols-7 border-b border-gray-200">
+              {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                <div key={day} className="text-center py-4 text-[12px] font-semibold text-[var(--ink)]">
+                  {day}
                 </div>
-              ));
-            })()}
-          </div>
+              ))}
+            </div>
+
+            {/* Grid Body */}
+            <div className="flex flex-col">
+              {(() => {
+                const year = currentDate.getFullYear();
+                const month = currentDate.getMonth();
+                const firstDay = new Date(year, month, 1, 12, 0, 0).getDay();
+                const daysInMonth = new Date(year, month + 1, 0, 12, 0, 0).getDate();
+                const rows = Math.ceil((firstDay + daysInMonth) / 7);
+
+                return Array.from({ length: rows }).map((_, rowIdx) => (
+                  <div key={rowIdx} className="grid grid-cols-7 min-h-[130px] border-b border-gray-200 last:border-0">
+                    {Array.from({ length: 7 }).map((_, colIdx) => {
+                      const cellIndex = rowIdx * 7 + colIdx;
+                      const dayNumber = cellIndex - firstDay + 1;
+                      const isCurrentMonth = dayNumber >= 1 && dayNumber <= daysInMonth;
+
+                      if (!isCurrentMonth) {
+                        return <div key={colIdx} className="p-2 border-r border-gray-200 bg-[#F5F4F0] last:border-r-0"></div>;
+                      }
+
+                      const dateStr = `${year}-${(month + 1).toString().padStart(2, '0')}-${dayNumber.toString().padStart(2, '0')}`;
+
+                      // Match appointments matching their true scheduled date in safeBaseTimezone
+                      const dayAppts = acceptedAppointments.filter(a => {
+                        const apptDate = formatInTimeZone(new Date(a.startsAt), safeBaseTimezone, 'yyyy-MM-dd');
+                        return apptDate === dateStr;
+                      });
+
+                      // Match busy blocks strictly in safeBaseTimezone
+                      const dayBusy = busyBlocks.filter(b => {
+                        const blockDate = formatInTimeZone(new Date(b.start), safeBaseTimezone, 'yyyy-MM-dd');
+                        return blockDate === dateStr;
+                      });
+
+                      // Prioritize happening now appointments at the top
+                      const sortedDayAppts = [...dayAppts].sort((a, b) => {
+                        const aHappening = isAppointmentHappeningNow(a, currentTime);
+                        const bHappening = isAppointmentHappeningNow(b, currentTime);
+                        if (aHappening && !bHappening) return -1;
+                        if (!aHappening && bHappening) return 1;
+                        return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+                      });
+
+                      return (
+                        <div key={colIdx} className="p-2 border-r border-gray-200 text-[12px] font-medium text-[var(--ink)] last:border-r-0 relative flex flex-col">
+                          <span className="font-semibold text-gray-700">{dayNumber}</span>
+                          <div className="mt-1 flex flex-col gap-1 overflow-y-auto max-h-[160px]">
+                            {sortedDayAppts.map(appt => {
+                              const isHappening = isAppointmentHappeningNow(appt, currentTime);
+                              const timeStr = formatEventTimes(appt.startsAt, appt.endsAt);
+
+                              return (
+                                <div
+                                  key={appt.id}
+                                  onClick={() => router.push(`/jobs/${appt.id}`)}
+                                  className={`px-2 py-1.5 rounded-md cursor-pointer transition-all ${
+                                    isHappening
+                                      ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400 hover:bg-emerald-700'
+                                      : 'bg-[#E8EFEA] text-[#0B3B32] border border-[#D5E3DB] hover:opacity-85'
+                                  }`}
+                                >
+                                  {isHappening && (
+                                    <div className="flex items-center gap-1 mb-0.5">
+                                      <span className="relative flex h-1.5 w-1.5 shrink-0">
+                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+                                        <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
+                                      </span>
+                                      <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
+                                    </div>
+                                  )}
+                                  <div className="text-[11px] font-semibold truncate leading-tight">{appt.title}</div>
+                                  <div className={`text-[10px] leading-tight mt-0.5 ${isHappening ? 'text-emerald-100' : 'opacity-90'}`}>
+                                    {timeStr}
+                                  </div>
+                                </div>
+                              );
+                            })}
+                            {dayBusy.map(block => {
+                              const timeStr = formatBusyBlockTimes(block);
+                              return (
+                                <div key={block.id} className="px-1.5 py-1 bg-gray-100 text-gray-700 rounded-md">
+                                  <div className="text-[11px] font-medium truncate leading-tight">{block.label || 'Busy'}</div>
+                                  <div className="text-[10px] opacity-80 leading-tight mt-0.5 truncate">{timeStr}</div>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ));
+              })()}
+            </div>
           </div>
         </div>
       )}
@@ -373,11 +395,23 @@ export default function InterpreterCalendarPage() {
       {/* WEEK VIEW TIME GRID */}
       {view === 'week' && (() => {
         const days = [];
-        const firstDayOfWeek = new Date(currentDate);
-        firstDayOfWeek.setDate(currentDate.getDate() - currentDate.getDay());
+        const startOfWeek = new Date(
+          currentDate.getFullYear(),
+          currentDate.getMonth(),
+          currentDate.getDate() - currentDate.getDay(),
+          12,
+          0,
+          0
+        );
         for (let i = 0; i < 7; i++) {
-          const day = new Date(firstDayOfWeek);
-          day.setDate(day.getDate() + i);
+          const day = new Date(
+            startOfWeek.getFullYear(),
+            startOfWeek.getMonth(),
+            startOfWeek.getDate() + i,
+            12,
+            0,
+            0
+          );
           days.push(day);
         }
 
@@ -392,108 +426,141 @@ export default function InterpreterCalendarPage() {
             <div className="min-w-[800px]">
               {/* Header row */}
               <div className="grid grid-cols-[60px_1fr] border-b border-gray-200">
-              <div className="border-r border-gray-100 bg-[#FAFAFA]"></div>
-              <div className="grid grid-cols-7">
-                {days.map((day, i) => (
-                  <div key={i} className="text-center py-4 border-r border-gray-100 last:border-r-0">
-                    <div className="text-[13px] font-semibold text-[var(--ink)]">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}</div>
-                    <div className="text-[13px] text-gray-500 mt-0.5">{day.getMonth() + 1}/{day.getDate()}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Scrollable grid area */}
-            <div className="relative h-[800px] overflow-y-auto">
-              <div className="grid grid-cols-[60px_1fr] absolute min-w-full">
-                {/* Time Axis */}
-                <div className="bg-[#FAFAFA] border-r border-gray-100 flex flex-col relative z-20">
-                  {hours.map((h, i) => (
-                    <div key={i} className="h-[60px] border-b border-gray-100 relative">
-                      <span className={`absolute right-2 text-[10px] text-gray-500 font-medium ${i === 0 ? 'top-1' : '-top-[9px]'}`}>{h}</span>
+                <div className="border-r border-gray-100 bg-[#FAFAFA]"></div>
+                <div className="grid grid-cols-7">
+                  {days.map((day, i) => (
+                    <div key={i} className="text-center py-4 border-r border-gray-100 last:border-r-0">
+                      <div className="text-[13px] font-semibold text-[var(--ink)]">{['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][day.getDay()]}</div>
+                      <div className="text-[13px] text-gray-500 mt-0.5">{day.getMonth() + 1}/{day.getDate()}</div>
                     </div>
                   ))}
                 </div>
+              </div>
 
-                {/* Day Columns */}
-                <div className="grid grid-cols-7 relative">
-                  {/* Background grid lines */}
-                  <div className="absolute inset-0 pointer-events-none flex flex-col">
-                    {hours.map((_, i) => (
-                      <div key={i} className="h-[60px] border-b border-gray-100 w-full" />
+              {/* Scrollable grid area */}
+              <div className="relative h-[800px] overflow-y-auto">
+                <div className="grid grid-cols-[60px_1fr] absolute min-w-full">
+                  {/* Time Axis */}
+                  <div className="bg-[#FAFAFA] border-r border-gray-100 flex flex-col relative z-20">
+                    {hours.map((h, i) => (
+                      <div key={i} className="h-[60px] border-b border-gray-100 relative">
+                        <span className={`absolute right-2 text-[10px] text-gray-500 font-medium ${i === 0 ? 'top-1' : '-top-[9px]'}`}>{h}</span>
+                      </div>
                     ))}
                   </div>
 
-                  {days.map((day, dIdx) => {
-                    const jobs = acceptedAppointments.filter(a => a.start.getFullYear() === day.getFullYear() && a.start.getMonth() === day.getMonth() && a.start.getDate() === day.getDate());
-                    const blocks = busyBlocks.filter(b => {
-                      const d = new Date(b.start);
-                      return d.getFullYear() === day.getFullYear() && d.getMonth() === day.getMonth() && d.getDate() === day.getDate();
-                    });
+                  {/* Day Columns */}
+                  <div className="grid grid-cols-7 relative">
+                    {/* Background grid lines */}
+                    <div className="absolute inset-0 pointer-events-none flex flex-col">
+                      {hours.map((_, i) => (
+                        <div key={i} className="h-[60px] border-b border-gray-100 w-full" />
+                      ))}
+                    </div>
 
-                    return (
-                      <div key={dIdx} className="border-r border-gray-100 last:border-r-0 relative group">
-                        {/* Interactive Click Grid */}
-                        <div className="absolute inset-0 flex flex-col cursor-crosshair">
-                          {hours.map((_, hIdx) => (
-                            <div 
-                              key={hIdx} 
-                              className="h-[60px] hover:bg-gray-50/50 transition-colors z-0"
-                              onClick={() => handleSlotClick(day, hIdx)}
-                            />
-                          ))}
+                    {days.map((day, dIdx) => {
+                      const dayDateStr = format(day, 'yyyy-MM-dd');
+
+                      // Match appointments whose scheduled date in safeBaseTimezone equals this day's date
+                      const dayJobs = acceptedAppointments.filter(a => {
+                        return formatInTimeZone(new Date(a.startsAt), safeBaseTimezone, 'yyyy-MM-dd') === dayDateStr;
+                      });
+
+                      const blocks = busyBlocks.filter(b => {
+                        return formatInTimeZone(new Date(b.start), safeBaseTimezone, 'yyyy-MM-dd') === dayDateStr;
+                      });
+
+                      return (
+                        <div key={dIdx} className="border-r border-gray-100 last:border-r-0 relative group">
+                          {/* Interactive Click Grid */}
+                          <div className="absolute inset-0 flex flex-col cursor-crosshair">
+                            {hours.map((_, hIdx) => (
+                              <div 
+                                key={hIdx} 
+                                className="h-[60px] hover:bg-gray-50/50 transition-colors z-0"
+                                onClick={() => handleSlotClick(day, hIdx)}
+                              />
+                            ))}
+                          </div>
+
+                          {/* Plotted Events with true base timezone placement & duration */}
+                          {dayJobs.map(appt => {
+                            const startD = new Date(appt.startsAt);
+                            const endD = new Date(appt.endsAt);
+
+                            const startH = parseInt(formatInTimeZone(startD, safeBaseTimezone, 'H'), 10);
+                            const startMMin = parseInt(formatInTimeZone(startD, safeBaseTimezone, 'm'), 10);
+                            const startM = startH * 60 + startMMin;
+
+                            const durationMin = Math.max(15, Math.round((endD.getTime() - startD.getTime()) / 60000));
+                            const top = startM;
+                            const height = Math.max(durationMin, 36);
+
+                            const isHappening = isAppointmentHappeningNow(appt, currentTime);
+                            const timeLabel = formatEventTimes(appt.startsAt, appt.endsAt);
+
+                            return (
+                              <div 
+                                key={appt.id} 
+                                onClick={(e) => { e.stopPropagation(); router.push(`/jobs/${appt.id}`); }}
+                                className={`absolute left-1 right-1 rounded-lg p-2 overflow-hidden cursor-pointer transition-all ${
+                                  isHappening
+                                    ? 'bg-emerald-600 text-white border-2 border-emerald-400 z-20 shadow-md ring-2 ring-emerald-500/40'
+                                    : 'bg-[#E8EFEA] border border-[#D5E3DB] z-10 shadow-sm hover:shadow-md'
+                                }`}
+                                style={{ top: `${top}px`, height: `${height}px` }}
+                              >
+                                {isHappening && (
+                                  <div className="flex items-center gap-1 mb-1">
+                                    <span className="relative flex h-2 w-2 shrink-0">
+                                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
+                                      <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                                    </span>
+                                    <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
+                                  </div>
+                                )}
+                                <div className={`text-[11px] font-semibold truncate ${isHappening ? 'text-white' : 'text-[#0B3B32]'}`}>{appt.title}</div>
+                                <div className={`text-[10px] mt-0.5 truncate ${isHappening ? 'text-emerald-100' : 'text-[#14332D]'}`}>{timeLabel}</div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Busy Blocks */}
+                          {blocks.map(block => {
+                            const s = new Date(block.start);
+                            const e = new Date(block.end);
+                            const startH = parseInt(formatInTimeZone(s, safeBaseTimezone, 'H'), 10);
+                            const startMMin = parseInt(formatInTimeZone(s, safeBaseTimezone, 'm'), 10);
+                            const startM = startH * 60 + startMMin;
+
+                            const endH = parseInt(formatInTimeZone(e, safeBaseTimezone, 'H'), 10);
+                            const endMMin = parseInt(formatInTimeZone(e, safeBaseTimezone, 'm'), 10);
+                            let endM = endH * 60 + endMMin;
+                            if (endM <= startM) {
+                              endM = 1440;
+                            }
+                            const top = startM;
+                            const height = Math.max(endM - startM, 36);
+
+                            const timeLabel = formatBusyBlockTimes(block);
+                            
+                            return (
+                              <div 
+                                key={block.id} 
+                                className="absolute left-1 right-1 bg-gray-100 border border-gray-200 rounded-lg p-2 overflow-hidden z-10"
+                                style={{ top: `${top}px`, height: `${height}px` }}
+                              >
+                                <div className="text-[11px] font-semibold text-gray-700 truncate">{block.label || 'Busy'}</div>
+                                <div className="text-[10px] text-gray-500 mt-0.5 truncate">{timeLabel}</div>
+                              </div>
+                            );
+                          })}
                         </div>
-
-                        {/* Plotted Events */}
-                        {jobs.map(appt => {
-                          const startM = appt.start.getHours() * 60 + appt.start.getMinutes();
-                          const endM = appt.end.getHours() * 60 + appt.end.getMinutes();
-                          const top = startM; // 1px = 1min
-                          const height = Math.max(endM - startM, 30);
-                          const startStr = appt.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-
-                          return (
-                            <div 
-                              key={appt.id} 
-                              onClick={(e) => { e.stopPropagation(); router.push(`/jobs/${appt.id}`); }}
-                              className="absolute left-1 right-1 bg-[#E8EFEA] border border-[#D5E3DB] rounded-lg p-2 overflow-hidden shadow-sm z-10 cursor-pointer hover:shadow-md transition-shadow"
-                              style={{ top: `${top}px`, height: `${height}px` }}
-                            >
-                              <div className="text-[11px] font-semibold text-[#0B3B32] truncate">{appt.title}</div>
-                              <div className="text-[10px] text-[#14332D] mt-0.5">{startStr}</div>
-                              <div className="text-[10px] text-[#14332D] opacity-90">Reserved</div>
-                              <div className="text-[10px] text-[#14332D] opacity-80 mt-1 truncate">{appt.agencyName}</div>
-                            </div>
-                          );
-                        })}
-
-                        {/* Busy Blocks */}
-                        {blocks.map(block => {
-                          const s = new Date(block.start);
-                          const e = new Date(block.end);
-                          const startM = s.getHours() * 60 + s.getMinutes();
-                          const endM = e.getHours() * 60 + e.getMinutes();
-                          const top = startM;
-                          const height = Math.max(endM - startM, 30);
-                          const startStr = s.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
-                          
-                          return (
-                            <div 
-                              key={block.id} 
-                              className="absolute left-1 right-1 bg-gray-100 border border-gray-200 rounded-lg p-2 overflow-hidden z-10"
-                              style={{ top: `${top}px`, height: `${height}px` }}
-                            >
-                              <div className="text-[11px] font-semibold text-gray-700 truncate">{block.label || 'Busy'}</div>
-                              <div className="text-[10px] text-gray-500 mt-0.5">{startStr}</div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
-            </div>
             </div>
           </div>
         );
@@ -501,26 +568,76 @@ export default function InterpreterCalendarPage() {
 
       {/* DAY VIEW (AGENDA STYLE) */}
       {view === 'day' && (() => {
-        const jobs = acceptedAppointments.filter(a => a.start.getFullYear() === currentDate.getFullYear() && a.start.getMonth() === currentDate.getMonth() && a.start.getDate() === currentDate.getDate());
+        const cellDateStr = format(currentDate, 'yyyy-MM-dd');
+        const dayJobs = acceptedAppointments.filter(a => {
+          return formatInTimeZone(new Date(a.startsAt), safeBaseTimezone, 'yyyy-MM-dd') === cellDateStr;
+        });
+        const dayBlocks = busyBlocks.filter(b => {
+          return formatInTimeZone(new Date(b.start), safeBaseTimezone, 'yyyy-MM-dd') === cellDateStr;
+        });
+
+        // Prioritize happening now appointments at top of list
+        const sortedJobs = [...dayJobs].sort((a, b) => {
+          const aHappening = isAppointmentHappeningNow(a, currentTime);
+          const bHappening = isAppointmentHappeningNow(b, currentTime);
+          if (aHappening && !bHappening) return -1;
+          if (!aHappening && bHappening) return 1;
+          return new Date(a.startsAt).getTime() - new Date(b.startsAt).getTime();
+        });
 
         return (
           <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-12 shadow-sm">
             <h2 className="text-[18px] font-semibold text-[var(--ink)] mb-4">
-              {formatDayViewSubtitle(currentDate)}
+              {format(currentDate, 'EEEE, MMMM d, yyyy')}
             </h2>
 
-            {jobs.length === 0 ? (
+            {sortedJobs.length === 0 && dayBlocks.length === 0 ? (
               <p className="text-[14px] text-[var(--sage)] mb-6">
                 Nothing scheduled for this day.
               </p>
             ) : (
-              <div className="flex flex-col gap-2 mb-6">
-                {jobs.map(appt => {
-                  const startStr = appt.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+              <div className="flex flex-col gap-3 mb-6">
+                {sortedJobs.map(appt => {
+                  const isHappening = isAppointmentHappeningNow(appt, currentTime);
+                  const timeStr = formatEventTimes(appt.startsAt, appt.endsAt);
+
                   return (
-                    <div key={appt.id} onClick={() => router.push(`/jobs/${appt.id}`)} className="px-4 py-3 bg-[#E8EFEA] text-[#0B3B32] border border-[#D5E3DB] rounded-xl cursor-pointer hover:opacity-90 transition-opacity w-full">
-                      <div className="text-[13px] font-semibold mb-0.5">{appt.title}</div>
-                      <div className="text-[12px] opacity-90">{startStr} · Reserved</div>
+                    <div 
+                      key={appt.id} 
+                      onClick={() => router.push(`/jobs/${appt.id}`)} 
+                      className={`p-4 rounded-xl cursor-pointer transition-all ${
+                        isHappening 
+                          ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 hover:bg-emerald-700' 
+                          : 'bg-[#E8EFEA] text-[#0B3B32] border border-[#D5E3DB] hover:opacity-90'
+                      }`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          {isHappening && <HappeningNowBadge size="sm" />}
+                          <span className="text-[14px] font-semibold">{appt.title}</span>
+                        </div>
+                        <div className={`text-[13px] ${isHappening ? 'text-emerald-100' : 'text-[#0B3B32]'}`}>
+                          {timeStr}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+
+                {dayBlocks.map(block => {
+                  const timeStr = formatBusyBlockTimes(block);
+
+                  return (
+                    <div
+                      key={block.id}
+                      className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-800"
+                    >
+                      <div className="space-y-1">
+                        <span className="text-[14px] font-semibold">{block.label || 'Busy'}</span>
+                        <div className="text-[13px] text-gray-600">
+                          {timeStr}
+                        </div>
+                      </div>
                     </div>
                   );
                 })}
@@ -534,214 +651,19 @@ export default function InterpreterCalendarPage() {
         );
       })()}
 
-      {/* Manage availability Section */}
+      {/* Manage availability & Private busy time Section */}
       <div className="mt-12">
         <h2 className="text-3xl font-semibold text-[var(--ink)] mb-2">Manage availability</h2>
-        <p className="text-[var(--sage)] mb-4 max-w-3xl">
+        <p className="text-[var(--sage)] mb-6 max-w-3xl">
           Your usual working hours, plus any dates that differ. This is a preference, not a promise: nothing here cancels a booking, and an agency can still offer you work outside these hours.
         </p>
 
-        {/* Base Timezone */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h3 className="font-semibold text-[var(--ink)] mb-4">Base time zone</h3>
-          <select value={baseTimezone} onChange={e => setBaseTimezone(e.target.value)} className="border border-gray-200 rounded-lg px-3 py-2 text-sm outline-none w-full max-w-md bg-white">
-             <option value="America/Los_Angeles">Pacific Time — Seattle, Los Angeles</option>
-             <option value="America/Denver">Mountain Time — Denver</option>
-             <option value="America/Phoenix">Arizona (no daylight saving)</option>
-             <option value="America/Chicago">Central Time — Chicago</option>
-             <option value="America/New_York">Eastern Time — New York</option>
-          </select>
-        </div>
-
-        {/* Card 1: Usual weekly hours */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h3 className="font-semibold text-[var(--ink)] mb-4">Usual weekly hours</h3>
-          <div className="flex flex-col">
-            {daysOfWeek.map((day, idx) => {
-              const rule = rules.find(r => r.weekday === idx);
-              return (
-                <div key={day} className="flex flex-col sm:flex-row sm:items-center border-b border-gray-200 py-3 last:border-b-0 last:pb-0">
-                  <div className="w-32 font-medium text-[var(--ink)] mt-2 sm:mt-0">{day}</div>
-                  <div className="flex-1">
-                    {!rule ? (
-                      <div className="text-gray-400 mt-2 sm:mt-0">Not provided</div>
-                    ) : (
-                      <div className="flex items-center gap-2 mt-2 sm:mt-0">
-                        <input type="time" value={minutesToTimeString(rule.startMinute)} onChange={e => updateRule(idx, 'startMinute', timeStringToMinutes(e.target.value))} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
-                        <span className="text-gray-400">-</span>
-                        <input type="time" value={minutesToTimeString(rule.endMinute)} onChange={e => updateRule(idx, 'endMinute', timeStringToMinutes(e.target.value))} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
-                        <button onClick={() => removeRule(idx)} className="text-gray-400 hover:text-red-500 p-1">
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                  {!rule && (
-                    <button onClick={() => addRule(idx)} className="px-4 py-1.5 rounded-full border border-gray-200 text-gray-700 text-[13px] font-medium hover:bg-gray-50 transition-colors shrink-0 mt-3 sm:mt-0">
-                      Add hours
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Card 2: Dates that are different */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6">
-          <h3 className="font-semibold text-[var(--ink)] mb-2">Dates that are different</h3>
-          <p className="text-[var(--sage)] mb-4 text-[15px]">A date entered here replaces your usual hours for that day.</p>
-
-          {exceptions.map((ex, idx) => (
-            <div key={idx} className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4 pb-4 border-b border-gray-100 last:border-0 last:pb-0 last:mb-0">
-              <input type="date" value={ex.date} onChange={e => updateException(idx, { date: e.target.value })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
-              <select
-                value={ex.available ? 'available' : 'unavailable'}
-                onChange={e => {
-                  const isAvail = e.target.value === 'available';
-                  updateException(idx, { available: isAvail, startMinute: isAvail ? 540 : undefined, endMinute: isAvail ? 1020 : undefined });
-                }}
-                className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm bg-white outline-none"
-              >
-                <option value="unavailable">Not available at all</option>
-                <option value="available">Available these hours</option>
-              </select>
-
-              {ex.available && ex.startMinute != null && ex.endMinute != null && (
-                <div className="flex items-center gap-2">
-                  <input type="time" value={minutesToTimeString(ex.startMinute)} onChange={e => updateException(idx, { startMinute: timeStringToMinutes(e.target.value) })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
-                  <span className="text-gray-400">-</span>
-                  <input type="time" value={minutesToTimeString(ex.endMinute)} onChange={e => updateException(idx, { endMinute: timeStringToMinutes(e.target.value) })} className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm outline-none" />
-                </div>
-              )}
-
-              <button onClick={() => removeException(idx)} className="text-gray-400 hover:text-red-500 p-2 ml-auto">
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-          ))}
-
-          <button onClick={addException} className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-[13px] font-medium hover:bg-gray-50 transition-colors mt-2">
-            Add a date
-          </button>
-        </div>
-
-        {/* Conflict Engine Output */}
-        {conflicts.length > 0 && (
-          <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="mt-4 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800 overflow-hidden">
-            <div className="flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-semibold mb-2 text-[14px]">These are still booked. Availability never cancels accepted work — contact the agency if you need a change.</p>
-                <ul className="list-disc pl-5 text-[13px] space-y-1">
-                  {conflicts.map(c => {
-                    const startStr = c.start.toLocaleString();
-                    return (
-                      <li key={c.id}>
-                        <span className="font-medium">{c.title}</span> with {c.agencyName} ({startStr})
-                      </li>
-                    );
-                  })}
-                </ul>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Private busy time Section */}
-      <div id="private-busy-time" className="mt-12">
-        <h2 className="text-3xl font-semibold text-[var(--ink)] mb-2">Private busy time</h2>
-        <p className="text-[var(--sage)] mb-6 max-w-2xl">
-          Only you can see these blocks. Agencies receive no personal details. A block cannot cancel a reserved appointment.
-        </p>
-
-        {/* Card 3: Block time */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-12">
-          <h3 className="font-semibold text-[var(--ink)] mb-6">Block time</h3>
-          <div className="space-y-4">
-            <div>
-              <label className="block text-[13px] text-[var(--sage)] mb-1">Private label (optional)</label>
-              <input type="text" value={busyLabel} onChange={e => setBusyLabel(e.target.value)} className="bg-[#F5F4F0] border-none rounded-xl p-3 w-full text-[14px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#1B433C]/20" />
-            </div>
-            <div>
-              <label className="block text-[13px] text-[var(--sage)] mb-1">Time zone</label>
-              <select
-                value={busyTimeZone}
-                onChange={e => setBusyTimeZone(e.target.value)}
-                className="bg-[#F5F4F0] border-none rounded-xl p-3 w-full text-[14px] text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#1B433C]/20"
-              >
-                <option value="Pacific Time — Seattle, Los Angeles">Pacific Time — Seattle, Los Angeles</option>
-                <option value="Mountain Time — Denver">Mountain Time — Denver</option>
-                <option value="Arizona (no daylight saving)">Arizona (no daylight saving)</option>
-                <option value="Central Time — Chicago">Central Time — Chicago</option>
-                <option value="Eastern Time — New York">Eastern Time — New York</option>
-                <option value="Alaska Time">Alaska Time</option>
-                <option value="Hawaii Time">Hawaii Time</option>
-              </select>
-            </div>
-            <div className="flex items-center gap-2 my-4">
-              <input type="checkbox" checked={busyAllDay} onChange={e => setBusyAllDay(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-[#1B433C] focus:ring-[#1B433C]" />
-              <span className="text-[14px] text-[var(--ink)]">All day</span>
-            </div>
-            <div>
-              <label className="block text-[13px] text-[var(--sage)] mb-1">Busy start</label>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="relative flex-1">
-                  <input type="date" value={busyStartDate} onChange={e => setBusyStartDate(e.target.value)} className="bg-[#F5F4F0] border-none rounded-xl p-3 w-full text-[14px] pr-10 focus:outline-none" />
-                  <CalendarIcon className="w-4 h-4 text-[var(--ink)] absolute right-4 top-3.5 pointer-events-none" />
-                </div>
-                <div className="relative flex-1">
-                  <input type="time" value={busyStartTime} onChange={e => setBusyStartTime(e.target.value)} className="bg-[#F5F4F0] border-none rounded-xl p-3 w-full text-[14px] pr-10 focus:outline-none" />
-                  <Clock className="w-4 h-4 text-[var(--ink)] absolute right-4 top-3.5 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-            <div className="pt-2">
-              <label className="block text-[13px] text-[var(--sage)] mb-1">Busy end</label>
-              <div className="flex flex-col sm:flex-row sm:items-center gap-4">
-                <div className="relative flex-1">
-                  <input type="date" value={busyEndDate} onChange={e => setBusyEndDate(e.target.value)} className="bg-[#F5F4F0] border-none rounded-xl p-3 w-full text-[14px] pr-10 focus:outline-none" />
-                  <CalendarIcon className="w-4 h-4 text-[var(--ink)] absolute right-4 top-3.5 pointer-events-none" />
-                </div>
-                <div className="relative flex-1">
-                  <input type="time" value={busyEndTime} onChange={e => setBusyEndTime(e.target.value)} className="bg-[#F5F4F0] border-none rounded-xl p-3 w-full text-[14px] pr-10 focus:outline-none" />
-                  <Clock className="w-4 h-4 text-[var(--ink)] absolute right-4 top-3.5 pointer-events-none" />
-                </div>
-              </div>
-            </div>
-            <p className="text-[12px] text-[var(--sage)] mt-6 mb-4">
-              Agencies you share availability with only see that you are unavailable — never the label. A block never cancels or changes a booked assignment.
-            </p>
-            <div className="flex items-center gap-3">
-              <button onClick={saveBusyTime} className="bg-[#1B433C] text-white rounded-full px-6 py-2 text-[14px] font-medium hover:bg-[#14332D] transition-colors">
-                Save private busy time
-              </button>
-              <button onClick={cancelBusyTime} className="bg-white border border-gray-200 text-gray-700 rounded-full px-6 py-2 text-[14px] font-medium hover:bg-gray-50 transition-colors">
-                Cancel
-              </button>
-            </div>
-
-            {busyBlocks.length > 0 && (
-              <div className="mt-6 border-t border-gray-100 pt-6">
-                <h4 className="font-medium text-[14px] mb-3">Saved Busy Blocks</h4>
-                <div className="space-y-2">
-                  {busyBlocks.map(b => (
-                    <div key={b.id} className="bg-gray-50 p-3 rounded-lg text-sm flex justify-between items-center">
-                      <div>
-                        <span className="font-semibold">{b.label}</span>
-                        <span className="text-gray-500 ml-2">{b.start} to {b.end}</span>
-                      </div>
-                      <button onClick={() => setBusyBlocks(prev => { const n = prev.filter(x => x.id !== b.id); localStorage.setItem('terpdesk_busy_blocks', JSON.stringify(n)); return n; })} className="text-gray-400 hover:text-red-500">
-                        <X className="w-4 h-4" />
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <ConnectedAvailability
+          interpreterId={interpreterId}
+          currentTimezone={baseTimezone}
+          onTimezoneChanged={handleTimezoneChange}
+          onAvailabilityChanged={reloadAvailability}
+        />
       </div>
     </motion.div>
   );

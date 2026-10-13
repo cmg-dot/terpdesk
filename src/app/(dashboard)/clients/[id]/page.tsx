@@ -1,9 +1,11 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useClients } from "@/context/ClientsContext";
+import { getClientByIdAction } from "@/app/actions/clients";
+import { isInvalidEmail } from "@/utils/validation";
 
 function CustomSelect({ options, value, onChange }: { options: string[], value?: string, onChange?: (val: string) => void }) {
  const [isOpen, setIsOpen] = useState(false);
@@ -76,6 +78,7 @@ export default function ClientDetailsPage() {
  const router = useRouter();
  const { 
  clients, 
+ isLoading,
  addClient,
  updateClient,
  archiveClient,
@@ -97,13 +100,39 @@ export default function ClientDetailsPage() {
 
  const [formData, setFormData] = useState({
  name: client?.name || "",
- type: client?.type || "Individual requesting service",
+ type: client?.type || "Organization",
  generalEmail: client?.generalEmail || "",
  generalPhone: client?.generalPhone || "",
  billingOrg: client?.billingOrg || "",
  billingAddress: client?.billingAddress || "",
  privateNotes: client?.privateNotes || "",
  });
+
+ const [linkedJobs, setLinkedJobs] = useState<any[]>([]);
+
+ useEffect(() => {
+ if (client) {
+ setFormData({
+ name: client.name || "",
+ type: client.type || "Organization",
+ generalEmail: client.generalEmail || "",
+ generalPhone: client.generalPhone || "",
+ billingOrg: client.billingOrg || "",
+ billingAddress: client.billingAddress || "",
+ privateNotes: client.privateNotes || "",
+ });
+ }
+ }, [client]);
+
+ useEffect(() => {
+ if (id) {
+ getClientByIdAction(id).then(data => {
+ if (data?.linkedJobs) {
+ setLinkedJobs(data.linkedJobs);
+ }
+ }).catch(console.error);
+ }
+ }, [id]);
 
  const [isSaving, setIsSaving] = useState(false);
 
@@ -115,6 +144,9 @@ export default function ClientDetailsPage() {
  phone: "",
  isDefault: false
  });
+
+ const isGeneralEmailInvalid = isInvalidEmail(formData.generalEmail);
+ const isContactEmailInvalid = isInvalidEmail(newContactForm.email);
 
  const [newLocationForm, setNewLocationForm] = useState({
  name: "",
@@ -129,6 +161,14 @@ export default function ClientDetailsPage() {
  const [contactToDelete, setContactToDelete] = useState<string | null>(null);
  const [locationToDelete, setLocationToDelete] = useState<string | null>(null);
  const [clientToDelete, setClientToDelete] = useState(false);
+
+ if (isLoading) {
+ return (
+ <div className="max-w-[1200px] mx-auto p-6 flex flex-col items-center justify-center h-[50vh]">
+ <h1 className="text-2xl font-bold text-gray-800 mb-4">Loading client details...</h1>
+ </div>
+ );
+ }
 
  if (!client) {
  return (
@@ -203,7 +243,17 @@ export default function ClientDetailsPage() {
  </Field>
  
  <Field label="General email">
- <input type="email" className={inputClass} value={formData.generalEmail} onChange={(e) => setFormData({...formData, generalEmail: e.target.value})} />
+ <input 
+   type="email" 
+   className={`${inputClass} ${isGeneralEmailInvalid ? "ring-2 ring-red-500 border-red-500" : ""}`} 
+   value={formData.generalEmail} 
+   onChange={(e) => setFormData({...formData, generalEmail: e.target.value})} 
+ />
+ {isGeneralEmailInvalid && (
+   <p className="text-xs text-red-600 mt-1 font-medium">
+     Please enter a valid email address (e.g., name@organization.org).
+   </p>
+ )}
  </Field>
  <Field label="General phone">
  <input type="tel" className={inputClass} value={formData.generalPhone} onChange={(e) => setFormData({...formData, generalPhone: e.target.value})} />
@@ -226,12 +276,16 @@ export default function ClientDetailsPage() {
  Only agency staff can read these notes. Interpreters never see the client directory, billing contacts or these notes.
  </p>
  <button 
+ disabled={isGeneralEmailInvalid}
  onClick={() => {
+ if (isGeneralEmailInvalid) return;
  updateClient(client.id, formData);
  setIsSaving(true);
  setTimeout(() => setIsSaving(false), 2000);
  }}
- className="w-full md:w-auto bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity flex items-center justify-center sm:justify-start gap-2"
+ className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-medium transition-opacity flex items-center justify-center sm:justify-start gap-2 ${
+   isGeneralEmailInvalid ? "bg-[#8BA49E] text-white/70 opacity-60 cursor-not-allowed" : "bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90"
+ }`}
  >
  {isSaving ? "Saved!" : "Save client details"}
  </button>
@@ -330,7 +384,17 @@ export default function ClientDetailsPage() {
  <input type="text" className={inputClass} value={newContactForm.role} onChange={e => setNewContactForm({ ...newContactForm, role: e.target.value })} />
  </Field>
  <Field label="Email">
- <input type="email" className={inputClass} value={newContactForm.email} onChange={e => setNewContactForm({ ...newContactForm, email: e.target.value })} />
+ <input 
+   type="email" 
+   className={`${inputClass} ${isContactEmailInvalid ? "ring-2 ring-red-500 border-red-500" : ""}`} 
+   value={newContactForm.email} 
+   onChange={e => setNewContactForm({ ...newContactForm, email: e.target.value })} 
+ />
+ {isContactEmailInvalid && (
+   <p className="text-xs text-red-600 mt-1 font-medium">
+     Please enter a valid email address (e.g., name@organization.org).
+   </p>
+ )}
  </Field>
  <Field label="Phone">
  <input type="tel" className={inputClass} value={newContactForm.phone} onChange={e => setNewContactForm({ ...newContactForm, phone: e.target.value })} />
@@ -347,8 +411,9 @@ export default function ClientDetailsPage() {
  </div>
  <div className="mt-4">
  <button 
+ disabled={!newContactForm.name.trim() || isContactEmailInvalid}
  onClick={() => {
- if (!newContactForm.name.trim()) return;
+ if (!newContactForm.name.trim() || isContactEmailInvalid) return;
  addContact(client.id, {
  id: Date.now().toString(),
  type: newContactForm.type as 'Requester contact' | 'Billing contact',
@@ -361,7 +426,7 @@ export default function ClientDetailsPage() {
  setNewContactForm({ type: "Requester contact", name: "", role: "", email: "", phone: "", isDefault: false });
  }}
  className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
- newContactForm.name.trim() 
+ newContactForm.name.trim() && !isContactEmailInvalid
  ? 'bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90' 
  : 'bg-[#8BA49E] text-white/70 opacity-60 cursor-not-allowed'
  }`}
@@ -473,8 +538,24 @@ export default function ClientDetailsPage() {
 
  {/* Card 4: Linked Jobs */}
  <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
- <h2 className="text-lg font-medium text-[var(--ink)] mb-4">Linked jobs</h2>
+ <h2 className="text-lg font-medium text-[var(--ink)] mb-4">Linked jobs ({linkedJobs.length})</h2>
+ {linkedJobs.length > 0 ? (
+ <div className="space-y-3 mb-4">
+ {linkedJobs.map((job) => (
+ <div key={job.id} className="bg-[#F4F3EF] rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+ <div>
+ <span className="font-semibold text-sm text-[var(--ink)] block">{job.title}</span>
+ <span className="text-xs text-[var(--sage)]">Status: {job.status || "draft"}</span>
+ </div>
+ <Link href={`/requests/${job.id}`} className="text-xs font-medium text-[var(--forest)] hover:underline inline-flex items-center gap-1">
+ View request →
+ </Link>
+ </div>
+ ))}
+ </div>
+ ) : (
  <p className="text-sm text-[var(--ink)] mb-2">No jobs are linked to this client yet.</p>
+ )}
  <p className="text-[14px] text-[var(--sage)]">
  Changing saved client details never rewrites these jobs. Each job keeps the address, contact and instructions that were confirmed when it was booked.
  </p>

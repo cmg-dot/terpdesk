@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
 
 type Tab = "upcoming" | "past";
 
@@ -30,12 +31,63 @@ export default function InterpreterJobsPage() {
     return () => clearInterval(timer);
   }, []);
 
+  const loadServiceRecords = () => {
+    if (typeof window !== 'undefined') {
+      const stored = localStorage.getItem('terpdesk_service_records');
+      if (stored) {
+        try {
+          setServiceRecords(JSON.parse(stored));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+    }
+  };
+
   useEffect(() => {
+    loadServiceRecords();
+    window.addEventListener('storage', loadServiceRecords);
+    return () => window.removeEventListener('storage', loadServiceRecords);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get('tab');
+      if (tabParam === 'past' || tabParam === 'upcoming') {
+        setActiveTab(tabParam as Tab);
+      }
+      const filterParam = params.get('filter');
+      if (filterParam) {
+        const lower = filterParam.toLowerCase().replace(/[-_]/g, ' ');
+        if (lower.includes('need')) {
+          setPastFilter('Needs hours');
+        } else if (lower.includes('submit')) {
+          setPastFilter('Submitted');
+        } else if (lower.includes('change') || lower.includes('correct')) {
+          setPastFilter('Changes requested');
+        } else if (lower.includes('approv')) {
+          setPastFilter('Approved');
+        } else if (lower.includes('all')) {
+          setPastFilter('All past jobs');
+        } else {
+          setPastFilter(filterParam);
+        }
+      }
+    }
+  }, []);
+
+  const refreshOffers = () => {
     if (currentUser?.email) {
       fetchInterpreterOffers(currentUser.email).then(data => {
         setOffers(data);
       }).catch(console.error);
     }
+    loadServiceRecords();
+  };
+
+  useEffect(() => {
+    refreshOffers();
   }, [currentUser?.email]);
 
   const [activeTab, setActiveTab] = useState<Tab>("upcoming");
@@ -54,23 +106,23 @@ export default function InterpreterJobsPage() {
   
   if (pastFilter === "Needs hours") {
     displayedPastJobs = pastBookedJobs.filter(j => {
-      const record = serviceRecords.find(r => r.appointmentId === j.id);
-      return !record || (record.state !== 'submitted' && record.state !== 'approved');
+      const state = getJobHoursState(j, serviceRecords);
+      return state === 'not_submitted' || state === 'draft';
     });
   } else if (pastFilter === "Submitted") {
     displayedPastJobs = pastBookedJobs.filter(j => {
-      const record = serviceRecords.find(r => r.appointmentId === j.id);
-      return record && record.state === 'submitted';
+      const state = getJobHoursState(j, serviceRecords);
+      return state === 'awaiting_review';
     });
   } else if (pastFilter === "Changes requested") {
     displayedPastJobs = pastBookedJobs.filter(j => {
-      const record = serviceRecords.find(r => r.appointmentId === j.id);
-      return record && record.state === 'changes_requested';
+      const state = getJobHoursState(j, serviceRecords);
+      return state === 'correction_requested';
     });
   } else if (pastFilter === "Approved") {
     displayedPastJobs = pastBookedJobs.filter(j => {
-      const record = serviceRecords.find(r => r.appointmentId === j.id);
-      return record && record.state === 'approved';
+      const state = getJobHoursState(j, serviceRecords);
+      return state === 'approved';
     });
   } else {
     // "All past jobs"
@@ -126,7 +178,11 @@ export default function InterpreterJobsPage() {
             Shared appointments, offers and reserved interpreter positions.
           </p>
         </div>
-        <button className="flex items-center justify-center p-2.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors shrink-0">
+        <button 
+          onClick={refreshOffers}
+          title="Refresh jobs & hours"
+          className="flex items-center justify-center p-2.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors shrink-0 cursor-pointer"
+        >
           <RefreshCw className="w-4 h-4" />
         </button>
       </div>
@@ -166,18 +222,20 @@ export default function InterpreterJobsPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {upcomingJobs.map((job) => {
               const isOffer = job.status === 'pending';
-              const locationText = isOffer ? job.agencyName : job.location;
-              const locPrimary = locationText?.split('·')[0]?.trim() || locationText;
-              const locSecondary = locationText?.split('·')[1]?.trim();
+              const locationText = isOffer ? (job.location || job.agencyName) : job.location;
+              const locPrimary = (locationText?.split('·')[0]?.trim() || locationText) || (job.isVirtual ? "Virtual" : "Location pending");
+              const locSecondary = locationText?.split('·')[1]?.trim() || (job.isVirtual ? "Remote / Video" : (job.agencyName || "North Fictional Interpreting"));
               const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
               const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
               const tz = (job as any).details?.timeZone || job.timeZone;
               const dateText = startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
               
               const isHappening = isAppointmentHappeningNow(job, currentTime);
+              const hoursState = getJobHoursState(job, serviceRecords);
+              const badgeInfo = getHoursBadgeInfo(hoursState);
               
               return (
-                <Link key={job.id} href={`/jobs/${job.id}`} className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : 'border-gray-200'}`}>
+                <Link key={job.id} href={`/jobs/${job.id}`} className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : hoursState === 'correction_requested' ? 'border-amber-300 ring-1 ring-amber-300/30' : 'border-gray-200'}`}>
                   <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
                     <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
                       {dateText}
@@ -195,6 +253,11 @@ export default function InterpreterJobsPage() {
                         <div className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
                           Booked
                         </div>
+                      )}
+                      {hoursState === 'correction_requested' && (
+                        <span className={`text-[12px] px-2.5 py-0.5 rounded-full ${badgeInfo.badgeClass}`}>
+                          {badgeInfo.label}
+                        </span>
                       )}
                       {job.hasAutoFill && (
                         <div className="bg-[#FCE8E6] text-[#A0522D] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
@@ -214,10 +277,12 @@ export default function InterpreterJobsPage() {
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2 mt-4">
-                    <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">Setting pending</span>
-                    {job.isVirtual && (
-                      <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">Virtual</span>
-                    )}
+                    <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                      {job.setting || (job as any).details?.setting || "Medical"}
+                    </span>
+                    <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                      {job.isVirtual ? "Virtual" : (job.format || (job as any).details?.format || "In person")}
+                    </span>
                   </div>
                 </Link>
               );
@@ -236,9 +301,9 @@ export default function InterpreterJobsPage() {
               <button 
                 key={filter}
                 onClick={() => setPastFilter(filter)}
-                className={`text-[13px] font-medium px-4 py-2 rounded-full transition-colors ${
+                className={`text-[13px] font-medium px-4 py-2 rounded-full transition-colors cursor-pointer ${
                   pastFilter === filter 
-                    ? "bg-[#1B433C] text-white" 
+                    ? "bg-[#1C3F36] text-white shadow-sm" 
                     : "bg-white border border-gray-200 text-gray-700 hover:bg-gray-50"
                 }`}
               >
@@ -248,7 +313,7 @@ export default function InterpreterJobsPage() {
           </div>
 
           {/* B. Past Jobs Section */}
-          <h2 className="text-xl font-semibold text-[var(--ink)] mb-2">Past jobs</h2>
+          <h2 className="text-2xl font-bold text-[var(--ink)] mb-2">Past jobs</h2>
           <p className="text-sm text-[var(--sage)] mb-6">
             A past date does not mean the service was completed or approved. Reported hours stay in their own state until an agency reviews them.
           </p>
@@ -263,43 +328,100 @@ export default function InterpreterJobsPage() {
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
               {displayedPastJobs.map(job => {
-                const locPrimary = job.location?.split('·')[0]?.trim() || job.location;
-                const locSecondary = job.location?.split('·')[1]?.trim();
+                const locationParts = (job.location || '').split('·');
+                const locPrimary = locationParts[0]?.trim() || "Location pending";
+                const locSecondary = locationParts[1]?.trim() || job.agencyName || "North Fictional Interpreting";
+                const hoursState = getJobHoursState(job, serviceRecords);
+                const isCorrection = hoursState === 'correction_requested';
+                const record = serviceRecords.find((r: any) => r.appointmentId === job.id || r.appointmentId === job.requestId);
+                const reviewMsg = record?.reviewMessage || (job.hoursSubmission as any)?.reviewMessage;
                 
                 return (
-                  <Link key={job.id} href={`/jobs/${job.id}`} className="block bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-shadow">
-                    <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
-                      <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
-                        {(() => {
-                           const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
-                           const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
-                           const tz = (job as any).details?.timeZone || job.timeZone;
-                           return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
-                        })()}
-                      </div>
-                      <div className="flex gap-2">
-                        <div className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
-                          Booked
+                  <div 
+                    key={job.id} 
+                    className={`bg-white rounded-2xl border p-6 flex flex-col justify-between hover:shadow-md transition-shadow ${
+                      isCorrection 
+                        ? 'border-amber-300 ring-1 ring-amber-300/30' 
+                        : 'border-gray-200'
+                    }`}
+                  >
+                    <div>
+                      {/* Top Row: Date on left, pills on right */}
+                      <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
+                        <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
+                          {(() => {
+                             const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
+                             const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
+                             const tz = (job as any).details?.timeZone || job.timeZone;
+                             return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+                          })()}
+                        </div>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <div className="bg-[#DCEAE3] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                            Booked
+                          </div>
+                          {hoursState === 'not_submitted' || hoursState === 'draft' ? (
+                            <div className="bg-[#F6EFE9] text-[#78350F] border border-[#EADBCE] text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                              Submit actual hours
+                            </div>
+                          ) : hoursState === 'correction_requested' ? (
+                            <div className="bg-amber-100 text-amber-900 border border-amber-300 text-[12px] font-semibold px-3 py-1 rounded-full shrink-0">
+                              Changes requested
+                            </div>
+                          ) : hoursState === 'awaiting_review' ? (
+                            <div className="bg-purple-100 text-purple-800 text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                              Submitted
+                            </div>
+                          ) : hoursState === 'approved' ? (
+                            <div className="bg-emerald-100 text-emerald-800 text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                              Approved
+                            </div>
+                          ) : null}
                         </div>
                       </div>
-                    </div>
-                    <h3 className="text-lg font-semibold text-[var(--ink)] my-2">
-                      {job.title}
-                    </h3>
-                    <div className="flex items-start gap-2 mb-4">
-                      <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
-                      <div className="text-[14px]">
-                        <span className="text-[var(--ink)] block">{locPrimary}</span>
-                        <span className="text-[var(--sage)]">{locSecondary}</span>
+
+                      {/* Appointment Title */}
+                      <h3 className="text-xl font-bold text-[var(--ink)] my-2">
+                        {job.title}
+                      </h3>
+
+                      {/* Location & Agency */}
+                      <div className="flex items-start gap-2 mb-3">
+                        <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
+                        <div className="text-[14px]">
+                          <span className="text-[var(--ink)] block font-normal">{locPrimary}</span>
+                          <span className="text-[var(--sage)] text-[13px]">{locSecondary}</span>
+                        </div>
+                      </div>
+
+                      {/* Agency feedback comment if present */}
+                      {isCorrection && reviewMsg && (
+                        <div className="mb-4 text-xs text-amber-900 bg-amber-50 rounded-lg p-2.5 border border-amber-200">
+                          <span className="font-semibold">Agency correction request: </span>"{reviewMsg}"
+                        </div>
+                      )}
+
+                      {/* Setting and format pills */}
+                      <div className="flex flex-wrap gap-2 my-4">
+                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full bg-white">
+                          {job.setting || (job as any).details?.setting || "Medical"}
+                        </span>
+                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full bg-white">
+                          {job.isVirtual ? "Virtual" : "In person"}
+                        </span>
                       </div>
                     </div>
-                    <div className="flex flex-wrap gap-2 mt-4">
-                      <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">Setting pending</span>
-                      {job.isVirtual && (
-                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">Virtual</span>
-                      )}
-                    </div>
-                  </Link>
+
+                    {/* Bottom Action Button */}
+                    <Link
+                      href={`/jobs/${job.id}`}
+                      className="w-full mt-2 py-3 rounded-full text-center text-sm font-semibold text-white bg-[#1C3F36] hover:bg-[#153029] transition-colors block shadow-sm"
+                    >
+                      {hoursState === 'not_submitted' || hoursState === 'draft' || hoursState === 'correction_requested'
+                        ? "Submit actual hours"
+                        : "View reported hours"}
+                    </Link>
+                  </div>
                 );
               })}
             </div>

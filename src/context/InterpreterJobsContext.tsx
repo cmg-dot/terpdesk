@@ -8,10 +8,11 @@ import { useGlobalState } from "@/context/GlobalContext";
 export interface Job {
   id: string;
   requestId: string;
+  positionIndex?: 1 | 2;
   requestStatus?: string;
   title: string;
   dateString: string;
-  status: 'pending' | 'booked' | 'declined' | 'released';
+  status: 'pending' | 'booked' | 'declined' | 'released' | 'expired';
   location: string;
   isVirtual: boolean;
   hasAutoFill?: boolean;
@@ -24,6 +25,19 @@ export interface Job {
   travelStartTime?: string | null;
   travelEndTime?: string | null;
   serviceCompleted?: boolean | null;
+  setting?: string;
+  format?: string;
+  meetingLink?: string | null;
+  virtualLink?: string | null;
+  meetingId?: string | null;
+  passcode?: string | null;
+  accessCode?: string | null;
+  platform?: string | null;
+  virtualInstructions?: string | null;
+  agencyName?: string;
+  details?: any;
+  onsite?: any;
+  data?: any;
 }
 
 interface InterpreterJobsContextType {
@@ -42,18 +56,20 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
   const [isMounted, setIsMounted] = useState(false);
   const { currentUser } = useGlobalState();
 
-  useEffect(() => {
+  const reloadJobs = async () => {
     if (currentUser?.email) {
-      fetchInterpreterOffers(currentUser.email).then(offers => {
-        const mappedJobs = offers.map(o => ({
+      try {
+        const offers = await fetchInterpreterOffers(currentUser.email);
+        const mappedJobs: Job[] = offers.map(o => ({
           id: o.id,
           requestId: o.requestId,
+          positionIndex: (o as any).positionIndex || 1,
           requestStatus: o.requestStatus,
           title: o.title || "Interpreter Request",
           dateString: o.startsAt ? new Date(o.startsAt).toLocaleString() : "Date TBD",
           status: o.status === 'accepted' ? 'booked' : o.status as any,
-          location: o.agencyName || "Remote",
-          isVirtual: true,
+          location: o.location || (o.isVirtual ? "Virtual" : (o.agencyName || "Remote")),
+          isVirtual: o.isVirtual ?? true,
           startsAt: o.startsAt,
           endsAt: o.endsAt,
           program: o.program,
@@ -62,13 +78,30 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           travelStartTime: (o as any).travelStartTime,
           travelEndTime: (o as any).travelEndTime,
           serviceCompleted: (o as any).serviceCompleted,
+          setting: o.setting || o.details?.setting || "Medical",
+          format: o.format || o.details?.format || (o.isVirtual ? "Virtual" : "In person"),
+          meetingLink: o.meetingLink || o.virtualLink || null,
+          virtualLink: o.meetingLink || o.virtualLink || null,
+          meetingId: o.meetingId || null,
+          passcode: o.passcode || o.accessCode || null,
+          accessCode: o.passcode || o.accessCode || null,
+          platform: o.platform || null,
+          virtualInstructions: o.virtualInstructions || null,
+          agencyName: o.agencyName || "North Fictional Interpreting",
+          details: o.details || {},
+          onsite: o.onsite || {},
+          data: o.data || {}
         }));
         setJobs(mappedJobs);
-        setIsMounted(true);
-      }).catch(e => {
+      } catch (e) {
         console.error(e);
-        setIsMounted(true);
-      });
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (currentUser?.email) {
+      reloadJobs().finally(() => setIsMounted(true));
     } else {
       setIsMounted(true);
     }
@@ -81,17 +114,28 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
   }, [jobs, isMounted]);
 
   const acceptJobOffer = async (jobId: string) => {
-    setJobs(prevJobs => prevJobs.map(job => 
-      job.id === jobId ? { ...job, status: 'booked' } : job
-    ));
-    await updateOfferStatus(jobId, 'accepted');
+    try {
+      await updateOfferStatus(jobId, 'accepted');
+      setJobs(prevJobs => prevJobs.map(job => 
+        job.id === jobId ? { ...job, status: 'booked' } : job
+      ));
+    } catch (err: any) {
+      // If offer expired or rejected, reload to sync updated DB state
+      await reloadJobs();
+      throw err;
+    }
   };
 
   const declineOffer = async (jobId: string) => {
-    setJobs(prevJobs => prevJobs.map(job => 
-      job.id === jobId ? { ...job, status: 'declined' } : job
-    ));
-    await updateOfferStatus(jobId, 'declined');
+    try {
+      await updateOfferStatus(jobId, 'declined');
+      setJobs(prevJobs => prevJobs.map(job => 
+        job.id === jobId ? { ...job, status: 'declined' } : job
+      ));
+    } catch (err: any) {
+      await reloadJobs();
+      throw err;
+    }
   };
 
   const markJobReleased = (jobId: string) => {

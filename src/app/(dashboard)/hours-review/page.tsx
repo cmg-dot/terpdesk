@@ -50,6 +50,7 @@ export interface ServiceRecord {
   mileageNote?: string;
   serviceNote?: string;
   history?: any[];
+  positionIndex?: 1 | 2;
 }
 
 function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpdate: (r: ServiceRecord) => void }) {
@@ -105,7 +106,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     setShowMileageError(false);
     
     try {
-      await approveHours(record.appointmentId, mileageNum);
+      await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1);
     } catch (e) {
       console.error(e);
     }
@@ -114,7 +115,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     const approveEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'approved',
-      title: 'Hours approved and finalized',
+      title: record.positionIndex ? `Hours approved and finalized (Position ${record.positionIndex})` : 'Hours approved and finalized',
       actor: 'Agency Staff',
       timestamp: new Date().toISOString(),
       version: record.version || 1,
@@ -140,7 +141,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     setShowCorrectionError(false);
     
     try {
-      await requestHoursCorrection(record.appointmentId, correctionText);
+      await requestHoursCorrection(record.appointmentId, correctionText, record.positionIndex || 1);
     } catch (e) {
       console.error(e);
     }
@@ -149,7 +150,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     const corrEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'correction_requested',
-      title: 'Correction requested by agency',
+      title: record.positionIndex ? `Correction requested by agency (Position ${record.positionIndex})` : 'Correction requested by agency',
       actor: 'Agency Staff',
       timestamp: new Date().toISOString(),
       version: record.version || 1,
@@ -168,7 +169,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 mb-4">
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h2 className="font-semibold text-lg text-[var(--ink)] mb-6">Appointment {record.appointmentId}</h2>
+          <h2 className="font-semibold text-lg text-[var(--ink)] mb-6">Appointment {record.appointmentId}{record.positionIndex ? ` · Position ${record.positionIndex}` : ''}</h2>
           <h3 className="font-medium text-[16px] text-[var(--ink)]">{record.interpreterName}</h3>
         </div>
         <div className="flex flex-col items-end gap-5">
@@ -418,49 +419,60 @@ export default function HoursReviewPage() {
         const dbRequests = await fetchLiveRequests();
         const merged = [...localRecords];
         for (const req of dbRequests) {
-          const hoursSub = req.data?.hoursSubmission;
-          const isEligibleStatus = ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
-          if (hoursSub || isEligibleStatus) {
-            const existingIdx = merged.findIndex(r => r.appointmentId === req.id);
-            const isOdhh = req.data?.intake?.program === 'WA ODHH' || req.data?.intake?.program === 'wa_odhh' || req.requester?.org === 'WA ODHH';
-            const acceptedOffer = req.offers?.find((o: any) => o.status === 'accepted');
-            const state: ServiceRecord['state'] = req.status === 'approved' 
-              ? 'approved' 
-              : req.status === 'correction_requested' 
-                ? 'correction_requested' 
-                : 'awaiting_review';
-            const mappedRecord: ServiceRecord = {
-              id: req.id,
-              appointmentId: req.id,
-              interpreterName: acceptedOffer?.interpreterName || "Jamie Fictional",
-              state: state,
-              scheduledStart: req.startsAt,
-              scheduledEnd: req.endsAt,
-              actualStart: hoursSub?.actualStartTime || req.startsAt,
-              actualEnd: hoursSub?.actualEndTime || req.endsAt,
-              breakMinutes: hoursSub?.breakMinutes || 0,
-              reportedMileage: hoursSub?.miles || 0,
-              approvedMileage: hoursSub?.approvedMileage ?? null,
-              reviewMessage: hoursSub?.reviewMessage ?? null,
-              version: hoursSub?.version || 1,
-              isOdhh: isOdhh,
-              travelStart: req.travelStartTime || hoursSub?.travelStartTime || req.startsAt,
-              travelEnd: req.travelEndTime || hoursSub?.travelEndTime || req.endsAt,
-              serviceCompleted: req.serviceCompleted ?? hoursSub?.serviceCompleted ?? true,
-              mileageNote: hoursSub?.mileageNote || "",
-              serviceNote: hoursSub?.note || "",
-              history: hoursSub?.history || []
-            };
-            if (existingIdx > -1) {
-              merged[existingIdx] = {
-                ...mappedRecord,
-                ...merged[existingIdx],
-                state: merged[existingIdx].state || state,
-                isOdhh: merged[existingIdx].isOdhh ?? isOdhh,
-                history: hoursSub?.history?.length ? hoursSub.history : (merged[existingIdx].history || mappedRecord.history),
+          const totalPos = (req.totalPositions || req.slotCount || (req.positions === "Team — two independent positions" ? 2 : 1)) as 1 | 2;
+          const posList: (1 | 2)[] = totalPos === 2 ? [1, 2] : [1];
+
+          for (const pos of posList) {
+            const hoursSub = req.data?.hoursSubmissions?.[pos] || (pos === 1 ? req.data?.hoursSubmission : null);
+            const isEligibleStatus = ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
+            if (hoursSub || isEligibleStatus) {
+              const recordId = totalPos === 2 ? `${req.id}-pos-${pos}` : req.id;
+              const existingIdx = merged.findIndex(r => r.id === recordId || (totalPos === 1 && r.appointmentId === req.id));
+              const isOdhh = req.data?.intake?.program === 'WA ODHH' || req.data?.intake?.program === 'wa_odhh' || req.requester?.org === 'WA ODHH';
+              const acceptedOffer = req.offers?.find((o: any) => (o.positionIndex === pos || (!o.positionIndex && pos === 1)) && (o.status === 'accepted' || o.state === 'accepted'));
+              
+              const posStatus = hoursSub?.status || req.status;
+              const state: ServiceRecord['state'] = posStatus === 'approved' 
+                ? 'approved' 
+                : posStatus === 'correction_requested' 
+                  ? 'correction_requested' 
+                  : 'awaiting_review';
+
+              const mappedRecord: ServiceRecord = {
+                id: recordId,
+                appointmentId: req.id,
+                positionIndex: pos,
+                interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || (pos === 2 ? "Position 2 Interpreter" : "Position 1 Interpreter"),
+                state: state,
+                scheduledStart: req.startsAt,
+                scheduledEnd: req.endsAt,
+                actualStart: hoursSub?.actualStartTime || req.startsAt,
+                actualEnd: hoursSub?.actualEndTime || req.endsAt,
+                breakMinutes: hoursSub?.breakMinutes || 0,
+                reportedMileage: hoursSub?.miles || 0,
+                approvedMileage: hoursSub?.approvedMileage ?? null,
+                reviewMessage: hoursSub?.reviewMessage ?? null,
+                version: hoursSub?.version || 1,
+                isOdhh: isOdhh,
+                travelStart: req.travelStartTime || hoursSub?.travelStartTime || req.startsAt,
+                travelEnd: req.travelEndTime || hoursSub?.travelEndTime || req.endsAt,
+                serviceCompleted: req.serviceCompleted ?? hoursSub?.serviceCompleted ?? true,
+                mileageNote: hoursSub?.mileageNote || "",
+                serviceNote: hoursSub?.note || "",
+                history: hoursSub?.history || []
               };
-            } else {
-              merged.push(mappedRecord);
+
+              if (existingIdx > -1) {
+                merged[existingIdx] = {
+                  ...mappedRecord,
+                  ...merged[existingIdx],
+                  state: merged[existingIdx].state || state,
+                  isOdhh: merged[existingIdx].isOdhh ?? isOdhh,
+                  history: hoursSub?.history?.length ? hoursSub.history : (merged[existingIdx].history || mappedRecord.history),
+                };
+              } else {
+                merged.push(mappedRecord);
+              }
             }
           }
         }
