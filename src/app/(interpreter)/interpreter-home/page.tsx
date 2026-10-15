@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
 import { td_availability_view } from "@/app/actions/availability";
 
@@ -491,11 +492,13 @@ export default function InterpreterHomePage() {
 
  {/* Upcoming Bookings */}
  <div>
- <div className="flex items-center justify-between mb-4 px-2">
+ <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-2">
+ <div className="flex items-center gap-3">
  <h2 className="text-lg font-medium text-[var(--ink)]">Upcoming bookings</h2>
+ </div>
  <Link
  href="/interpreter-calendar"
- className="text-[13px] font-medium text-gray-600 hover:text-[var(--ink)] hover:underline shrink-0"
+ className="text-[13px] font-medium text-gray-600 hover:text-[var(--ink)] hover:underline shrink-0 whitespace-nowrap"
  >
  Open calendar &rarr;
  </Link>
@@ -506,8 +509,12 @@ export default function InterpreterHomePage() {
      No upcoming bookings right now.
    </div>
  ) : (
- <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
- {sortedUpcomingBookings.map((job) => {
+ <AnimatedPaginatedList
+ items={sortedUpcomingBookings}
+ itemsPerPage={5}
+ className="grid grid-cols-1 md:grid-cols-2 gap-3"
+ getKey={(job) => job.id}
+ renderItem={(job) => {
  const isHappening = isAppointmentHappeningNow(job, currentTime);
  const locationParts = (job.location || '').split("·");
  const locPrimary = (locationParts[0]?.trim() || (job.isVirtual ? "Virtual" : "Location pending"));
@@ -517,10 +524,10 @@ export default function InterpreterHomePage() {
  <Link
  key={job.id}
  href={`/jobs/${job.id}`}
- className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : 'border-gray-200'}`}
+ className={`block bg-white rounded-2xl border p-4 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : 'border-gray-200'}`}
  >
- <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
- <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
+ <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-1">
+ <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase leading-6">
  {(() => {
     const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
     const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
@@ -528,61 +535,61 @@ export default function InterpreterHomePage() {
     return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
  })()}
  </div>
- <div className="flex items-center gap-2 flex-wrap">
+ <div className="flex flex-row flex-wrap items-center justify-end gap-2">
  {isHappening && (
-   <HappeningNowBadge />
+   <HappeningNowBadge size="sm" className="h-6" />
  )}
- <div className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
+ <div className="inline-flex h-6 items-center bg-[#E2EBE5] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
  Booked
  </div>
  {job.hasAutoFill && (
- <div className="bg-[#FCE8E6] text-[#A0522D] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
+ <div className="inline-flex h-6 items-center bg-[#FCE8E6] text-[#A0522D] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
  Auto Fill
  </div>
  )}
  </div>
  </div>
- <h3 className="text-lg font-semibold text-[var(--ink)] my-2">
+ <h3 className="text-base font-semibold text-[var(--ink)] my-1.5 leading-snug">
  {job.title}
  </h3>
- <div className="flex items-start gap-2 mb-4">
- <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
- <div className="text-[14px]">
+ <div className="flex items-start gap-2 mb-2.5">
+ <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+ <div className="text-[13px] leading-snug">
  <span className="text-[var(--ink)] block">{locPrimary}</span>
  <span className="text-[var(--sage)]">{locSecondary}</span>
  </div>
  </div>
  
  {job.hasAutoFill && (
- <p className="text-[13px] text-[var(--sage)] mb-4">
+ <p className="text-xs text-[var(--sage)] mb-2.5">
  Booked by {locSecondary?.split('(')[0]?.trim()} using your Auto Fill permission.
  </p>
  )}
 
- <div className="flex flex-wrap gap-2 mt-4">
- <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+ <div className="flex flex-wrap gap-1.5 mt-2.5">
+ <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
  {job.setting || (job as any).details?.setting || "Medical"}
  </span>
- <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+ <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
  {job.isVirtual ? "Virtual" : (job.format || (job as any).details?.format || "In person")}
  </span>
  {job.positionIndex && (
- <span className="text-[12px] font-medium text-[#1B433C] bg-[#E2EBE5] px-3 py-1 rounded-full">
+ <span className="text-xs font-medium text-[#1B433C] bg-[#E2EBE5] px-2.5 py-0.5 rounded-full">
  Position {job.positionIndex}
  </span>
  )}
  </div>
  </Link>
  );
- })}
- </div>
+ }}
+ />
  )}
  </div>
 
  {/* Hours to submit Section (moved to bottom) */}
  {sortedHoursToSubmitJobs.length > 0 ? (
- <div id="hours-to-submit-section" className="bg-white rounded-2xl border border-amber-300/80 shadow-sm p-6 space-y-5 scroll-mt-6 mt-6">
- <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
+ <div id="hours-to-submit-section" className="bg-white rounded-2xl border border-amber-300/80 shadow-sm p-5 space-y-4 scroll-mt-6 mt-6">
+ <div className="flex flex-wrap items-center justify-between gap-4 mb-4 border-b border-gray-100 pb-4">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 shrink-0 border border-amber-200">
  <Clock className="w-5 h-5" />
@@ -605,14 +612,18 @@ export default function InterpreterHomePage() {
  </div>
  <Link
  href="/jobs?tab=past&filter=needs_hours"
- className="text-[13px] font-medium text-gray-600 hover:text-[var(--ink)] hover:underline shrink-0"
+ className="text-[13px] font-medium text-gray-600 hover:text-[var(--ink)] hover:underline shrink-0 whitespace-nowrap"
  >
  View in jobs &rarr;
  </Link>
  </div>
 
- <div className="space-y-3.5">
- {sortedHoursToSubmitJobs.map((job) => {
+ <AnimatedPaginatedList
+ items={sortedHoursToSubmitJobs}
+ itemsPerPage={5}
+ className="space-y-2.5"
+ getKey={(job) => job.id}
+ renderItem={(job) => {
  const hoursState = getJobHoursState(job, serviceRecords);
  const badgeInfo = getHoursBadgeInfo(hoursState);
  const isCorrection = hoursState === 'correction_requested';
@@ -626,14 +637,14 @@ export default function InterpreterHomePage() {
  return (
  <div
  key={job.id}
- className={`rounded-xl p-4 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border ${
+ className={`rounded-xl p-3 transition-all flex flex-col md:flex-row justify-between items-start md:items-center gap-3 border ${
  isCorrection
  ? 'bg-amber-50/70 border-amber-300 ring-1 ring-amber-400/20'
  : 'bg-[var(--canvas)] border-gray-200/80 hover:border-gray-300'
  }`}
  >
- <div className="space-y-1.5 flex-1 min-w-0">
- <div className="flex items-center gap-2 flex-wrap">
+ <div className="space-y-1 flex-1 min-w-0">
+ <div className="flex flex-row flex-wrap items-center gap-2">
  <span className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase">
  {(() => {
  const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
@@ -642,11 +653,11 @@ export default function InterpreterHomePage() {
  return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
  })()}
  </span>
- <span className={`text-[12px] px-2.5 py-0.5 rounded-full ${badgeInfo.badgeClass}`}>
+ <span className={`inline-flex h-6 items-center text-[11px] px-2.5 rounded-full whitespace-nowrap ${badgeInfo.badgeClass}`}>
  {badgeInfo.label}
  </span>
  </div>
- <h3 className="text-[15px] font-semibold text-[var(--ink)] truncate">
+ <h3 className="text-sm font-semibold text-[var(--ink)] truncate">
  {job.title}
  </h3>
  <div className="flex items-start gap-1.5 text-[13px] text-[var(--sage)]">
@@ -663,7 +674,7 @@ export default function InterpreterHomePage() {
  <div className="shrink-0 w-full md:w-auto flex items-center justify-end">
  <Link
  href={`/jobs/${job.id}`}
- className={`w-full md:w-auto text-[13px] font-semibold px-5 py-2.5 rounded-full transition-colors inline-flex items-center justify-center gap-1.5 shadow-sm ${
+ className={`w-full md:w-auto text-xs font-semibold px-4 py-2 rounded-full transition-colors inline-flex items-center justify-center gap-1.5 shadow-sm ${
  isCorrection
  ? 'bg-amber-600 hover:bg-amber-700 text-white'
  : 'bg-[#1B433C] hover:bg-[#14332D] text-white'
@@ -678,12 +689,12 @@ export default function InterpreterHomePage() {
  </div>
  </div>
  );
- })}
- </div>
+ }}
+ />
  </div>
  ) : (
  <div id="hours-to-submit-section" className="bg-white rounded-2xl border border-gray-200 p-6 mt-6">
- <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+ <div className="flex flex-wrap items-center justify-between gap-4">
  <div className="flex items-center gap-3">
  <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-700 shrink-0 border border-emerald-200">
  <Clock className="w-5 h-5" />
@@ -697,7 +708,7 @@ export default function InterpreterHomePage() {
  </div>
  <Link
  href="/jobs?tab=past&filter=needs_hours"
- className="text-[13px] font-medium text-gray-600 hover:text-[var(--ink)] hover:underline shrink-0"
+ className="text-[13px] font-medium text-gray-600 hover:text-[var(--ink)] hover:underline shrink-0 whitespace-nowrap"
  >
  View in jobs &rarr;
  </Link>

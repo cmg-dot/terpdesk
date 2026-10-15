@@ -1,5 +1,6 @@
 "use client";
 
+import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRequests } from "@/context/RequestsContext";
@@ -172,6 +173,7 @@ function RequestsPageContent() {
   else if (filterParam === "partially-staffed") initialStatus = "Partially staffed";
 
   const [statusFilter, setStatusFilter] = useState(initialStatus);
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
 
   const [interpreterJobs, setInterpreterJobs] = useState<any[]>([]);
   useEffect(() => {
@@ -315,12 +317,36 @@ function RequestsPageContent() {
 
  <p className="text-[13px] text-[var(--sage)] font-medium pl-2 pb-2">{filteredRequests.length} appointments</p>
 
+ {/* Tab toggle: same pill layout as the interpreter Jobs page */}
+ <div className="bg-[#F5F4F0] p-1 rounded-full flex w-full mb-2">
+ <button
+ type="button"
+ onClick={() => setActiveTab("upcoming")}
+ className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "upcoming" ? "bg-[#163C3A] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
+ >
+ Upcoming <span className="font-normal opacity-80">{upcomingRequests.length}</span>
+ </button>
+ <button
+ type="button"
+ onClick={() => setActiveTab("past")}
+ className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "past" ? "bg-[#163C3A] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
+ >
+ Past <span className="font-normal opacity-80">{pastRequests.length}</span>
+ </button>
+ </div>
+
  {/* UPCOMING SECTION */}
+ {activeTab === 'upcoming' && (
  <div className="space-y-5 pb-8">
  <h2 className="text-[19px] font-semibold text-[var(--ink)] pl-1">Upcoming</h2>
  <div className="space-y-4">
  {upcomingRequests.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">No upcoming requests match your filters.</p>}
- {upcomingRequests.map((req) => {
+ <AnimatedPaginatedList
+ items={upcomingRequests}
+ itemsPerPage={5}
+ className="space-y-4"
+ getKey={(req) => req.id}
+ renderItem={(req) => {
  const org = req.requester?.org || "Organization not provided";
  const setting = req.setting || req.details?.setting || "Medical";
  const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
@@ -337,14 +363,14 @@ function RequestsPageContent() {
  <Link
  href={`/requests/${req.id}`}
  key={req.id}
- className="block rounded-2xl border border-gray-200 bg-white p-7 border border-[#EBE8DF] hover:bg-gray-50 transition-colors cursor-pointer"
+ className="block rounded-2xl border border-gray-200 bg-white p-5 border border-[#EBE8DF] hover:bg-gray-50 transition-colors cursor-pointer"
  >
- <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+ <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
  <div className="space-y-1">
  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
  <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
  </div>
- <div className="flex items-center gap-2 flex-wrap">
+ <div className="flex flex-row flex-wrap items-center justify-end gap-2">
  {isAppointmentHappeningNow(req, currentTime) && (
    <HappeningNowBadge size="sm" />
  )}
@@ -352,7 +378,7 @@ function RequestsPageContent() {
  </div>
  </div>
 
- <div className="mt-8 flex flex-col md:flex-row gap-4 justify-between">
+ <div className="mt-4 flex flex-col md:flex-row gap-3 justify-between">
  {/* Col 1 */}
  <div className="flex items-start gap-3 w-full md:w-1/3">
  <Building2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
@@ -380,11 +406,14 @@ function RequestsPageContent() {
  </div>
  </div>
  </Link>
- )})}
+ )}}
+ />
  </div>
  </div>
+ )}
 
  {/* PAST SECTION */}
+ {activeTab === 'past' && (
  <div className="space-y-5 pb-12">
  <div className="space-y-1 pl-1">
  <h2 className="text-[19px] font-semibold text-[var(--ink)]">Past — unresolved</h2>
@@ -395,7 +424,12 @@ function RequestsPageContent() {
  
  <div className="space-y-4">
  {pastRequests.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">No past requests match your filters.</p>}
- {pastRequests.map((req) => {
+ <AnimatedPaginatedList
+ items={pastRequests}
+ itemsPerPage={5}
+ className="space-y-4"
+ getKey={(req) => req.id}
+ renderItem={(req) => {
  const org = req.requester?.org || "Organization not provided";
  const setting = req.setting || req.details?.setting || "Medical";
  const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
@@ -412,9 +446,9 @@ function RequestsPageContent() {
  <Link
  href={`/requests/${req.id}`}
  key={req.id}
- className="block rounded-2xl border border-gray-200 bg-white p-7 border border-[#EBE8DF] hover:bg-gray-50 transition-colors cursor-pointer"
+ className="block rounded-2xl border border-gray-200 bg-white p-5 border border-[#EBE8DF] hover:bg-gray-50 transition-colors cursor-pointer"
  >
- <div className="flex flex-col sm:flex-row items-start justify-between gap-4">
+ <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
  <div className="space-y-1">
  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
  <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
@@ -424,7 +458,7 @@ function RequestsPageContent() {
  </div>
  </div>
 
- <div className="mt-8 flex flex-col md:flex-row gap-4 justify-between">
+ <div className="mt-4 flex flex-col md:flex-row gap-3 justify-between">
  {/* Col 1 */}
  <div className="flex items-start gap-3 w-full md:w-1/3">
  <Building2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
@@ -452,9 +486,11 @@ function RequestsPageContent() {
  </div>
  </div>
  </Link>
- )})}
+ )}}
+ />
  </div>
  </div>
+ )}
  </motion.div>
  );
 }

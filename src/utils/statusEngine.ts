@@ -37,6 +37,22 @@ export function isNeedsReplacementStatus(status?: string | null): boolean {
   return !!status && status.toLowerCase().replace(/[\s_-]+/g, '') === 'needsreplacement';
 }
 
+/** True when an offer is pending, not expired, and the appointment has not ended. */
+export function hasLivePendingOffer(appointment: Appointment, now: number = Date.now()): boolean {
+  const isPastEnd = appointment.endsAt ? now > new Date(appointment.endsAt).getTime() : false;
+  if (isPastEnd) return false;
+  return (
+    (appointment.offers || []).some((o: any) =>
+      (o.state === 'pending' || o.status === 'pending') &&
+      o.state !== 'expired' &&
+      o.status !== 'expired' &&
+      new Date(o.expiresAt).getTime() > now,
+    ) ||
+    appointment.pendingOffer === true ||
+    Boolean(appointment.status?.toLowerCase().includes('awaiting response'))
+  );
+}
+
 export function getStaffingRatio(appointment: Appointment) {
   const totalSlots = appointment.totalPositions || appointment.slotCount || (appointment.requiredPositions || (appointment.positions === "Team — two independent positions" ? 2 : 1));
   const activeSlots = appointment.slots?.filter(s => s.active) || [];
@@ -90,8 +106,9 @@ export function getStaffingRatio(appointment: Appointment) {
   }
 
   const isAllFilled = bookedCount >= totalSlots && totalSlots > 0;
+  // A live offer means the open position is being addressed, so a stale "Needs replacement" status is ignored.
   const isReplacement = !isAllFilled && (
-    isNeedsReplacementStatus(appointment.status) ||
+    (isNeedsReplacementStatus(appointment.status) && !hasLivePendingOffer(appointment)) ||
     activeSlots.some(s => s.needsReplacement && !s.reservedBy)
   );
 
@@ -142,7 +159,7 @@ export function getStatusFilters(appointment: Appointment, now: number = Date.no
   
   const needsReplacement = !isCancelled && !fullyStaffed && (
     isReplacement ||
-    isNeedsReplacementStatus(appointment.status) ||
+    (isNeedsReplacementStatus(appointment.status) && !hasPendingOffer) ||
     (activeSlots.some(s => s.needsReplacement && !s.reservedBy) && bookedCount < totalSlots)
   );
 

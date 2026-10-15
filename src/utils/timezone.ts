@@ -77,6 +77,31 @@ export function buildAppointmentUtcTimes(params: {
   };
 }
 
+const HAS_ZONE = /(Z|[+-]\d{2}:?\d{2})$/i;
+const NAIVE_DATETIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+
+/**
+ * Normalises a timestamp to an absolute UTC ISO string.
+ * A string that already carries a zone (Z or an offset) is trusted as-is. A "naive" wall-clock string
+ * such as "2026-03-04T09:00" is read in the job's own IANA zone, never the host's local zone.
+ */
+export function toUtcIso(value: string | Date | null | undefined, ianaZone: string): string | null {
+  if (!value) return null;
+  if (value instanceof Date) return isNaN(value.getTime()) ? null : value.toISOString();
+  const text = String(value).trim();
+  if (!text) return null;
+  try {
+    if (NAIVE_DATETIME.test(text) && !HAS_ZONE.test(text)) {
+      const d = fromZonedTime(text.replace(" ", "T"), ianaZone);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    const d = new Date(text);
+    return isNaN(d.getTime()) ? null : d.toISOString();
+  } catch {
+    return null;
+  }
+}
+
 export function resolveRequestTimes(row: { createdAt?: Date | string | null; data?: any } | any): { startsAt: string; endsAt: string } {
   if (!row) {
     const fallbackStart = new Date().toISOString();
@@ -94,9 +119,12 @@ export function resolveRequestTimes(row: { createdAt?: Date | string | null; dat
     details.startsAt ||
     row.startsAt;
 
-  if (!startsAt && details.startDate && details.startTime) {
+  const reqStartDate = details.startDate || details.date || details.appointmentDate || rowData.date || rowData.startDate;
+  const startTimeVal = details.startTime || rowData.startTime;
+  if (!startsAt && reqStartDate && startTimeVal) {
     try {
-      startsAt = fromZonedTime(`${details.startDate}T${details.startTime}:00`, ianaZone).toISOString();
+      const cleanTime = String(startTimeVal).trim().length === 5 ? `${startTimeVal}:00` : startTimeVal;
+      startsAt = fromZonedTime(`${reqStartDate}T${cleanTime}`, ianaZone).toISOString();
     } catch (e) {}
   }
 
@@ -113,13 +141,12 @@ export function resolveRequestTimes(row: { createdAt?: Date | string | null; dat
     details.endsAt ||
     row.endsAt;
 
-  if (!endsAt && details.endDate && details.endTime) {
+  const reqEndDate = details.endDate || rowData.endDate || reqStartDate;
+  const endTimeVal = details.endTime || rowData.endTime;
+  if (!endsAt && reqEndDate && endTimeVal) {
     try {
-      endsAt = fromZonedTime(`${details.endDate}T${details.endTime}:00`, ianaZone).toISOString();
-    } catch (e) {}
-  } else if (!endsAt && details.startDate && details.endTime) {
-    try {
-      endsAt = fromZonedTime(`${details.startDate}T${details.endTime}:00`, ianaZone).toISOString();
+      const cleanTime = String(endTimeVal).trim().length === 5 ? `${endTimeVal}:00` : endTimeVal;
+      endsAt = fromZonedTime(`${reqEndDate}T${cleanTime}`, ianaZone).toISOString();
     } catch (e) {}
   }
 
@@ -127,7 +154,12 @@ export function resolveRequestTimes(row: { createdAt?: Date | string | null; dat
     endsAt = new Date(new Date(startsAt).getTime() + 3600000).toISOString();
   }
 
-  return { startsAt, endsAt };
+  // Always hand back absolute UTC instants so every comparison downstream is timezone-safe.
+  const startUtc = toUtcIso(startsAt, ianaZone);
+  const endUtc = toUtcIso(endsAt, ianaZone);
+  const safeStart = startUtc ?? startsAt;
+  const safeEnd = endUtc ?? (startUtc ? new Date(new Date(startUtc).getTime() + 3600000).toISOString() : endsAt);
+  return { startsAt: safeStart, endsAt: safeEnd };
 }
 
 /**

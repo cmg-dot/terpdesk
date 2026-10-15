@@ -615,6 +615,7 @@ export async function td_conflict(params: {
         .select({
           offerId: offers.id,
           requestId: offers.requestId,
+          reqStatus: requests.status,
           reqData: requests.data,
           reqCreatedAt: requests.createdAt,
         })
@@ -629,6 +630,9 @@ export async function td_conflict(params: {
 
       for (const row of acceptedOffers) {
         if (excludeRequestId && row.requestId === excludeRequestId) continue;
+        const reqStat = String(row.reqStatus || "").toLowerCase();
+        if (reqStat === "cancelled" || reqStat === "canceled") continue;
+
         const { startsAt: existingStartStr, endsAt: existingEndStr } = resolveRequestTimes({
           createdAt: row.reqCreatedAt,
           data: row.reqData,

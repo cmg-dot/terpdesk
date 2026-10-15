@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
 export type Program = 'General' | 'WA ODHH' | 'WA Apple Health';
@@ -46,6 +46,10 @@ export const interpreters = pgTable('interpreters', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+export type SelectInterpreter = typeof interpreters.$inferSelect;
+export type InsertInterpreter = typeof interpreters.$inferInsert;
+
+
 export const offers = pgTable('offers', {
   id: uuid('id').defaultRandom().primaryKey(),
   requestId: uuid('request_id').notNull().references(() => requests.id),
@@ -55,6 +59,52 @@ export const offers = pgTable('offers', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const timesheetStatusValues = ['pending', 'submitted', 'approved', 'rejected'] as const;
+export type TimesheetStatus = (typeof timesheetStatusValues)[number];
+
+export interface TimesheetTravelLeg {
+  fromLabel: string;
+  toLabel: string;
+  miles: number;
+  roundTrip: boolean;
+}
+
+export const timesheets = pgTable('timesheets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requestId: uuid('request_id').notNull().references(() => requests.id),
+  interpreterId: uuid('interpreter_id').notNull().references(() => interpreters.id),
+  // SHA-256 hex digest of the magic-link token. The raw token is never stored.
+  tokenHash: text('token_hash').notNull(),
+  tokenExpiresAt: timestamp('token_expires_at', { withTimezone: true }).notNull(),
+  actualStartTime: timestamp('actual_start_time', { withTimezone: true }),
+  actualEndTime: timestamp('actual_end_time', { withTimezone: true }),
+  breakMinutes: integer('break_minutes'),
+  travelStartTime: timestamp('travel_start_time', { withTimezone: true }),
+  travelEndTime: timestamp('travel_end_time', { withTimezone: true }),
+  billableHours: numeric('billable_hours', { precision: 5, scale: 2 }),
+  mileage: numeric('mileage', { precision: 7, scale: 1 }),
+  // Agency-approved mileage; kept separate so the interpreter's submitted value is never overwritten.
+  approvedMileage: numeric('approved_mileage', { precision: 7, scale: 1 }),
+  notes: text('notes'),
+  mileageNote: text('mileage_note'),
+  // Itemised mileage legs as entered by the interpreter; `mileage` holds the server-computed total.
+  travelLegs: jsonb('travel_legs').$type<TimesheetTravelLeg[]>(),
+  // ODHH only: whether the service was completed (the "verification" question).
+  serviceCompleted: boolean('service_completed'),
+  cancellationReason: text('cancellation_reason'),
+  serviceNote: text('service_note'),
+  signatureDataUrl: text('signature_data_url'),
+  status: text('status', { enum: timesheetStatusValues }).notNull().default('pending'),
+  submittedAt: timestamp('submitted_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  tokenHashIdx: uniqueIndex('timesheets_token_hash_idx').on(t.tokenHash),
+}));
+
+export type SelectTimesheet = typeof timesheets.$inferSelect;
+export type InsertTimesheet = typeof timesheets.$inferInsert;
 
 export interface ClientContact {
   id: string;

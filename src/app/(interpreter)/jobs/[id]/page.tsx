@@ -13,6 +13,10 @@ import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
+import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
+import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
+import { splitTimesheetError } from "@/lib/timesheetErrors";
+import type { DateFieldErrors } from "@/lib/timesheetErrors";
 
 const mapSafeZone = (tz: any) => {
   if (!tz || typeof tz !== 'string') return 'America/Los_Angeles';
@@ -364,15 +368,15 @@ function ServiceTimeBlock({ job }: { job: any }) {
   const [mileageNote, setMileageNote] = useState("");
   const [note, setNote] = useState("");
 
-  const [timeChecked, setTimeChecked] = useState(false);
-  const [mileageChecked, setMileageChecked] = useState(false);
-  const [signatureChecked, setSignatureChecked] = useState(false);
+  const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
 
   const isOdhh = job.program === 'wa_odhh' || job.program === 'WA ODHH' || (job as any).data?.intake?.program === 'WA ODHH' || (job as any).data?.intake?.program === 'wa_odhh';
   const [travelStart, setTravelStart] = useState(() => toLocalInput(job.startsAt));
   const [travelEnd, setTravelEnd] = useState(() => toLocalInput(job.endsAt));
   const [serviceCompleted, setServiceCompleted] = useState<string>("yes");
-  const [completionChecked, setCompletionChecked] = useState(false);
+  const [cancellationReason, setCancellationReason] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<DateFieldErrors>({});
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
   useEffect(() => {
     const loadRecord = () => {
@@ -424,6 +428,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
           setServiceCompleted(typeof found.serviceCompleted === 'boolean' ? (found.serviceCompleted ? 'yes' : 'no') : String(found.serviceCompleted));
         }
         if (found.mileageNote) setMileageNote(found.mileageNote);
+        if (found.cancellationReason) setCancellationReason(found.cancellationReason);
         if (found.serviceNote) setNote(found.serviceNote);
       }
     };
@@ -447,6 +452,9 @@ function ServiceTimeBlock({ job }: { job: any }) {
     return acc + (dist * multiplier);
   }, 0);
 
+  // The unpaid break only exists on private jobs; ODHH reports travel instead.
+  const effectiveBreakMinutes = isOdhh ? 0 : Math.max(0, parseInt(breakMinutes) || 0);
+
   const handleSaveDraft = () => {
     if (Date.now() < startsAtMs) {
       alert("Actual service time can be entered once the appointment starts.");
@@ -462,7 +470,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
       scheduledEnd: job.endsAt,
       actualStart: actualStart || job.startsAt,
       actualEnd: actualEnd || job.endsAt,
-      breakMinutes: parseInt(breakMinutes) || 0,
+      breakMinutes: effectiveBreakMinutes,
       reportedMileage: totalMileage,
       mileageNote: mileageNote,
       serviceNote: note,
@@ -495,6 +503,11 @@ function ServiceTimeBlock({ job }: { job: any }) {
   const handleSubmit = () => {
     if (Date.now() < startsAtMs) {
       alert("Actual service time can be entered once the appointment starts.");
+      return;
+    }
+    if (!signatureDataUrl) return;
+    if (isOdhh && serviceCompleted === 'no' && !cancellationReason.trim()) {
+      alert("Please give a reason the service was not completed.");
       return;
     }
     const isCorrection = serviceRecord?.state === 'approved' || serviceRecord?.state === 'changes_requested' || serviceRecord?.state === 'correction_requested' || job.requestStatus === 'correction_requested';
@@ -531,7 +544,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
         actualStart: actualStart || job.startsAt,
         actualEnd: actualEnd || job.endsAt,
         mileage: totalMileage,
-        breakMinutes: parseInt(breakMinutes) || 0,
+        breakMinutes: effectiveBreakMinutes,
         travelStart: travelStart || job.startsAt,
         travelEnd: travelEnd || job.endsAt,
         serviceCompleted: serviceCompleted,
@@ -551,13 +564,14 @@ function ServiceTimeBlock({ job }: { job: any }) {
       scheduledEnd: job.endsAt,
       actualStart: actualStart || job.startsAt,
       actualEnd: actualEnd || job.endsAt,
-      breakMinutes: parseInt(breakMinutes) || 0,
+      breakMinutes: effectiveBreakMinutes,
       reportedMileage: totalMileage,
       mileageNote: mileageNote,
       serviceNote: note,
       travelStart: travelStart || job.startsAt,
       travelEnd: travelEnd || job.endsAt,
       serviceCompleted: serviceCompleted,
+      cancellationReason: serviceCompleted === 'no' ? cancellationReason.trim() : null,
       isOdhh: isOdhh,
       approvedMileage: null,
       reviewMessage: null,
@@ -566,6 +580,9 @@ function ServiceTimeBlock({ job }: { job: any }) {
       history: updatedHistory
     };
 
+    const previousRequestStatus = job.requestStatus;
+    setFieldErrors({});
+    setSubmitError(null);
     job.requestStatus = 'awaiting_review';
     if ((job as any).hoursSubmission) {
       (job as any).hoursSubmission.reviewMessage = null;
@@ -575,17 +592,35 @@ function ServiceTimeBlock({ job }: { job: any }) {
     }
 
     startSubmit(async () => {
-      await submitInterpreterHours(job.requestId || job.id, startIso, endIso, totalMileage, {
-        breakMinutes: parseInt(breakMinutes) || 0,
-        travelStartTime: travelStartIso,
-        travelEndTime: travelEndIso,
-        serviceCompleted: isOdhh ? serviceCompleted : null,
-        mileageNote: mileageNote,
-        note: note,
-        version: nextVersion,
-        history: updatedHistory,
-        positionIndex: (job as any).positionIndex || 1,
-      });
+      try {
+        await submitInterpreterHours(job.requestId || job.id, startIso, endIso, totalMileage, {
+          breakMinutes: effectiveBreakMinutes,
+          travelStartTime: travelStartIso,
+          travelEndTime: travelEndIso,
+          serviceCompleted: isOdhh ? serviceCompleted : null,
+          mileageNote: mileageNote,
+          note: note,
+          version: nextVersion,
+          history: updatedHistory,
+          positionIndex: (job as any).positionIndex || 1,
+          signatureDataUrl,
+          cancellationReason: isOdhh && serviceCompleted === 'no' ? cancellationReason.trim() : undefined,
+          legs: mileageLegs.map(leg => ({
+            fromLabel: leg.from,
+            toLabel: leg.to,
+            miles: parseFloat(String(leg.distance)) || 0,
+            roundTrip: leg.type === 'round_trip',
+          })),
+        });
+      } catch (err) {
+        // Restore the optimistic status and show the message next to the field it belongs to.
+        job.requestStatus = previousRequestStatus;
+        const message = err instanceof Error && err.message ? err.message : "Could not submit your hours. Please try again.";
+        const split = splitTimesheetError(message);
+        setFieldErrors(split.fieldErrors);
+        setSubmitError(split.formError);
+        return;
+      }
 
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('terpdesk_service_records');
@@ -612,7 +647,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
     const end = new Date(actualEnd).getTime();
     if (!isNaN(start) && !isNaN(end)) {
       const diffMs = end - start;
-      const mins = Math.max(0, (diffMs / 60000) - (parseInt(breakMinutes) || 0));
+      const mins = Math.max(0, (diffMs / 60000) - (effectiveBreakMinutes));
       serviceTimeHours = (mins / 60).toFixed(1) + " hr";
     }
   }
@@ -679,134 +714,55 @@ function ServiceTimeBlock({ job }: { job: any }) {
 
              <p className="text-sm text-gray-600 mb-6">The scheduled times are filled in as a starting point. Nothing is recorded until you submit, and they are not treated as confirmed until you do. Changing these times does not move the booking in anyone's calendar.</p>
              
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label className="block text-[13px] text-gray-600 mb-2">Actual start</label>
-                  <input type="datetime-local" disabled={isFutureAppointment} value={actualStart} onChange={e => setActualStart(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                  <p className="text-[11px] text-gray-500 mt-1">9:21 AM PDT - Pacific Time — Seattle, Los Angeles (UTC-07:00)</p>
-                </div>
-                <div>
-                  <label className="block text-[13px] text-gray-600 mb-2">Actual end</label>
-                  <input type="datetime-local" disabled={isFutureAppointment} value={actualEnd} onChange={e => setActualEnd(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                  <p className="text-[11px] text-gray-500 mt-1">12:21 PM PDT - Pacific Time — Seattle, Los Angeles (UTC-07:00)</p>
-                </div>
-             </div>
-             
-             {!isOdhh ? (
-               <div className="mb-6">
-                  <label className="block text-[13px] text-gray-600 mb-2">Unpaid break, in minutes (leave at 0 if none)</label>
-                  <input type="number" disabled={isFutureAppointment} value={breakMinutes} onChange={e => setBreakMinutes(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-               </div>
-             ) : (
-               <>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                    <div>
-                      <label className="block text-[13px] text-gray-600 mb-2">Travel start</label>
-                      <input type="datetime-local" disabled={isFutureAppointment} value={travelStart} onChange={e => setTravelStart(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                    </div>
-                    <div>
-                      <label className="block text-[13px] text-gray-600 mb-2">Travel end</label>
-                      <input type="datetime-local" disabled={isFutureAppointment} value={travelEnd} onChange={e => setTravelEnd(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                    </div>
-                 </div>
-                 
-                 <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
-                    <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Verification</h4>
-                    <p className="text-xs text-[var(--sage)] mb-4">Was this service completed?</p>
-                    <div className="flex gap-4">
-                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                        <input type="radio" disabled={isFutureAppointment} value="yes" checked={serviceCompleted === "yes"} onChange={(e) => setServiceCompleted(e.target.value)} className="text-[var(--forest)] focus:ring-[#0B3B32] disabled:opacity-50" />
-                        Yes
-                      </label>
-                      <label className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                        <input type="radio" disabled={isFutureAppointment} value="no" checked={serviceCompleted === "no"} onChange={(e) => setServiceCompleted(e.target.value)} className="text-[var(--forest)] focus:ring-[#0B3B32] disabled:opacity-50" />
-                        No
-                      </label>
-                    </div>
-                 </div>
-               </>
-             )}
-             
-             <div className="mb-6">
-                <p className="text-sm font-medium text-gray-800 mb-2">Service time before review: <span className="font-bold">{serviceTimeHours}</span></p>
-             </div>
-             
-             <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
-                <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Mileage for this assignment</h4>
-                <p className="text-xs text-[var(--sage)] mb-6">Enter either the one-way distance and add a return on the same route, or enter the total distance already travelled without adding a return. This records miles only — no reimbursement is calculated here, and not every assignment pays mileage.</p>
-                
-                {mileageLegs.map(leg => {
-                  const dist = parseFloat(leg.distance as string) || 0;
-                  const legTotal = leg.type === 'round_trip' ? dist * 2 : dist;
-                  return (
-                    <div key={leg.id} className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
-                      <div className="flex flex-col md:flex-row md:items-center gap-3 mb-3">
-                        <input type="text" disabled={isFutureAppointment} placeholder="From" value={leg.from} onChange={e => updateMileageLeg(leg.id, 'from', e.target.value)} className="w-full md:w-auto md:flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                        <input type="text" disabled={isFutureAppointment} placeholder="To" value={leg.to} onChange={e => updateMileageLeg(leg.id, 'to', e.target.value)} className="w-full md:w-auto md:flex-1 min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                        <input type="number" disabled={isFutureAppointment} placeholder="Distance" value={leg.distance} onChange={e => updateMileageLeg(leg.id, 'distance', e.target.value)} className="w-full md:w-24 md:flex-none min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed" />
-                        <select disabled={isFutureAppointment} value={leg.type} onChange={e => updateMileageLeg(leg.id, 'type', e.target.value)} className="w-full md:w-auto md:flex-[1.5] min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] truncate text-ellipsis disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed">
-                          <option value="total">Total distance already travelled</option>
-                          <option value="round_trip">One-way distance + return on same route</option>
-                        </select>
-                        <button type="button" disabled={isFutureAppointment} onClick={() => removeMileageLeg(leg.id)} className="text-sm font-medium text-gray-500 hover:text-red-600 self-end md:self-auto shrink-0 transition-colors px-1 disabled:opacity-50 disabled:cursor-not-allowed">Remove</button>
-                      </div>
-                      <p className="text-xs text-gray-600">Calculated total for this leg: <span className="font-semibold">{legTotal.toFixed(1)} mi</span> {legTotal === 0 ? '— no distance added' : ''}</p>
-                    </div>
-                  );
-                })}
-                
-                <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-                   <button type="button" disabled={isFutureAppointment} onClick={addMileageLeg} className="bg-white border border-gray-300 text-gray-700 rounded-full px-4 py-1.5 text-xs font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Add a travel leg</button>
-                   <span className="text-sm text-gray-700">Calculated total mileage: <span className="font-bold">{totalMileage.toFixed(1)} mi</span></span>
-                </div>
-
-                <div className="mb-4">
-                  <label className="block text-[13px] text-gray-600 mb-2">Mileage note (optional)</label>
-                  <textarea rows={2} disabled={isFutureAppointment} value={mileageNote} onChange={e => setMileageNote(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"></textarea>
-                </div>
-
-                <p className="text-xs text-[var(--sage)]">Automatic driving distance is not switched on. No mapping service is connected to this workspace yet, so nothing can be calculated from an address today.</p>
-             </div>
-             
-             <div className="mb-6">
-                <label className="block text-[13px] text-gray-600 mb-2">Service note (optional)</label>
-                <textarea rows={3} disabled={isFutureAppointment} value={note} onChange={e => setNote(e.target.value)} className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed"></textarea>
-                <p className="text-xs text-[var(--sage)] mt-2">Keep this about timing only — start, end, breaks and waiting. Do not enter participant names, health details or anything said during the assignment.</p>
-             </div>
-             
-             <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
-                <h4 className="text-sm font-medium text-[var(--ink)] mb-3">Before you submit</h4>
-                <div className="space-y-2">
-                   <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" disabled={isFutureAppointment} checked={timeChecked} onChange={e => setTimeChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
-                      <span className="text-sm text-gray-700">Actual service time — {serviceTimeHours}</span>
-                   </label>
-                   <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" disabled={isFutureAppointment} checked={mileageChecked} onChange={e => setMileageChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
-                      <span className="text-sm text-gray-700">Mileage — {totalMileage.toFixed(1)} mi reported (leave this empty if there was no travel to report)</span>
-                   </label>
-                   <label className="flex items-center gap-3 cursor-pointer">
-                      <input type="checkbox" disabled={isFutureAppointment} checked={signatureChecked} onChange={e => setSignatureChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
-                      <span className="text-sm text-gray-700">No verification signature is asked for on this assignment</span>
-                   </label>
-                   {isOdhh && (
-                     <label className="flex items-center gap-3 cursor-pointer">
-                        <input type="checkbox" disabled={isFutureAppointment} checked={completionChecked} onChange={e => setCompletionChecked(e.target.checked)} className="rounded text-[var(--forest)] w-4 h-4 focus:ring-[#0B3B32] disabled:opacity-50" />
-                        <span className="text-sm text-gray-700">Service completion answered</span>
-                     </label>
-                   )}
-                </div>
-             </div>
-             
-             <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={handleSubmit} disabled={isSubmitting || isFutureAppointment || !timeChecked || !mileageChecked || !signatureChecked || (isOdhh && !completionChecked)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">{isSubmitting ? "Submitting..." : "Submit actual hours"}</button>
-                <button type="button" onClick={handleSaveDraft} disabled={isFutureAppointment} className="bg-white border border-gray-300 text-gray-700 rounded-full px-5 py-2 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">Save draft</button>
-                {isOdhh && (
-                  <button className="bg-white border border-gray-300 text-[var(--forest)] rounded-full px-5 py-2 text-sm font-medium hover:bg-gray-50 transition-colors sm:ml-auto">
-                    Open ODHH Portal
-                  </button>
-                )}
-             </div>
+             <InterpreterSubmitForm
+               isFutureAppointment={isFutureAppointment}
+               isSubmitting={isSubmitting}
+               isOdhh={isOdhh}
+               timeZoneLabel={String((job as any).details?.timeZone || job.timeZone || "the appointment time zone")}
+               odhhPortalUrl={buildOdhhPortalUrl((job as any).data?.intake?.odhhSrn)}
+               actualStart={actualStart}
+               actualEnd={actualEnd}
+               onActualStartChange={(v) => {
+                 setActualStart(v);
+                 setFieldErrors({});
+               }}
+               onActualEndChange={(v) => {
+                 setActualEnd(v);
+                 setFieldErrors({});
+               }}
+               breakMinutes={breakMinutes}
+               onBreakMinutesChange={setBreakMinutes}
+               travelStart={travelStart}
+               travelEnd={travelEnd}
+               onTravelStartChange={(v) => {
+                 setTravelStart(v);
+                 setFieldErrors({});
+               }}
+               onTravelEndChange={(v) => {
+                 setTravelEnd(v);
+                 setFieldErrors({});
+               }}
+               serviceCompleted={serviceCompleted}
+               onServiceCompletedChange={setServiceCompleted}
+               cancellationReason={cancellationReason}
+               onCancellationReasonChange={setCancellationReason}
+               fieldErrors={fieldErrors}
+               formError={submitError}
+               serviceTimeHours={serviceTimeHours}
+               mileageLegs={mileageLegs}
+               totalMileage={totalMileage}
+               onAddLeg={addMileageLeg}
+               onRemoveLeg={removeMileageLeg}
+               onUpdateLeg={updateMileageLeg}
+               mileageNote={mileageNote}
+               onMileageNoteChange={setMileageNote}
+               note={note}
+               onNoteChange={setNote}
+               hasSignature={Boolean(signatureDataUrl)}
+               onSignatureChange={setSignatureDataUrl}
+               onSubmit={handleSubmit}
+               onSaveDraft={handleSaveDraft}
+             />
           </div>
         </div>
       ) : currentState === 'not_submitted' ? (

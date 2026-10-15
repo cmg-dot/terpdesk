@@ -5,6 +5,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect } from
 export interface DevUser {
   id: string;
   role: 'agency' | 'interpreter';
+  name?: string;
   email?: string;
   agency_id?: string;
 }
@@ -77,10 +78,26 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
   const [website_profile_consent, setWebsiteProfileConsent] = useState<WebsiteProfileConsent[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [currentUser, setCurrentUser] = useState<DevUser>({ id: 'staff-1', role: 'agency', email: 'north.staff@fictional.test', agency_id: 'agency-1' });
+  const [currentUser, setCurrentUserState] = useState<DevUser>({ id: 'staff-1', role: 'agency', name: 'Avery North', email: 'north.staff@fictional.test', agency_id: 'agency-1' });
+
+  const setCurrentUser = (user: DevUser) => {
+    setCurrentUserState(user);
+    if (typeof window !== 'undefined') {
+      try {
+        localStorage.setItem('terpdesk_current_user', JSON.stringify(user));
+      } catch (e) {}
+    }
+  };
 
   useEffect(() => {
     try {
+      const storedUser = localStorage.getItem('terpdesk_current_user');
+      if (storedUser) {
+        try {
+          setCurrentUserState(JSON.parse(storedUser));
+        } catch (e) {}
+      }
+
       const storedAgencies = localStorage.getItem('terpdesk_agencies');
       if (storedAgencies) {
         setAgencies(JSON.parse(storedAgencies));

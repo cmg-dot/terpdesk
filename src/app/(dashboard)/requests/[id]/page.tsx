@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { useRequests } from "@/context/RequestsContext";
 import { useGlobalState } from "@/context/GlobalContext";
 import { ChevronDown, Copy, Check, ExternalLink, Video, MapPin, Edit2, X, Lock, Clock } from "lucide-react";
@@ -22,6 +22,7 @@ import { formatReference } from "@/utils/statusEngine";
 import { getInterpretersFitForJob } from "@/app/actions/availability";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { InterpreterFitBadge, FitWarningNotice } from "@/components/scheduling-ui";
+import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
 
 const fitOptionLabels: Record<InterpreterFitStatus, string> = {
   available: "Available",
@@ -33,13 +34,15 @@ const fitOptionLabels: Record<InterpreterFitStatus, string> = {
 
 function getInterpreterOptionLabel(
   name: string,
+  email: string | undefined,
   fit: InterpreterFitStatus | undefined,
   isLoading: boolean,
   hasError: boolean
 ): string {
-  if (fit) return `${name} — ${fitOptionLabels[fit]}`;
-  if (hasError) return `${name} — Availability check failed`;
-  return isLoading ? `${name} — Checking availability…` : `${name} — Availability status unavailable`;
+  const identifier = email ? `${name} (${email})` : name;
+  if (fit) return `${identifier} — ${fitOptionLabels[fit]}`;
+  if (hasError) return `${identifier} — Availability check failed`;
+  return isLoading ? `${identifier} — Checking availability…` : `${identifier} — Availability status unavailable`;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -247,6 +250,7 @@ export default function AssignmentDetailPage() {
   const activeRoster = dbInterpreters.map(m => ({
     id: m.id,
     name: m.name,
+    email: m.email,
     isAutoFillEligible: interpreterFitMap[m.id] === 'available' || interpreterFitMap[m.id] === 'outside_hours' || interpreterFitMap[m.id] === undefined
   }));
 
@@ -255,6 +259,8 @@ export default function AssignmentDetailPage() {
   const [expiryDate1, setExpiryDate1] = useState('');
   const [expiryTime1, setExpiryTime1] = useState('');
   const [errorMessage1, setErrorMessage1] = useState('');
+  const [successMessage1, setSuccessMessage1] = useState('');
+  const [isSendingOffer1, setIsSendingOffer1] = useState(false);
   const [isEligible1, setIsEligible1] = useState<boolean | null>(null);
 
   const [recipient2, setRecipient2] = useState('');
@@ -262,7 +268,18 @@ export default function AssignmentDetailPage() {
   const [expiryDate2, setExpiryDate2] = useState('');
   const [expiryTime2, setExpiryTime2] = useState('');
   const [errorMessage2, setErrorMessage2] = useState('');
+  const [successMessage2, setSuccessMessage2] = useState('');
+  const [isSendingOffer2, setIsSendingOffer2] = useState(false);
   const [isEligible2, setIsEligible2] = useState<boolean | null>(null);
+
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage((cur) => (cur === msg ? null : cur));
+    }, 5000);
+  };
 
   const [foundRequest, setFoundRequest] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -281,16 +298,20 @@ export default function AssignmentDetailPage() {
   const slot1Accepted = realOffers.find((o: any) => (o.positionIndex === 1 || !o.positionIndex) && (o.state === 'accepted' || o.status === 'accepted')) || (
     foundRequest?.slots?.find((s: any) => s.positionIndex === 1 && s.reservedBy)
       ? { interpreterName: foundRequest.slots.find((s: any) => s.positionIndex === 1).interpreterName || 'Booked', interpreterId: foundRequest.slots.find((s: any) => s.positionIndex === 1).reservedBy, id: 'assigned-1', positionIndex: 1 }
-      : ((totalPositions === 1 && (foundRequest?.status === 'assigned' || foundRequest?.status === 'booked') && foundRequest?.assignedInterpreterName)
-        ? { interpreterName: foundRequest.assignedInterpreterName, id: 'assigned-booking', positionIndex: 1 }
-        : null)
+      : (foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId
+          ? { interpreterName: foundRequest.assignedInterpreterName || foundRequest?.data?.assignedInterpreterName || 'Booked', interpreterId: foundRequest.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId, id: 'assigned-root', positionIndex: 1 }
+          : ((totalPositions === 1 && (foundRequest?.status === 'assigned' || foundRequest?.status === 'booked') && foundRequest?.assignedInterpreterName)
+            ? { interpreterName: foundRequest.assignedInterpreterName, id: 'assigned-booking', positionIndex: 1 }
+            : null))
   );
 
   const slot2Accepted = totalPositions === 2 ? (
     realOffers.find((o: any) => o.positionIndex === 2 && (o.state === 'accepted' || o.status === 'accepted')) || (
       foundRequest?.slots?.find((s: any) => s.positionIndex === 2 && s.reservedBy)
         ? { interpreterName: foundRequest.slots.find((s: any) => s.positionIndex === 2).interpreterName || 'Booked', interpreterId: foundRequest.slots.find((s: any) => s.positionIndex === 2).reservedBy, id: 'assigned-2', positionIndex: 2 }
-        : null
+        : (foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId
+            ? { interpreterName: foundRequest.position2InterpreterName || foundRequest?.data?.position2InterpreterName || 'Booked', interpreterId: foundRequest.position2InterpreterId || foundRequest?.data?.position2InterpreterId, id: 'assigned-pos2', positionIndex: 2 }
+            : null)
     )
   ) : null;
 
@@ -325,12 +346,19 @@ export default function AssignmentDetailPage() {
   const slot1NeedsReplacement = !isAllPositionsFilled && !slot1Accepted && Boolean(slot1Slot?.needsReplacement || foundRequest?.data?.slotReplacements?.[1]);
   const slot2NeedsReplacement = !isAllPositionsFilled && !slot2Accepted && Boolean(slot2Slot?.needsReplacement || foundRequest?.data?.slotReplacements?.[2]);
 
-  // Rule — No Duplicate Interpreter Across Slots
+  // Rule — No Duplicate Interpreter Across Slots (Prevent Position Duplication)
   const isOccupiedInSlot1 = (interpId: string, interpName?: string) => {
+    // Currently selected in Position 1
+    if (recipient1 && recipient1 === interpId) return true;
+    if (autoBookRecipient1 && autoBookRecipient1 === interpId) return true;
+
+    // Currently assigned or offered in Position 1
     if (slot1Accepted) {
       if (slot1Accepted.interpreterId && slot1Accepted.interpreterId === interpId) return true;
       if (interpName && slot1Accepted.interpreterName && slot1Accepted.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
     }
+    const slot1Reserved = slot1Slot?.reservedBy || foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId;
+    if (slot1Reserved && slot1Reserved === interpId) return true;
     if (slot1ActiveOffer) {
       if (slot1ActiveOffer.interpreterId && slot1ActiveOffer.interpreterId === interpId) return true;
       if (interpName && slot1ActiveOffer.interpreterName && slot1ActiveOffer.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
@@ -339,10 +367,17 @@ export default function AssignmentDetailPage() {
   };
 
   const isOccupiedInSlot2 = (interpId: string, interpName?: string) => {
+    // Currently selected in Position 2
+    if (recipient2 && recipient2 === interpId) return true;
+    if (autoBookRecipient2 && autoBookRecipient2 === interpId) return true;
+
+    // Currently assigned or offered in Position 2
     if (slot2Accepted) {
       if (slot2Accepted.interpreterId && slot2Accepted.interpreterId === interpId) return true;
       if (interpName && slot2Accepted.interpreterName && slot2Accepted.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
     }
+    const slot2Reserved = slot2Slot?.reservedBy || foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId;
+    if (slot2Reserved && slot2Reserved === interpId) return true;
     if (slot2ActiveOffer) {
       if (slot2ActiveOffer.interpreterId && slot2ActiveOffer.interpreterId === interpId) return true;
       if (interpName && slot2ActiveOffer.interpreterName && slot2ActiveOffer.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
@@ -540,8 +575,11 @@ export default function AssignmentDetailPage() {
     interpreterName: string;
   } | null>(null);
   const [isRemovingBooking, setIsRemovingBooking] = useState(false);
+  const [removeBookingError, setRemoveBookingError] = useState<string | null>(null);
+  const router = useRouter();
 
   const handleOpenRemoveBookingModal = (positionIndex: 1 | 2, offerId?: string, interpreterName?: string) => {
+    setRemoveBookingError(null);
     setRemoveBookingTarget({
       positionIndex,
       offerId,
@@ -553,6 +591,7 @@ export default function AssignmentDetailPage() {
   const handleConfirmRemoveBooking = async () => {
     if (!removeBookingTarget) return;
     setIsRemovingBooking(true);
+    setRemoveBookingError(null);
     try {
       await removeBooking(id, removeBookingTarget.offerId, removeBookingTarget.positionIndex);
 
@@ -573,12 +612,15 @@ export default function AssignmentDetailPage() {
         }
       }
 
-      const updated = await fetchLiveRequestById(id);
-      setFoundRequest(updated);
+      // Close the modal right away, then invalidate and refetch so the UI reflects the DB
       setShowRemoveBookingModal(false);
       setRemoveBookingTarget(null);
+      const updated = await fetchLiveRequestById(id);
+      setFoundRequest(updated);
+      router.refresh();
     } catch (err) {
       console.error(err);
+      setRemoveBookingError(err instanceof Error ? err.message : 'Failed to remove the booking. Please try again.');
     } finally {
       setIsRemovingBooking(false);
     }
@@ -733,7 +775,12 @@ export default function AssignmentDetailPage() {
     const expDate = posIdx === 1 ? expiryDate1 : expiryDate2;
     const expTime = posIdx === 1 ? expiryTime1 : expiryTime2;
     const setErr = posIdx === 1 ? setErrorMessage1 : setErrorMessage2;
+    const setSuccess = posIdx === 1 ? setSuccessMessage1 : setSuccessMessage2;
     const setRec = posIdx === 1 ? setRecipient1 : setRecipient2;
+    const setIsSending = posIdx === 1 ? setIsSendingOffer1 : setIsSendingOffer2;
+
+    setErr('');
+    setSuccess('');
 
     if (!rec || !expDate || !expTime) {
       setErr('Please select an interpreter and set a valid future expiry date/time before the appointment starts.');
@@ -750,7 +797,18 @@ export default function AssignmentDetailPage() {
       return;
     }
 
+    const selectedInterpreter = dbInterpreters.find((i: any) => i.id === rec);
+    const interpreterEmail = selectedInterpreter?.email;
+
+    if (!interpreterEmail) {
+      setErr('Unable to find an email address for the selected interpreter.');
+      return;
+    }
+
+    setIsSending(true);
+
     try {
+      // 1. Create the offer in the database
       await createOffer({
         requestId: id,
         interpreterId: rec,
@@ -758,15 +816,40 @@ export default function AssignmentDetailPage() {
         positionIndex: posIdx
       });
 
-      // Refetch the request to get updated offers list
+      // 2. Dispatch offer email with magic link
+      const dispatchRes = await fetch('/api/offers/dispatch', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          interpreterId: rec,
+          requestId: id,
+          interpreterEmail,
+          positionNumber: posIdx,
+        }),
+      });
+
+      const dispatchData = await dispatchRes.json();
+
+      if (!dispatchRes.ok || !dispatchData.success) {
+        throw new Error(dispatchData.error || 'Failed to dispatch offer email');
+      }
+
+      // 3. Refetch the request to get updated offers list
       const updatedRequest = await fetchLiveRequestById(id);
       setFoundRequest(updatedRequest);
       
       setErr('');
+      setSuccess('Offer emailed successfully');
+      showToast('Offer emailed successfully');
       setRec('');
     } catch (error) {
-      console.error(error);
-      setErr('Failed to create offer. Please try again.');
+      console.error('[Offer Dispatch] Error creating or sending offer:', error);
+      const errorMsg = error instanceof Error ? error.message : 'Failed to create offer. Please try again.';
+      setErr(errorMsg);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -1446,15 +1529,38 @@ export default function AssignmentDetailPage() {
       const needsReplacement = isSlot1 ? slot1NeedsReplacement : slot2NeedsReplacement;
       const roster = isSlot1 ? rosterSlot1 : rosterSlot2;
       const rec = isSlot1 ? recipient1 : recipient2;
-      const setRec = isSlot1 ? setRecipient1 : setRecipient2;
+      const setRec = (val: string) => {
+        if (isSlot1) {
+          setRecipient1(val);
+          if (val && recipient2 === val) setRecipient2('');
+          if (val && autoBookRecipient2 === val) setAutoBookRecipient2('');
+        } else {
+          setRecipient2(val);
+          if (val && recipient1 === val) setRecipient1('');
+          if (val && autoBookRecipient1 === val) setAutoBookRecipient1('');
+        }
+      };
+
       const autoBookRec = isSlot1 ? autoBookRecipient1 : autoBookRecipient2;
-      const setAutoBookRec = isSlot1 ? setAutoBookRecipient1 : setAutoBookRecipient2;
+      const setAutoBookRec = (val: string) => {
+        if (isSlot1) {
+          setAutoBookRecipient1(val);
+          if (val && autoBookRecipient2 === val) setAutoBookRecipient2('');
+          if (val && recipient2 === val) setRecipient2('');
+        } else {
+          setAutoBookRecipient2(val);
+          if (val && autoBookRecipient1 === val) setAutoBookRecipient1('');
+          if (val && recipient1 === val) setRecipient1('');
+        }
+      };
       const expDate = isSlot1 ? expiryDate1 : expiryDate2;
       const setExpDate = isSlot1 ? setExpiryDate1 : setExpiryDate2;
       const expTime = isSlot1 ? expiryTime1 : expiryTime2;
       const setExpTime = isSlot1 ? setExpiryTime1 : setExpiryTime2;
       const errMsg = isSlot1 ? errorMessage1 : errorMessage2;
       const setErrMsg = isSlot1 ? setErrorMessage1 : setErrorMessage2;
+      const successMsg = isSlot1 ? successMessage1 : successMessage2;
+      const isSending = isSlot1 ? isSendingOffer1 : isSendingOffer2;
       const isElig = isSlot1 ? isEligible1 : isEligible2;
       const setIsElig = isSlot1 ? setIsEligible1 : setIsEligible2;
 
@@ -1463,12 +1569,12 @@ export default function AssignmentDetailPage() {
       if (accepted) {
         slotBadgeColor = 'bg-green-100 text-green-700';
         slotBadgeText = 'Booking: Filled';
-      } else if (needsReplacement) {
-        slotBadgeColor = 'bg-[#FDE8E8] text-[#9B1C1C]';
-        slotBadgeText = 'Booking: Needs replacement';
       } else if (activeOffer) {
         slotBadgeColor = 'bg-blue-100 text-blue-700';
         slotBadgeText = 'Booking: Offer awaiting response';
+      } else if (needsReplacement) {
+        slotBadgeColor = 'bg-[#FDE8E8] text-[#9B1C1C]';
+        slotBadgeText = 'Booking: Needs replacement';
       }
 
       return (
@@ -1563,6 +1669,7 @@ export default function AssignmentDetailPage() {
                           <option key={interpreter.id} value={interpreter.id}>
                             {getInterpreterOptionLabel(
                               interpreter.name,
+                              interpreter.email,
                               interpreterFitMap[interpreter.id],
                               isInterpreterFitLoading,
                               Boolean(interpreterFitError)
@@ -1615,21 +1722,39 @@ export default function AssignmentDetailPage() {
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Choose a future expiration before the appointment starts. No messages are sent outside this workspace.</p>
+                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Choose a future expiration before the appointment starts. An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
                       {errMsg && <p className="text-[#C23B22] text-sm mb-4">{errMsg}</p>}
+                      {successMsg && (
+                        <p className="text-[#059669] text-sm mb-4 font-medium flex items-center gap-1.5">
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="20 6 9 17 4 12"/>
+                          </svg>
+                          {successMsg}
+                        </p>
+                      )}
                     </div>
 
                     <button 
                       type="button"
                       onClick={() => handleCreateOffer(posIdx)}
-                      disabled={!rec}
-                      className={`rounded-full px-6 py-2 text-sm font-medium transition-colors mt-2 w-auto ${
-                        !rec 
+                      disabled={!rec || isSending}
+                      className={`rounded-full px-6 py-2 text-sm font-medium transition-colors mt-2 w-auto flex items-center gap-2 ${
+                        !rec || isSending
                           ? 'bg-[#8BA49E] text-white opacity-50 cursor-not-allowed' 
                           : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
                       }`}
                     >
-                      Create offer
+                      {isSending ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                          </svg>
+                          <span>Sending offer...</span>
+                        </>
+                      ) : (
+                        'Create offer'
+                      )}
                     </button>
                   </div>
 
@@ -1667,6 +1792,7 @@ export default function AssignmentDetailPage() {
                             <option key={interpreter.id} value={interpreter.id}>
                               {getInterpreterOptionLabel(
                                 interpreter.name,
+                                interpreter.email,
                                 interpreterFitMap[interpreter.id],
                                 isInterpreterFitLoading,
                                 Boolean(interpreterFitError)
@@ -1710,25 +1836,46 @@ export default function AssignmentDetailPage() {
           ) : (
             <div className="space-y-4">
               <div className="bg-[#F5F4F0] p-4 rounded-xl">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center gap-2">
                     <span className="text-sm text-[var(--ink)] font-medium">{accepted.interpreterName}</span>
                     <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-semibold capitalize">Assigned</span>
                   </div>
-                  {isBookingLocked ? (
-                    <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-200/70 text-gray-600 text-xs font-medium">
-                      <Lock className="w-3.5 h-3.5 text-gray-500" />
-                      <span>{isAppointmentInProgress ? 'Locked · In progress' : 'Locked · Appointment passed'}</span>
-                    </div>
-                  ) : (
-                    <button 
-                      type="button"
-                      onClick={() => handleOpenRemoveBookingModal(posIdx, accepted.id, accepted.interpreterName)}
-                      className="text-[var(--sage)] hover:text-red-600 text-sm font-medium transition-colors"
-                    >
-                      Remove booking
-                    </button>
-                  )}
+                  <div className="flex items-center gap-3">
+                    {(() => {
+                      const assignedInterpId = String(
+                        accepted.interpreterId ||
+                        (isSlot1
+                          ? (foundRequest?.slots?.find((s: any) => s.positionIndex === 1)?.reservedBy || foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId)
+                          : (foundRequest?.slots?.find((s: any) => s.positionIndex === 2)?.reservedBy || foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId)) ||
+                        dbInterpreters.find((i: any) => i.name === accepted.interpreterName)?.id ||
+                        ''
+                      );
+                      const reqId = String(foundRequest?.id || id || '');
+                      if (!assignedInterpId || !reqId) return null;
+                      return (
+                        <RequestTimesheetButton 
+                          requestId={reqId} 
+                          interpreterId={assignedInterpId} 
+                          className="mb-0"
+                        />
+                      );
+                    })()}
+                    {isBookingLocked ? (
+                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-200/70 text-gray-600 text-xs font-medium">
+                        <Lock className="w-3.5 h-3.5 text-gray-500" />
+                        <span>{isAppointmentInProgress ? 'Locked · In progress' : 'Locked · Appointment passed'}</span>
+                      </div>
+                    ) : (
+                      <button 
+                        type="button"
+                        onClick={() => handleOpenRemoveBookingModal(posIdx, accepted.id, accepted.interpreterName)}
+                        className="text-[var(--sage)] hover:text-red-600 text-sm font-medium transition-colors"
+                      >
+                        Remove booking
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -2146,6 +2293,7 @@ export default function AssignmentDetailPage() {
           )}
         </p>
 
+        {removeBookingError && (<p className="text-[#C23B22] text-sm mb-4" role="alert">{removeBookingError}</p>)}
         <div className="flex justify-end gap-3">
           <button
             type="button"
@@ -2168,6 +2316,26 @@ export default function AssignmentDetailPage() {
           </button>
         </div>
       </div>
+    </div>
+  )}
+
+  {/* Global Toast Notification */}
+  {toastMessage && (
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[#0A3D31] text-white px-5 py-3.5 rounded-2xl shadow-xl border border-[#145347] transition-all duration-300">
+      <div className="w-6 h-6 rounded-full bg-[#10b981] flex items-center justify-center text-white shrink-0">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+      </div>
+      <span className="text-sm font-medium">{toastMessage}</span>
+      <button 
+        type="button" 
+        onClick={() => setToastMessage(null)}
+        className="ml-2 text-gray-300 hover:text-white text-lg leading-none"
+        aria-label="Close notification"
+      >
+        &times;
+      </button>
     </div>
   )}
  </div>

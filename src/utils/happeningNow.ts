@@ -29,7 +29,8 @@ export function isAppointmentHappeningNow(
 
   if (isNaN(start) || isNaN(end)) return false;
 
-  return nowMs >= start && nowMs <= end;
+  // Strictly inside the window: the instant the end time arrives it is no longer live.
+  return nowMs >= start && nowMs < end;
 }
 
 export function isAppointmentUpcoming(
@@ -55,8 +56,24 @@ export function isAppointmentUpcoming(
   const end = new Date(endsAt).getTime();
   if (isNaN(end)) return true;
 
-  // Booking remains categorized under upcoming until its endsAt time has completely passed
-  return nowMs <= end;
+  // Booking remains categorized under upcoming until its endsAt time has passed
+  return nowMs < end;
+}
+
+/**
+ * True once the appointment's end instant has passed. Uses absolute UTC time from resolveRequestTimes,
+ * which interprets naive times in the job's own zone, so PDT / AKDT / etc. cannot skew the result.
+ */
+export function isAppointmentPast(
+  job: { startsAt?: string | Date | null; endsAt?: string | Date | null; [key: string]: any } | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  if (!job) return false;
+  const { endsAt } = resolveRequestTimes(job);
+  if (!endsAt) return false;
+  const end = new Date(endsAt).getTime();
+  if (isNaN(end)) return false;
+  return nowMs >= end;
 }
 
 export function sortUpcomingWithHappeningNow<T extends { startsAt?: string | Date | null; endsAt?: string | Date | null; [key: string]: any }>(

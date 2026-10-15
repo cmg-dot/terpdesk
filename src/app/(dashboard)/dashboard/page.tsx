@@ -1,4 +1,5 @@
 "use client";
+import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import React from "react";
 import Link from "next/link";
 import { useRequests } from "@/context/RequestsContext";
@@ -7,7 +8,10 @@ import { MapPin } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import { getStatusFilters, getStaffingLabel, getStaffingRatio } from "@/utils/statusEngine";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
-import EmailIngestTester from "@/components/agency/EmailIngestTester";
+import { getSubmittedTimesheets } from "@/app/actions/getSubmittedTimesheets";
+import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
+import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords";
+import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { getIanaZone } from "@/utils/timezone";
@@ -16,6 +20,7 @@ export default function DashboardPage() {
   const [requests, setRequests] = React.useState<any[]>([]);
   const [interpreterJobs, setInterpreterJobs] = React.useState<any[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
+  const [awaitingReviewCount, setAwaitingReviewCount] = React.useState<number>(0);
 
   React.useEffect(() => {
     const timer = setInterval(() => {
@@ -27,8 +32,21 @@ export default function DashboardPage() {
   // Re-callable so client-side consumers (e.g. the ODHH ingest tester) can force a reload from PostgreSQL.
   const loadRequests = React.useCallback(async (): Promise<void> => {
     try {
-      const data = await fetchLiveRequests();
+      const [data, submitted] = await Promise.all([
+        fetchLiveRequests(),
+        getSubmittedTimesheets().catch((): SubmittedTimesheet[] => []),
+      ]);
       setRequests(data);
+
+      // Same records, same merge and same predicate as the /hours-review "Awaiting review" tab.
+      let localRecords: ServiceRecord[] = [];
+      try {
+        localRecords = JSON.parse(localStorage.getItem('terpdesk_service_records') || '[]');
+      } catch {
+        localRecords = [];
+      }
+      const records = mergeHoursRecords({ localRecords, requests: data, timesheets: submitted });
+      setAwaitingReviewCount(records.filter(isAwaitingReview).length);
     } catch (e) {
       console.error(e);
     }
@@ -47,7 +65,17 @@ export default function DashboardPage() {
     };
     loadJobs();
     window.addEventListener('storage', loadJobs);
-    return () => window.removeEventListener('storage', loadJobs);
+
+    // Keep every metric on one live snapshot: refresh periodically and when the tab regains focus.
+    const refresh = setInterval(() => void loadRequests(), 30000);
+    const onFocus = () => void loadRequests();
+    window.addEventListener('focus', onFocus);
+
+    return () => {
+      window.removeEventListener('storage', loadJobs);
+      window.removeEventListener('focus', onFocus);
+      clearInterval(refresh);
+    };
   }, [loadRequests]);
 
   const parseSafeDate = (dateVal: any) => {
@@ -111,10 +139,10 @@ export default function DashboardPage() {
   }, [requests, interpreterJobs]);
 
   const totalAppointments = enrichedRequests.filter(r => !getStatusFilters(r as any).isCancelled).length;
-  const needingCoverage = enrichedRequests.filter(r => getStatusFilters(r as any).needingCoverage || getStatusFilters(r as any).partiallyStaffed).length;
+  // Identical predicate to the /requests "Needing coverage" filter, so the number matches the list.
+  const needingCoverage = enrichedRequests.filter(r => getStatusFilters(r as any).needingCoverage).length;
   const pendingOffersCount = enrichedRequests.filter(r => getStatusFilters(r as any).hasPendingOffer).length;
   const staffFollowUpCount = enrichedRequests.filter(r => getStatusFilters(r as any).staffFollowUp).length;
-  const awaitingReviewCount = enrichedRequests.filter(r => r.status === 'awaiting_review').length;
   const needsReplacementCount = enrichedRequests.filter(r => getStatusFilters(r as any).needsReplacement).length;
 
   const getNeedsAttentionPriority = (status: string) => {
@@ -245,9 +273,6 @@ export default function DashboardPage() {
         </Link>
       </div>
 
-      {/* DEMO: ODHH email intake simulator — remove before production */}
-      <EmailIngestTester onIngested={loadRequests} />
-
       {/* Dark Stats Card */}
       <div className="rounded-2xl border border-gray-200 bg-[var(--forest)] p-8 text-white ">
         <p className="mb-8 text-xs font-medium text-[#8BA49E]">
@@ -293,7 +318,12 @@ export default function DashboardPage() {
             
             <div className="space-y-2.5">
               {needsAttentionJobs.length === 0 && <p className="text-sm text-[var(--sage)]">Nothing needs your attention right now.</p>}
-              {needsAttentionJobs.map(request => {
+              <AnimatedPaginatedList
+                items={needsAttentionJobs}
+                itemsPerPage={5}
+                className="space-y-2.5"
+                getKey={(request) => request.id}
+                renderItem={(request) => {
                 const s = (request as any).displayStatus;
                 let dotColor = "bg-[#B59A6D]";
                 let btnLabel = "Manage slots";
@@ -332,23 +362,24 @@ export default function DashboardPage() {
                     </div>
                   </Link>
                 );
-              })}
+              }}
+              />
             </div>
           </section>
 
           {/* Upcoming bookings */}
           <section className="space-y-5">
-            <div className="flex items-center justify-between px-2">
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-4 px-2">
               <div className="flex items-center gap-3">
                 <h2 className="text-[17px] font-semibold text-[var(--ink)]">Upcoming bookings</h2>
                 {upcomingHappeningNowCount > 0 && (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300">
+                  <span className="inline-flex h-6 items-center gap-1.5 px-2.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 border border-emerald-300 whitespace-nowrap">
                     <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
                     {upcomingHappeningNowCount} active now
                   </span>
                 )}
               </div>
-              <Link href="/calendar" className="text-sm font-medium text-slate-600 hover:text-[var(--ink)] transition-colors">Open calendar →</Link>
+              <Link href="/calendar" className="text-sm font-medium text-slate-600 hover:text-[var(--ink)] transition-colors whitespace-nowrap">Open calendar →</Link>
             </div>
 
             {upcomingBookingsJobs.length === 0 ? (
@@ -356,8 +387,12 @@ export default function DashboardPage() {
                 No upcoming bookings right now.
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {upcomingBookingsJobs.map((job) => {
+              <AnimatedPaginatedList
+                items={upcomingBookingsJobs}
+                itemsPerPage={6}
+                className="grid grid-cols-1 md:grid-cols-2 gap-3"
+                getKey={(job) => job.id}
+                renderItem={(job) => {
                   const isHappening = isAppointmentHappeningNow(job, currentTime);
                   const tz = job.details?.timeZone || job.data?.details?.timeZone;
                   const setting = job.setting || job.details?.setting || "Medical";
@@ -370,14 +405,14 @@ export default function DashboardPage() {
                     <Link
                       key={job.id}
                       href={`/requests/${job.id}`}
-                      className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all cursor-pointer ${
+                      className={`block bg-white rounded-2xl border p-4 hover:shadow-md transition-all cursor-pointer ${
                         isHappening
                           ? 'border-emerald-500/60 ring-2 ring-emerald-500/10 bg-emerald-50/20'
                           : 'border-gray-200'
                       }`}
                     >
-                      <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
-                        <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
+                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-1">
+                        <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase leading-6">
                           {(() => {
                             try {
                               const s = parseSafeDate(job.startsAt);
@@ -395,11 +430,11 @@ export default function DashboardPage() {
                             }
                           })()}
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
+                        <div className="flex flex-row flex-wrap items-center justify-end gap-2">
                           {isHappening && (
-                            <HappeningNowBadge size="sm" />
+                            <HappeningNowBadge size="sm" className="h-6" />
                           )}
-                          <div className={`text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0 ${
+                          <div className={`inline-flex h-6 items-center text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0 ${
                             formattedBadge.toLowerCase().includes('partially') 
                               ? 'bg-[#E8F3EE] text-[#466960]' 
                               : 'bg-[#E2EBE5] text-[#1B433C]'
@@ -409,35 +444,35 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       
-                      <h3 className="text-lg font-semibold text-[var(--ink)] my-2">
+                      <h3 className="text-base font-semibold text-[var(--ink)] my-1.5 leading-snug">
                         {job.title}
                       </h3>
 
-                      <div className="flex items-start gap-2 mb-4">
-                        <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
-                        <div className="text-[14px]">
+                      <div className="flex items-start gap-2 mb-2.5">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                        <div className="text-[13px] leading-snug">
                           <span className="text-[var(--ink)] block">{venue}</span>
                           {org && <span className="text-[var(--sage)]">{org}</span>}
                         </div>
                       </div>
 
-                      <div className="flex flex-wrap gap-2 mt-4">
-                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                      <div className="flex flex-wrap gap-1.5 mt-2.5">
+                        <span className="text-[11px] font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
                           {setting}
                         </span>
-                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                        <span className="text-[11px] font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
                           {format}
                         </span>
                         {org && (
-                          <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                          <span className="text-[11px] font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
                             {org}
                           </span>
                         )}
                       </div>
                     </Link>
                   );
-                })}
-              </div>
+                }}
+              />
             )}
           </section>
 

@@ -24,10 +24,14 @@ import {
 import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { motion, AnimatePresence } from "framer-motion";
+import { useGlobalState } from "@/context/GlobalContext";
 
 export default function InterpreterLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const { currentUser } = useGlobalState();
+  const displayName = currentUser?.name || "Dale Fictional";
+  const displayEmail = currentUser?.email || "terp.declined@fictional.test";
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F9F8F4] font-sans text-slate-900">
@@ -114,8 +118,8 @@ export default function InterpreterLayout({ children }: { children: React.ReactN
 
         <div className="p-5 pt-2">
           <div className="mb-4 flex flex-col">
-            <span className="text-[14px] font-medium text-white">Dale Fictional</span>
-            <span className="text-xs text-[#8BA49E]">terp.declined@fictional.test</span>
+            <span className="text-[14px] font-medium text-white">{displayName}</span>
+            <span className="text-xs text-[#8BA49E]">{displayEmail}</span>
           </div>
           <Link href="/" className="text-[13px] font-medium text-[#8BA49E] hover:text-white transition-colors">
             Sign out
@@ -129,7 +133,7 @@ export default function InterpreterLayout({ children }: { children: React.ReactN
         <header className="sticky top-0 z-40 bg-[#F9F8F4]">
           <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-5 flex items-center justify-between w-full">
             <div className="text-[14px] text-gray-500 font-medium">
-              Dale Fictional · Interpreter
+              {displayName} · Interpreter
             </div>
             <div className="flex items-center gap-6">
               <Link href="/dashboard" className="text-[13px] font-medium text-[#0B3B32] hover:underline underline-offset-4 hidden sm:block">
@@ -253,8 +257,8 @@ export default function InterpreterLayout({ children }: { children: React.ReactN
             {/* Footer */}
             <div className="mt-auto p-6 border-t border-neutral-100">
               <div className="flex flex-col gap-1 mb-6">
-                <span className="text-[15px] font-semibold text-[var(--ink)]">Dale Fictional</span>
-                <span className="text-sm text-[var(--sage)]">terp.declined@fictional.test</span>
+                <span className="text-[15px] font-semibold text-[var(--ink)]">{displayName}</span>
+                <span className="text-sm text-[var(--sage)]">{displayEmail}</span>
               </div>
               <div className="flex flex-col gap-4">
                 <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="text-slate-600 text-[15px] font-medium hover:text-[var(--forest)]">Switch to Agency</Link>

@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
 
 type Tab = "upcoming" | "past";
@@ -219,8 +220,12 @@ export default function InterpreterJobsPage() {
       {activeTab === "upcoming" && (
         <div>
           <h2 className="text-xl font-semibold text-[var(--ink)] mt-8 mb-4">Upcoming</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {upcomingJobs.map((job) => {
+          <AnimatedPaginatedList
+            items={upcomingJobs}
+            itemsPerPage={10}
+            className="grid grid-cols-1 md:grid-cols-2 gap-3"
+            getKey={(job) => job.id}
+            renderItem={(job) => {
               const isOffer = job.status === 'pending';
               const locationText = isOffer ? (job.location || job.agencyName) : job.location;
               const locPrimary = (locationText?.split('·')[0]?.trim() || locationText) || (job.isVirtual ? "Virtual" : "Location pending");
@@ -235,59 +240,59 @@ export default function InterpreterJobsPage() {
               const badgeInfo = getHoursBadgeInfo(hoursState);
               
               return (
-                <Link key={job.id} href={`/jobs/${job.id}`} className={`block bg-white rounded-2xl border p-6 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : hoursState === 'correction_requested' ? 'border-amber-300 ring-1 ring-amber-300/30' : 'border-gray-200'}`}>
-                  <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
-                    <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
+                <Link key={job.id} href={`/jobs/${job.id}`} className={`block bg-white rounded-2xl border p-4 hover:shadow-md transition-all ${isHappening ? 'border-emerald-500/60 ring-2 ring-emerald-500/10' : hoursState === 'correction_requested' ? 'border-amber-300 ring-1 ring-amber-300/30' : 'border-gray-200'}`}>
+                  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-1">
+                    <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase leading-6">
                       {dateText}
                     </div>
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex flex-row flex-wrap items-center justify-end gap-2">
                       {isHappening && (
-                        <HappeningNowBadge />
+                        <HappeningNowBadge size="sm" className="h-6" />
                       )}
                       {job.status === 'pending' && (
-                        <div className="bg-[#F5F3FF] text-[#6D28D9] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
+                        <div className="inline-flex h-6 items-center bg-[#F5F3FF] text-[#6D28D9] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                           Offer received
                         </div>
                       )}
                       {job.status === 'booked' && (
-                        <div className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
+                        <div className="inline-flex h-6 items-center bg-[#E2EBE5] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                           Booked
                         </div>
                       )}
                       {hoursState === 'correction_requested' && (
-                        <span className={`text-[12px] px-2.5 py-0.5 rounded-full ${badgeInfo.badgeClass}`}>
+                        <span className={`inline-flex h-6 items-center text-[11px] px-2.5 rounded-full whitespace-nowrap ${badgeInfo.badgeClass}`}>
                           {badgeInfo.label}
                         </span>
                       )}
                       {job.hasAutoFill && (
-                        <div className="bg-[#FCE8E6] text-[#A0522D] text-[12px] font-medium px-3 py-1 rounded-full w-max shrink-0">
+                        <div className="inline-flex h-6 items-center bg-[#FCE8E6] text-[#A0522D] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                           Auto Fill
                         </div>
                       )}
                     </div>
                   </div>
-                  <h3 className="text-lg font-semibold text-[var(--ink)] my-2">
+                  <h3 className="text-base font-semibold text-[var(--ink)] my-1.5 leading-snug">
                     {job.title}
                   </h3>
-                  <div className="flex items-start gap-2 mb-4">
-                    <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-1" />
-                    <div className="text-[14px]">
+                  <div className="flex items-start gap-2 mb-2.5">
+                    <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                    <div className="text-[13px] leading-snug">
                       <span className="text-[var(--ink)] block">{locPrimary}</span>
                       <span className="text-[var(--sage)]">{locSecondary}</span>
                     </div>
                   </div>
-                  <div className="flex flex-wrap gap-2 mt-4">
-                    <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
+                    <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
                       {job.setting || (job as any).details?.setting || "Medical"}
                     </span>
-                    <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full">
+                    <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
                       {job.isVirtual ? "Virtual" : (job.format || (job as any).details?.format || "In person")}
                     </span>
                   </div>
                 </Link>
               );
-            })}
-          </div>
+            }}
+          />
         </div>
       )}
 
@@ -326,8 +331,14 @@ export default function InterpreterJobsPage() {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-12">
-              {displayedPastJobs.map(job => {
+            <div className="mb-12">
+            <AnimatedPaginatedList
+              key={pastFilter}
+              items={displayedPastJobs}
+              itemsPerPage={10}
+              className="grid grid-cols-1 md:grid-cols-2 gap-3"
+              getKey={(job) => job.id}
+              renderItem={(job) => {
                 const locationParts = (job.location || '').split('·');
                 const locPrimary = locationParts[0]?.trim() || "Location pending";
                 const locSecondary = locationParts[1]?.trim() || job.agencyName || "North Fictional Interpreting";
@@ -339,7 +350,7 @@ export default function InterpreterJobsPage() {
                 return (
                   <div 
                     key={job.id} 
-                    className={`bg-white rounded-2xl border p-6 flex flex-col justify-between hover:shadow-md transition-shadow ${
+                    className={`bg-white rounded-2xl border p-4 flex flex-col justify-between hover:shadow-md transition-shadow ${
                       isCorrection 
                         ? 'border-amber-300 ring-1 ring-amber-300/30' 
                         : 'border-gray-200'
@@ -347,8 +358,8 @@ export default function InterpreterJobsPage() {
                   >
                     <div>
                       {/* Top Row: Date on left, pills on right */}
-                      <div className="flex flex-col xl:flex-row xl:items-start justify-between gap-4 mb-2">
-                        <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase mt-1">
+                      <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-1">
+                        <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase leading-6">
                           {(() => {
                              const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
                              const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
@@ -356,24 +367,24 @@ export default function InterpreterJobsPage() {
                              return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
                           })()}
                         </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <div className="bg-[#DCEAE3] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                        <div className="flex flex-row flex-wrap items-center justify-end gap-2">
+                          <div className="inline-flex h-6 items-center bg-[#DCEAE3] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                             Booked
                           </div>
                           {hoursState === 'not_submitted' || hoursState === 'draft' ? (
-                            <div className="bg-[#F6EFE9] text-[#78350F] border border-[#EADBCE] text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                            <div className="inline-flex h-6 items-center bg-[#F6EFE9] text-[#78350F] border border-[#EADBCE] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                               Submit actual hours
                             </div>
                           ) : hoursState === 'correction_requested' ? (
-                            <div className="bg-amber-100 text-amber-900 border border-amber-300 text-[12px] font-semibold px-3 py-1 rounded-full shrink-0">
+                            <div className="inline-flex h-6 items-center bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-semibold px-2.5 rounded-full whitespace-nowrap shrink-0">
                               Changes requested
                             </div>
                           ) : hoursState === 'awaiting_review' ? (
-                            <div className="bg-purple-100 text-purple-800 text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                            <div className="inline-flex h-6 items-center bg-purple-100 text-purple-800 text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                               Submitted
                             </div>
                           ) : hoursState === 'approved' ? (
-                            <div className="bg-emerald-100 text-emerald-800 text-[12px] font-medium px-3 py-1 rounded-full shrink-0">
+                            <div className="inline-flex h-6 items-center bg-emerald-100 text-emerald-800 text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                               Approved
                             </div>
                           ) : null}
@@ -381,14 +392,14 @@ export default function InterpreterJobsPage() {
                       </div>
 
                       {/* Appointment Title */}
-                      <h3 className="text-xl font-bold text-[var(--ink)] my-2">
+                      <h3 className="text-base font-bold text-[var(--ink)] my-1.5 leading-snug">
                         {job.title}
                       </h3>
 
                       {/* Location & Agency */}
-                      <div className="flex items-start gap-2 mb-3">
-                        <MapPin className="w-4 h-4 text-gray-400 shrink-0 mt-0.5" />
-                        <div className="text-[14px]">
+                      <div className="flex items-start gap-2 mb-2">
+                        <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
+                        <div className="text-[13px] leading-snug">
                           <span className="text-[var(--ink)] block font-normal">{locPrimary}</span>
                           <span className="text-[var(--sage)] text-[13px]">{locSecondary}</span>
                         </div>
@@ -396,17 +407,17 @@ export default function InterpreterJobsPage() {
 
                       {/* Agency feedback comment if present */}
                       {isCorrection && reviewMsg && (
-                        <div className="mb-4 text-xs text-amber-900 bg-amber-50 rounded-lg p-2.5 border border-amber-200">
+                        <div className="mb-2.5 text-xs text-amber-900 bg-amber-50 rounded-lg p-2.5 border border-amber-200">
                           <span className="font-semibold">Agency correction request: </span>"{reviewMsg}"
                         </div>
                       )}
 
                       {/* Setting and format pills */}
-                      <div className="flex flex-wrap gap-2 my-4">
-                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full bg-white">
+                      <div className="flex flex-wrap gap-1.5 my-2.5">
+                        <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full bg-white">
                           {job.setting || (job as any).details?.setting || "Medical"}
                         </span>
-                        <span className="text-[12px] font-medium text-gray-600 border border-gray-200 px-3 py-1 rounded-full bg-white">
+                        <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full bg-white">
                           {job.isVirtual ? "Virtual" : "In person"}
                         </span>
                       </div>
@@ -415,7 +426,7 @@ export default function InterpreterJobsPage() {
                     {/* Bottom Action Button */}
                     <Link
                       href={`/jobs/${job.id}`}
-                      className="w-full mt-2 py-3 rounded-full text-center text-sm font-semibold text-white bg-[#1C3F36] hover:bg-[#153029] transition-colors block shadow-sm"
+                      className="w-full mt-1 py-2 rounded-full text-center text-sm font-semibold text-white bg-[#1C3F36] hover:bg-[#153029] transition-colors block shadow-sm"
                     >
                       {hoursState === 'not_submitted' || hoursState === 'draft' || hoursState === 'correction_requested'
                         ? "Submit actual hours"
@@ -423,19 +434,25 @@ export default function InterpreterJobsPage() {
                     </Link>
                   </div>
                 );
-              })}
+              }}
+            />
             </div>
           )}
 
           {/* D. Assignments You No Longer Hold */}
           <h2 className="text-xl font-semibold text-[var(--ink)] mb-4">Assignments you no longer hold</h2>
-          <div className="flex flex-col gap-4">
+          <div>
             
             {declinedReleasedJobs.length === 0 ? (
                <p className="text-sm text-[var(--sage)]">No released or declined assignments.</p>
             ) : (
-               declinedReleasedJobs.map(job => (
-                 <div key={job.id} className="bg-white rounded-2xl border border-gray-200 p-6 w-full">
+               <AnimatedPaginatedList
+                 items={declinedReleasedJobs}
+                 itemsPerPage={5}
+                 className="flex flex-col gap-3"
+                 getKey={(job) => job.id}
+                 renderItem={(job) => (
+                 <div className="bg-white rounded-2xl border border-gray-200 p-4 w-full">
                    <h3 className="font-semibold text-[var(--ink)] mb-1">{job.title}</h3>
                    <p className="text-sm text-[var(--sage)] mb-3">
                      {(() => {
@@ -450,7 +467,8 @@ export default function InterpreterJobsPage() {
                    </p>
                    <p className="text-xs text-gray-400">Job details and prep materials are no longer available to you.</p>
                  </div>
-               ))
+                 )}
+               />
             )}
             
           </div>

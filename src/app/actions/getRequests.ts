@@ -73,22 +73,27 @@ function mapRequestRow(row: any, requestOffers: any[]) {
   if (staffedCount > totalPositions) staffedCount = totalPositions;
   const isAllPositionsFilled = staffedCount >= totalPositions && totalPositions > 0;
 
+  // A live pending offer for a position means that position is being addressed. The replacement flag is
+  // kept in the data (so it returns if the offer is declined or expires) but is not surfaced meanwhile.
+  const isLivePendingOffer = (o: any): boolean =>
+    (o.status === 'pending' || o.state === 'pending') &&
+    o.status !== 'expired' &&
+    o.state !== 'expired' &&
+    new Date(o.expiresAt) > new Date() &&
+    new Date(endsAt) > new Date();
+  const hasPendingForPosition = (pos: 1 | 2): boolean =>
+    normalizedOffers.some(o => isLivePendingOffer(o) && (o.positionIndex === pos || (!o.positionIndex && pos === 1)));
+
   // Replacement flags (auto-cleared once all positions are filled)
   const slot1ReplacementFlag = Boolean(rowData.slotReplacements?.[1] || rowData.slots?.[0]?.needsReplacement || (totalPositions === 1 && isNeedsReplacementStatus(row.status)));
-  const effectiveSlot1NeedsReplacement = !isAllPositionsFilled && !isSlot1AssignedOrBooked && slot1ReplacementFlag;
+  const effectiveSlot1NeedsReplacement = !isAllPositionsFilled && !isSlot1AssignedOrBooked && slot1ReplacementFlag && !hasPendingForPosition(1);
 
   const slot2ReplacementFlag = totalPositions === 2 && Boolean(rowData.slotReplacements?.[2] || rowData.slots?.[1]?.needsReplacement);
-  const effectiveSlot2NeedsReplacement = !isAllPositionsFilled && !isSlot2AssignedOrBooked && slot2ReplacementFlag;
+  const effectiveSlot2NeedsReplacement = !isAllPositionsFilled && !isSlot2AssignedOrBooked && slot2ReplacementFlag && !hasPendingForPosition(2);
 
   const anyNeedsReplacement = effectiveSlot1NeedsReplacement || effectiveSlot2NeedsReplacement;
 
-  const hasActivePendingOffer = normalizedOffers.some(o => 
-    (o.status === 'pending' || o.state === 'pending') && 
-    o.status !== 'expired' && 
-    o.state !== 'expired' &&
-    new Date(o.expiresAt) > new Date() &&
-    new Date(endsAt) > new Date()
-  );
+  const hasActivePendingOffer = normalizedOffers.some(isLivePendingOffer);
 
   let effectiveStatus = row.status;
   if (isCancelled) {

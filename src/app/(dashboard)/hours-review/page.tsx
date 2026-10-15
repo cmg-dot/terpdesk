@@ -5,6 +5,11 @@ import Link from "next/link";
 import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { approveHours, requestHoursCorrection } from "@/app/actions/reviewHours";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
+import { approveTimesheet } from "@/app/actions/approveTimesheet";
+import { getSubmittedTimesheets } from "@/app/actions/getSubmittedTimesheets";
+import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
+import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords";
+import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
   const [copied, setCopied] = useState(false);
@@ -29,29 +34,11 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
   );
 }
 
-export interface ServiceRecord {
-  id: string;
-  appointmentId: string;
-  interpreterName: string;
-  state: 'not_started' | 'draft' | 'submitted' | 'awaiting_review' | 'changes_requested' | 'correction_requested' | 'approved';
-  scheduledStart: string;
-  scheduledEnd: string;
-  actualStart: string;
-  actualEnd: string;
-  breakMinutes: number;
-  reportedMileage: number;
-  approvedMileage: number | null;
-  reviewMessage: string | null;
-  version: number;
-  isOdhh?: boolean;
-  travelStart?: string;
-  travelEnd?: string;
-  serviceCompleted?: string | boolean;
-  mileageNote?: string;
-  serviceNote?: string;
-  history?: any[];
-  positionIndex?: 1 | 2;
-}
+export type { ServiceRecord };
+
+// Signatures are sensitive and large; keep them out of localStorage (the database is the source of truth).
+const withoutSignatures = (list: ServiceRecord[]): ServiceRecord[] =>
+  list.map(r => (r.signatureDataUrl ? { ...r, signatureDataUrl: null } : r));
 
 function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpdate: (r: ServiceRecord) => void }) {
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(false);
@@ -65,7 +52,9 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
   const [mileageToApprove, setMileageToApprove] = useState(record.reportedMileage.toString());
   const [showMileageError, setShowMileageError] = useState(false);
   
-  const [showViewSignatureError, setShowViewSignatureError] = useState(false);
+  // React 18: an async startTransition does not stay pending across the await, so track it explicitly.
+  const [isApproving, setIsApproving] = useState(false);
+  const [approveError, setApproveError] = useState<string | null>(null);
 
   // calculate service time from actual start and actual end (mock string parsing)
   const actualStartDt = new Date(record.actualStart);
@@ -93,7 +82,8 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
   const serviceHours = (serviceMinutes / 60).toFixed(1);
 
   const handleApprove = async () => {
-    if (!hasException) {
+    if (isApproving) return;
+    if (!hasException && !record.signatureDataUrl) {
       setShowSignatureError(true);
       return;
     }
@@ -104,12 +94,24 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     }
     setShowSignatureError(false);
     setShowMileageError(false);
-    
+    setApproveError(null);
+    setIsApproving(true);
+
     try {
-      await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1);
+      if (record.timesheetId) {
+        const result = await approveTimesheet({ timesheetId: record.timesheetId, approvedMileage: mileageNum });
+        if (!result.success) {
+          setApproveError(result.error);
+          setIsApproving(false);
+          return;
+        }
+      } else {
+        await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1);
+      }
     } catch (e) {
       console.error(e);
     }
+    setIsApproving(false);
 
     const prevHistory = Array.isArray(record.history) ? record.history : [];
     const approveEntry = {
@@ -287,6 +289,29 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
         </div>
       )}
 
+      {(record.serviceCompleted === false || record.serviceCompleted === 'no') && (
+        <div className="text-sm mb-6 border-t border-gray-100 pt-4">
+          <div className="text-[var(--sage)] text-xs mb-1">Service not completed — reason</div>
+          <div className="text-[var(--ink)] text-xs bg-amber-50 p-2.5 rounded-lg border border-amber-100">
+            {record.cancellationReason || "No reason given."}
+          </div>
+        </div>
+      )}
+
+      {Array.isArray(record.travelLegs) && record.travelLegs.length > 0 && (
+        <div className="text-sm mb-6 border-t border-gray-100 pt-4">
+          <div className="text-[var(--sage)] text-xs mb-2">Mileage legs</div>
+          <ul className="space-y-1.5">
+            {record.travelLegs.map((leg, i) => (
+              <li key={i} className="text-xs text-[var(--ink)] bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+                {leg.fromLabel || "—"} → {leg.toLabel || "—"} · {leg.miles.toFixed(1)} mi
+                {leg.roundTrip ? ` (round trip, ${(leg.miles * 2).toFixed(1)} mi)` : ""}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
       {record.state === 'approved' && (
         <div className="text-sm text-gray-600 mb-6 border-t border-gray-200 pt-4">
           Approved {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} - v{record.version}. Locked. Approval confirms the service record only; it is not a payment.
@@ -316,7 +341,17 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
         )}
       </div>
 
-      {(record.state === 'submitted' || record.state === 'awaiting_review') ? (
+      {record.signatureDataUrl ? (
+        <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mb-6">
+          <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Service-verification signature</h4>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={record.signatureDataUrl}
+            alt="Interpreter Signature"
+            className="max-h-32 max-w-full w-auto rounded-lg border border-gray-200 bg-white object-contain"
+          />
+        </div>
+      ) : (record.state === 'submitted' || record.state === 'awaiting_review') ? (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mb-6">
           <h4 className="text-sm font-medium text-[var(--ink)] mb-1">Service-verification signature</h4>
           <p className="text-sm text-[var(--sage)]">No signature has been collected yet.</p>
@@ -324,23 +359,15 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
       ) : (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mb-6">
           <h4 className="text-sm font-medium text-[var(--ink)] mb-1">Service-verification signature</h4>
-          <p className="text-sm text-[var(--sage)] mb-4">Signed on {actualEndDt.toLocaleDateString('en-US')}.</p>
-          <button 
-            onClick={() => setShowViewSignatureError(true)}
-            className="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full px-4 py-1.5 text-sm font-medium transition-colors mb-2"
-          >
-            View signature
-          </button>
-          {showViewSignatureError && (
-            <p className="text-[#C23B22] text-sm mt-1">That signature could not be opened. Try again.</p>
-          )}
+          <p className="text-sm text-[var(--sage)]">No signature image is on file for this record.</p>
         </div>
       )}
 
       {(record.state === 'submitted' || record.state === 'awaiting_review') && (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl">
+          {!record.signatureDataUrl && (
           <label className="flex items-start gap-3 cursor-pointer mb-6">
-            <input 
+            <input
               type="checkbox" 
               className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
               checked={hasException}
@@ -351,6 +378,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
             />
             <span className="text-sm text-gray-700">Record a signature exception (demo bypass)</span>
           </label>
+          )}
           <div className="mb-5">
             <label className="block text-xs text-gray-600 mb-2">Mileage to approve (reported: {record.reportedMileage.toFixed(1)} mi)</label>
             <input 
@@ -375,12 +403,14 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
             {showCorrectionError && <p className="text-[#C23B22] text-xs mt-1">Say what needs correcting so the interpreter can fix it</p>}
           </div>
           {showSignatureError && <p className="text-[#C23B22] text-sm mb-4">This assignment needs a service-verification signature, or a recorded exception, before it can be approved</p>}
+          {approveError && <p className="text-[#C23B22] text-sm mb-4" role="alert">{approveError}</p>}
           <div className="flex flex-col sm:flex-row gap-3 w-full mb-4">
-            <button 
+            <button
               onClick={handleApprove}
-              className="w-full sm:w-auto bg-[#145347] text-white hover:bg-[#0f4037] rounded-full px-6 py-2.5 text-sm font-medium transition-colors"
+              disabled={isApproving}
+              className="w-full sm:w-auto bg-[#145347] text-white hover:bg-[#0f4037] rounded-full px-6 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              Approve service record
+              {isApproving ? 'Approving…' : 'Approve service record'}
             </button>
             <button 
               onClick={handleRequestCorrection}
@@ -416,69 +446,14 @@ export default function HoursReviewPage() {
         }
       }
       try {
-        const dbRequests = await fetchLiveRequests();
-        const merged = [...localRecords];
-        for (const req of dbRequests) {
-          const totalPos = (req.totalPositions || req.slotCount || (req.positions === "Team — two independent positions" ? 2 : 1)) as 1 | 2;
-          const posList: (1 | 2)[] = totalPos === 2 ? [1, 2] : [1];
-
-          for (const pos of posList) {
-            const hoursSub = req.data?.hoursSubmissions?.[pos] || (pos === 1 ? req.data?.hoursSubmission : null);
-            const isEligibleStatus = ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
-            if (hoursSub || isEligibleStatus) {
-              const recordId = totalPos === 2 ? `${req.id}-pos-${pos}` : req.id;
-              const existingIdx = merged.findIndex(r => r.id === recordId || (totalPos === 1 && r.appointmentId === req.id));
-              const isOdhh = req.data?.intake?.program === 'WA ODHH' || req.data?.intake?.program === 'wa_odhh' || req.requester?.org === 'WA ODHH';
-              const acceptedOffer = req.offers?.find((o: any) => (o.positionIndex === pos || (!o.positionIndex && pos === 1)) && (o.status === 'accepted' || o.state === 'accepted'));
-              
-              const posStatus = hoursSub?.status || req.status;
-              const state: ServiceRecord['state'] = posStatus === 'approved' 
-                ? 'approved' 
-                : posStatus === 'correction_requested' 
-                  ? 'correction_requested' 
-                  : 'awaiting_review';
-
-              const mappedRecord: ServiceRecord = {
-                id: recordId,
-                appointmentId: req.id,
-                positionIndex: pos,
-                interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || (pos === 2 ? "Position 2 Interpreter" : "Position 1 Interpreter"),
-                state: state,
-                scheduledStart: req.startsAt,
-                scheduledEnd: req.endsAt,
-                actualStart: hoursSub?.actualStartTime || req.startsAt,
-                actualEnd: hoursSub?.actualEndTime || req.endsAt,
-                breakMinutes: hoursSub?.breakMinutes || 0,
-                reportedMileage: hoursSub?.miles || 0,
-                approvedMileage: hoursSub?.approvedMileage ?? null,
-                reviewMessage: hoursSub?.reviewMessage ?? null,
-                version: hoursSub?.version || 1,
-                isOdhh: isOdhh,
-                travelStart: req.travelStartTime || hoursSub?.travelStartTime || req.startsAt,
-                travelEnd: req.travelEndTime || hoursSub?.travelEndTime || req.endsAt,
-                serviceCompleted: req.serviceCompleted ?? hoursSub?.serviceCompleted ?? true,
-                mileageNote: hoursSub?.mileageNote || "",
-                serviceNote: hoursSub?.note || "",
-                history: hoursSub?.history || []
-              };
-
-              if (existingIdx > -1) {
-                merged[existingIdx] = {
-                  ...mappedRecord,
-                  ...merged[existingIdx],
-                  state: merged[existingIdx].state || state,
-                  isOdhh: merged[existingIdx].isOdhh ?? isOdhh,
-                  history: hoursSub?.history?.length ? hoursSub.history : (merged[existingIdx].history || mappedRecord.history),
-                };
-              } else {
-                merged.push(mappedRecord);
-              }
-            }
-          }
-        }
+        const [dbRequests, submitted] = await Promise.all([
+          fetchLiveRequests(),
+          getSubmittedTimesheets().catch((): SubmittedTimesheet[] => []),
+        ]);
+        const merged = mergeHoursRecords({ localRecords, requests: dbRequests, timesheets: submitted });
         setRecords(merged);
         if (typeof window !== 'undefined') {
-          localStorage.setItem('terpdesk_service_records', JSON.stringify(merged));
+          localStorage.setItem('terpdesk_service_records', JSON.stringify(withoutSignatures(merged)));
         }
       } catch (e) {
         console.error("Failed to fetch live requests for hours review", e);
@@ -494,12 +469,12 @@ export default function HoursReviewPage() {
     const newRecords = records.map(r => r.id === updatedRecord.id ? updatedRecord : r);
     setRecords(newRecords);
     if (typeof window !== 'undefined') {
-      localStorage.setItem('terpdesk_service_records', JSON.stringify(newRecords));
+      localStorage.setItem('terpdesk_service_records', JSON.stringify(withoutSignatures(newRecords)));
       window.dispatchEvent(new Event('storage'));
     }
   };
   
-  const awaitingRecords = records.filter(r => r.state === 'submitted' || r.state === 'awaiting_review');
+  const awaitingRecords = records.filter(isAwaitingReview);
   const submittedCount = awaitingRecords.length;
   const allCount = records.length;
   

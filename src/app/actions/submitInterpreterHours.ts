@@ -5,6 +5,14 @@ import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
+import { z } from "zod";
+import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
+import type { TravelLeg } from "@/lib/timesheetSchemas";
+
+const signatureSchema = z
+  .string()
+  .max(400_000)
+  .regex(/^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/);
 
 export async function submitInterpreterHours(
   requestId: string,
@@ -23,8 +31,27 @@ export async function submitInterpreterHours(
     note?: string;
     version?: number;
     history?: any[];
+    signatureDataUrl?: string;
+    cancellationReason?: string;
+    /** Itemised mileage legs; when present the server computes total miles from them. */
+    legs?: TravelLeg[];
   }
 ): Promise<{ success: boolean }> {
+  // Optional, but if present it must be a bounded PNG data URL.
+  const signatureDataUrl = extra?.signatureDataUrl === undefined
+    ? undefined
+    : signatureSchema.parse(extra.signatureDataUrl);
+
+  const cancellationReason = extra?.cancellationReason === undefined
+    ? undefined
+    : z.string().trim().max(1000).parse(extra.cancellationReason);
+
+  const legs = travelLegsSchema.parse(extra?.legs ?? []);
+  const totalMiles = legs.length > 0 ? sumLegMiles(legs) : miles;
+  if (!Number.isFinite(totalMiles) || totalMiles < 0 || totalMiles > MAX_TOTAL_MILES) {
+    throw new Error("Mileage is out of range.");
+  }
+
   await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ createdAt: requests.createdAt, data: requests.data })
@@ -57,6 +84,10 @@ export async function submitInterpreterHours(
           ? false
           : null;
 
+    if (isCompleted === false && !cancellationReason) {
+      throw new Error("A reason is required when the service was not completed.");
+    }
+
     const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? existingData.hoursSubmission : {}) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
     const isCorrection = (extra?.version ?? 1) > 1;
@@ -70,7 +101,7 @@ export async function submitInterpreterHours(
       details: {
         actualStart: actualStartTime,
         actualEnd: actualEndTime,
-        mileage: miles,
+        mileage: totalMiles,
         breakMinutes: extra?.breakMinutes ?? 0,
         travelStartTime: extra?.travelStartTime ?? null,
         travelEndTime: extra?.travelEndTime ?? null,
@@ -92,7 +123,8 @@ export async function submitInterpreterHours(
       interpreterId: extra?.interpreterId || existingHours.interpreterId,
       actualStartTime,
       actualEndTime,
-      miles,
+      miles: totalMiles,
+      legs,
       breakMinutes: extra?.breakMinutes ?? 0,
       travelStartTime: extra?.travelStartTime ?? null,
       travelEndTime: extra?.travelEndTime ?? null,
@@ -100,6 +132,8 @@ export async function submitInterpreterHours(
       mileageNote: extra?.mileageNote ?? "",
       note: extra?.note ?? "",
       version: extra?.version ?? 1,
+      signatureDataUrl: signatureDataUrl ?? null,
+      cancellationReason: isCompleted === false ? (cancellationReason ?? null) : null,
       submittedAt: new Date().toISOString(),
       reviewMessage: null,
       approvedMileage: null,

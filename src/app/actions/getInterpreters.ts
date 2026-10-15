@@ -7,3 +7,5 @@ import { asc } from "drizzle-orm";
 export async function getInterpreters() {
   return await db.select().from(interpreters).orderBy(asc(interpreters.name));
 }
+
+

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
+import { resolveRequestTimes } from "@/utils/timezone";
 
 interface CreateOfferPayload {
   requestId: string;
@@ -20,7 +21,9 @@ export async function createOffer(payload: CreateOfferPayload) {
     throw new Error("Expiry must be in the future");
   }
   
-  if (payload.expiresAt >= request.createdAt) {
+  const { startsAt } = resolveRequestTimes(request);
+  const apptStart = new Date(startsAt);
+  if (!isNaN(apptStart.getTime()) && payload.expiresAt >= apptStart) {
     throw new Error("Expiry must be before appointment start");
   }
   const [newOffer] = await db.insert(offers).values({

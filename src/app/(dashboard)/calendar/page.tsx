@@ -8,9 +8,22 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
 import { getIanaZone } from "@/utils/timezone";
-import { isAppointmentHappeningNow } from "@/utils/happeningNow";
+import { isAppointmentHappeningNow, isAppointmentPast } from "@/utils/happeningNow";
+import { resolveRequestTimes } from "@/utils/timezone";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
-import { formatReference } from "@/utils/statusEngine";
+
+/** Text colour for a request status on the calendar, so state reads at a glance. */
+const statusTextClass = (status: string | undefined, isHappening: boolean, isPast = false): string => {
+  if (isHappening) return "text-emerald-100";
+  if (isPast) return "text-gray-500";
+  const s = (status || "").toLowerCase();
+  if (s.includes("replacement")) return "text-red-700";
+  if (s.includes("awaiting") || s.includes("offer") || s.includes("pending")) return "text-blue-700";
+  if (s.includes("partial")) return "text-amber-700";
+  if (s.includes("cancel")) return "text-gray-500";
+  if (s.includes("staffed") || s.includes("booked") || s.includes("assigned")) return "text-emerald-800";
+  return "text-gray-700";
+};
 
 export default function CalendarPage() {
   const [requests, setRequests] = useState<any[]>([]);
@@ -84,17 +97,12 @@ export default function CalendarPage() {
     const tz = req.details?.timeZone || req.data?.details?.timeZone || req.data?.timeZone || req.timeZone || 'America/Los_Angeles';
     const safeZone = getIanaZone(tz);
     
-    const startsAt = req.startsAt || (req.data?.details?.startDate && req.data?.details?.startTime ? `${req.data.details.startDate}T${req.data.details.startTime}` : null) || req.data?.startsAt;
-    
-    let endsAt = req.endsAt || req.data?.endsAt;
-    if (!endsAt && req.data?.details?.endDate && req.data?.details?.endTime) {
-      try {
-        endsAt = `${req.data.details.endDate}T${req.data.details.endTime}`;
-      } catch (e) {}
-    }
-    if (!endsAt && startsAt) {
-      endsAt = new Date(new Date(startsAt).getTime() + 3600000).toISOString();
-    }
+    const hasStart = Boolean(
+      req.startsAt || req.data?.startsAt || (req.data?.details?.startDate && req.data?.details?.startTime),
+    );
+    const resolved = hasStart ? resolveRequestTimes(req) : null;
+    const startsAt: string | undefined = resolved?.startsAt ?? undefined;
+    const endsAt: string | undefined = resolved?.endsAt ?? undefined;
 
     return { safeZone, startsAt, endsAt };
   };
@@ -226,9 +234,9 @@ export default function CalendarPage() {
                       <div className="flex-1 overflow-y-auto space-y-1 max-h-[160px]">
                         {sortedDayRequests.map(req => {
                           const isHappening = isAppointmentHappeningNow(req, currentTime);
+                  const isPast = !isHappening && isAppointmentPast(req, currentTime);
                           const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
                           const timeStr = formatEventTime(startsAt, endsAt, safeZone);
-                          const refCode = formatReference(req.id);
 
                           return (
                             <Link 
@@ -237,7 +245,9 @@ export default function CalendarPage() {
                               className={`block rounded-md p-1.5 text-xs transition-all ${
                                 isHappening 
                                   ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400 hover:bg-emerald-700' 
-                                  : 'bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]'
+                                  : isPast
+                                    ? 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
+                                    : 'bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]'
                               }`}
                             >
                               {isHappening && (
@@ -249,13 +259,14 @@ export default function CalendarPage() {
                                   <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
                                 </div>
                               )}
-                              <div className="font-semibold truncate leading-tight">{req.title || "Request"}</div>
-                              <div className={`text-[10px] leading-tight mt-0.5 ${isHappening ? 'text-emerald-100' : 'opacity-85'}`}>
-                                {timeStr}
-                              </div>
-                              <div className={`text-[10px] leading-tight mt-0.5 flex items-center justify-between ${isHappening ? 'text-emerald-200' : 'opacity-75'}`}>
-                                <span>{refCode}</span>
-                                <span className="capitalize">{req.status}</span>
+                              <div className="flex flex-col gap-1 p-0.5">
+                                <div className="font-medium text-sm truncate leading-tight">{req.title || "Request"}</div>
+                                <div className={`text-xs truncate leading-tight ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>
+                                  {timeStr}
+                                </div>
+                                <div className={`text-[11px] font-semibold capitalize truncate leading-tight text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
+                                  {req.status}
+                                </div>
                               </div>
                             </Link>
                           );
@@ -301,9 +312,9 @@ export default function CalendarPage() {
                       ) : (
                         sortedDayRequests.map(req => {
                           const isHappening = isAppointmentHappeningNow(req, currentTime);
+                  const isPast = !isHappening && isAppointmentPast(req, currentTime);
                           const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
                           const timeStr = formatEventTime(startsAt, endsAt, safeZone);
-                          const refCode = formatReference(req.id);
 
                           return (
                             <Link 
@@ -312,7 +323,9 @@ export default function CalendarPage() {
                               className={`block rounded-lg p-2.5 text-xs transition-all ${
                                 isHappening 
                                   ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400 hover:bg-emerald-700' 
-                                  : 'bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]'
+                                  : isPast
+                                    ? 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
+                                    : 'bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]'
                               }`}
                             >
                               {isHappening && (
@@ -324,11 +337,12 @@ export default function CalendarPage() {
                                   <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
                                 </div>
                               )}
-                              <div className="font-semibold truncate">{req.title || "Request"}</div>
-                              <div className={`text-[10px] mt-0.5 ${isHappening ? 'text-emerald-100' : 'opacity-85'}`}>{timeStr}</div>
-                              <div className={`text-[10px] mt-1 flex items-center justify-between ${isHappening ? 'text-emerald-200' : 'opacity-75'}`}>
-                                <span>{refCode}</span>
-                                <span className="capitalize">{req.status}</span>
+                              <div className="flex flex-col gap-1 p-0.5">
+                                <div className="font-medium text-sm truncate">{req.title || "Request"}</div>
+                                <div className={`text-xs truncate ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>{timeStr}</div>
+                                <div className={`text-[11px] font-semibold capitalize truncate text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
+                                  {req.status}
+                                </div>
                               </div>
                             </Link>
                           );
@@ -367,9 +381,9 @@ export default function CalendarPage() {
               <div className="space-y-3">
                 {sortedDayRequests.map(req => {
                   const isHappening = isAppointmentHappeningNow(req, currentTime);
+                  const isPast = !isHappening && isAppointmentPast(req, currentTime);
                   const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
                   const timeStr = formatEventTime(startsAt, endsAt, safeZone);
-                  const refCode = formatReference(req.id);
                   const org = req.requester?.org || req.data?.intake?.program || "General";
 
                   return (
@@ -379,7 +393,9 @@ export default function CalendarPage() {
                       className={`block rounded-xl p-4 sm:p-5 transition-all ${
                         isHappening 
                           ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 hover:bg-emerald-700' 
-                          : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
+                          : isPast
+                            ? 'bg-slate-50 border border-gray-200 text-gray-500 hover:bg-gray-100'
+                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
                       }`}
                     >
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -388,25 +404,20 @@ export default function CalendarPage() {
                             {isHappening && <HappeningNowBadge size="sm" />}
                             <h3 className="font-semibold text-base">{req.title || "Request"}</h3>
                           </div>
-                          <div className={`text-sm ${isHappening ? 'text-emerald-100' : 'text-[var(--ink)]'}`}>
+                          <div className={`text-sm ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-500' : 'text-[var(--ink)]'}`}>
                             {timeStr}
                           </div>
-                          <div className={`text-xs ${isHappening ? 'text-emerald-200' : 'text-[var(--sage)]'}`}>
+                          <div className={`text-xs ${isHappening ? 'text-emerald-200' : isPast ? 'text-gray-400' : 'text-[var(--sage)]'}`}>
                             Organization: <span className="font-medium">{org}</span>
                           </div>
                         </div>
                         <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
-                          <span className={`text-xs font-mono px-2.5 py-1 rounded-md ${
-                            isHappening 
-                              ? 'bg-emerald-700/60 text-white' 
-                              : 'bg-white border border-gray-200 text-gray-700 font-medium'
-                          }`}>
-                            {refCode}
-                          </span>
                           <span className={`rounded-full px-3 py-0.5 text-xs font-medium capitalize ${
                             isHappening 
                               ? 'bg-emerald-500 text-white' 
-                              : 'bg-[#E5F0EB] text-[#0A3D31]'
+                              : isPast
+                                ? 'bg-gray-200 text-gray-600'
+                                : 'bg-[#E5F0EB] text-[#0A3D31]'
                           }`}>
                             {req.status}
                           </span>
