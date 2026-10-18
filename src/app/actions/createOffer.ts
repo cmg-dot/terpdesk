@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
@@ -14,6 +15,7 @@ interface CreateOfferPayload {
 }
 
 export async function createOffer(payload: CreateOfferPayload) {
+  await requireRole("agency");
   const [request] = await db.select().from(requests).where(eq(requests.id, payload.requestId));
   if (!request) throw new Error("Request not found");
 

@@ -4,6 +4,39 @@ import { resolveRequestTimes } from "./timezone";
  * Utility functions for detecting and prioritizing appointments that are currently in progress ("Happening now").
  */
 
+/**
+ * True when an interpreter is actually booked on the job. "Happening now" is only meaningful then;
+ * an unfilled request that has reached its start time is overdue, not live.
+ */
+export function isInterpreterAssigned(
+  job: { status?: string | null; state?: string | null; [key: string]: any } | null | undefined,
+): boolean {
+  if (!job) return false;
+  const status = String(job.status || job.state || '').toLowerCase();
+  if (status.includes('cancel') || status === 'declined' || status === 'released') return false;
+  return (
+    job.hasAcceptedOffer === true ||
+    Number(job.staffedCount ?? 0) > 0 ||
+    Number(job.acceptedInterpretersCount ?? 0) > 0 ||
+    /booked|assigned|staffed/.test(status)
+  );
+}
+
+/** A draft / unfilled request whose start time has arrived without anyone booked. */
+export function isUnfilledPastDue(
+  job: { startsAt?: string | Date | null; status?: string | null; state?: string | null; [key: string]: any } | null | undefined,
+  nowMs: number = Date.now()
+): boolean {
+  if (!job) return false;
+  const status = String(job.status || job.state || '').toLowerCase();
+  if (status.includes('cancel')) return false;
+  if (!(status.includes('draft') || status.includes('unfilled'))) return false;
+  if (isInterpreterAssigned(job)) return false;
+  const { startsAt } = resolveRequestTimes(job);
+  const start = new Date(startsAt).getTime();
+  return !isNaN(start) && nowMs >= start;
+}
+
 export function isAppointmentHappeningNow(
   job: {
     startsAt?: string | Date | null;
@@ -20,6 +53,9 @@ export function isAppointmentHappeningNow(
   if (status.includes('cancel') || status === 'declined' || status === 'released') {
     return false;
   }
+
+  // Only a booked interpreter makes an appointment "live"; unfilled drafts show as past due instead.
+  if (!isInterpreterAssigned(job)) return false;
 
   const { startsAt, endsAt } = resolveRequestTimes(job);
   if (!startsAt || !endsAt) return false;

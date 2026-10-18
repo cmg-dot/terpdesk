@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { approveHours, requestHoursCorrection } from "@/app/actions/reviewHours";
@@ -9,6 +10,9 @@ import { approveTimesheet } from "@/app/actions/approveTimesheet";
 import { getSubmittedTimesheets } from "@/app/actions/getSubmittedTimesheets";
 import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords";
+import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone } from "@/utils/timezone";
+import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
+import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -56,26 +60,15 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
   const [isApproving, setIsApproving] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
 
-  // calculate service time from actual start and actual end (mock string parsing)
+  // Every time on this card is shown in the job's own zone, never the browser's.
+  const zone = getIanaZone(record.timeZone);
   const actualStartDt = new Date(record.actualStart);
   const actualEndDt = new Date(record.actualEnd);
-  
-  // mock for "Tue, Sep 22 · 10:53 AM – 12:53 PM PDT"
-  const formattedActual = `${actualStartDt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric'})} · ${actualStartDt.toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit'})} – ${actualEndDt.toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', timeZoneName: 'short'})}`;
-  
-  const scheduledStartDt = new Date(record.scheduledStart);
-  const scheduledEndDt = new Date(record.scheduledEnd);
-  const formattedScheduled = `${scheduledStartDt.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric'})} · ${scheduledStartDt.toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit'})} – ${scheduledEndDt.toLocaleTimeString('en-US', {hour: 'numeric', minute:'2-digit', timeZoneName: 'short'})}`;
-
-  const formattedTravel = record.travelStart && record.travelEnd ? (() => {
-    try {
-      const ts = new Date(record.travelStart);
-      const te = new Date(record.travelEnd);
-      return `${ts.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} · ${ts.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })} – ${te.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', timeZoneName: 'short' })}`;
-    } catch (e) {
-      return `${record.travelStart} – ${record.travelEnd}`;
-    }
-  })() : "None reported";
+  const formattedActual = formatDateTimeRangeInZone(record.actualStart, record.actualEnd, zone);
+  const formattedScheduled = formatDateTimeRangeInZone(record.scheduledStart, record.scheduledEnd, zone);
+  const formattedTravel = record.travelStart && record.travelEnd
+    ? formatDateTimeRangeInZone(record.travelStart, record.travelEnd, zone)
+    : "None reported";
 
   const diffMs = actualEndDt.getTime() - actualStartDt.getTime();
   const serviceMinutes = Math.max(0, (diffMs / 60000) - (record.breakMinutes || 0));
@@ -234,9 +227,9 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           <div>
             <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
               <span>Mileage reported</span>
-              <CopyButton text={`${record.reportedMileage.toFixed(1)} mi`} label="mileage reported" />
+              <CopyButton text={`${(record.reportedMileage ?? 0).toFixed(1)} mi`} label="mileage reported" />
             </div>
-            <div className="text-[var(--ink)]">{record.reportedMileage.toFixed(1)} mi</div>
+            <div className="text-[var(--ink)]">{(record.reportedMileage ?? 0).toFixed(1)} mi</div>
           </div>
         </div>
         
@@ -257,7 +250,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           </div>
           <div>
             <div className="text-[var(--sage)] mb-1">Mileage approved by the agency</div>
-            <div className="text-[var(--ink)]">{record.state === 'approved' && record.approvedMileage !== null ? `${record.approvedMileage.toFixed(1)} mi` : 'Not approved yet'}</div>
+            <div className="text-[var(--ink)]">{record.state === 'approved' && record.approvedMileage != null ? `${(record.approvedMileage ?? 0).toFixed(1)} mi` : 'Not approved yet'}</div>
           </div>
         </div>
       </div>
@@ -304,8 +297,8 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           <ul className="space-y-1.5">
             {record.travelLegs.map((leg, i) => (
               <li key={i} className="text-xs text-[var(--ink)] bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                {leg.fromLabel || "—"} → {leg.toLabel || "—"} · {leg.miles.toFixed(1)} mi
-                {leg.roundTrip ? ` (round trip, ${(leg.miles * 2).toFixed(1)} mi)` : ""}
+                {leg.fromLabel || "—"} → {leg.toLabel || "—"} · {(leg.miles ?? 0).toFixed(1)} mi
+                {leg.roundTrip ? ` (round trip, ${((leg.miles ?? 0) * 2).toFixed(1)} mi)` : ""}
               </li>
             ))}
           </ul>
@@ -314,7 +307,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
 
       {record.state === 'approved' && (
         <div className="text-sm text-gray-600 mb-6 border-t border-gray-200 pt-4">
-          Approved {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })} - v{record.version}. Locked. Approval confirms the service record only; it is not a payment.
+          Approved {formatDateInZone(new Date(), zone, 'EEE, MMM d')} - v{record.version}. Locked. Approval confirms the service record only; it is not a payment.
         </div>
       )}
 
@@ -335,7 +328,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
                 </div>
               ))
             ) : (
-              <div>v{record.version} · submitted by {record.interpreterName} · {actualEndDt.toLocaleDateString('en-US')}</div>
+              <div>v{record.version} · submitted by {record.interpreterName} · {formatDateInZone(record.actualEnd, zone, 'M/d/yyyy')}</div>
             )}
           </div>
         )}
@@ -380,7 +373,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           </label>
           )}
           <div className="mb-5">
-            <label className="block text-xs text-gray-600 mb-2">Mileage to approve (reported: {record.reportedMileage.toFixed(1)} mi)</label>
+            <label className="block text-xs text-gray-600 mb-2">Mileage to approve (reported: {(record.reportedMileage ?? 0).toFixed(1)} mi)</label>
             <input 
               type="text" 
               value={mileageToApprove} 
@@ -428,7 +421,14 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
   );
 }
 
-export default function HoursReviewPage() {
+// Hardcoded to 5 for current testing.
+const ITEMS_PER_PAGE = 5;
+
+const pagerBase = "inline-flex items-center justify-center min-w-[2.5rem] px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg transition-colors";
+
+function HoursReviewContent() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [activeTab, setActiveTab] = useState<'awaiting' | 'all'>('awaiting');
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   
@@ -480,18 +480,38 @@ export default function HoursReviewPage() {
   
   const displayedRecords = activeTab === 'awaiting' ? awaitingRecords : records;
 
+  // Page lives in the URL (?page=2) so it survives reloads and can be shared. 20 records per page.
+  const requestedPage = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
+  const totalPages = Math.max(1, Math.ceil(displayedRecords.length / ITEMS_PER_PAGE));
+  const page = Math.min(requestedPage, totalPages);
+  const pageRecords = displayedRecords.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+
+  const goToPage = (next: number) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('page', String(next));
+    router.push(`?${params.toString()}`);
+  };
+  const selectTab = (tab: 'awaiting' | 'all') => {
+    setActiveTab(tab);
+    if (requestedPage !== 1) goToPage(1);
+  };
+
   return (
     <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-6 pb-24 antialiased pt-6">
-      <div>
-        <h1 className="text-3xl font-bold text-[var(--ink)] mb-2">Hours review</h1>
-        <p className="text-sm text-[var(--sage)] mb-6">
-          Reported service time awaiting your confirmation. Approval records the service; it does not create pay or an invoice.
-        </p>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-[var(--ink)] mb-2">Hours review</h1>
+          <p className="text-sm text-[var(--sage)] mb-6">
+            Reported service time awaiting your confirmation. Approval records the service; it does not create pay or an invoice.
+          </p>
+        </div>
+        {/* Reuses this page's existing "storage" listener to reload the records after a log. */}
+        <LogStateJobHoursDialog onLogged={() => window.dispatchEvent(new Event('storage'))} />
       </div>
 
       <div className="flex flex-wrap gap-3 mb-8">
         <button 
-          onClick={() => setActiveTab('awaiting')}
+          onClick={() => selectTab('awaiting')}
           className={`w-full sm:w-auto px-5 py-2.5 transition-colors text-sm font-medium rounded-full ${
             activeTab === 'awaiting' 
               ? 'bg-[#145347] text-white hover:bg-[#0f4037]' 
@@ -501,7 +521,7 @@ export default function HoursReviewPage() {
           Awaiting review ({submittedCount})
         </button>
         <button 
-          onClick={() => setActiveTab('all')}
+          onClick={() => selectTab('all')}
           className={`w-full sm:w-auto px-5 py-2.5 transition-colors text-sm font-medium rounded-full ${
             activeTab === 'all' 
               ? 'bg-[#145347] text-white hover:bg-[#0f4037]' 
@@ -519,11 +539,64 @@ export default function HoursReviewPage() {
             <p className="text-sm text-[var(--sage)]">There are currently no records to review.</p>
           </div>
         ) : (
-          displayedRecords.map(record => (
+          pageRecords.map(record => (
             <ServiceRecordCard key={record.id} record={record} onUpdate={handleUpdateRecord} />
           ))
         )}
       </div>
+
+      {/* Same numbered-block look as "Needs attention" and "Upcoming bookings". */}
+      <nav aria-label="Pagination" className="flex flex-wrap items-center gap-2 mt-6 py-4 border-t border-gray-200">
+        {page > 1 ? (
+          <Link href={`?page=${page - 1}`} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
+            Prev
+          </Link>
+        ) : (
+          <span aria-disabled="true" className={`${pagerBase} bg-white text-gray-300 cursor-not-allowed pointer-events-none`}>
+            Prev
+          </span>
+        )}
+
+        {buildPageTokens(page, totalPages).map((token) =>
+          typeof token === 'number' ? (
+            <Link
+              key={token}
+              href={`?page=${token}`}
+              aria-current={token === page ? 'page' : undefined}
+              className={`${pagerBase} ${
+                token === page
+                  ? 'bg-[#163C3A] text-white border-transparent'
+                  : 'bg-white text-slate-700 hover:bg-slate-50'
+              }`}
+            >
+              {token}
+            </Link>
+          ) : (
+            <span key={token} className="px-1 text-gray-400" aria-hidden="true">
+              …
+            </span>
+          ),
+        )}
+
+        {page < totalPages ? (
+          <Link href={`?page=${page + 1}`} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
+            Next
+          </Link>
+        ) : (
+          <span aria-disabled="true" className={`${pagerBase} bg-white text-gray-300 cursor-not-allowed pointer-events-none`}>
+            Next
+          </span>
+        )}
+      </nav>
     </div>
+  );
+}
+
+// useSearchParams requires a Suspense boundary in the App Router.
+export default function HoursReviewPage() {
+  return (
+    <Suspense fallback={null}>
+      <HoursReviewContent />
+    </Suspense>
   );
 }

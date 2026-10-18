@@ -20,11 +20,16 @@ import {
 import { RequestsProvider } from "@/context/RequestsContext";
 import { ClientsProvider } from "@/context/ClientsContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { SignOutButton } from "@/components/auth/SignOutButton";
+import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
+  const { data: session } = useSession();
+  const userName = session?.user?.name ?? "";
+  const userEmail = session?.user?.email ?? "";
 
   return (
     <ClientsProvider>
@@ -88,12 +93,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             <div className="p-6">
               <div className="mb-4 flex flex-col">
-                <span className="text-sm font-medium text-white">Avery North</span>
-                <span className="text-xs text-[#8BA49E]">north.staff@fictional.test</span>
+                <span className="text-sm font-medium text-white">{userName}</span>
+                <span className="text-xs text-[#8BA49E]">{userEmail}</span>
               </div>
-              <Link href="#" className="text-sm font-medium text-white hover:underline underline-offset-4 decoration-white/30">
-                Sign out
-              </Link>
+              <SignOutButton className="text-sm font-medium text-white hover:underline underline-offset-4 decoration-white/30" />
             </div>
           </aside>
 
@@ -102,13 +105,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             {/* Header */}
             <header className="flex items-center justify-between px-4 md:px-8 py-5 sticky top-0 z-40 bg-[#F9F8F4]">
               <div className="text-sm text-slate-500">
-                Avery North · Agency
+                {userName} · Agency
               </div>
               <div className="flex items-center gap-4 md:gap-6">
                 <NotificationBell />
-                <Link href="#" className="text-sm text-slate-500 hover:text-slate-700">
-                  Sign out
-                </Link>
+                <SignOutButton className="text-sm text-slate-500 hover:text-slate-700" />
                 <button onClick={() => setIsMenuOpen(true)} className="md:hidden text-slate-500 hover:text-slate-700 ml-1">
                   <Menu className="h-5 w-5" />
                 </button>
@@ -193,8 +194,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Footer */}
                 <div className="mt-auto p-6 border-t border-neutral-100">
                   <div className="flex flex-col gap-1 mb-6">
-                    <span className="text-[15px] font-semibold text-[var(--ink)]">Avery North</span>
-                    <span className="text-sm text-[var(--sage)]">north.staff@fictional.test</span>
+                    <span className="text-[15px] font-semibold text-[var(--ink)]">{userName}</span>
+                    <span className="text-sm text-[var(--sage)]">{userEmail}</span>
                   </div>
                   <div className="flex flex-col gap-4">
                     <Link href="/interpreter" onClick={() => setIsMenuOpen(false)} className="text-slate-600 text-[15px] font-medium hover:text-[var(--forest)]">Switch to Interpreter</Link>

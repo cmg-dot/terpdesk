@@ -74,6 +74,8 @@ export function getJobHoursState(job: any, serviceRecords: any[] = []): HoursWor
 
 export function isJobNeedingHours(job: any, serviceRecords: any[] = [], nowMs: number = Date.now()): boolean {
   if (!job) return false;
+  // State jobs: hours are submitted in the state portal, not in TerpDesk.
+  if (job.isStateJob === true) return false;
   const isBooked = job.status === 'booked' || job.status === 'accepted';
   if (!isBooked) return false;
 

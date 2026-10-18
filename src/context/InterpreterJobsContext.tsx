@@ -20,6 +20,7 @@ export interface Job {
   endsAt?: string;
   serviceRecordState?: 'not_started' | 'submitted' | 'approved';
   program?: string;
+  isStateJob?: boolean;
   timeZone?: string;
   hoursSubmission?: any;
   travelStartTime?: string | null;
@@ -73,6 +74,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           startsAt: o.startsAt,
           endsAt: o.endsAt,
           program: o.program,
+          isStateJob: (o as any).isStateJob === true,
           timeZone: o.timeZone,
           hoursSubmission: (o as any).hoursSubmission,
           travelStartTime: (o as any).travelStartTime,

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
@@ -8,6 +9,7 @@ import { revalidatePath } from "next/cache";
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export async function removeBooking(requestId: string, offerId?: string, positionIndex?: 1 | 2) {
+  await requireRole("agency");
   const [request] = await db.select().from(requests).where(eq(requests.id, requestId));
   if (!request) throw new Error("Request not found");
 

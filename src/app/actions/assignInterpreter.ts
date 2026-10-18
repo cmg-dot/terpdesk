@@ -1,9 +1,15 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { DEFAULT_AGENCY_ID } from "@/lib/agency";
+import { readPermission } from "@/lib/agencyPermissions";
+import { ensureAvailabilityTables } from "./availability";
+
+const AUTO_BOOK_NOT_ALLOWED = "This interpreter has not enabled auto-booking for your agency. You must send an offer instead.";
 
 export async function assignInterpreter(
   requestId: string, 
@@ -11,6 +17,13 @@ export async function assignInterpreter(
   interpreterName?: string,
   positionIndex: 1 | 2 = 1
 ) {
+  await requireRole("agency");
+
+  // Assigning directly (no offer, no acceptance) is only allowed for interpreters who opted in for this agency.
+  // Ordinary offers go through createOffer and never reach this check.
+  await ensureAvailabilityTables();
+  const permission = await readPermission(DEFAULT_AGENCY_ID, interpreterId);
+  if (!permission.allowsAutoBook) return { error: AUTO_BOOK_NOT_ALLOWED };
   const [request] = await db.select().from(requests).where(eq(requests.id, requestId));
   if (!request) throw new Error("Request not found");
 

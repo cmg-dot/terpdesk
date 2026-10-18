@@ -3,9 +3,13 @@
 import React, { useState } from "react";
 import { useGlobalState } from "@/context/GlobalContext";
 import { motion } from "framer-motion";
+import { useAgencyPermissions } from "@/hooks/useAgencyPermissions";
 
 export default function AgenciesPage() {
-  const { currentUser, requestToJoinAgency, memberships, membership_requests, agencies } = useGlobalState();
+  const { currentUser, requestToJoinAgency, memberships, membership_requests, agencies, rosterAgencyIds } = useGlobalState();
+  const { permissionFor, pendingKey, error: permError, setSharing, setAutoBook } = useAgencyPermissions(
+    currentUser.role === 'interpreter' && Boolean(currentUser.id),
+  );
   const [inputCode, setInputCode] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
@@ -26,6 +30,15 @@ export default function AgenciesPage() {
 
   const myMemberships = memberships.filter(m => m.user_id === currentUser.id && m.active);
   const myRequests = membership_requests.filter(r => r.interpreter_id === currentUser.id);
+
+  // Connected = approved memberships plus agencies whose roster this interpreter is already on
+  // (for example a shadow profile the agency created and the interpreter then claimed).
+  const connectedAgencies = [
+    ...myMemberships.map(m => ({ key: m.id, agencyId: m.agency_id })),
+    ...rosterAgencyIds
+      .filter(id => !myMemberships.some(m => m.agency_id === id))
+      .map(id => ({ key: `roster-${id}`, agencyId: id })),
+  ];
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2 pb-24">
@@ -62,7 +75,11 @@ export default function AgenciesPage() {
                 Send request
               </button>
             </div>
-            {errorMsg && <p className="text-[#C23B22] text-[13px] mt-2 font-medium">{errorMsg}</p>}
+            {errorMsg && (
+              <p role="alert" className="mt-3 rounded-xl border border-red-200 bg-red-50 px-4 py-2.5 text-[13px] font-medium text-[#C23B22]">
+                {errorMsg}
+              </p>
+            )}
             {successMsg && <p className="text-emerald-600 text-sm mt-2">{successMsg}</p>}
           </div>
           
@@ -76,17 +93,16 @@ export default function AgenciesPage() {
           <h2 className="text-[19px] font-semibold text-[var(--ink)] mb-6">Connected</h2>
           
           <div className="space-y-0">
-            {myMemberships.length === 0 && (
+            {connectedAgencies.length === 0 && (
               <p className="text-[15px] text-[var(--sage)]">No connected agencies.</p>
             )}
             
-            {myMemberships.map((membership, i) => {
-              const agency = agencies.find(a => a.id === membership.agency_id);
+            {connectedAgencies.map((membership, i) => {
+              const agency = agencies.find(a => a.id === membership.agencyId);
               return (
-                <div key={membership.id} className={`flex flex-col sm:flex-row sm:items-center gap-4 py-4 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
+                <div key={membership.key} className={`flex flex-col sm:flex-row sm:items-center gap-4 py-4 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <span className="text-[15px] font-medium text-[var(--ink)]">{agency?.name || 'Unknown Agency'}</span>
                   <span className="rounded-full bg-[#E6EFEA] px-3 py-1 text-[11px] font-semibold text-[#385B52]">Active</span>
-                  <span className="text-[13px] text-[var(--sage)] hidden sm:block">Automated test fixtures only. Records in this agency are disposable and may be deleted by the test cleanup script.</span>
                 </div>
               );
             })}
@@ -101,22 +117,32 @@ export default function AgenciesPage() {
           </p>
 
           <div className="space-y-0">
-            {myMemberships.length === 0 && (
+            {connectedAgencies.length === 0 && (
               <p className="text-[15px] text-[var(--sage)]">No connected agencies to share with.</p>
             )}
             
-            {myMemberships.map((membership, i) => {
-              const agency = agencies.find(a => a.id === membership.agency_id);
+            {connectedAgencies.map((membership, i) => {
+              const agency = agencies.find(a => a.id === membership.agencyId);
+              const perm = permissionFor(membership.agencyId);
+              const saving = pendingKey === `share:${membership.agencyId}`;
               return (
-                <div key={membership.id} className={`flex flex-col sm:flex-row sm:items-center gap-4 py-5 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
+                <div key={membership.key} className={`flex flex-col sm:flex-row sm:items-center gap-4 py-5 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <span className="text-[15px] font-medium text-[var(--ink)] w-full sm:w-[280px]">{agency?.name || 'Unknown Agency'}</span>
-                  <span className="rounded-full bg-[#F3F2EE] px-3 py-1 text-[11px] font-semibold text-slate-500 shrink-0">Not sharing</span>
-                  <button className="h-9 rounded-full border border-gray-200 px-5 text-[13px] font-medium text-slate-600 hover:bg-gray-50 transition-colors whitespace-nowrap">
-                    Share with this agency
+                  <span className={`rounded-full px-3 py-1 text-[11px] font-semibold shrink-0 ${perm.sharesAvailability ? 'bg-[#E6EFEA] text-[#385B52]' : 'bg-[#F3F2EE] text-slate-500'}`}>
+                    {perm.sharesAvailability ? 'Sharing' : 'Not sharing'}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSharing(membership.agencyId, !perm.sharesAvailability)}
+                    disabled={Boolean(pendingKey)}
+                    className="h-9 rounded-full border border-gray-200 px-5 text-[13px] font-medium text-slate-600 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:opacity-60 disabled:cursor-not-allowed"
+                  >
+                    {saving ? 'Saving…' : perm.sharesAvailability ? 'Stop sharing' : 'Share with this agency'}
                   </button>
                 </div>
               );
             })}
+            {permError && <p role="alert" className="mt-4 text-[13px] font-medium text-[#C23B22]">{permError}</p>}
           </div>
         </div>
 
@@ -142,24 +168,36 @@ export default function AgenciesPage() {
           </div>
 
           <div className="space-y-0">
-            {myMemberships.length === 0 && (
+            {connectedAgencies.length === 0 && (
               <p className="text-[15px] text-[var(--sage)]">No connected agencies to allow auto-booking.</p>
             )}
             
-            {myMemberships.map((membership, i) => {
-              const agency = agencies.find(a => a.id === membership.agency_id);
+            {connectedAgencies.map((membership, i) => {
+              const agency = agencies.find(a => a.id === membership.agencyId);
+              const agencyName = agency?.name || 'this agency';
+              const perm = permissionFor(membership.agencyId);
+              const saving = pendingKey === `auto:${membership.agencyId}`;
               return (
-                <div key={membership.id} className={`flex flex-col py-6 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
+                <div key={membership.key} className={`flex flex-col py-6 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-3">
-                    <span className="text-[15px] font-medium text-[var(--ink)] w-full sm:w-[280px]">{agency?.name || 'Unknown Agency'}</span>
-                    <span className="rounded-full bg-[#F3F2EE] px-3 py-1 text-[11px] font-semibold text-slate-500 shrink-0">Auto Fill off</span>
-                    <button disabled className="h-9 rounded-full border border-gray-200 px-5 text-[13px] font-medium text-slate-400 cursor-not-allowed whitespace-nowrap opacity-70">
-                      Allow this agency to auto-book
+                    <span className="text-[15px] font-medium text-[var(--ink)] w-full sm:w-[280px]">{agencyName}</span>
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold shrink-0 ${perm.allowsAutoBook ? 'bg-[#E6EFEA] text-[#385B52]' : 'bg-[#F3F2EE] text-slate-500'}`}>
+                      {perm.allowsAutoBook ? 'Auto Fill on' : 'Auto Fill off'}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setAutoBook(membership.agencyId, !perm.allowsAutoBook)}
+                      disabled={!perm.sharesAvailability || Boolean(pendingKey)}
+                      className="h-9 rounded-full border border-gray-200 px-5 text-[13px] font-medium text-slate-600 hover:bg-gray-50 transition-colors whitespace-nowrap disabled:text-slate-400 disabled:opacity-70 disabled:cursor-not-allowed"
+                    >
+                      {saving ? 'Saving…' : perm.allowsAutoBook ? 'Turn off auto-book' : 'Allow this agency to auto-book'}
                     </button>
                   </div>
-                  <p className="text-[13px] text-[var(--sage)] max-w-4xl leading-relaxed">
-                    Turn on "Share my availability" for {agency?.name || 'this agency'} in the section above first — that is why this button is unavailable. Auto Fill can only book inside availability that agency can see. Nothing is switched on for you.
-                  </p>
+                  {!perm.sharesAvailability && (
+                    <p className="text-[13px] text-[var(--sage)] max-w-4xl leading-relaxed">
+                      Turn on 'Share my availability' for {agencyName} in the section above first.
+                    </p>
+                  )}
                 </div>
               );
             })}

@@ -1,5 +1,6 @@
 "use client";
 
+import { isStateAgencyClient } from "@/lib/validation/client";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useRequests } from "@/context/RequestsContext";
 import { useClients } from "@/context/ClientsContext";
@@ -330,6 +331,18 @@ export default function NewRequestPage() {
  }, []);
 
  const handleChange = (field: keyof typeof formData, value: string | boolean) => {
+  // Choosing a client on file routes the request: a state agency (or anything named ODHH) switches the funding
+  // program to WA ODHH, which turns on the state-job workflow. Picking a regular client only undoes that
+  // automatic switch, so a manually chosen program such as WA Apple Health is left alone.
+  if (field === "client" && typeof value === "string") {
+    const picked = dbClients.find((c) => c.name === value);
+    const routeToOdhh = picked ? isStateAgencyClient(picked) : false;
+    setFormData((prev) => ({
+      ...prev,
+      program: routeToOdhh ? "WA ODHH" : prev.program === "WA ODHH" ? "General" : prev.program,
+    }));
+  }
+
   if (field === "requesterOrgOrContact") {
     if (value === "New organization or contact") {
       setFormData(prev => ({
@@ -942,6 +955,7 @@ export default function NewRequestPage() {
  </Field>
  </div>
  )}
+
  </div>
 
  {/* Notes Section */}

@@ -110,7 +110,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
   }): Promise<string> => {
     const createdId = await createClientAction({
       name: clientData.name,
-      type: clientData.type || "Organization",
+      type: clientData.type || "organization",
       generalEmail: clientData.generalEmail,
       generalPhone: clientData.generalPhone,
       billingOrganization: clientData.billingOrg,

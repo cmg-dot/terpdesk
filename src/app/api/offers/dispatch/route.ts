@@ -1,3 +1,4 @@
+import { hasRole } from "@/lib/auth/guards";
 import { NextResponse } from "next/server";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
 import { generateOfferToken } from "@/lib/jwt";
@@ -78,6 +79,9 @@ function formatJobTimeDisplay(
 
 export async function POST(req: Request) {
   try {
+    if (!(await hasRole("agency"))) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
     const body = (await req.json()) as Partial<DispatchOfferBody>;
     const { interpreterId, requestId, interpreterEmail, positionNumber } = body;
 

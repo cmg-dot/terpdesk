@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole, NOT_ALLOWED_MESSAGE } from "@/lib/auth/guards";
 import { and, eq } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { revalidatePath } from "next/cache";
@@ -7,6 +8,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { interpreters, requests, timesheets } from "@/db/schema";
 import { sendApprovalEmail } from "@/lib/timesheetEmail";
+import { writeAuditLog } from "@/lib/audit";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
@@ -31,6 +33,12 @@ interface LooseData {
 const fail = (error: string): ApproveTimesheetResult => ({ success: false, error });
 
 export async function approveTimesheet(input: z.input<typeof approveSchema>): Promise<ApproveTimesheetResult> {
+  let session;
+  try {
+    session = await requireRole("agency");
+  } catch {
+    return { success: false, error: NOT_ALLOWED_MESSAGE };
+  }
   const parsed = approveSchema.safeParse(input);
   if (!parsed.success) return fail("Enter a valid, non-negative mileage.");
   const { timesheetId, approvedMileage } = parsed.data;
@@ -58,6 +66,13 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
       return row;
     });
     if (!approved) return fail("This timesheet is not awaiting review.");
+
+    await writeAuditLog({
+      userId: session.user.id,
+      userEmail: session.user.email ?? null,
+      action: "timesheet_approved",
+      details: `timesheetId=${timesheetId}; requestId=${approved.requestId}; approvedMileage=${approvedMileage.toFixed(1)}`,
+    });
 
     revalidatePath("/hours-review");
     revalidatePath("/dashboard");

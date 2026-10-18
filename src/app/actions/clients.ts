@@ -1,5 +1,8 @@
 "use server";
 
+import { clientTypeSchema, normalizeClientType } from "@/lib/validation/client";
+import type { ClientType } from "@/lib/validation/client";
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { clients, requests, type ClientContact, type ClientLocation, type ClientData, type SelectClient } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
@@ -8,13 +11,14 @@ import { revalidatePath } from "next/cache";
 let clientsTableEnsured = false;
 
 export async function ensureClientsTable() {
+  await requireRole("agency");
   if (clientsTableEnsured) return;
   try {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS clients (
         id TEXT PRIMARY KEY,
         name TEXT NOT NULL,
-        type TEXT NOT NULL DEFAULT 'Organization',
+        type TEXT NOT NULL DEFAULT 'organization',
         archived BOOLEAN NOT NULL DEFAULT FALSE,
         data JSONB NOT NULL DEFAULT '{"contacts": [], "locations": []}'::jsonb,
         created_at TIMESTAMP NOT NULL DEFAULT NOW()
@@ -29,7 +33,7 @@ export async function ensureClientsTable() {
 export interface ClientWithStats {
   id: string;
   name: string;
-  type: string;
+  type: ClientType;
   isArchived: boolean;
   generalEmail?: string;
   generalPhone?: string;
@@ -72,6 +76,7 @@ function matchesClientRequest(requestRow: { data: any }, clientName: string): bo
 }
 
 export async function getClientsAction(): Promise<ClientWithStats[]> {
+  await requireRole("agency");
   await ensureClientsTable();
 
   try {
@@ -102,7 +107,7 @@ export async function getClientsAction(): Promise<ClientWithStats[]> {
       return {
         id: c.id,
         name: c.name,
-        type: c.type || "Organization",
+        type: normalizeClientType(c.type),
         isArchived: Boolean(c.archived),
         generalEmail: cData.generalEmail || "",
         generalPhone: cData.generalPhone || "",
@@ -124,6 +129,7 @@ export async function getClientsAction(): Promise<ClientWithStats[]> {
 }
 
 export async function getClientByIdAction(id: string) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   try {
@@ -140,7 +146,7 @@ export async function getClientByIdAction(id: string) {
     return {
       id: c.id,
       name: c.name,
-      type: c.type || "Organization",
+      type: normalizeClientType(c.type),
       isArchived: Boolean(c.archived),
       generalEmail: cData.generalEmail || "",
       generalPhone: cData.generalPhone || "",
@@ -174,6 +180,7 @@ export async function createClientAction(payload: {
   billingAddress?: string;
   privateNotes?: string;
 }) {
+  const session = await requireRole("agency");
   await ensureClientsTable();
 
   const id = `client-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -191,7 +198,7 @@ export async function createClientAction(payload: {
     auditLogs: [{
       id: `${Date.now()}-created`,
       timestamp: now,
-      user: "Avery North",
+      user: session.user.name ?? "Agency staff",
       action: "Client created",
       details: `Client created - ${payload.name.trim()}`
     }]
@@ -200,7 +207,8 @@ export async function createClientAction(payload: {
   await db.insert(clients).values({
     id,
     name: payload.name.trim(),
-    type: payload.type || "Organization",
+    // Only the four canonical types are accepted; anything else is rejected rather than stored.
+    type: payload.type === undefined ? "organization" : clientTypeSchema.parse(payload.type),
     archived: false,
     data,
     createdAt: new Date()
@@ -225,6 +233,7 @@ export async function updateClientAction(id: string, updates: {
   billingAddress?: string;
   privateNotes?: string;
 }) {
+  const session = await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, id));
@@ -233,14 +242,14 @@ export async function updateClientAction(id: string, updates: {
   const existingData = (existing.data || {}) as ClientData;
 
   const newName = updates.name !== undefined ? updates.name.trim() : existing.name;
-  const newType = updates.type !== undefined ? updates.type : existing.type;
+  const newType = updates.type !== undefined ? clientTypeSchema.parse(updates.type) : normalizeClientType(existing.type);
   const newArchived = updates.archived !== undefined ? updates.archived : existing.archived;
 
   const now = new Date().toISOString();
   const log = {
     id: `${Date.now()}-update`,
     timestamp: now,
-    user: "Avery North",
+    user: session.user.name ?? "Agency staff",
     action: "Client updated",
     details: "Client details were updated"
   };
@@ -270,6 +279,7 @@ export async function updateClientAction(id: string, updates: {
 }
 
 export async function archiveClientAction(id: string, archived: boolean) {
+  const session = await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, id));
@@ -280,7 +290,7 @@ export async function archiveClientAction(id: string, archived: boolean) {
   const log = {
     id: `${Date.now()}-archive`,
     timestamp: new Date().toISOString(),
-    user: "Avery North",
+    user: session.user.name ?? "Agency staff",
     action: archived ? "Client archived" : "Client restored",
     details: archived ? "Client was archived" : "Client was restored from archive"
   };
@@ -301,6 +311,7 @@ export async function archiveClientAction(id: string, archived: boolean) {
 }
 
 export async function deleteClientAction(id: string) {
+  await requireRole("agency");
   await ensureClientsTable();
   await db.delete(clients).where(eq(clients.id, id));
 
@@ -309,6 +320,7 @@ export async function deleteClientAction(id: string) {
 }
 
 export async function addClientContactAction(clientId: string, contact: Omit<ClientContact, "id">) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, clientId));
@@ -344,6 +356,7 @@ export async function addClientContactAction(clientId: string, contact: Omit<Cli
 }
 
 export async function updateClientContactAction(clientId: string, contactId: string, updates: Partial<ClientContact>) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, clientId));
@@ -374,6 +387,7 @@ export async function updateClientContactAction(clientId: string, contactId: str
 }
 
 export async function deleteClientContactAction(clientId: string, contactId: string) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, clientId));
@@ -396,6 +410,7 @@ export async function deleteClientContactAction(clientId: string, contactId: str
 }
 
 export async function addClientLocationAction(clientId: string, location: Omit<ClientLocation, "id">) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, clientId));
@@ -435,6 +450,7 @@ export async function addClientLocationAction(clientId: string, location: Omit<C
 }
 
 export async function updateClientLocationAction(clientId: string, locationId: string, updates: Partial<ClientLocation>) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, clientId));
@@ -461,6 +477,7 @@ export async function updateClientLocationAction(clientId: string, locationId: s
 }
 
 export async function deleteClientLocationAction(clientId: string, locationId: string) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const rows = await db.select().from(clients).where(eq(clients.id, clientId));
@@ -492,6 +509,7 @@ export async function saveRequesterToClientsAction(payload: {
   phone: string;
   preferredContact?: string;
 }) {
+  await requireRole("agency");
   await ensureClientsTable();
 
   const org = (payload.organization || "").trim();
@@ -541,7 +559,7 @@ export async function saveRequesterToClientsAction(payload: {
     await db.insert(clients).values({
       id: newId,
       name: orgToMatch,
-      type: "Organization",
+      type: "organization",
       archived: false,
       data: newClientData,
       createdAt: new Date()

@@ -2,6 +2,8 @@
 
 import React from "react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
+import { VerificationBanners } from "@/components/features/VerificationBanners";
 import { Calendar, MapPin, Clock, X, AlertCircle } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { useGlobalState } from "@/context/GlobalContext";
@@ -18,6 +20,7 @@ import { td_availability_view } from "@/app/actions/availability";
 export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
   const { currentUser } = useGlobalState();
+  const { data: session } = useSession();
   const [offers, setOffers] = React.useState<any[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
   const [serviceRecords, setServiceRecords] = React.useState<any[]>([]);
@@ -267,11 +270,13 @@ export default function InterpreterHomePage() {
     </div>
   )}
 
+  <VerificationBanners />
+
   {/* Header */}
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
  <div>
  <h1 className="text-4xl font-semibold tracking-tight text-[var(--ink)] mb-2">
- Welcome, Dale
+ {session?.user?.name?.trim() ? `Welcome, ${session.user.name.trim()}` : "Welcome"}
  </h1>
  <p className="text-[var(--sage)] text-lg">
  Your interpreting work, across your agencies.

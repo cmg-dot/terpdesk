@@ -13,6 +13,7 @@ import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappe
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
+import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 
 type Tab = "upcoming" | "past";
 
@@ -371,7 +372,11 @@ export default function InterpreterJobsPage() {
                           <div className="inline-flex h-6 items-center bg-[#DCEAE3] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                             Booked
                           </div>
-                          {hoursState === 'not_submitted' || hoursState === 'draft' ? (
+                          {job.isStateJob ? (
+                            <div className="inline-flex h-6 items-center bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
+                              Hours via ODHH portal
+                            </div>
+                          ) : hoursState === 'not_submitted' || hoursState === 'draft' ? (
                             <div className="inline-flex h-6 items-center bg-[#F6EFE9] text-[#78350F] border border-[#EADBCE] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                               Submit actual hours
                             </div>
@@ -424,6 +429,16 @@ export default function InterpreterJobsPage() {
                     </div>
 
                     {/* Bottom Action Button */}
+                    {job.isStateJob ? (
+                      <a
+                        href={buildOdhhPortalUrl()}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="w-full mt-1 py-2 rounded-full text-center text-sm font-semibold text-[#1C3F36] border border-[#1C3F36] bg-white hover:bg-gray-50 transition-colors block"
+                      >
+                        Submit via ODHH Portal
+                      </a>
+                    ) : (
                     <Link
                       href={`/jobs/${job.id}`}
                       className="w-full mt-1 py-2 rounded-full text-center text-sm font-semibold text-white bg-[#1C3F36] hover:bg-[#153029] transition-colors block shadow-sm"
@@ -432,6 +447,7 @@ export default function InterpreterJobsPage() {
                         ? "Submit actual hours"
                         : "View reported hours"}
                     </Link>
+                    )}
                   </div>
                 );
               }}

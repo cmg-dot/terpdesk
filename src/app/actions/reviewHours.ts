@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -10,6 +11,7 @@ export async function approveHours(
   approvedMileage: number,
   positionIndex: 1 | 2 = 1
 ): Promise<{ success: boolean }> {
+  await requireRole("agency");
   await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ data: requests.data })
@@ -91,6 +93,7 @@ export async function requestHoursCorrection(
   reviewMessage: string,
   positionIndex: 1 | 2 = 1
 ): Promise<{ success: boolean }> {
+  await requireRole("agency");
   await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ data: requests.data })

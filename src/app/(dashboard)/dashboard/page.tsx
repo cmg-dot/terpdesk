@@ -15,8 +15,11 @@ import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { getIanaZone } from "@/utils/timezone";
+import { useSession } from "next-auth/react";
 
 export default function DashboardPage() {
+  const { data: session } = useSession();
+  const welcomeName = session?.user?.name?.trim();
   const [requests, setRequests] = React.useState<any[]>([]);
   const [interpreterJobs, setInterpreterJobs] = React.useState<any[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
@@ -263,7 +266,7 @@ export default function DashboardPage() {
       {/* Welcome Section */}
       <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 md:gap-0">
         <div className="space-y-2">
-          <h1 className="text-[32px] font-semibold tracking-tight text-[var(--ink)]">Welcome, Avery</h1>
+          <h1 className="text-[32px] font-semibold tracking-tight text-[var(--ink)]">{welcomeName ? `Welcome, ${welcomeName}` : "Welcome"}</h1>
           <p className="text-[15px] text-[var(--sage)]">
             Your scheduling desk. Appointments and coverage saved across authorized accounts.
           </p>

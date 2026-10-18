@@ -2,9 +2,12 @@
 
 import { motion } from "framer-motion";
 import React, { useState } from "react";
+import { useSession } from "next-auth/react";
+import { ChangePasswordDialog } from "@/components/features/ChangePasswordDialog";
 
 export default function SettingsPage() {
  const [theme, setTheme] = useState("default");
+ const { data: session } = useSession();
 
  const notifications = [
  { title: "Offer responses", subtitle: "An interpreter accepts or declines one of your offers." },
@@ -32,12 +35,12 @@ export default function SettingsPage() {
 
  <div className="flex justify-between items-center py-3 border-b border-gray-200">
  <span className="text-[14px] text-[var(--sage)]">Name</span>
- <span className="text-[14px] text-[var(--ink)] font-medium">Avery North</span>
+ <span className="text-[14px] text-[var(--ink)] font-medium">{session?.user?.name ?? ""}</span>
  </div>
 
  <div className="flex justify-between items-center py-3 border-b border-gray-200">
  <span className="text-[14px] text-[var(--sage)]">Sign-in email</span>
- <span className="text-[14px] text-[var(--ink)] font-medium">north.staff@fictional.test</span>
+ <span className="text-[14px] text-[var(--ink)] font-medium">{session?.user?.email ?? ""}</span>
  </div>
 
  <div className="flex justify-between items-center py-3 border-b border-gray-200 mb-4">
@@ -63,9 +66,7 @@ export default function SettingsPage() {
  Notifications are sent to your sign-in email above, not to a contact address on your profile.
  </p>
 
- <button className="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
- Change my password
- </button>
+ <ChangePasswordDialog triggerClassName="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors" />
  </div>
 
  {/* Card 2: Notifications */}

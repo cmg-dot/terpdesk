@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -31,6 +32,7 @@ export interface UpdateRequestDetailsPayload {
 }
 
 export async function updateRequestDetails(payload: UpdateRequestDetailsPayload) {
+  await requireRole("agency");
   const rows = await db.select().from(requests).where(eq(requests.id, payload.requestId));
   if (!rows || rows.length === 0) {
     throw new Error("Request not found");

@@ -16,10 +16,10 @@ interface AnimatedPaginatedListProps<T> {
   as?: "div" | "ul";
 }
 
-type PageToken = number | "gap-start" | "gap-end";
+export type PageToken = number | "gap-start" | "gap-end";
 
 /** Page numbers with ellipses, e.g. 1 … 4 5 6 … 12. */
-const buildPageTokens = (current: number, total: number): PageToken[] => {
+export const buildPageTokens = (current: number, total: number): PageToken[] => {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
   const pages = new Set<number>([1, total, current - 1, current, current + 1]);
   const sorted = Array.from(pages)

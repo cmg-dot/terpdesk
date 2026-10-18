@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -20,6 +21,7 @@ export interface CreateShadowInterpreterData {
 export async function createShadowInterpreter(
   data: CreateShadowInterpreterData
 ): Promise<SelectInterpreter> {
+  await requireRole("agency");
   if (!data || !data.email || typeof data.email !== "string" || !data.email.trim()) {
     throw new Error("A valid email is required to create a shadow interpreter profile.");
   }

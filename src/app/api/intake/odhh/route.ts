@@ -203,6 +203,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       .values({
         title: `ODHH SRN #${data.srn} — ${data.locationName}`,
         status: "draft",
+        isStateJob: true,
         // Matches createRequest: createdAt is used as the appointment start across the app.
         createdAt: startsAt,
         data: requestData,

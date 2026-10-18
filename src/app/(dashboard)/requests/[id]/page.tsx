@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { useRequests } from "@/context/RequestsContext";
 import { useGlobalState } from "@/context/GlobalContext";
-import { ChevronDown, Copy, Check, ExternalLink, Video, MapPin, Edit2, X, Lock, Clock } from "lucide-react";
+import { ChevronDown, Copy, Check, ExternalLink, Video, MapPin, Edit2, X, Lock, Clock, Building2 } from "lucide-react";
 import { fetchLiveRequestById } from "@/app/actions/getRequests";
 import { updateRequestDetails } from "@/app/actions/updateRequestDetails";
 import { removeBooking } from "@/app/actions/removeBooking";
@@ -16,13 +16,21 @@ import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { cancelRequest } from "@/app/actions/cancelRequest";
 import { wallClockToUtc, wallClockToUtcDate, getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
-import { isAppointmentHappeningNow } from "@/utils/happeningNow";
+import { isAppointmentHappeningNow, isUnfilledPastDue } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { getInterpretersFitForJob } from "@/app/actions/availability";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { InterpreterFitBadge, FitWarningNotice } from "@/components/scheduling-ui";
 import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
+import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
+import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
+import { getClientsAction } from "@/app/actions/clients";
+import type { ClientWithStats } from "@/app/actions/clients";
+import { ClientAssignmentBanner } from "@/components/features/ClientAssignmentBanner";
+import { normalizeClientType } from "@/lib/validation/client";
+import { isStateJobRequest } from "@/lib/stateJob";
+import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 
 const fitOptionLabels: Record<InterpreterFitStatus, string> = {
   available: "Available",
@@ -247,6 +255,14 @@ export default function AssignmentDetailPage() {
     getInterpreters().then(setDbInterpreters).catch(console.error);
   }, []);
 
+  // Real auto-book permission per interpreter (sharing on AND auto-book on), read from the database.
+  const [autoBookAllowed, setAutoBookAllowed] = useState<Record<string, boolean>>({});
+  const [autoBookErrors, setAutoBookErrors] = useState<Record<number, string>>({});
+  useEffect(() => {
+    if (dbInterpreters.length === 0) return;
+    getAutoBookEligibility(dbInterpreters.map((m: any) => String(m.id))).then(setAutoBookAllowed).catch(() => setAutoBookAllowed({}));
+  }, [dbInterpreters]);
+
   const activeRoster = dbInterpreters.map(m => ({
     id: m.id,
     name: m.name,
@@ -282,6 +298,21 @@ export default function AssignmentDetailPage() {
   };
 
   const [foundRequest, setFoundRequest] = useState<any>(null);
+  const [clientsOnFile, setClientsOnFile] = useState<ClientWithStats[]>([]);
+  useEffect(() => {
+    getClientsAction().then(setClientsOnFile).catch(() => setClientsOnFile([]));
+  }, []);
+  const [timesheetFlags, setTimesheetFlags] = useState<Record<string, TimesheetFlags>>({});
+  const loadTimesheetFlags = React.useCallback(async (requestId: string) => {
+    try {
+      setTimesheetFlags(await getTimesheetStatus(requestId));
+    } catch {
+      setTimesheetFlags({});
+    }
+  }, []);
+  useEffect(() => {
+    if (foundRequest?.id) void loadTimesheetFlags(String(foundRequest.id));
+  }, [foundRequest?.id, loadTimesheetFlags]);
   const [isLoading, setIsLoading] = useState(true);
 
   const totalPositions = (
@@ -712,7 +743,7 @@ export default function AssignmentDetailPage() {
 
  const confirmCancelAppointment = async () => {
    try {
-     await cancelRequest(id, cancelReasonInput);
+     await cancelRequest(id, cancelReasonInput.trim(), clientRequested);
      const updatedRequest = await fetchLiveRequestById(id);
      setFoundRequest(updatedRequest);
      setShowCancelModal(false);
@@ -727,7 +758,14 @@ export default function AssignmentDetailPage() {
     const selectedName = currentRoster.find(i => i.id === selectedId)?.name || 'Unknown Interpreter';
 
     try {
-      await assignInterpreter(id, selectedId, selectedName, posIdx);
+      const result = await assignInterpreter(id, selectedId, selectedName, posIdx);
+      if (typeof result.error === 'string') {
+        const blockedMessage = result.error;
+        // Blocked on the server (interpreter has not opted in): nothing was booked, so stop here.
+        setAutoBookErrors(prev => ({ ...prev, [posIdx]: blockedMessage }));
+        return;
+      }
+      setAutoBookErrors(prev => ({ ...prev, [posIdx]: '' }));
       const updatedRequest = await fetchLiveRequestById(id);
       setFoundRequest(updatedRequest);
       if (posIdx === 1) setAutoBookRecipient1('');
@@ -906,6 +944,29 @@ export default function AssignmentDetailPage() {
  };
 
  const cardClass = "bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 border border-gray-200/50 shadow-none space-y-4";
+ const isOdhhRequest = foundRequest?.data?.intake?.program === 'WA ODHH' || foundRequest?.data?.intake?.program === 'wa_odhh' || foundRequest?.program === 'WA ODHH' || foundRequest?.program === 'wa_odhh';
+ // Client shown in the banner: the saved client name when there is one, otherwise the requester's organization.
+ const rawClientName = String(foundRequest?.client ?? foundRequest?.data?.client ?? foundRequest?.requester?.org ?? '').trim();
+ const bannerClientName = rawClientName && !rawClientName.startsWith('New or one-time') ? rawClientName : '';
+ const matchedClient = clientsOnFile.find((c) => c.name.trim().toLowerCase() === bannerClientName.toLowerCase());
+ // State-program requests are always shown as state assignments; otherwise the client's own type decides.
+ const bannerClientType = isOdhhRequest ? 'state_agency' : normalizeClientType(matchedClient?.type);
+ const programLabel = isOdhhRequest ? 'WA ODHH (State Agency)' : 'Private Hospital / Standard Agency';
+
+ // Requester card: only these fields, and only when something was actually provided.
+ const textOf = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '');
+ const requesterInfo = (assignment.requester || {}) as Record<string, unknown>;
+ const requesterRows: { label: string; value: string }[] = [
+   { label: 'Organization', value: textOf(requesterInfo.org) },
+   { label: 'Name', value: textOf(requesterInfo.name) },
+   { label: 'Email', value: textOf(requesterInfo.email) },
+   { label: 'Phone', value: textOf(requesterInfo.phone) },
+   {
+     label: 'Team suggested',
+     value: requesterInfo.teamSuggested === true ? 'Yes' : (textOf(requesterInfo.teamSuggested).toLowerCase() === 'no' ? '' : textOf(requesterInfo.teamSuggested)),
+   },
+ ].filter((row) => row.value !== '');
+
  const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow";
 
  const { startsAt: reqStartsAt, endsAt: reqEndsAt } = resolveRequestTimes({
@@ -948,6 +1009,11 @@ export default function AssignmentDetailPage() {
  <div className="flex flex-wrap items-center gap-3">
  {isAppointmentHappeningNow(assignment, currentTime) && (
    <HappeningNowBadge />
+ )}
+ {!isCancelled && isUnfilledPastDue(assignment, currentTime) && (
+   <span className="inline-flex items-center bg-red-50 text-red-700 border border-red-200 text-[13px] font-semibold px-3 py-1 rounded-full">
+     Unfilled - Past Due
+   </span>
  )}
  {isCancelled && (
  <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
@@ -1017,7 +1083,7 @@ export default function AssignmentDetailPage() {
    } catch (e) {
      return '';
    }
- })() : ''}. Every position was released and any pending offer was closed. {clientRequested && "The client requested cancellation. "}The record is kept; the scheduled times are unchanged.
+ })() : ''}. Every position was released and any pending offer was closed. {(foundRequest?.clientRequestedCancellation || clientRequested) && "The client requested cancellation. "}The record is kept; the scheduled times are unchanged.
  </div>
  <div className="bg-[#F5F4F0] text-gray-600 px-6 py-4 rounded-2xl border border-gray-200 text-sm">
  Internal reason (agency only): {cancelReason || "No reason provided"}
@@ -1031,10 +1097,14 @@ export default function AssignmentDetailPage() {
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Overview</h2>
  <div className="flex flex-col">
- {Object.entries(assignment.overview).map(([key, val]) => (
- <DataRow key={key} label={formatLabel(key)} value={String(val)} />
- ))}
+ <DataRow label="Request source" value={programLabel} />
+ <DataRow label="Location" value={assignment.overview.location} />
+ <DataRow label="Reference" value={assignment.overview.reference} />
+ <DataRow label="Status" value={assignment.overview.status} />
+ {assignment.overview.repeats && <DataRow label="Repeats" value={String(assignment.overview.repeats)} />}
  </div>
+
+ <ClientAssignmentBanner clientType={bannerClientType} clientName={bannerClientName} />
  </div>
 
   {(() => {
@@ -1050,11 +1120,6 @@ export default function AssignmentDetailPage() {
     const currentPlatform = assignment.platform || assignment.details?.platform || (currentMeetingLink?.includes('zoom') ? 'Zoom' : 'Virtual');
     const currentVirtualInstructions = assignment.virtualInstructions || assignment.details?.virtualInstructions || null;
 
-    const filteredDetails = Object.entries(assignment.details).filter(([key]) => {
-      const lower = key.toLowerCase();
-      return !['meetinglink', 'virtuallink', 'passcode', 'accesscode', 'platform', 'virtualinstructions', 'meetingid', 'instructions', 'venue', 'address', 'building', 'parking', 'entrance', 'contact', 'contactmethod', 'repeats', 'recurrencenote'].includes(lower);
-    });
-
     return (
       <>
         <div className={cardClass}>
@@ -1069,9 +1134,19 @@ export default function AssignmentDetailPage() {
             </button>
           </div>
           <div className="flex flex-col">
-            {filteredDetails.map(([key, val]) => (
-              <DataRow key={key} label={formatLabel(key)} value={String(val)} />
-            ))}
+            <DataRow label="Program type" value={programLabel} />
+            <DataRow
+              label="Format"
+              value={isVirtualAppointment ? 'Virtual' : (textOf(assignment.details?.format) || textOf(foundRequest?.format) || 'In person')}
+            />
+            <DataRow
+              label="Time zone"
+              value={textOf(assignment.details?.timeZone) || textOf(foundRequest?.timeZone) || 'Pacific Time — Seattle, Los Angeles'}
+            />
+            <DataRow
+              label="Setting"
+              value={textOf(assignment.details?.setting) || textOf(foundRequest?.setting) || 'Medical'}
+            />
           </div>
         </div>
 
@@ -1264,9 +1339,11 @@ export default function AssignmentDetailPage() {
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Requester and internal information</h2>
  <div className="flex flex-col">
- {Object.entries(assignment.requester).map(([key, val]) => (
- <DataRow key={key} label={formatLabel(key)} value={String(val)} />
- ))}
+ {requesterRows.length === 0 ? (
+ <p className="text-sm text-gray-500 py-2">No requester details were provided.</p>
+ ) : (
+ requesterRows.map((row) => <DataRow key={row.label} label={row.label} value={row.value} />)
+ )}
  </div>
  <p className="text-xs text-gray-400 mt-4">
  Staff only. A requested interpreter is a preference, not a booking.
@@ -1562,6 +1639,8 @@ export default function AssignmentDetailPage() {
       const successMsg = isSlot1 ? successMessage1 : successMessage2;
       const isSending = isSlot1 ? isSendingOffer1 : isSendingOffer2;
       const isElig = isSlot1 ? isEligible1 : isEligible2;
+      // Not granted (or still loading) means no auto-book; sending an offer is always still possible.
+      const autoBookDenied = Boolean(autoBookRec) && autoBookAllowed[autoBookRec] !== true;
       const setIsElig = isSlot1 ? setIsEligible1 : setIsEligible2;
 
       let slotBadgeColor = 'bg-[#FEF3C7] text-[#92400E]';
@@ -1815,13 +1894,18 @@ export default function AssignmentDetailPage() {
                           </p>
                         )}
                       </div>
-                      {isElig === false && <p className="text-[var(--sage)] text-sm mb-4">Not eligible for Auto Fill: This interpreter is not sharing availability with your agency. You can still send an offer.</p>}
+                      {autoBookDenied ? (
+                        <p className="text-[var(--sage)] text-sm mb-4">Not eligible for Auto Fill: This interpreter has not granted auto-book permission. You can still send an offer.</p>
+                      ) : (
+                        isElig === false && <p className="text-[var(--sage)] text-sm mb-4">Not eligible for Auto Fill: This interpreter is not sharing availability with your agency. You can still send an offer.</p>
+                      )}
+                      {autoBookErrors[posIdx] && <p role="alert" className="text-sm font-medium text-red-700 mb-4">{autoBookErrors[posIdx]}</p>}
                       <button 
                         type="button"
                         onClick={() => handleAutoBook(posIdx)}
-                        disabled={!autoBookRec || isElig === false}
+                        disabled={!autoBookRec || isElig === false || autoBookDenied}
                         className={`rounded-full px-6 py-2 text-sm font-medium transition-colors w-full sm:w-auto ${
-                          !autoBookRec || isElig === false
+                          !autoBookRec || isElig === false || autoBookDenied
                             ? 'bg-[#8BA49E] text-white opacity-50 cursor-not-allowed'
                             : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
                         }`}
@@ -1854,10 +1938,22 @@ export default function AssignmentDetailPage() {
                       const reqId = String(foundRequest?.id || id || '');
                       if (!assignedInterpId || !reqId) return null;
                       return (
-                        <RequestTimesheetButton 
-                          requestId={reqId} 
-                          interpreterId={assignedInterpId} 
+                        <RequestTimesheetButton
+                          requestId={reqId}
+                          interpreterId={assignedInterpId}
+                          assignmentId={String(accepted.id || '')}
+                          startTime={reqStartsAt}
+                          endTime={reqEndsAt}
+                          timezone={foundRequest?.details?.timeZone || foundRequest?.timeZone}
+                          timesheetDispatched={Boolean(timesheetFlags[assignedInterpId]?.dispatched)}
+                          timesheetSubmitted={Boolean(timesheetFlags[assignedInterpId]?.submitted)}
+                          timesheetApproved={Boolean(timesheetFlags[assignedInterpId]?.approved)}
+                          isStateJob={isStateJobRequest({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data })}
                           className="mb-0"
+                          onSuccess={(message) => {
+                            showToast(message);
+                            void loadTimesheetFlags(reqId);
+                          }}
                         />
                       );
                     })()}
@@ -1931,9 +2027,32 @@ export default function AssignmentDetailPage() {
  </button>
  </div>
  
+ {(() => {
+   const hasBookedInterpreter = Boolean(slot1Accepted || slot2Accepted);
+   const startsSoonOrStarted = currentTime >= startsAtUtcMs || startsAtUtcMs - currentTime < 24 * 60 * 60 * 1000;
+   if (!hasBookedInterpreter) {
+     // STATE A: nobody booked
+     return (
+       <p className="text-[15px] text-gray-600 mb-6 leading-relaxed">
+         This request is currently unfilled. Canceling will permanently close this draft.
+       </p>
+     );
+   }
+   if (startsSoonOrStarted) {
+     // STATE C: booked, starting within 24 hours or already underway
+     return (
+       <p className="text-[15px] font-bold text-red-700 mb-6 leading-relaxed" role="alert">
+         Warning: This assignment is starting soon or in progress. An interpreter is already booked. Canceling now may require a late-cancellation payout.
+       </p>
+     );
+   }
+   // STATE B: booked, more than 24 hours out
+   return (
  <p className="text-[15px] text-gray-600 mb-6 leading-relaxed">
  Every position on this appointment will be cancelled. Booked interpreters lose the assignment and their reserved time is released, pending offers are closed, and nobody can accept or be auto-booked afterwards. Affected interpreters are told in the app. The appointment and its history are kept, not deleted, and the original scheduled times stay on record.
- </p>
+       </p>
+     );
+ })()}
  
  <div className="mb-6 space-y-4">
  <div>

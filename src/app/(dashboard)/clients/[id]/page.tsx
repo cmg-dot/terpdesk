@@ -1,5 +1,6 @@
 "use client";
 
+import { CLIENT_TYPE_LABELS, CLIENT_TYPE_OPTIONS, clientTypeFromLabel, normalizeClientType } from "@/lib/validation/client";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
@@ -100,7 +101,7 @@ export default function ClientDetailsPage() {
 
  const [formData, setFormData] = useState({
  name: client?.name || "",
- type: client?.type || "Organization",
+ type: normalizeClientType(client?.type),
  generalEmail: client?.generalEmail || "",
  generalPhone: client?.generalPhone || "",
  billingOrg: client?.billingOrg || "",
@@ -114,7 +115,7 @@ export default function ClientDetailsPage() {
  if (client) {
  setFormData({
  name: client.name || "",
- type: client.type || "Organization",
+ type: normalizeClientType(client.type),
  generalEmail: client.generalEmail || "",
  generalPhone: client.generalPhone || "",
  billingOrg: client.billingOrg || "",
@@ -235,10 +236,10 @@ export default function ClientDetailsPage() {
  <input type="text" className={inputClass} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
  </Field>
  <Field label="Client type">
- <CustomSelect 
- options={["Organization", "Individual requesting service"]} 
- value={formData.type} 
- onChange={(val) => setFormData({...formData, type: val})} 
+ <CustomSelect
+ options={CLIENT_TYPE_OPTIONS.map((o) => o.label)}
+ value={CLIENT_TYPE_LABELS[normalizeClientType(formData.type)]}
+ onChange={(val) => setFormData({...formData, type: clientTypeFromLabel(val)})} 
  />
  </Field>
  

@@ -1,5 +1,6 @@
 "use server";
 
+import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -11,6 +12,7 @@ export async function respondToOffer(
   offerId: string, 
   response: 'accept' | 'decline' | 'accepted' | 'declined'
 ) {
+  const { interpreterId: sessionInterpreterId } = await requireInterpreter();
   const normResponse = (response === 'accept' || response === 'accepted') ? 'accepted' : 'declined';
 
   // 1. Fetch offer
@@ -18,6 +20,7 @@ export async function respondToOffer(
   if (!offer) {
     throw new Error("Offer not found");
   }
+  if (offer.interpreterId !== sessionInterpreterId) throw new Error(FORBIDDEN);
 
   // 2. Fetch parent request
   const [parentReq] = await db.select().from(requests).where(eq(requests.id, offer.requestId));

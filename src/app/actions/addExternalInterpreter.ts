@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -25,6 +26,7 @@ export interface AddExternalInterpreterResponse {
 export async function addExternalInterpreter(
   input: AddExternalInterpreterInput
 ): Promise<AddExternalInterpreterResponse> {
+  await requireRole("agency");
   if (!input || !input.name || typeof input.name !== "string" || !input.name.trim()) {
     return {
       success: false,

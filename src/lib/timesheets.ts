@@ -4,6 +4,7 @@ import { requests, timesheets } from '@/db/schema';
 import { getIanaZone, resolveRequestTimes, utcToWallClock } from '@/utils/timezone';
 import { hashToken, TOKEN_PATTERN } from '@/lib/timesheetToken';
 import { buildOdhhPortalUrl } from '@/lib/odhhPortal';
+import { isStateJobRequest } from '@/lib/stateJob';
 
 export interface TimesheetAppointment {
   timesheetId: string;
@@ -47,6 +48,7 @@ export async function getPendingTimesheetByToken(token: string): Promise<Timeshe
       title: requests.title,
       createdAt: requests.createdAt,
       data: requests.data,
+      isStateJob: requests.isStateJob,
     })
     .from(timesheets)
     .innerJoin(requests, eq(timesheets.requestId, requests.id))
@@ -60,6 +62,7 @@ export async function getPendingTimesheetByToken(token: string): Promise<Timeshe
     .limit(1);
 
   if (!row) return null;
+  if (isStateJobRequest(row)) return null;
 
   const { startsAt, endsAt } = resolveRequestTimes({ createdAt: row.createdAt, data: row.data });
   const data = row.data as unknown as { details?: LooseDetails; intake?: { program?: string; odhhSrn?: string } } & LooseDetails;

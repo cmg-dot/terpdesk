@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole, assertOwnInterpreterId } from "@/lib/auth/guards";
 import { db } from "@/db";
 import {
   interpreterProfiles,
@@ -71,6 +72,8 @@ export async function ensureAvailabilityTables(): Promise<void> {
         interpreter_id TEXT NOT NULL,
         enabled BOOLEAN NOT NULL DEFAULT true
       );
+
+      ALTER TABLE availability_shares ADD COLUMN IF NOT EXISTS allows_auto_book BOOLEAN NOT NULL DEFAULT false;
 
       CREATE INDEX IF NOT EXISTS idx_avail_rules_interp ON availability_rules (interpreter_id);
       CREATE INDEX IF NOT EXISTS idx_avail_exceptions_interp ON availability_exceptions (interpreter_id);
@@ -174,6 +177,8 @@ export async function td_save_availability(params: {
   rules: AvailabilityRuleInput[];
   exceptions?: AvailabilityExceptionInput[];
 }) {
+  const ownSession = await requireRole("interpreter");
+  assertOwnInterpreterId(ownSession, params.interpreterId);
   await ensureAvailabilityTables();
   const { interpreterId, timeZone, rules, exceptions = [] } = params;
   const targetIds = await resolveInterpreterIds(interpreterId);
@@ -252,6 +257,8 @@ export async function td_update_interpreter_timezone(params: {
   interpreterId: string;
   timeZone: string;
 }): Promise<{ success: boolean; timeZone: string }> {
+  const ownSession = await requireRole("interpreter");
+  assertOwnInterpreterId(ownSession, params.interpreterId);
   await ensureAvailabilityTables();
   const { interpreterId, timeZone } = params;
   const targetIds = await resolveInterpreterIds(interpreterId);
@@ -308,6 +315,8 @@ export async function td_save_busy(params: {
   isAllDay?: boolean;
   revision?: number;
 }) {
+  const ownSession = await requireRole("interpreter");
+  assertOwnInterpreterId(ownSession, params.interpreterId);
   await ensureAvailabilityTables();
   const {
     id,
@@ -479,6 +488,9 @@ export async function td_save_busy(params: {
  * Delete a private busy block.
  */
 export async function td_delete_busy(busyId: string) {
+  const ownSession = await requireRole("interpreter");
+  const [busy] = await db.select({ interpreterId: busyBlocks.interpreterId }).from(busyBlocks).where(eq(busyBlocks.id, busyId)).limit(1);
+  if (busy) assertOwnInterpreterId(ownSession, busy.interpreterId);
   await ensureAvailabilityTables();
   await db.delete(busyBlocks).where(eq(busyBlocks.id, busyId));
   revalidatePath("/interpreter-calendar");
@@ -490,6 +502,8 @@ export async function td_delete_busy(busyId: string) {
  * Fetch availability view data for an interpreter across resolved IDs.
  */
 export async function td_availability_view(interpreterId: string) {
+  const ownSession = await requireRole("interpreter");
+  assertOwnInterpreterId(ownSession, interpreterId);
   await ensureAvailabilityTables();
   const targetIds = await resolveInterpreterIds(interpreterId);
 
@@ -554,6 +568,8 @@ export async function td_toggle_share(params: {
   agencyId: string;
   enabled: boolean;
 }) {
+  const ownSession = await requireRole("interpreter");
+  assertOwnInterpreterId(ownSession, params.interpreterId);
   await ensureAvailabilityTables();
   const { interpreterId, agencyId, enabled } = params;
   const targetIds = await resolveInterpreterIds(interpreterId);
@@ -696,6 +712,7 @@ export async function checkInterpreterFit(params: {
   jobEndsAtUtc: string | Date;
   jobTimeZone?: string;
 }): Promise<{ fit: InterpreterFitStatus }> {
+  await requireRole("agency");
   await ensureAvailabilityTables();
   const { interpreterId, agencyId, jobStartsAtUtc, jobEndsAtUtc } = params;
 
@@ -835,6 +852,7 @@ export async function getInterpretersFitForJob(params: {
   jobEndsAtUtc: string | Date;
   jobTimeZone?: string;
 }): Promise<Record<string, InterpreterFitStatus>> {
+  await requireRole("agency");
   const result: Record<string, InterpreterFitStatus> = {};
   for (const interpreterId of params.interpreterIds) {
     try {

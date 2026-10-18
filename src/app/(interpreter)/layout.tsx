@@ -24,14 +24,15 @@ import {
 import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { motion, AnimatePresence } from "framer-motion";
-import { useGlobalState } from "@/context/GlobalContext";
+import { SignOutButton } from "@/components/auth/SignOutButton";
+import { useSession } from "next-auth/react";
 
 export default function InterpreterLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
-  const { currentUser } = useGlobalState();
-  const displayName = currentUser?.name || "Dale Fictional";
-  const displayEmail = currentUser?.email || "terp.declined@fictional.test";
+  const { data: session } = useSession();
+  const displayName = session?.user?.name ?? "";
+  const displayEmail = session?.user?.email ?? "";
 
   return (
     <div className="flex h-screen overflow-hidden bg-[#F9F8F4] font-sans text-slate-900">
@@ -121,9 +122,7 @@ export default function InterpreterLayout({ children }: { children: React.ReactN
             <span className="text-[14px] font-medium text-white">{displayName}</span>
             <span className="text-xs text-[#8BA49E]">{displayEmail}</span>
           </div>
-          <Link href="/" className="text-[13px] font-medium text-[#8BA49E] hover:text-white transition-colors">
-            Sign out
-          </Link>
+          <SignOutButton className="text-[13px] font-medium text-[#8BA49E] hover:text-white transition-colors" />
         </div>
       </aside>
 
@@ -136,15 +135,10 @@ export default function InterpreterLayout({ children }: { children: React.ReactN
               {displayName} · Interpreter
             </div>
             <div className="flex items-center gap-6">
-              <Link href="/dashboard" className="text-[13px] font-medium text-[#0B3B32] hover:underline underline-offset-4 hidden sm:block">
-                Switch to Agency
-              </Link>
               <div className="relative mt-1">
                 <NotificationBell />
               </div>
-              <Link href="/" className="text-[14px] font-medium text-gray-700 hover:text-gray-900 transition-colors hidden md:block">
-                Sign out
-              </Link>
+              <SignOutButton className="text-[14px] font-medium text-gray-700 hover:text-gray-900 transition-colors hidden md:block" />
               <button onClick={() => setIsMenuOpen(true)} className="md:hidden text-slate-500 hover:text-slate-900 transition-colors">
                 <Menu className="w-6 h-6" />
               </button>
@@ -262,7 +256,7 @@ export default function InterpreterLayout({ children }: { children: React.ReactN
               </div>
               <div className="flex flex-col gap-4">
                 <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="text-slate-600 text-[15px] font-medium hover:text-[var(--forest)]">Switch to Agency</Link>
-                <Link href="/" onClick={() => setIsMenuOpen(false)} className="text-red-600 text-[15px] font-medium hover:text-red-700">Sign out</Link>
+                <SignOutButton className="text-red-600 text-[15px] font-medium hover:text-red-700 text-left" />
               </div>
             </div>
           </motion.div>

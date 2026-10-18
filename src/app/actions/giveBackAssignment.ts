@@ -1,11 +1,20 @@
 "use server";
 
+import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function giveBackAssignment(offerId: string, requestId: string, reason: string) {
+  const { interpreterId } = await requireInterpreter();
+  const [ownOffer] = await db
+    .select({ id: offers.id })
+    .from(offers)
+    .where(and(eq(offers.id, offerId), eq(offers.requestId, requestId), eq(offers.interpreterId, interpreterId)))
+    .limit(1);
+  if (!ownOffer) throw new Error(FORBIDDEN);
+
   await db.transaction(async (tx) => {
     // 1. Update offer to 'returned'
     await tx.update(offers)

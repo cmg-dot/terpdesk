@@ -1,4 +1,5 @@
 import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
+import { getIanaZone } from "@/utils/timezone";
 
 export interface ServiceRecord {
   id: string;
@@ -26,6 +27,8 @@ export interface ServiceRecord {
   timesheetId?: string;
   signatureDataUrl?: string | null;
   cancellationReason?: string | null;
+  /** IANA zone of the job. Times are always shown in it, never in the viewer's local zone. */
+  timeZone?: string;
   travelLegs?: { fromLabel: string; toLabel: string; miles: number; roundTrip: boolean }[];
 }
 
@@ -74,6 +77,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
 
           const mappedRecord: ServiceRecord = {
             id: recordId,
+            timeZone: getIanaZone(req.details?.timeZone ?? req.data?.details?.timeZone ?? req.timeZone ?? req.data?.timeZone),
             appointmentId: req.id,
             positionIndex: pos,
             interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || (pos === 2 ? "Position 2 Interpreter" : "Position 1 Interpreter"),
@@ -127,6 +131,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
         const rec: ServiceRecord = {
           id: `ts-${ts.timesheetId}`,
           timesheetId: ts.timesheetId,
+      timeZone: ts.timeZone,
           appointmentId: ts.requestId,
           interpreterName: ts.interpreterName,
           state: ts.status === 'approved' ? 'approved' : 'awaiting_review',

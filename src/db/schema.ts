@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
 export type Program = 'General' | 'WA ODHH' | 'WA Apple Health';
@@ -27,6 +27,9 @@ export const requests = pgTable('requests', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
   canceledAt: timestamp('canceled_at'),
   cancelReason: text('cancel_reason'),
+  clientRequestedCancellation: boolean('client_requested_cancellation').notNull().default(false),
+  // State job (ODHH/HCA): hours are submitted in the state portal, so no TerpDesk timesheet emails.
+  isStateJob: boolean('is_state_job').notNull().default(false),
   travelStartTime: timestamp('travel_start_time'),
   travelEndTime: timestamp('travel_end_time'),
   serviceCompleted: boolean('service_completed'),
@@ -42,9 +45,55 @@ export const interpreters = pgTable('interpreters', {
   name: text('name').notNull(),
   email: text('email').notNull().unique(),
   phone: text('phone'),
+  // The login that owns this profile. NULL = shadow/external profile created by an agency, not yet claimed.
+  // (Lazy reference: `users` is declared below.)
+  userId: uuid('user_id').unique().references(() => users.id),
+  // The agency whose roster this person is on (set when an agency created the profile and the interpreter
+  // later claimed it). NULL = not on any agency's roster yet.
+  rosterAgencyId: text('roster_agency_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+export const userRoleValues = ['agency', 'interpreter'] as const;
+export type UserRole = (typeof userRoleValues)[number];
+
+// Login accounts (NextAuth credentials). Passwords are stored only as bcrypt hashes.
+export const users = pgTable('users', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  email: varchar('email', { length: 255 }).notNull().unique(),
+  passwordHash: varchar('password_hash', { length: 255 }).notNull(),
+  name: varchar('name', { length: 255 }).notNull(),
+  role: varchar('role', { length: 20, enum: userRoleValues }).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
+// Security audit trail (logins, approvals, ...). `details` must never contain PHI.
+export const auditLogs = pgTable('audit_logs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: varchar('user_id', { length: 255 }),
+  userEmail: varchar('user_email', { length: 255 }),
+  action: varchar('action', { length: 100 }).notNull(),
+  details: text('details'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  // Serves the brute-force check: failed logins for one email within a time window.
+  actionEmailCreatedIdx: index('audit_logs_action_email_created_idx').on(t.action, t.userEmail, t.createdAt),
+}));
+
+export type SelectAuditLog = typeof auditLogs.$inferSelect;
+export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// One-time proof-of-email tokens (profile claiming). `token` holds the SHA-256 hash, never the raw value.
+export const verificationTokens = pgTable('verification_tokens', {
+  identifier: text('identifier').notNull(),
+  token: text('token').notNull().unique(),
+  expires: timestamp('expires').notNull(),
+});
+
+export type SelectUser = typeof users.$inferSelect;
+export type InsertUser = typeof users.$inferInsert;
 
 export type SelectInterpreter = typeof interpreters.$inferSelect;
 export type InsertInterpreter = typeof interpreters.$inferInsert;
@@ -153,10 +202,13 @@ export interface ClientData {
   [key: string]: any;
 }
 
+export const clientTypeValues = ['organization', 'individual', 'state_agency', 'private_hospital'] as const;
+export type ClientType = (typeof clientTypeValues)[number];
+
 export const clients = pgTable('clients', {
   id: text('id').primaryKey(),
   name: text('name').notNull(),
-  type: text('type').notNull().default('Organization'),
+  type: text('type', { enum: clientTypeValues }).notNull().default('organization'),
   archived: boolean('archived').notNull().default(false),
   data: jsonb('data').$type<ClientData>().notNull().default({ contacts: [], locations: [] }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
@@ -216,6 +268,8 @@ export const availabilityShares = pgTable('availability_shares', {
   agencyId: text('agency_id').notNull(),
   interpreterId: text('interpreter_id').notNull(),
   enabled: boolean('enabled').notNull().default(true),
+  // Separate permission: this agency may book the interpreter without an offer. Only valid while `enabled`.
+  allowsAutoBook: boolean('allows_auto_book').notNull().default(false),
 });
 
 export type SelectAvailabilityShare = typeof availabilityShares.$inferSelect;

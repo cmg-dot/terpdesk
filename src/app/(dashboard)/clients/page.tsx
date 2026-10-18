@@ -5,6 +5,16 @@ import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useClients } from "@/context/ClientsContext";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { Link2, Mail, Phone } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import {
+  CLIENT_TYPE_LABELS,
+  CLIENT_TYPE_OPTIONS,
+  CLIENT_TYPE_TONES,
+  clientTypeFromLabel,
+  normalizeClientType,
+} from "@/lib/validation/client";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 function CustomSelect({ options, value, onChange, variant = "default" }: { options: string[], value?: string, onChange?: (val: string) => void, variant?: "default" | "outline" }) {
  const [isOpen, setIsOpen] = useState(false);
@@ -75,7 +85,7 @@ export default function ClientsPage() {
  }, [refreshClients]);
  const [isCreating, setIsCreating] = useState(false);
  const [newName, setNewName] = useState("");
- const [newType, setNewType] = useState("Organization");
+ const [newType, setNewType] = useState<string>("organization");
  const [filter, setFilter] = useState<'Active clients' | 'Archived clients' | 'All clients'>('Active clients');
  const [searchQuery, setSearchQuery] = useState("");
 
@@ -116,7 +126,7 @@ export default function ClientsPage() {
  });
  
  setNewName("");
- setNewType("Organization");
+ setNewType("organization");
  setIsCreating(false);
  
  router.push(`/clients/${createdId}`);
@@ -134,7 +144,7 @@ export default function ClientsPage() {
  </div>
 
  {/* Search & Action Card */}
- <div className={`rounded-2xl border border-gray-200 p-6 border border-gray-200 transition-colors ${isCreating ? 'bg-[#FCFCFB]' : 'bg-white'}`}>
+ <div className="rounded-2xl border border-gray-200 bg-white p-6">
  {/* Top Row */}
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
  <div className="flex-1 flex flex-col md:flex-row gap-6">
@@ -158,82 +168,99 @@ export default function ClientsPage() {
  />
  </div>
  </div>
- <button
- onClick={() => setIsCreating(!isCreating)}
- className="w-full md:w-auto shrink-0 bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity h-[40px]"
- >
- {isCreating ? "Close" : "Add client"}
- </button>
- </div>
-
- {/* Inline Creation Form */}
- {isCreating && (
- <div className="mt-8 pt-6 border-t border-gray-200/50">
- <div className="flex flex-col md:flex-row md:items-end gap-6">
- <div className="flex-1">
+ <Dialog open={isCreating} onOpenChange={setIsCreating}>
+ <DialogTrigger className="w-full md:w-auto shrink-0 bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity h-[40px]">
+ Add client
+ </DialogTrigger>
+ <DialogContent className="overflow-visible">
+ <DialogHeader>
+ <DialogTitle>Add client</DialogTitle>
+ <DialogDescription>Creating a client never creates a login, sends an invitation or sends email.</DialogDescription>
+ </DialogHeader>
+ <div className="space-y-5">
+ <div>
  <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Client name</label>
  <input
  type="text"
  value={newName}
  onChange={(e) => setNewName(e.target.value)}
+ onKeyDown={(e) => {
+ if (e.key === "Enter") handleCreate();
+ }}
  className="w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
  />
  </div>
- <div className="md:w-[250px]">
+ <div>
  <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Client type</label>
- <CustomSelect 
- options={["Organization", "Individual"]}
- value={newType}
- onChange={(val) => setNewType(val)}
+ <CustomSelect
+ options={CLIENT_TYPE_OPTIONS.map((o) => o.label)}
+ value={CLIENT_TYPE_LABELS[normalizeClientType(newType)]}
+ onChange={(val) => setNewType(clientTypeFromLabel(val))}
  variant="default"
  />
  </div>
+ </div>
+ <DialogFooter>
  <button
+ type="button"
+ onClick={() => setIsCreating(false)}
+ className="w-full sm:w-auto px-6 py-2.5 rounded-full text-sm font-medium border border-gray-300 text-gray-700 hover:bg-gray-50 transition-colors h-[40px]"
+ >
+ Cancel
+ </button>
+ <button
+ type="button"
  onClick={handleCreate}
- className={`w-full md:w-auto shrink-0 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-colors h-[40px] ${
+ className={`w-full sm:w-auto shrink-0 text-white px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-colors h-[40px] ${
  newName.trim() ? "bg-[var(--forest)]" : "bg-[#7B958F]"
  }`}
  >
  Create client
  </button>
+ </DialogFooter>
+ </DialogContent>
+ </Dialog>
  </div>
- <p className="text-[12px] text-gray-400 mt-4 ml-2">
- Creating a client never creates a login, sends an invitation or sends email.
- </p>
- </div>
- )}
  </div>
 
  {/* Client Grid */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
  {filteredClients.map((client) => (
- <div key={client.id} className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 hover: transition-shadow">
- <div className="flex items-center justify-between mb-6">
- <div className="flex items-center gap-3">
- <h3 className="text-base font-semibold text-[var(--ink)]">{client.name}</h3>
- {client.isArchived && <span className="text-xs border border-gray-200 bg-[#F4F3EF] rounded-full px-2 py-0.5 text-[var(--sage)]">Archived</span>}
- </div>
- <Link href={`/clients/${client.id}`} className="text-[13px] text-[var(--sage)] underline underline-offset-4 hover:text-[var(--ink)] transition-colors">Open</Link>
- </div>
- 
- <div className="space-y-4 text-[13px]">
- <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
- <span className="text-[var(--sage)] shrink-0">Type</span>
- <span className="text-[var(--ink)] font-medium sm:text-right">{client.type}</span>
- </div>
- <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
- <span className="text-[var(--sage)] shrink-0">General contact</span>
- <span className="text-[var(--ink)] font-medium sm:text-right break-words sm:break-normal">
- {[client.generalEmail, client.generalPhone].filter(Boolean).join(" · ") || "No contact info"}
- </span>
- </div>
- <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-1 sm:gap-4">
- <span className="text-[var(--sage)] shrink-0">On file</span>
- <span className="text-[var(--ink)] font-medium sm:text-right">
- {client.stats || `${client.contacts?.length || 0} contacts · ${client.locations?.length || 0} locations · ${client.linkedJobsCount ?? 0} linked jobs`}
- </span>
+ <div
+ key={client.id}
+ className="flex h-full flex-col justify-between bg-white rounded-2xl border border-gray-200 p-6 hover:shadow-md transition-all duration-200 cursor-default"
+ >
+ <div>
+ <div className="flex items-start justify-between gap-3 mb-5">
+ <div className="min-w-0 space-y-2">
+ <h3 className="text-base font-semibold text-[var(--ink)] break-words">{client.name}</h3>
+ <div className="flex flex-wrap items-center gap-2">
+ <Badge variant={CLIENT_TYPE_TONES[normalizeClientType(client.type)]}>{CLIENT_TYPE_LABELS[normalizeClientType(client.type)]}</Badge>
+ {client.isArchived && <Badge variant="gray">Archived</Badge>}
  </div>
  </div>
+ <Link href={`/clients/${client.id}`} className="shrink-0 text-[13px] text-[var(--sage)] underline underline-offset-4 hover:text-[var(--ink)] transition-colors">Open</Link>
+ </div>
+
+ <ul className="space-y-3 text-[13px] text-[var(--sage)]">
+ <li className="flex items-center gap-2.5">
+ <Mail className="w-4 h-4 shrink-0 text-gray-400" aria-hidden="true" />
+ <span className="break-all">{client.generalEmail || "No email on file"}</span>
+ </li>
+ <li className="flex items-center gap-2.5">
+ <Phone className="w-4 h-4 shrink-0 text-gray-400" aria-hidden="true" />
+ <span>{client.generalPhone || "No phone on file"}</span>
+ </li>
+ <li className="flex items-center gap-2.5">
+ <Link2 className="w-4 h-4 shrink-0 text-gray-400" aria-hidden="true" />
+ <span>{client.linkedJobsCount ?? 0} linked jobs</span>
+ </li>
+ </ul>
+ </div>
+
+ <p className="mt-5 border-t border-gray-100 pt-4 text-[12px] text-gray-400">
+ {client.stats || `${client.contacts?.length || 0} contacts · ${client.locations?.length || 0} locations`}
+ </p>
  </div>
  ))}
  {filteredClients.length === 0 && (

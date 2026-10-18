@@ -1,11 +1,13 @@
 "use server";
 
+import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
-import { requests } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { offers, requests } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { z } from "zod";
+import { isStateJobRequest } from "@/lib/stateJob";
 import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
 import type { TravelLeg } from "@/lib/timesheetSchemas";
 
@@ -37,6 +39,23 @@ export async function submitInterpreterHours(
     legs?: TravelLeg[];
   }
 ): Promise<{ success: boolean }> {
+  const { interpreterId: sessionInterpreterId } = await requireInterpreter();
+  // Only an interpreter holding the accepted booking may report hours for it.
+  const [ownBooking] = await db
+    .select({ id: offers.id })
+    .from(offers)
+    .where(and(eq(offers.requestId, requestId), eq(offers.interpreterId, sessionInterpreterId), eq(offers.status, "accepted")))
+    .limit(1);
+  if (!ownBooking) throw new Error(FORBIDDEN);
+
+  // State jobs (ODHH/HCA) are reported in the state portal; the internal form is not allowed for them.
+  const [jobRow] = await db
+    .select({ isStateJob: requests.isStateJob, data: requests.data })
+    .from(requests)
+    .where(eq(requests.id, requestId))
+    .limit(1);
+  if (jobRow && isStateJobRequest(jobRow)) throw new Error("Cannot submit internal timesheets for State Jobs.");
+
   // Optional, but if present it must be a bounded PNG data URL.
   const signatureDataUrl = extra?.signatureDataUrl === undefined
     ? undefined

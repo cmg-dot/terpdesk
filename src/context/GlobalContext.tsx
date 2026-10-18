@@ -1,6 +1,8 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from "react";
+import { useSession } from "next-auth/react";
+import { getMyRosterAgencyIds } from "@/app/actions/getMyAgencies";
 
 export interface DevUser {
   id: string;
@@ -9,6 +11,9 @@ export interface DevUser {
   email?: string;
   agency_id?: string;
 }
+
+// Placeholder used only while nobody is signed in (e.g. on /login); protected pages never render in this state.
+const SIGNED_OUT_USER: DevUser = { id: '', role: 'agency' };
 
 export interface Agency {
   id: string;
@@ -61,7 +66,8 @@ interface GlobalContextType {
   website_profile_consent: WebsiteProfileConsent[];
   notifications: AppNotification[];
   currentUser: DevUser;
-  setCurrentUser: (user: DevUser) => void;
+  /** Agencies this interpreter is already on the roster of (from the database, not just local memberships). */
+  rosterAgencyIds: string[];
   requestToJoinAgency: (inputCode: string) => { error?: string; success?: boolean };
   approveMembershipRequest: (requestId: string) => void;
   declineMembershipRequest: (requestId: string) => void;
@@ -78,26 +84,33 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
   const [website_profile_consent, setWebsiteProfileConsent] = useState<WebsiteProfileConsent[]>([]);
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
-  const [currentUser, setCurrentUserState] = useState<DevUser>({ id: 'staff-1', role: 'agency', name: 'Avery North', email: 'north.staff@fictional.test', agency_id: 'agency-1' });
+  const [rosterAgencyIds, setRosterAgencyIds] = useState<string[]>([]);
+  // The signed-in user comes from the NextAuth session (provided by the root layout).
+  const { data: session } = useSession();
+  const currentUser: DevUser = useMemo(() => {
+    const user = session?.user;
+    if (!user) return SIGNED_OUT_USER;
+    return {
+      id: user.role === 'interpreter' ? (user.interpreterId ?? user.id) : user.id,
+      role: user.role,
+      name: user.name ?? undefined,
+      email: user.email ?? undefined,
+      // There is a single agency in this workspace; the users table has no agency column yet.
+      agency_id: user.role === 'agency' ? 'agency-1' : undefined,
+    };
+  }, [session]);
 
-  const setCurrentUser = (user: DevUser) => {
-    setCurrentUserState(user);
-    if (typeof window !== 'undefined') {
-      try {
-        localStorage.setItem('terpdesk_current_user', JSON.stringify(user));
-      } catch (e) {}
+  // Roster links live in the database. Only interpreters have one, so only they ask.
+  useEffect(() => {
+    if (currentUser.role !== 'interpreter' || !currentUser.id) {
+      setRosterAgencyIds([]);
+      return;
     }
-  };
+    getMyRosterAgencyIds().then(setRosterAgencyIds).catch(() => setRosterAgencyIds([]));
+  }, [currentUser.role, currentUser.id]);
 
   useEffect(() => {
     try {
-      const storedUser = localStorage.getItem('terpdesk_current_user');
-      if (storedUser) {
-        try {
-          setCurrentUserState(JSON.parse(storedUser));
-        } catch (e) {}
-      }
-
       const storedAgencies = localStorage.getItem('terpdesk_agencies');
       if (storedAgencies) {
         setAgencies(JSON.parse(storedAgencies));
@@ -184,9 +197,9 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
       return { error: 'You already have a pending request for this agency.' };
     }
 
-    const isConnected = memberships.some(
-      m => m.user_id === currentUser.id && m.agency_id === agency.id && m.active
-    );
+    const isConnected =
+      rosterAgencyIds.includes(agency.id) ||
+      memberships.some(m => m.user_id === currentUser.id && m.agency_id === agency.id && m.active);
     if (isConnected) {
       return { error: 'You are already connected to this agency.' };
     }
@@ -290,7 +303,7 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
       website_profile_consent,
       notifications,
       currentUser,
-      setCurrentUser,
+      rosterAgencyIds,
       requestToJoinAgency,
       approveMembershipRequest,
       declineMembershipRequest,

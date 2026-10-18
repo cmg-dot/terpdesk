@@ -1,9 +1,11 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { isStateProgram } from "@/lib/stateJob";
 import { buildAppointmentUtcTimes, getIanaZone } from "@/utils/timezone";
 
 export interface UpdateRequestPayload {
@@ -34,6 +36,7 @@ export interface UpdateRequestPayload {
 }
 
 export async function updateRequestAction(requestId: string, payload: UpdateRequestPayload) {
+  await requireRole("agency");
   const rows = await db.select().from(requests).where(eq(requests.id, requestId));
   if (!rows || rows.length === 0) {
     throw new Error("Request not found");
@@ -191,12 +194,16 @@ export async function updateRequestAction(requestId: string, payload: UpdateRequ
     }
   };
 
+  // State job = funding program is ODHH or Apple Health. Derived here, never sent by the client.
+  const isStateJob = isStateProgram(payload.data?.intake?.program ?? payload.intake?.program ?? existingData.intake?.program);
+
   // 4. Update Database Row
   const [updated] = await db.update(requests)
     .set({
       title: newTitle,
       createdAt: new Date(startsAtIso),
       data: updatedData,
+      isStateJob,
       updatedAt: new Date(),
     })
     .where(eq(requests.id, requestId))

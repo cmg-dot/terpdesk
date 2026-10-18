@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
@@ -205,11 +206,14 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     serviceCompleted: row.serviceCompleted,
     canceledAt: row.canceledAt ? row.canceledAt.toISOString() : null,
     cancelReason: row.cancelReason,
+    clientRequestedCancellation: row.clientRequestedCancellation,
+    isStateJob: row.isStateJob,
     hoursSubmissions: rowData.hoursSubmissions || (rowData.hoursSubmission ? { 1: rowData.hoursSubmission } : {})
   };
 }
 
 export async function fetchLiveRequests() {
+  await requireRole("agency");
   const dbRows = await db.select().from(requests).orderBy(desc(requests.createdAt));
   const allOffers = await db.select({
     id: offers.id,
@@ -284,6 +288,7 @@ export async function fetchLiveRequests() {
 }
 
 export async function fetchLiveRequestById(id: string) {
+  await requireRole("agency");
   const dbRows = await db.select().from(requests).where(eq(requests.id, id));
   if (!dbRows || dbRows.length === 0) return null;
   const row = dbRows[0];

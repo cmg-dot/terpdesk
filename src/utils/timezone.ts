@@ -224,3 +224,30 @@ export function wallClockToUtcDate(params: {
 }
 
 
+
+/**
+ * "Tue, Sep 22 · 10:53 AM – 12:53 PM PDT", always in the given IANA zone and never the browser's.
+ * Returns an em dash when either instant is missing or invalid.
+ */
+export function formatDateTimeRangeInZone(start: string | Date | null | undefined, end: string | Date | null | undefined, ianaZone: string): string {
+  try {
+    if (!start || !end) return "—";
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s.getTime()) || isNaN(e.getTime())) return "—";
+    return `${formatInTimeZone(s, ianaZone, "EEE, MMM d")} · ${formatInTimeZone(s, ianaZone, "h:mm a")} – ${formatInTimeZone(e, ianaZone, "h:mm a zzz")}`;
+  } catch {
+    return "—";
+  }
+}
+
+/** A single date such as "Mar 4, 2026" in the given IANA zone. */
+export function formatDateInZone(value: string | Date | null | undefined, ianaZone: string, pattern: string = "MMM d, yyyy"): string {
+  try {
+    if (!value) return "—";
+    const d = new Date(value);
+    return isNaN(d.getTime()) ? "—" : formatInTimeZone(d, ianaZone, pattern);
+  } catch {
+    return "—";
+  }
+}

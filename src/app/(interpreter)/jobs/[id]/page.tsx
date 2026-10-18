@@ -695,6 +695,28 @@ function ServiceTimeBlock({ job }: { job: any }) {
     return buildAuditLog(serviceRecord, job, isOdhh);
   }, [serviceRecord, job, isOdhh]);
 
+  // State jobs: the whole TerpDesk hours form is replaced by a pointer to the state portal.
+  if (job.isStateJob === true) {
+    return (
+      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Actual service time</h2>
+        <div className="rounded-xl border border-[#CEEAD6] bg-[#E6F4EA]/80 p-5 text-[#137333]">
+          <p className="text-[15px] font-semibold leading-relaxed">
+            State Job: Timesheets for this assignment must be submitted directly through the ODHH portal.
+          </p>
+          <a
+            href={buildOdhhPortalUrl((job as any).data?.intake?.odhhSrn)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-[#1B433C] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#14332D]"
+          >
+            Open ODHH Portal
+          </a>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
       <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Actual service time</h2>

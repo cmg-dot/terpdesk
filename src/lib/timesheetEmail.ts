@@ -9,7 +9,7 @@ import {
 
 const SENDER = "dispatch@aslprofessionals.net";
 
-const sendEmail = async (to: string, subject: string, html: string, text: string): Promise<void> => {
+export const sendEmail = async (to: string, subject: string, html: string, text: string): Promise<void> => {
   const ses = new SESClient({
     region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2",
   });

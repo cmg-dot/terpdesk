@@ -1,13 +1,16 @@
 "use server";
 
+import { requireInterpreter } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
+import { isStateJobRequest } from "@/lib/stateJob";
 
-export async function fetchInterpreterOffers(interpreterEmail: string = 'interpreter@example.com') {
-  // Find interpreter by email
-  const interpreterRows = await db.select().from(interpreters).where(eq(interpreters.email, interpreterEmail));
+// The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
+export async function fetchInterpreterOffers(_interpreterEmail?: string) {
+  const { interpreterId } = await requireInterpreter();
+  const interpreterRows = await db.select().from(interpreters).where(eq(interpreters.id, interpreterId));
   if (!interpreterRows.length) return [];
   const interpreter = interpreterRows[0];
 
@@ -109,6 +112,7 @@ export async function fetchInterpreterOffers(interpreterEmail: string = 'interpr
       agencyName: "North Fictional Interpreting",
       interpreterId: row.offer.interpreterId,
       program: rowData?.intake?.program || "General",
+      isStateJob: isStateJobRequest(row.request),
       timeZone: details.timeZone || "America/Los_Angeles",
       hoursSubmission: hoursSub,
       travelStartTime: row.request.travelStartTime ? row.request.travelStartTime.toISOString() : null,

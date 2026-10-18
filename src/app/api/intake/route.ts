@@ -410,6 +410,8 @@ export async function POST(
       .values({
         title,
         status: "draft",
+        // This parser only handles ODHH emails (program is always WA ODHH), so these are always state jobs.
+        isStateJob: true,
         data: requestData,
         // The app reads createdAt as the appointment start (see createRequest); default now() if unparsed.
         ...(startsAt ? { createdAt: startsAt } : {}),

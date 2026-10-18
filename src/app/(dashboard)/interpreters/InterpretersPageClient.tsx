@@ -116,6 +116,8 @@ export function InterpretersPageClient({
   const registeredIdSet = useMemo(() => new Set(registeredProfileIds), [registeredProfileIds]);
 
   const checkIsRegistered = (interpreter: SelectInterpreter): boolean => {
+    // A linked login (set when an interpreter registers or claims a shadow profile) is the source of truth.
+    if (interpreter.userId) return true;
     const email = interpreter.email.toLowerCase();
     if (KNOWN_REGISTERED_EMAILS.has(email)) return true;
     if (registeredIdSet.has(interpreter.id)) return true;

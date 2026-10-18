@@ -1,5 +1,6 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import { eq } from "drizzle-orm";
@@ -7,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { respondToOffer } from "./respondToOffer";
 
 export async function updateOfferStatus(offerId: string, status: 'accepted' | 'declined' | 'withdrawn') {
+  if (status !== 'accepted' && status !== 'declined') await requireRole("agency");
   if (status === 'accepted' || status === 'declined') {
     return await respondToOffer(offerId, status);
   }

@@ -1,8 +1,10 @@
 "use server";
 
+import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, RequestData } from "@/db/schema";
 import { revalidatePath } from "next/cache";
+import { isStateProgram } from "@/lib/stateJob";
 
 interface CreateRequestPayload {
   title: string;
@@ -12,6 +14,9 @@ interface CreateRequestPayload {
 }
 
 export async function createRequest(payload: CreateRequestPayload) {
+  await requireRole("agency");
+  // Never taken from the client: a job is a state job exactly when its funding program is ODHH or Apple Health.
+  const isStateJob = isStateProgram(payload.data?.intake?.program);
   const startsAtIso = typeof payload.startsAt === 'string' ? payload.startsAt : payload.startsAt.toISOString();
   const endsAtIso = typeof payload.endsAt === 'string' ? payload.endsAt : payload.endsAt.toISOString();
 
@@ -73,6 +78,7 @@ export async function createRequest(payload: CreateRequestPayload) {
   const [newRequest] = await db.insert(requests).values({
     title: payload.title,
     status: 'draft',
+    isStateJob,
     createdAt: new Date(startsAtIso),
     data: requestData
   }).returning({ id: requests.id });
