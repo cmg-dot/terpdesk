@@ -8,6 +8,10 @@ import "./globals.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
+// The layout reads the user's session on every request, so nothing under it (including /_not-found) can be
+// prerendered at build time.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "terpDESK",
   description: "Your interpreting business. One place.",

@@ -1,3 +1,4 @@
+import { getBaseUrl } from "@/lib/baseUrl";
 import { hasRole } from "@/lib/auth/guards";
 import { NextResponse } from "next/server";
 import { SESClient, SendEmailCommand } from "@aws-sdk/client-ses";
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
     });
 
     // 2. Construct Magic Link action URLs
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const appUrl = getBaseUrl();
     const acceptUrl = `${appUrl}/api/offers/response?token=${token}&action=accept`;
     const declineUrl = `${appUrl}/api/offers/response?token=${token}&action=decline`;
 

@@ -1,5 +1,6 @@
 "use server";
 
+import { getBaseUrl } from "@/lib/baseUrl";
 import bcrypt from "bcryptjs";
 import { randomBytes } from "crypto";
 import { eq, sql } from "drizzle-orm";
@@ -74,7 +75,7 @@ export async function registerInterpreter(input: RegisterInterpreterInput): Prom
     });
 
     if (outcome.rawToken) {
-      const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const baseUrl = getBaseUrl();
       const link = `${baseUrl}/verify-claim?token=${outcome.rawToken}`;
       if (process.env.NODE_ENV !== "production") {
         // Development stand-in for the email. Never done in production: logs must not contain live tokens.

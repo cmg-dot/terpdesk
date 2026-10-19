@@ -6,8 +6,12 @@ import { z } from "zod";
 import { db } from "@/db";
 import { auditLogs, interpreters, users } from "@/db/schema";
 import { getAuthSecret } from "@/lib/auth/secret";
+import { ensureValidAuthUrl } from "@/lib/baseUrl";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
+
+// Runs before NextAuth ever reads NEXTAUTH_URL, so a missing/malformed value cannot throw "Invalid URL".
+ensureValidAuthUrl();
 
 const credentialsSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(255),

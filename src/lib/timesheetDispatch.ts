@@ -1,3 +1,4 @@
+import { getBaseUrl } from "@/lib/baseUrl";
 import { randomBytes } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
@@ -122,7 +123,7 @@ export async function dispatchTimesheetCore(input: DispatchTimesheetInput): Prom
   const zone = getIanaZone(data.details?.timeZone ?? data.details?.timezone ?? data.timeZone ?? data.timezone);
   const { startsAt } = resolveRequestTimes({ createdAt: request.createdAt, data: request.data });
   const isVirtual = (data.details?.format ?? data.format) === "Virtual";
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   try {
     await sendTimesheetEmail({

@@ -1,5 +1,6 @@
 "use server";
 
+import { getBaseUrl } from "@/lib/baseUrl";
 import { randomBytes } from "crypto";
 import { and, count, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
@@ -63,7 +64,7 @@ export async function resendVerification(): Promise<ResendVerificationResult> {
       });
     });
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const baseUrl = getBaseUrl();
     const link = `${baseUrl}/verify-claim?token=${rawToken}`;
     if (process.env.NODE_ENV !== "production") {
       // Development stand-in for the email. In production the token is never logged.
