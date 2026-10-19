@@ -16,6 +16,7 @@ import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappe
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { getIanaZone } from "@/utils/timezone";
 import { useSession } from "next-auth/react";
+import { ApprovalQueue } from "@/components/features/ApprovalQueue";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
@@ -275,6 +276,8 @@ export default function DashboardPage() {
           New request
         </Link>
       </div>
+
+      <ApprovalQueue />
 
       {/* Dark Stats Card */}
       <div className="rounded-2xl border border-gray-200 bg-[var(--forest)] p-8 text-white ">

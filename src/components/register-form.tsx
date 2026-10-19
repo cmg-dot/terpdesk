@@ -44,7 +44,7 @@ export function RegisterForm() {
         setFormError(result.error);
         return;
       }
-      router.push(result.verificationRequired ? "/login?registered=true&verify=sent" : "/login?registered=true");
+      router.push(result.verificationRequired ? "/login?registered=true&pending=true&verify=sent" : "/login?registered=true&pending=true");
     } catch {
       setFormError("Something went wrong. Please try again.");
     }

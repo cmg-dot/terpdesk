@@ -34,8 +34,8 @@ async function main() {
     const passwordHash = await bcrypt.hash(password, 12);
     await db
       .insert(users)
-      .values({ email, passwordHash, name, role })
-      .onConflictDoUpdate({ target: users.email, set: { passwordHash, name, role, updatedAt: new Date() } });
+      .values({ email, passwordHash, name, role, accountStatus: 'approved' })
+      .onConflictDoUpdate({ target: users.email, set: { passwordHash, name, role, accountStatus: 'approved', updatedAt: new Date() } });
     console.log(`Saved ${role} account for ${email}.`);
   } finally {
     await client.end();

@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { auditLogs, interpreters, users } from "@/db/schema";
 import { getAuthSecret } from "@/lib/auth/secret";
 import { ensureValidAuthUrl } from "@/lib/baseUrl";
+import { LOCKED_MESSAGE, PENDING_MESSAGE, REJECTED_MESSAGE } from "@/lib/auth/messages";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -20,7 +21,6 @@ const credentialsSchema = z.object({
 
 const MAX_FAILED_ATTEMPTS = 5;
 const LOCKOUT_WINDOW_MS = 15 * 60 * 1000;
-export const LOCKED_MESSAGE = "Account temporarily locked due to too many failed attempts. Try again in 15 minutes.";
 
 // Compared against when the email is unknown, so "no such user" and "wrong password" take similar time.
 const DUMMY_HASH = "$2a$12$C6UzMDM.H6dfI/f/IKcEeO7Z2m5G3N7uK5QdY8bq3rN1Zc1l3oD3a";
@@ -60,6 +60,13 @@ export const authOptions: NextAuthOptions = {
         if (!user || !passwordOk || !isAppRole(user.role)) {
           await writeAuditLog({ userId: user?.id ?? null, userEmail: email, action: "login_failed", details: "invalid credentials" });
           return null;
+        }
+
+        // Approval gate. Checked only after the password is correct, so the message cannot be used to find out which
+        // emails have accounts. Agency staff are never gated, so the approval queue can always be reached.
+        if (user.role === "interpreter" && user.accountStatus !== "approved") {
+          await writeAuditLog({ userId: user.id, userEmail: email, action: "login_blocked", details: `accountStatus=${user.accountStatus}` });
+          throw new Error(user.accountStatus === "rejected" ? REJECTED_MESSAGE : PENDING_MESSAGE);
         }
 
         // Link an interpreter login to its interpreters row (matched by email) so actions can scope data to it.

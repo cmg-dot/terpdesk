@@ -58,6 +58,10 @@ export const interpreters = pgTable('interpreters', {
 export const userRoleValues = ['agency', 'interpreter'] as const;
 export type UserRole = (typeof userRoleValues)[number];
 
+// Registration approval: new accounts start as 'pending' and cannot sign in until agency staff approve them.
+export const accountStatusValues = ['pending', 'approved', 'rejected'] as const;
+export type AccountStatus = (typeof accountStatusValues)[number];
+
 // Login accounts (NextAuth credentials). Passwords are stored only as bcrypt hashes.
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
@@ -65,6 +69,7 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   role: varchar('role', { length: 20, enum: userRoleValues }).notNull(),
+  accountStatus: varchar('account_status', { length: 20, enum: accountStatusValues }).notNull().default('pending'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });

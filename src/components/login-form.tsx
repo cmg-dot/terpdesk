@@ -8,6 +8,7 @@ import { getSession, signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { homePathForRole, isAppRole } from "@/lib/auth/routes";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { DISPLAYABLE_AUTH_MESSAGES } from "@/lib/auth/messages";
 
 const loginSchema = z.object({
  email: z.string().email({ message: "Please enter a valid email address" }),
@@ -51,7 +52,7 @@ export function LoginForm() {
  // Only the lockout notice is shown verbatim; every other failure is one generic message
  // so the form never reveals whether an email exists.
  setFormError(
- result?.error?.startsWith("Account temporarily locked")
+ result?.error && DISPLAYABLE_AUTH_MESSAGES.includes(result.error)
  ? result.error
  : "Incorrect email or password.",
  );
@@ -76,7 +77,7 @@ export function LoginForm() {
  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
  {justRegistered && (
  <p role="status" className="rounded-xl bg-green-50 px-4 py-2.5 text-xs text-green-800">
- Account created successfully. Please log in.
+ Account created successfully. An agency staff member must approve your registration before you can sign in.
  {verifySent && " We emailed you a link to verify your address and connect your existing interpreter profile. Until you verify, you will not see your agency's offers."}
  </p>
  )}
