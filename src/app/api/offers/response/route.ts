@@ -2,6 +2,7 @@ import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
+import type { RequestData } from "@/db/schema";
 import { verifyOfferToken } from "@/lib/jwt";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
@@ -650,7 +651,8 @@ export async function GET(request: NextRequest) {
               positionIndex === 1 ? interpreterId : existingData.assignedInterpreterId || null,
             assignedInterpreterName:
               positionIndex === 1 ? interpreterName : existingData.assignedInterpreterName || interpreterName,
-          },
+          // existingData is a loose Record, so the spread loses the typed `brief` / `intake` keys.
+          } as unknown as RequestData,
           updatedAt: now,
         })
         .where(eq(requests.id, requestId));
@@ -774,7 +776,7 @@ export async function GET(request: NextRequest) {
         .update(requests)
         .set({
           status: newStatus,
-          data: updatedData,
+          data: updatedData as RequestData,
           updatedAt: now,
         })
         .where(eq(requests.id, requestId));
