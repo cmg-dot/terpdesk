@@ -1,16 +1,14 @@
 import { db } from "@/db";
-import { interpreters, interpreterProfiles } from "@/db/schema";
-import { asc } from "drizzle-orm";
+import { interpreterProfiles } from "@/db/schema";
+import { DEFAULT_AGENCY_ID } from "@/lib/agency";
+import { getRosterInterpreters } from "@/lib/roster";
 import { InterpretersPageClient } from "./InterpretersPageClient";
 
 export const dynamic = "force-dynamic";
 
 export default async function InterpretersPage() {
   // Fetch live interpreters list directly from PostgreSQL via Drizzle ORM
-  const dbInterpreters = await db
-    .select()
-    .from(interpreters)
-    .orderBy(asc(interpreters.name));
+  const dbInterpreters = await getRosterInterpreters(DEFAULT_AGENCY_ID);
 
   // Fetch interpreter profile IDs to identify registered app users
   let registeredProfileIds: string[] = [];

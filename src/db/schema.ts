@@ -48,8 +48,7 @@ export const interpreters = pgTable('interpreters', {
   // The login that owns this profile. NULL = shadow/external profile created by an agency, not yet claimed.
   // (Lazy reference: `users` is declared below.)
   userId: uuid('user_id').unique().references(() => users.id),
-  // The agency whose roster this person is on (set when an agency created the profile and the interpreter
-  // later claimed it). NULL = not on any agency's roster yet.
+  // LEGACY: no longer written or read. Roster membership lives in agency_interpreters.
   rosterAgencyId: text('roster_agency_id'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),

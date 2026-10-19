@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { VerificationBanners } from "@/components/features/VerificationBanners";
+import { getConnectedAgencyCount } from "@/app/actions/agencyConnections";
 import { Calendar, MapPin, Clock, X, AlertCircle } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { useGlobalState } from "@/context/GlobalContext";
@@ -21,6 +22,10 @@ export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
   const { currentUser } = useGlobalState();
   const { data: session } = useSession();
+  const [connectedAgencyCount, setConnectedAgencyCount] = React.useState(0);
+  React.useEffect(() => {
+    getConnectedAgencyCount().then(setConnectedAgencyCount).catch(() => setConnectedAgencyCount(0));
+  }, [session?.user?.id]);
   const [offers, setOffers] = React.useState<any[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
   const [serviceRecords, setServiceRecords] = React.useState<any[]>([]);
@@ -330,7 +335,7 @@ export default function InterpreterHomePage() {
  Connected agencies
  </span>
  <span className="text-[28px] font-medium tracking-tight text-white leading-none">
- 1
+ {connectedAgencyCount}
  </span>
  </div>
  <Link

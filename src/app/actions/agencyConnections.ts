@@ -1,13 +1,13 @@
 "use server";
 
-import { and, desc, eq } from "drizzle-orm";
+import { and, count, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { agencyInterpreters } from "@/db/schema";
 import type { ConnectionStatus } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
-import { requireInterpreter } from "@/lib/auth/guards";
+import { requireInterpreter, requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 
 export interface MyConnection {
@@ -77,4 +77,14 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
     logError("requestAgencyConnection", err);
     return { success: false, error: "Could not send your request. Please try again." };
   }
+}
+
+/** Number of agencies with an approved connection to the signed-in user's login. */
+export async function getConnectedAgencyCount(): Promise<number> {
+  const session = await requireRole("interpreter");
+  const [row] = await db
+    .select({ total: count() })
+    .from(agencyInterpreters)
+    .where(and(eq(agencyInterpreters.userId, session.user.id), eq(agencyInterpreters.status, "approved")));
+  return Number(row?.total ?? 0);
 }
