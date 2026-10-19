@@ -45,7 +45,7 @@ export async function registerInterpreter(input: RegisterInterpreterInput): Prom
     const outcome = await db.transaction(async (tx) => {
       const [created] = await tx
         .insert(users)
-        .values({ email, passwordHash, name, role: "interpreter", accountStatus: "pending" })
+        .values({ email, passwordHash, name, role: "interpreter", accountStatus: "approved" })
         .returning({ id: users.id });
 
       const [profile] = await tx

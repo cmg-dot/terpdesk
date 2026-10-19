@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { getMyRosterAgencyIds } from "@/app/actions/getMyAgencies";
+import { requestAgencyConnection } from "@/app/actions/agencyConnections";
 
 export interface DevUser {
   id: string;
@@ -68,7 +69,7 @@ interface GlobalContextType {
   currentUser: DevUser;
   /** Agencies this interpreter is already on the roster of (from the database, not just local memberships). */
   rosterAgencyIds: string[];
-  requestToJoinAgency: (inputCode: string) => { error?: string; success?: boolean };
+  requestToJoinAgency: (inputCode: string) => Promise<{ error?: string; success?: boolean }>;
   approveMembershipRequest: (requestId: string) => void;
   declineMembershipRequest: (requestId: string) => void;
   updateInterpreterProfile: (newFields: any) => void;
@@ -178,7 +179,7 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  const requestToJoinAgency = (inputCode: string) => {
+  const requestToJoinAgency = async (inputCode: string): Promise<{ error?: string; success?: boolean }> => {
     const cleanedCode = inputCode.replace(/\s+/g, '').toLowerCase();
     const agency = agencies.find(a => a.join_code.replace(/\s+/g, '').toLowerCase() === cleanedCode);
 
@@ -190,29 +191,12 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
       return { error: 'This agency is not currently accepting join requests.' };
     }
 
-    const hasPending = membership_requests.some(
-      r => r.interpreter_id === currentUser.id && r.agency_id === agency.id && r.state === 'pending'
-    );
-    if (hasPending) {
-      return { error: 'You already have a pending request for this agency.' };
+    // The request is stored in the database as a 'pending' connection. The server also refuses duplicates
+    // ("already connected" / "already pending"), so this cannot be bypassed from the browser.
+    const result = await requestAgencyConnection(agency.id);
+    if (!result.success) {
+      return { error: result.error };
     }
-
-    const isConnected =
-      rosterAgencyIds.includes(agency.id) ||
-      memberships.some(m => m.user_id === currentUser.id && m.agency_id === agency.id && m.active);
-    if (isConnected) {
-      return { error: 'You are already connected to this agency.' };
-    }
-
-    const newRequest: MembershipRequest = {
-      id: Math.random().toString(36).substring(7),
-      agency_id: agency.id,
-      interpreter_id: currentUser.id,
-      state: 'pending'
-    };
-    const updated = [...membership_requests, newRequest];
-    setMembershipRequests(updated);
-    save('terpdesk_membership_requests', updated);
 
     sendNotification({
       recipient_id: agency.id,

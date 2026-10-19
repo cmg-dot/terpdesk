@@ -58,7 +58,7 @@ export const interpreters = pgTable('interpreters', {
 export const userRoleValues = ['agency', 'interpreter'] as const;
 export type UserRole = (typeof userRoleValues)[number];
 
-// Registration approval: new accounts start as 'pending' and cannot sign in until agency staff approve them.
+// Legacy per-account status. Approval now happens per agency connection (see agencyInterpreters).
 export const accountStatusValues = ['pending', 'approved', 'rejected'] as const;
 export type AccountStatus = (typeof accountStatusValues)[number];
 
@@ -69,7 +69,8 @@ export const users = pgTable('users', {
   passwordHash: varchar('password_hash', { length: 255 }).notNull(),
   name: varchar('name', { length: 255 }).notNull(),
   role: varchar('role', { length: 20, enum: userRoleValues }).notNull(),
-  accountStatus: varchar('account_status', { length: 20, enum: accountStatusValues }).notNull().default('pending'),
+  // No longer a login gate: anyone may register and sign in. Kept so existing rows stay valid; always 'approved'.
+  accountStatus: varchar('account_status', { length: 20, enum: accountStatusValues }).notNull().default('approved'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
@@ -89,6 +90,27 @@ export const auditLogs = pgTable('audit_logs', {
 
 export type SelectAuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
+
+// Which agencies an interpreter belongs to. One row per (agency, interpreter profile).
+//  - 'approved': on the agency's roster (e.g. the agency added them as a shadow profile, or approved a request)
+//  - 'pending' : the interpreter asked to join with a join code and the agency has not decided yet
+export const connectionStatusValues = ['pending', 'approved', 'rejected'] as const;
+export type ConnectionStatus = (typeof connectionStatusValues)[number];
+
+export const agencyInterpreters = pgTable('agency_interpreters', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  agencyId: text('agency_id').notNull(),
+  interpreterId: uuid('interpreter_id').notNull().references(() => interpreters.id),
+  // The login that owns the profile. NULL while it is still a shadow profile nobody has claimed.
+  userId: uuid('user_id').references(() => users.id),
+  status: varchar('status', { length: 20, enum: connectionStatusValues }).notNull().default('pending'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  agencyInterpreterIdx: uniqueIndex('agency_interpreters_agency_interpreter_idx').on(t.agencyId, t.interpreterId),
+}));
+
+export type SelectAgencyInterpreter = typeof agencyInterpreters.$inferSelect;
 
 // One-time proof-of-email tokens (profile claiming). `token` holds the SHA-256 hash, never the raw value.
 export const verificationTokens = pgTable('verification_tokens', {

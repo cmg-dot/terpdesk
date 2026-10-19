@@ -1,12 +1,14 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useGlobalState } from "@/context/GlobalContext";
 import { motion } from "framer-motion";
 import { useAgencyPermissions } from "@/hooks/useAgencyPermissions";
+import { getMyConnections } from "@/app/actions/agencyConnections";
+import type { MyConnection } from "@/app/actions/agencyConnections";
 
 export default function AgenciesPage() {
-  const { currentUser, requestToJoinAgency, memberships, membership_requests, agencies, rosterAgencyIds } = useGlobalState();
+  const { currentUser, requestToJoinAgency, agencies, rosterAgencyIds } = useGlobalState();
   const { permissionFor, pendingKey, error: permError, setSharing, setAutoBook } = useAgencyPermissions(
     currentUser.role === 'interpreter' && Boolean(currentUser.id),
   );
@@ -14,31 +16,33 @@ export default function AgenciesPage() {
   const [errorMsg, setErrorMsg] = useState("");
   const [successMsg, setSuccessMsg] = useState("");
 
-  const handleSendRequest = () => {
+  const [connections, setConnections] = useState<MyConnection[]>([]);
+  const loadConnections = () => {
+    if (currentUser.role !== 'interpreter' || !currentUser.id) return;
+    getMyConnections().then(setConnections).catch(() => setConnections([]));
+  };
+  useEffect(loadConnections, [currentUser.role, currentUser.id]);
+
+  const handleSendRequest = async () => {
     if (inputCode.trim()) {
-      const result = requestToJoinAgency(inputCode);
+      const result = await requestToJoinAgency(inputCode);
       if (result && result.error) {
         setErrorMsg(result.error);
         setSuccessMsg("");
       } else {
         setInputCode("");
         setErrorMsg("");
-        setSuccessMsg("Request sent successfully!");
+        setSuccessMsg("Request sent. The agency will review it.");
+        loadConnections();
       }
     }
   };
 
-  const myMemberships = memberships.filter(m => m.user_id === currentUser.id && m.active);
-  const myRequests = membership_requests.filter(r => r.interpreter_id === currentUser.id);
-
-  // Connected = approved memberships plus agencies whose roster this interpreter is already on
-  // (for example a shadow profile the agency created and the interpreter then claimed).
-  const connectedAgencies = [
-    ...myMemberships.map(m => ({ key: m.id, agencyId: m.agency_id })),
-    ...rosterAgencyIds
-      .filter(id => !myMemberships.some(m => m.agency_id === id))
-      .map(id => ({ key: `roster-${id}`, agencyId: id })),
-  ];
+  // Connected = approved connections from the database. Pending and declined ones are listed as requests.
+  const connectedAgencies = rosterAgencyIds.map(id => ({ key: id, agencyId: id }));
+  const myRequests = connections
+    .filter(c => c.status !== 'approved')
+    .map(c => ({ id: c.id, agency_id: c.agencyId, state: c.status === 'rejected' ? 'declined' : 'pending' }));
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2 pb-24">

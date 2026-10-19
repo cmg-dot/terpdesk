@@ -1,20 +1,19 @@
 "use server";
 
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { interpreters } from "@/db/schema";
+import { agencyInterpreters } from "@/db/schema";
 import { requireInterpreter } from "@/lib/auth/guards";
 
 /**
- * Agencies whose roster the signed-in interpreter is already on (e.g. through a shadow profile they claimed).
+ * Agencies the signed-in interpreter is connected to (approved connections only).
  * Always scoped to the session's own profile.
  */
 export async function getMyRosterAgencyIds(): Promise<string[]> {
   const { interpreterId } = await requireInterpreter();
-  const [row] = await db
-    .select({ rosterAgencyId: interpreters.rosterAgencyId })
-    .from(interpreters)
-    .where(eq(interpreters.id, interpreterId))
-    .limit(1);
-  return row?.rosterAgencyId ? [row.rosterAgencyId] : [];
+  const rows = await db
+    .select({ agencyId: agencyInterpreters.agencyId })
+    .from(agencyInterpreters)
+    .where(and(eq(agencyInterpreters.interpreterId, interpreterId), eq(agencyInterpreters.status, "approved")));
+  return rows.map((r) => r.agencyId);
 }

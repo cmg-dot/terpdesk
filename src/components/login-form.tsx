@@ -77,8 +77,8 @@ export function LoginForm() {
  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
  {justRegistered && (
  <p role="status" className="rounded-xl bg-green-50 px-4 py-2.5 text-xs text-green-800">
- Account created successfully. An agency staff member must approve your registration before you can sign in.
- {verifySent && " We emailed you a link to verify your address and connect your existing interpreter profile. Until you verify, you will not see your agency's offers."}
+ Account created successfully. Please log in.
+ {verifySent && " We emailed you a link to verify your address and connect your existing interpreter profile. Until you verify, you will not see your agencies' offers."}
  </p>
  )}
  <div className="space-y-1">

@@ -4,9 +4,8 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
-import { interpreters, users, verificationTokens } from "@/db/schema";
+import { agencyInterpreters, interpreters, users, verificationTokens } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
-import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { hashToken } from "@/lib/timesheetToken";
 
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
@@ -43,10 +42,17 @@ export async function verifyClaim(formData: FormData): Promise<never> {
     // `userId IS NULL` keeps an already-claimed profile from being taken over.
     const linked = await tx
       .update(interpreters)
-      .set({ userId: user.id, name: user.name, rosterAgencyId: DEFAULT_AGENCY_ID, updatedAt: new Date() })
+      .set({ userId: user.id, name: user.name, updatedAt: new Date() })
       .where(and(eq(sql`lower(${interpreters.email})`, token.identifier), isNull(interpreters.userId)))
       .returning({ id: interpreters.id });
     if (linked.length === 0) return { ok: false, reason: "unavailable" } as const;
+
+    // Shadow upgrade: every agency that already had this person on its roster now sees the new account. Their
+    // existing 'approved' rows are kept as they are; only the owner is filled in. No agency is assumed.
+    await tx
+      .update(agencyInterpreters)
+      .set({ userId: user.id, updatedAt: new Date() })
+      .where(and(eq(agencyInterpreters.interpreterId, linked[0].id), isNull(agencyInterpreters.userId)));
 
     return { ok: true, userId: user.id, email: token.identifier, interpreterId: linked[0].id } as const;
   });

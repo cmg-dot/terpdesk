@@ -4,7 +4,8 @@ import { requireRole } from "@/lib/auth/guards";
 import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { interpreters, type SelectInterpreter } from "@/db/schema";
+import { agencyInterpreters, interpreters, type SelectInterpreter } from "@/db/schema";
+import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { ilike } from "drizzle-orm";
 
 export interface AddExternalInterpreterInput {
@@ -84,6 +85,13 @@ export async function addExternalInterpreter(
         updatedAt: now,
       })
       .returning();
+
+    // The creating agency has this person on its roster. Registered people join by request instead, so only
+    // shadow profiles (which cannot have a login yet) get an automatic row.
+    await db
+      .insert(agencyInterpreters)
+      .values({ agencyId: DEFAULT_AGENCY_ID, interpreterId: newInterpreter.id, status: "approved" })
+      .onConflictDoNothing();
 
     // Revalidate paths so the roster and dispatch dropdowns update immediately
     try {
