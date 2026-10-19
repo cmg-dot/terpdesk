@@ -104,9 +104,9 @@ export default function ClientsPage() {
  contact.phone.includes(query)
  );
  const matchLocations = c.locations?.some(location => 
- location.name.toLowerCase().includes(query) || 
- location.address.toLowerCase().includes(query) || 
- location.room.toLowerCase().includes(query)
+ location.name?.toLowerCase().includes(query) ||
+ location.address?.toLowerCase().includes(query) ||
+ location.room?.toLowerCase().includes(query)
  );
  
  if (!matchName && !matchContacts && !matchLocations) {
