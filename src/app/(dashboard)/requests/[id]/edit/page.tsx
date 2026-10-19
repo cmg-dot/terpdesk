@@ -630,6 +630,9 @@ export default function EditRequestPage() {
           qualifications: formData.qualifications,
           repeats: Boolean(formData.repeats),
           recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
+          positions: formData.positions,
+          requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
+          slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
         },
         onsite: {
           venue: formData.venue,
@@ -659,11 +662,6 @@ export default function EditRequestPage() {
         positions: formData.positions,
         requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
         slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
-        details: {
-          positions: formData.positions,
-          requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-          slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
-        },
         data: {
           client: formData.client,
           startsAt: startsAtStr,
