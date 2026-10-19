@@ -1,3 +1,5 @@
+export const dynamic = "force-dynamic";
+
 import { NextResponse } from "next/server";
 import { createHash, timingSafeEqual } from "node:crypto";
 import { revalidatePath } from "next/cache";
