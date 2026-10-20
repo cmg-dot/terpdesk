@@ -28,6 +28,7 @@ export const toMyCredential = (row: SelectCredential, shares: CredentialShare[])
   expirationDate: row.expirationDate ?? "",
   notes: row.notes ?? "",
   shares,
+  isArchived: row.isArchived,
 });
 
 /** Shares per credential, keeping only agencies the interpreter is still connected to. */
@@ -50,12 +51,12 @@ export async function sharesFor(credentialIds: string[], connected: string[]): P
   return byCredential;
 }
 
-/** The interpreter's active (not archived) credentials, by name, with their current shares. */
+/** All of the interpreter's credentials (active and archived), by name, with their current shares. */
 export async function loadCredentials(interpreterId: string): Promise<MyCredential[]> {
   const rows = await db
     .select()
     .from(credentials)
-    .where(and(eq(credentials.interpreterId, interpreterId), eq(credentials.isArchived, false)))
+    .where(eq(credentials.interpreterId, interpreterId))
     .orderBy(asc(credentials.name));
   const shares = await sharesFor(rows.map((r) => r.id), await connectedAgencyIds(interpreterId));
   return rows.map((r) => toMyCredential(r, shares.get(r.id) ?? []));

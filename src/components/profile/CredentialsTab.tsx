@@ -3,12 +3,14 @@
 import { useMemo, useState } from "react";
 import type { Dispatch, SetStateAction } from "react";
 import { Award, Plus } from "lucide-react";
+import { ArchivedCredentialCard } from "@/components/profile/ArchivedCredentialCard";
 import { CredentialCard } from "@/components/profile/CredentialCard";
 import { CredentialForm } from "@/components/profile/CredentialForm";
 import { useGlobalState } from "@/context/GlobalContext";
 import type { MyCredential } from "@/lib/validation/credential";
 
 interface CredentialsTabProps {
+  /** Active and archived credentials together; the tab splits them. */
   credentials: MyCredential[];
   /** A state setter, so rapid changes (e.g. optimistic sharing, then the server's answer) never use a stale list. */
   onChange: Dispatch<SetStateAction<MyCredential[]>>;
@@ -18,7 +20,7 @@ interface CredentialsTabProps {
 
 const byName = (a: MyCredential, b: MyCredential) => a.name.localeCompare(b.name);
 
-/** "My Profile" Credentials tab: what the interpreter holds, and which agencies may see each one. */
+/** "My Profile" Credentials tab: active credentials with sharing, and an Archived section when there are any. */
 export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds }: CredentialsTabProps) => {
   const { agencies: knownAgencies } = useGlobalState();
   // null = list view; "new" = add form; otherwise the id being edited.
@@ -30,11 +32,14 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds }: Cr
     [connectedAgencyIds, knownAgencies],
   );
 
+  const active = useMemo(() => credentials.filter((c) => !c.isArchived), [credentials]);
+  const archived = useMemo(() => credentials.filter((c) => c.isArchived), [credentials]);
+
   const replace = (updated: MyCredential) =>
     onChange((list) => list.map((c) => (c.id === updated.id ? updated : c)).sort(byName));
 
   if (formFor) {
-    const editing = formFor === "new" ? undefined : credentials.find((c) => c.id === formFor);
+    const editing = formFor === "new" ? undefined : active.find((c) => c.id === formFor);
     return (
       <CredentialForm
         key={formFor}
@@ -60,34 +65,63 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds }: Cr
     </button>
   );
 
-  if (credentials.length === 0) {
-    return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-        <Award className="mx-auto mb-3 h-8 w-8 text-gray-300" aria-hidden="true" />
-        <h2 className="text-lg font-semibold text-[var(--ink)]">Nothing listed yet</h2>
-        <p className="mx-auto mb-6 mt-1 max-w-md text-sm text-[var(--sage)]">
-          Add your certifications, qualifications, training and insurance so agencies know what you hold.
-        </p>
-        {addButton}
-      </div>
-    );
-  }
-
   return (
-    <div className="space-y-4">
-      <div className="flex justify-end">{addButton}</div>
-      <ul className="space-y-4">
-        {credentials.map((c) => (
-          <CredentialCard
-            key={c.id}
-            credential={c}
-            agencies={agencies}
-            onEdit={() => setFormFor(c.id)}
-            onArchived={() => onChange((list) => list.filter((x) => x.id !== c.id))}
-            onSharesChange={(shares) => onChange((list) => list.map((x) => (x.id === c.id ? { ...x, shares } : x)))}
-          />
-        ))}
-      </ul>
+    <div className="space-y-8">
+      {active.length === 0 ? (
+        <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
+          <Award className="mx-auto mb-3 h-8 w-8 text-gray-300" aria-hidden="true" />
+          <h2 className="text-lg font-semibold text-[var(--ink)]">Nothing listed yet</h2>
+          <p className="mx-auto mb-6 mt-1 max-w-md text-sm text-[var(--sage)]">
+            Add your certifications, qualifications, training and insurance so agencies know what you hold.
+          </p>
+          {addButton}
+        </div>
+      ) : (
+        <section aria-labelledby="active-credentials" className="space-y-4">
+          <div className="flex items-center justify-between gap-3">
+            <h2 id="active-credentials" className="text-lg font-semibold text-[var(--ink)]">
+              Active ({active.length})
+            </h2>
+            {addButton}
+          </div>
+          <ul className="space-y-4">
+            {active.map((c) => (
+              <CredentialCard
+                key={c.id}
+                credential={c}
+                agencies={agencies}
+                onEdit={() => setFormFor(c.id)}
+                // Archiving clears the credential's shares on the server, so mirror that here.
+                onArchived={() => replace({ ...c, isArchived: true, shares: [] })}
+                onSharesChange={(shares) => onChange((list) => list.map((x) => (x.id === c.id ? { ...x, shares } : x)))}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      {archived.length > 0 && (
+        <section aria-labelledby="archived-credentials" className="space-y-4">
+          <div className="space-y-1">
+            <h2 id="archived-credentials" className="text-lg font-semibold text-[var(--ink)]">
+              Archived credentials ({archived.length})
+            </h2>
+            <p className="text-[13px] text-[var(--sage)]">
+              Hidden from you and from agencies. Reactivate one to use it again, or delete it for good.
+            </p>
+          </div>
+          <ul className="space-y-4">
+            {archived.map((c) => (
+              <ArchivedCredentialCard
+                key={c.id}
+                credential={c}
+                onReactivated={replace}
+                onDeleted={() => onChange((list) => list.filter((x) => x.id !== c.id))}
+              />
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 };

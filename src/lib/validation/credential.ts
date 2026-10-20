@@ -42,8 +42,9 @@ export interface CredentialShare {
 
 /** A saved credential as the browser sees it (dates stay as yyyy-mm-dd text). */
 export interface MyCredential {
-  /** Only agencies the interpreter is currently connected to. */
+  /** Only agencies the interpreter is currently connected to. Always empty while archived. */
   shares: CredentialShare[];
+  isArchived: boolean;
   id: string;
   name: string;
   type: CredentialTypeName;

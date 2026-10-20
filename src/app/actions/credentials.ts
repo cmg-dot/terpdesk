@@ -3,7 +3,7 @@
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { credentials } from "@/db/schema";
+import { credentialAgencyShares, credentials } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
 import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
@@ -55,7 +55,7 @@ const toColumns = (d: z.output<typeof credentialSchema>) => ({
   notes: d.notes || null,
 });
 
-/** The signed-in interpreter's active credentials with their shares. Never accepts an id from the browser. */
+/** The signed-in interpreter's credentials (active and archived) with shares. Never accepts an id from the browser. */
 export async function getCredentials(): Promise<MyCredential[]> {
   const { interpreterId } = await requireInterpreter();
   await ensureAvailabilityTables();
@@ -130,7 +130,10 @@ export async function updateCredential(idInput: string, input: CredentialInput):
   }
 }
 
-/** Soft delete: hides the credential from the profile and from every agency, but keeps the record. */
+/**
+ * Soft delete: hides the credential from the profile and from every agency, but keeps the record.
+ * Agency shares are cleared too, so reactivating it later never re-exposes it without the interpreter choosing to.
+ */
 export async function archiveCredential(idInput: string): Promise<ArchiveCredentialResult> {
   const me = await sessionInterpreter();
   if (!me) return { success: false, error: NOT_LINKED };
@@ -139,11 +142,15 @@ export async function archiveCredential(idInput: string): Promise<ArchiveCredent
 
   try {
     await ensureAvailabilityTables();
-    const archived = await db
-      .update(credentials)
-      .set({ isArchived: true, updatedAt: new Date() })
-      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
-      .returning({ id: credentials.id });
+    const archived = await db.transaction(async (tx) => {
+      const rows = await tx
+        .update(credentials)
+        .set({ isArchived: true, updatedAt: new Date() })
+        .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
+        .returning({ id: credentials.id });
+      if (rows.length > 0) await tx.delete(credentialAgencyShares).where(eq(credentialAgencyShares.credentialId, id.data));
+      return rows;
+    });
     if (archived.length === 0) return { success: false, error: "This credential was not found. It may already be archived." };
 
     await writeAuditLog({
@@ -156,5 +163,75 @@ export async function archiveCredential(idInput: string): Promise<ArchiveCredent
   } catch (err) {
     logError("archiveCredential", err);
     return { success: false, error: "We could not archive this credential. Please try again." };
+  }
+}
+
+/** Brings an archived credential back to the active list. It starts private (only the interpreter sees it). */
+export async function reactivateCredential(idInput: string): Promise<SaveCredentialResult> {
+  const me = await sessionInterpreter();
+  if (!me) return { success: false, error: NOT_LINKED };
+  const id = idSchema.safeParse(idInput);
+  if (!id.success) return { success: false, error: "Invalid request." };
+
+  try {
+    await ensureAvailabilityTables();
+    const [active] = await db
+      .select({ total: count() })
+      .from(credentials)
+      .where(and(eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)));
+    if (Number(active?.total ?? 0) >= MAX_CREDENTIALS) {
+      return { success: false, error: `You can list up to ${MAX_CREDENTIALS} credentials. Archive one to reactivate this one.` };
+    }
+
+    const [restored] = await db
+      .update(credentials)
+      .set({ isArchived: false, updatedAt: new Date() })
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, true)))
+      .returning();
+    if (!restored) return { success: false, error: "This credential was not found. It may already be active." };
+
+    await writeAuditLog({
+      userId: me.session.user.id,
+      userEmail: me.session.user.email ?? null,
+      action: "credential_reactivated",
+      details: `credentialId=${restored.id}`,
+    });
+    return { success: true, credential: toMyCredential(restored, []) };
+  } catch (err) {
+    logError("reactivateCredential", err);
+    return { success: false, error: "We could not reactivate this credential. Please try again." };
+  }
+}
+
+/**
+ * Permanently removes a credential (and, through the database cascade, its agency shares). This cannot be undone,
+ * so only archived credentials qualify: an active one must be archived first.
+ */
+export async function deleteCredentialPermanently(idInput: string): Promise<ArchiveCredentialResult> {
+  const me = await sessionInterpreter();
+  if (!me) return { success: false, error: NOT_LINKED };
+  const id = idSchema.safeParse(idInput);
+  if (!id.success) return { success: false, error: "Invalid request." };
+
+  try {
+    await ensureAvailabilityTables();
+    const removed = await db
+      .delete(credentials)
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, true)))
+      .returning({ id: credentials.id });
+    if (removed.length === 0) {
+      return { success: false, error: "Only archived credentials can be deleted. Archive it first, or it may already be gone." };
+    }
+
+    await writeAuditLog({
+      userId: me.session.user.id,
+      userEmail: me.session.user.email ?? null,
+      action: "credential_deleted_permanently",
+      details: `credentialId=${id.data}`,
+    });
+    return { success: true };
+  } catch (err) {
+    logError("deleteCredentialPermanently", err);
+    return { success: false, error: "We could not delete this credential. Please try again." };
   }
 }
