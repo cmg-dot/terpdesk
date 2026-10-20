@@ -17,7 +17,6 @@ import {
   Network,
   User,
   Settings,
-  Bell,
   Menu,
   X,
 } from "lucide-react";
@@ -26,12 +25,22 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { motion, AnimatePresence } from "framer-motion";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { useSession } from "next-auth/react";
+import { InterpreterNameProvider, useInterpreterName } from "@/context/InterpreterNameContext";
 
 export default function InterpreterLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <InterpreterNameProvider>
+      <InterpreterShell>{children}</InterpreterShell>
+    </InterpreterNameProvider>
+  );
+}
+
+function InterpreterShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = React.useState(false);
   const { data: session } = useSession();
-  const displayName = session?.user?.name ?? "";
+  // Preferred name, else the account name.
+  const { name: displayName } = useInterpreterName();
   const displayEmail = session?.user?.email ?? "";
 
   return (

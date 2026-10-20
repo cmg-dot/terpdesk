@@ -8,6 +8,7 @@ import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
+import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 import type { MyWebsiteSharing, WebsitePermission } from "@/lib/websiteProfile";
 
@@ -77,7 +78,7 @@ export async function setWebsiteSharing(input: z.input<typeof setSchema>): Promi
         type: "agency",
         href: "/interpreters?tab=website",
         title: "Website profile request",
-        message: `${session.user.name || "An interpreter"} would like to be featured on your website.`,
+        message: `${(await getInterpreterDisplayName(interpreterId).catch(() => null)) || session.user.name || "An interpreter"} would like to be featured on your website.`,
       });
     }
     return { success: true, status: next };

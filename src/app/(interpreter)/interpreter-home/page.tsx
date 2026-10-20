@@ -8,6 +8,7 @@ import { getConnectedAgencyCount } from "@/app/actions/agencyConnections";
 import { Calendar, MapPin, Clock, X, AlertCircle } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { useGlobalState } from "@/context/GlobalContext";
+import { useInterpreterName } from "@/context/InterpreterNameContext";
 import { motion } from "framer-motion";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { format } from "date-fns";
@@ -22,6 +23,8 @@ export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
   const { currentUser } = useGlobalState();
   const { data: session } = useSession();
+  // Preferred name, else the account name (same name the sidebar shows).
+  const { name: displayName } = useInterpreterName();
   const [connectedAgencyCount, setConnectedAgencyCount] = React.useState(0);
   React.useEffect(() => {
     getConnectedAgencyCount().then(setConnectedAgencyCount).catch(() => setConnectedAgencyCount(0));
@@ -281,7 +284,7 @@ export default function InterpreterHomePage() {
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">
  <div>
  <h1 className="text-4xl font-semibold tracking-tight text-[var(--ink)] mb-2">
- {session?.user?.name?.trim() ? `Welcome, ${session.user.name.trim()}` : "Welcome"}
+ {displayName ? `Welcome, ${displayName}` : "Welcome"}
  </h1>
  <p className="text-[var(--sage)] text-lg">
  Your interpreting work, across your agencies.

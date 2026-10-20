@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Pencil } from "lucide-react";
 import { ProfileEditForm } from "@/components/profile/ProfileEditForm";
 import { ProfileOverviewView } from "@/components/profile/ProfileOverviewView";
+import { useInterpreterName } from "@/context/InterpreterNameContext";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
 
 interface ProfileOverviewTabProps {
@@ -16,6 +17,7 @@ interface ProfileOverviewTabProps {
 
 /** "My Profile" Overview tab: read-only view with an "Edit profile" mode. */
 export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview }: ProfileOverviewTabProps) => {
+  const { setName: setDisplayName } = useInterpreterName();
   const [editing, setEditing] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
@@ -32,6 +34,8 @@ export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview
         onCancel={() => setEditing(false)}
         onSaved={(saved, websiteReReview) => {
           onProfileChange(saved);
+          // Sidebar, top bar and Home greeting show the new name straight away.
+          setDisplayName(saved.preferredName || saved.fullName);
           if (websiteReReview) onWebsiteReReview();
           setEditing(false);
           setSavedMessage(

@@ -8,6 +8,7 @@ import { db } from "@/db";
 import { agencyInterpreters, interpreters, users, verificationTokens } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { logError } from "@/lib/logError";
+import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 import { hashToken } from "@/lib/timesheetToken";
 
@@ -111,7 +112,7 @@ export async function verifyClaim(formData: FormData): Promise<never> {
       type: "agency",
       href: "/interpreters",
       title: "Profile claimed",
-      message: `${outcome.name} confirmed their email and linked an account to the profile you added.`,
+      message: `${(await getInterpreterDisplayName(outcome.interpreterId).catch(() => null)) || outcome.name} confirmed their email and linked an account to the profile you added.`,
     });
     revalidatePath("/interpreters");
   }

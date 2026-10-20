@@ -10,6 +10,7 @@ import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { requireInterpreter, requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { getInterpreterDisplayName } from "@/lib/displayName";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 
 export interface MyConnection {
@@ -81,11 +82,12 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
       await db.insert(agencyInterpreters).values({ agencyId, interpreterId, userId, status: "pending" });
     }
     await writeAuditLog({ userId, userEmail, action: "agency_connection_requested", details: `agencyId=${agencyId}` });
+    const requesterName = (await getInterpreterDisplayName(interpreterId).catch(() => null)) || userName || userEmail;
     await notifyAgencyAdmins({
       type: "agency",
       href: "/interpreters?tab=requests",
       title: "New join request",
-      message: `New join request from ${userName || userEmail || "an interpreter"}.`,
+      message: `New join request from ${requesterName || "an interpreter"}.`,
     });
     return { success: true };
   } catch (err) {
