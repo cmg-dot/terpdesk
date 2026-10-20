@@ -2,7 +2,7 @@
 
 import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
-import { requests, offers } from "@/db/schema";
+import { requests, offers, interpreters } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
@@ -160,9 +160,16 @@ export async function respondToOffer(
     const hasPending = allReqOffers.some(o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now);
     const hasReplacement = Boolean(existingData.slotReplacements?.[1] || existingData.slotReplacements?.[2]);
 
-    let newStatus = 'Unfilled / draft';
+    // No other live offer for THIS position means it still needs coverage: flag it instead of leaving a draft.
+    const hasPendingForPosition = allReqOffers.some(
+      o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now && (offerPositions[o.id] || 1) === posIdx
+    );
+
+    let newStatus = 'Needs replacement';
     if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
       newStatus = 'booked';
+    } else if (!hasPendingForPosition) {
+      newStatus = 'Needs replacement';
     } else if (hasReplacement) {
       newStatus = 'Needs replacement';
     } else if (hasOtherAccepted) {
@@ -190,14 +197,14 @@ export async function respondToOffer(
       .where(eq(requests.id, offer.requestId));
   }
 
-  if (normResponse === 'accepted') {
-    await notifyAgencyAdmins({
-      type: "job",
-      href: `/requests/${offer.requestId}`,
-      title: "Job offer accepted",
-      message: "An interpreter accepted the job.",
-    });
-  }
+  const [who] = await db.select({ name: interpreters.name }).from(interpreters).where(eq(interpreters.id, offer.interpreterId));
+  const who_name = who?.name ?? "An interpreter";
+  await notifyAgencyAdmins({
+    type: "job",
+    href: `/requests/${offer.requestId}`,
+    title: normResponse === 'accepted' ? "Job offer accepted" : "Job offer declined",
+    message: `${who_name} ${normResponse === 'accepted' ? "accepted the job" : "declined the offer"}.`,
+  });
 
   revalidatePath('/interpreter-home');
   revalidatePath('/jobs');

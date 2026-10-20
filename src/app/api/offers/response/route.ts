@@ -662,7 +662,7 @@ export async function GET(request: NextRequest) {
         type: "job",
         href: `/requests/${requestId}`,
         title: "Job offer accepted",
-        message: "An interpreter accepted the job.",
+        message: `${interpreterName || "An interpreter"} accepted the job.`,
       });
 
       try {
@@ -726,9 +726,21 @@ export async function GET(request: NextRequest) {
       );
 
       // Determine request status
-      let newStatus = "Unfilled / draft";
+      // No other live offer for THIS position means it still needs coverage: flag it instead of leaving a draft.
+      const declinedOfferPositions = (existingData.offerPositions || {}) as Record<string, number>;
+      const hasPendingForPosition = allReqOffers.some(
+        (o) =>
+          o.interpreterId !== interpreterId &&
+          o.status === "pending" &&
+          new Date(o.expiresAt) > now &&
+          (declinedOfferPositions[o.id] || 1) === positionIndex
+      );
+
+      let newStatus = "Needs replacement";
       if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
         newStatus = "booked";
+      } else if (!hasPendingForPosition) {
+        newStatus = "Needs replacement";
       } else if (hasReplacement) {
         newStatus = "Needs replacement";
       } else if (remainingAccepted.length > 0) {
@@ -788,6 +800,13 @@ export async function GET(request: NextRequest) {
           updatedAt: now,
         })
         .where(eq(requests.id, requestId));
+
+      await notifyAgencyAdmins({
+        type: "job",
+        href: `/requests/${requestId}`,
+        title: "Job offer declined",
+        message: `${interpreterName || "An interpreter"} declined the offer.`,
+      });
 
       try {
         revalidatePath(`/requests/${requestId}`);
