@@ -15,6 +15,8 @@ interface ProfileEditFormProps {
   profile: MyProfile;
   /** `websiteReReview` is true when the edit sent an approved agency website profile back to review. */
   onSaved: (profile: MyProfile, websiteReReview: boolean) => void;
+  /** A new photo was uploaded and saved on its own (before "Save profile"). */
+  onPhotoSaved: (photoUrl: string, websiteReReview: boolean) => void;
   onCancel: () => void;
 }
 
@@ -35,7 +37,7 @@ const toInput = (p: MyProfile): InterpreterProfileInput => ({
 });
 
 /** Edit mode of the profile Overview. The sign-in email is shown for reference only and is never sent. */
-export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormProps) => {
+export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: ProfileEditFormProps) => {
   const [values, setValues] = useState<InterpreterProfileInput>(() => toInput(profile));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -95,6 +97,11 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
         <ProfilePhotoPicker
           currentPhotoUrl={values.photoUrl}
           name={values.preferredName || profile.fullName}
+          onUploaded={(photoUrl, websiteReReview) => {
+            // The photo is already saved; keep the form in step so "Save profile" doesn't clear it.
+            setValues((v) => ({ ...v, photoUrl }));
+            onPhotoSaved(photoUrl, websiteReReview);
+          }}
           onRemove={() => setValues((v) => ({ ...v, photoUrl: "" }))}
         />
       </fieldset>

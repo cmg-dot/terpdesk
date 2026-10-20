@@ -3,12 +3,13 @@
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { credentialAgencyShares, credentials } from "@/db/schema";
+import { credentialAgencyShares, credentials, files } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
 import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
-import { connectedAgencyIds, loadCredentials, sharesFor, toMyCredential } from "@/lib/credentials";
+import { connectedAgencyIds, filesFor, loadCredentials, sharesFor, toMyCredential } from "@/lib/credentials";
 import { logError } from "@/lib/logError";
+import { removeObjectsQuietly } from "@/lib/s3";
 import { credentialSchema } from "@/lib/validation/credential";
 import type { CredentialField, CredentialInput, MyCredential } from "@/lib/validation/credential";
 
@@ -123,7 +124,8 @@ export async function updateCredential(idInput: string, input: CredentialInput):
       details: `credentialId=${updated.id}`,
     });
     const shares = await sharesFor([updated.id], await connectedAgencyIds(me.interpreterId));
-    return { success: true, credential: toMyCredential(updated, shares.get(updated.id) ?? []) };
+    const attached = await filesFor([updated.id]);
+    return { success: true, credential: toMyCredential(updated, shares.get(updated.id) ?? [], attached.get(updated.id) ?? []) };
   } catch (err) {
     logError("updateCredential", err);
     return { success: false, error: "We could not save this credential. Please try again." };
@@ -196,7 +198,8 @@ export async function reactivateCredential(idInput: string): Promise<SaveCredent
       action: "credential_reactivated",
       details: `credentialId=${restored.id}`,
     });
-    return { success: true, credential: toMyCredential(restored, []) };
+    const attached = await filesFor([restored.id]);
+    return { success: true, credential: toMyCredential(restored, [], attached.get(restored.id) ?? []) };
   } catch (err) {
     logError("reactivateCredential", err);
     return { success: false, error: "We could not reactivate this credential. Please try again." };
@@ -215,6 +218,16 @@ export async function deleteCredentialPermanently(idInput: string): Promise<Arch
 
   try {
     await ensureAvailabilityTables();
+    // Remember the stored files first: the database removes their rows with the credential, S3 does not.
+    const [owned] = await db
+      .select({ id: credentials.id })
+      .from(credentials)
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, true)))
+      .limit(1);
+    const storedKeys = owned
+      ? (await db.select({ key: files.storageKey }).from(files).where(eq(files.linkedCredentialId, owned.id))).map((f) => f.key)
+      : [];
+
     const removed = await db
       .delete(credentials)
       .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, true)))
@@ -222,6 +235,7 @@ export async function deleteCredentialPermanently(idInput: string): Promise<Arch
     if (removed.length === 0) {
       return { success: false, error: "Only archived credentials can be deleted. Archive it first, or it may already be gone." };
     }
+    await removeObjectsQuietly(storedKeys);
 
     await writeAuditLog({
       userId: me.session.user.id,

@@ -1,3 +1,4 @@
+import { CredentialFileLinks } from "@/components/interpreters/detail/CredentialFileLinks";
 import { expiryStatus, formatDay, neutralBadge, badgeBase } from "@/components/profile/credentialFormat";
 import type { SharedCredentialView } from "@/lib/agencyInterpreterView";
 
@@ -34,6 +35,7 @@ export const SharedCredentialsSection = ({ credentials, timeZone }: { credential
               </div>
               {c.issuedBy && <p className="mt-1 text-[13px] text-gray-600">Issued by {c.issuedBy}</p>}
               {dates && <p className="text-[13px] text-gray-500">{dates}</p>}
+              <CredentialFileLinks files={c.files} />
             </li>
           );
         })}

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PHOTO_PATH_PATTERN } from "@/lib/validation/file";
 
 /** Time zones offered on the profile form (the ones the calendar understands). */
 export const PROFILE_TIME_ZONES = [
@@ -26,9 +27,11 @@ const text = (max: number, label: string) => z.string().trim().max(max, `${label
 /** Shared by the profile form (instant feedback) and the server action (the real check). Empty = not set. */
 export const interpreterProfileSchema = z.object({
   preferredName: text(80, "Preferred name"),
-  photoUrl: text(500, "Photo link").refine(
-    (v) => v === "" || /^https:\/\/[^\s"'<>]+$/i.test(v),
-    "Use an image link that starts with https://",
+  // Holds the photo the upload flow saved ("/api/files/<id>") or an older https link. The server only ever keeps or
+  // clears it; it never adopts a new value from the browser.
+  photoUrl: text(500, "Photo").refine(
+    (v) => v === "" || PHOTO_PATH_PATTERN.test(v) || /^https:\/\/[^\s"'<>]+$/i.test(v),
+    "That photo isn't valid. Choose it again.",
   ),
   shortBio: text(600, "Short bio"),
   city: text(100, "City"),

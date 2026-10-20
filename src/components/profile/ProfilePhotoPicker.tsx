@@ -3,27 +3,31 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { ImagePlus } from "lucide-react";
+import { presignProfilePhoto, saveProfilePhoto } from "@/app/actions/profilePhotoUpload";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-
-const ACCEPTED_TYPES = ["image/jpeg", "image/png", "image/webp"];
-const MAX_BYTES = 5 * 1024 * 1024;
+import { MAX_PHOTO_BYTES, PHOTO_FILE_TYPES } from "@/lib/validation/file";
 
 interface ProfilePhotoPickerProps {
-  /** The photo currently saved on the profile (a link), or "". */
+  /** The photo currently saved on the profile ("/api/files/<id>" or an older link), or "". */
   currentPhotoUrl: string;
   name: string;
-  /** Called when the saved photo is removed. */
+  /** Called when a new photo has been uploaded AND saved, so the page can show it. */
+  onUploaded: (photoUrl: string, websiteReReview: boolean) => void;
+  /** Called when the saved photo is removed (applied when the profile is saved). */
   onRemove: () => void;
 }
 
 /**
- * File picker for the profile photo. The chosen image is previewed here, in the browser only.
- * Uploading it needs file storage (S3) that is not connected yet, so a new photo is not saved with the profile.
+ * Profile photo picker. Choosing a file uploads it straight to S3 through a signed link and saves it as the photo
+ * at once; it does not wait for "Save profile". The bucket is private, so the photo is shown through the
+ * authorized /api/files route.
  */
-export const ProfilePhotoPicker = ({ currentPhotoUrl, name, onRemove }: ProfilePhotoPickerProps) => {
+export const ProfilePhotoPicker = ({ currentPhotoUrl, name, onUploaded, onRemove }: ProfilePhotoPickerProps) => {
   const inputRef = useRef<HTMLInputElement>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // Release the temporary preview link when it is replaced or the form closes.
@@ -33,29 +37,43 @@ export const ProfilePhotoPicker = ({ currentPhotoUrl, name, onRemove }: ProfileP
     };
   }, [previewUrl]);
 
-  const onChange = (e: ChangeEvent<HTMLInputElement>) => {
+  const onChange = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
-    if (!ACCEPTED_TYPES.includes(file.type)) {
-      setError("Choose a JPEG, PNG or WebP image.");
-      e.target.value = "";
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      setError("That image is larger than 5 MB. Choose a smaller one.");
-      e.target.value = "";
-      return;
-    }
+    e.target.value = "";
+    if (!file || busy) return;
     setError(null);
-    setFileName(file.name);
-    setPreviewUrl(URL.createObjectURL(file));
-  };
+    setNotice(null);
+    if (!(file.type in PHOTO_FILE_TYPES)) return setError("Choose a JPEG, PNG or WebP image.");
+    if (file.size > MAX_PHOTO_BYTES) return setError("That image is larger than 5 MB. Choose a smaller one.");
 
-  const clearChoice = () => {
-    setPreviewUrl(null);
-    setFileName(null);
-    setError(null);
-    if (inputRef.current) inputRef.current.value = "";
+    setBusy(true);
+    setPreviewUrl(URL.createObjectURL(file));
+    try {
+      setStatus("Preparing upload…");
+      const presign = await presignProfilePhoto({ fileName: file.name, fileType: file.type, fileSize: file.size });
+      if (!presign.success) return setError(presign.error);
+
+      setStatus("Uploading…");
+      const put = await fetch(presign.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
+      if (!put.ok) return setError("The upload failed. Please try again.");
+
+      setStatus("Saving…");
+      const saved = await saveProfilePhoto({ key: presign.key, fileName: file.name });
+      if (!saved.success) return setError(saved.error);
+
+      onUploaded(saved.photoUrl, saved.websiteReReview);
+      setNotice(
+        saved.websiteReReview
+          ? "Photo saved. Because it's part of your public profile, your agency will review your website profile again."
+          : "Photo saved.",
+      );
+    } catch {
+      setError("The upload failed. Check your connection and try again.");
+    } finally {
+      setPreviewUrl(null);
+      setStatus(null);
+      setBusy(false);
+    }
   };
 
   return (
@@ -68,35 +86,28 @@ export const ProfilePhotoPicker = ({ currentPhotoUrl, name, onRemove }: ProfileP
           type="file"
           accept="image/jpeg, image/png, image/webp"
           onChange={onChange}
+          disabled={busy}
           className="sr-only"
         />
         <div className="flex flex-wrap items-center gap-3">
           <label
             htmlFor="profile-photo-file"
-            className="inline-flex cursor-pointer items-center gap-2 rounded-full border border-gray-300 bg-stone-100 px-5 py-2 text-sm font-medium text-gray-800 transition-colors hover:bg-stone-200 focus-within:ring-2 focus-within:ring-[#0B3B32]"
+            aria-disabled={busy}
+            className={`inline-flex items-center gap-2 rounded-full border border-gray-300 bg-stone-100 px-5 py-2 text-sm font-medium text-gray-800 transition-colors focus-within:ring-2 focus-within:ring-[#0B3B32] ${
+              busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-stone-200"
+            }`}
           >
             <ImagePlus className="h-4 w-4" aria-hidden="true" />
-            {previewUrl ? "Choose a different photo" : "Choose photo"}
+            {busy ? status ?? "Working…" : currentPhotoUrl ? "Choose a different photo" : "Choose photo"}
           </label>
-          {previewUrl && (
-            <button type="button" onClick={clearChoice} className="text-sm font-medium text-gray-600 hover:text-gray-900">
-              Clear
-            </button>
-          )}
-          {!previewUrl && currentPhotoUrl && (
+          {!busy && currentPhotoUrl && (
             <button type="button" onClick={onRemove} className="text-sm font-medium text-red-700 hover:underline">
               Remove current photo
             </button>
           )}
         </div>
-        <p className="text-[12px] text-gray-500">
-          {fileName ? `Selected: ${fileName}. ` : ""}JPEG, PNG or WebP, up to 5 MB.
-        </p>
-        {previewUrl && (
-          <p role="status" className="text-[12px] text-amber-800">
-            Photo uploads are not switched on yet, so this photo is only a preview and will not be saved.
-          </p>
-        )}
+        <p className="text-[12px] text-gray-500">JPEG, PNG or WebP, up to 5 MB. Your photo is stored privately.</p>
+        {notice && <p role="status" className="text-[12px] font-medium text-emerald-700">{notice}</p>}
         {error && <p role="alert" className="text-[12px] text-red-700">{error}</p>}
       </div>
     </div>

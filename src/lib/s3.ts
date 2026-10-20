@@ -102,3 +102,17 @@ export async function removeObject(key: string): Promise<void> {
   const { client, config } = storage();
   await client.send(new DeleteObjectCommand({ Bucket: config.bucket, Key: key }));
 }
+
+/**
+ * Best-effort cleanup for objects whose database rows are already gone. A failure is logged by key count only and
+ * never blocks the action, since an orphaned private object is harmless and the user's change has already happened.
+ */
+export async function removeObjectsQuietly(keys: string[]): Promise<void> {
+  for (const key of keys) {
+    try {
+      await removeObject(key);
+    } catch {
+      console.error("[s3] could not remove an object during cleanup");
+    }
+  }
+}

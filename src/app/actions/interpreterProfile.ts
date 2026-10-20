@@ -1,16 +1,16 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { agencyInterpreters, interpreterProfiles, users } from "@/db/schema";
+import { interpreterProfiles, users } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
-import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
-import { notifyAgencyAdmins } from "@/lib/notifications";
+import { deletePhotoFile } from "@/lib/profilePhoto";
+import { announceWebsiteReReview, sendApprovedWebsiteProfilesBackToReview } from "@/lib/websiteReview";
 import { publicFieldsChanged } from "@/lib/websiteProfile";
 import { interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
@@ -135,6 +135,11 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
     await ensureAgencyInterpreterColumns();
     const existing = await findProfileRow(interpreterId);
 
+    // A photo can only be set through the upload flow (saveProfilePhoto), never by a value sent from the browser.
+    // Here it can only be kept or removed, so nobody can point their profile at someone else's file.
+    const removingPhoto = d.photoUrl === "";
+    values.photoUrl = removingPhoto ? null : existing?.photoUrl ?? null;
+
     // Anything an agency website would show changed after the agency approved it? Then the agency must review it
     // again. Save and downgrade together, so a profile can never be saved with a stale approval.
     const publicFieldsEdited = publicFieldsChanged(accountName, existing, values);
@@ -144,30 +149,20 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
       } else {
         await tx.insert(interpreterProfiles).values({ id: randomUUID(), interpreterId, ...values });
       }
-      if (!publicFieldsEdited) return 0;
-      const rows = await tx
-        .update(agencyInterpreters)
-        .set({ websitePermissionStatus: "pending", updatedAt: new Date() })
-        .where(and(eq(agencyInterpreters.interpreterId, interpreterId), eq(agencyInterpreters.websitePermissionStatus, "approved")))
-        .returning({ id: agencyInterpreters.id });
-      return rows.length;
+      return publicFieldsEdited ? sendApprovedWebsiteProfilesBackToReview(tx, interpreterId) : 0;
     });
 
     if (downgraded > 0) {
-      await writeAuditLog({
+      await announceWebsiteReReview({
         userId: session.user.id,
         userEmail: session.user.email ?? null,
-        action: "website_profile_re_review",
-        details: `interpreterId=${interpreterId}; agencies=${downgraded}`,
+        interpreterId,
+        displayName: values.preferredName || accountName,
+        agencies: downgraded,
       });
-      await notifyAgencyAdmins({
-        type: "agency",
-        href: "/interpreters?tab=website",
-        title: "Website profile needs review",
-        message: `${values.preferredName || accountName || "An interpreter"} changed their public profile. It is back in your review queue.`,
-      });
-      revalidatePath("/interpreters");
     }
+    // The removed photo's file is no longer referenced: delete its record and stored object.
+    if (removingPhoto && existing?.photoUrl) await deletePhotoFile(existing.photoUrl, interpreterId);
 
     revalidatePath("/profile");
     revalidatePath("/interpreter-calendar");

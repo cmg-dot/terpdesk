@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { CredentialFile } from "@/lib/validation/file";
 
 export const CREDENTIAL_TYPES = ["Certification", "Qualification", "Training", "Insurance", "Other"] as const;
 export type CredentialTypeName = (typeof CREDENTIAL_TYPES)[number];
@@ -45,6 +46,8 @@ export interface MyCredential {
   /** Only agencies the interpreter is currently connected to. Always empty while archived. */
   shares: CredentialShare[];
   isArchived: boolean;
+  /** Supporting files attached to this credential (private to the interpreter unless shared with files included). */
+  files: CredentialFile[];
   id: string;
   name: string;
   type: CredentialTypeName;

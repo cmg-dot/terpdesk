@@ -32,6 +32,11 @@ export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview
       <ProfileEditForm
         profile={profile}
         onCancel={() => setEditing(false)}
+        onPhotoSaved={(photoUrl, websiteReReview) => {
+          // Saved on its own, so the overview and Visibility tab must show it even if the form is cancelled.
+          onProfileChange({ ...profile, photoUrl });
+          if (websiteReReview) onWebsiteReReview();
+        }}
         onSaved={(saved, websiteReReview) => {
           onProfileChange(saved);
           // Sidebar, top bar and Home greeting show the new name straight away.

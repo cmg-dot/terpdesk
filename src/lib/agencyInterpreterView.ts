@@ -15,6 +15,8 @@ import {
 import { ensureAvailabilityTables, resolveInterpreterIds } from "@/app/actions/availability";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { readPermission } from "@/lib/agencyPermissions";
+import { filesFor } from "@/lib/credentials";
+import type { CredentialFile } from "@/lib/validation/file";
 import { summarizeAvailability } from "@/lib/availabilitySummary";
 import type { DayAvailability } from "@/lib/availabilitySummary";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
@@ -29,6 +31,8 @@ export interface SharedCredentialView {
   issuedBy: string;
   issueDate: string;
   expirationDate: string;
+  /** Supporting files; empty unless the interpreter shared this credential with files included. */
+  files: CredentialFile[];
 }
 
 export interface AgencyInterpreterView {
@@ -85,11 +89,14 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       issuedBy: credentials.issuedBy,
       issueDate: credentials.issueDate,
       expirationDate: credentials.expirationDate,
+      includeFiles: credentialAgencyShares.includeFiles,
     })
     .from(credentials)
     .innerJoin(credentialAgencyShares, eq(credentialAgencyShares.credentialId, credentials.id))
     .where(and(eq(credentials.interpreterId, interpreterId), eq(credentials.isArchived, false), eq(credentialAgencyShares.agencyId, agencyId)))
     .orderBy(asc(credentials.name));
+
+  const filesByCredential = await filesFor(sharedCredentials.filter((c) => c.includeFiles).map((c) => c.id));
 
   const timeZone = getIanaZone(profile?.timeZone ?? "America/Los_Angeles");
   const { sharesAvailability } = await readPermission(agencyId, interpreterId);
@@ -155,6 +162,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       issuedBy: c.issuedBy ?? "",
       issueDate: c.issueDate ?? "",
       expirationDate: c.expirationDate ?? "",
+      // Supporting files travel only when the interpreter chose "Include supporting files" for this agency.
+      files: c.includeFiles ? (filesByCredential.get(c.id) ?? []) : [],
     })),
     sharesAvailability,
     days: summarizeAvailability({ timeZone, rules, exceptions, busy, booked }, now, SUMMARY_DAYS),

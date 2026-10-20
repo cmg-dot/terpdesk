@@ -6,8 +6,8 @@ import { db } from "@/db";
 import { files, requests } from "@/db/schema";
 import type { SelectFile } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
-import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { writeAuditLog } from "@/lib/audit";
+import { canViewFile } from "@/lib/fileAuthorization";
 import { requireInterpreter, requireSession } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 import { bookedRequestIds } from "@/lib/prepAccess";
@@ -46,20 +46,8 @@ export async function getFileDownloadUrl(fileIdInput: string): Promise<DownloadU
   try {
     await ensureAvailabilityTables();
     const [file] = await db.select().from(files).where(eq(files.id, id.data)).limit(1);
-    if (!file) return { success: false, error: NOT_FOUND };
-
-    if (session.user.role === "agency") {
-      if (file.uploadedByAgencyId !== DEFAULT_AGENCY_ID) return { success: false, error: NOT_FOUND };
-    } else {
-      let interpreterId: string;
-      try {
-        ({ interpreterId } = await requireInterpreter());
-      } catch {
-        return { success: false, error: NOT_FOUND };
-      }
-      const booked = file.linkedJobId ? (await bookedRequestIds(interpreterId)).includes(file.linkedJobId) : false;
-      if (!file.sharedWithInterpreters || !booked) return { success: false, error: NOT_FOUND };
-    }
+    // One rule (src/lib/fileAuthorization.ts) decides; a missing file and a forbidden one look the same.
+    if (!file || !(await canViewFile(session, file))) return { success: false, error: NOT_FOUND };
 
     const url = await presignDownload(file.storageKey, file.fileName);
     await writeAuditLog({

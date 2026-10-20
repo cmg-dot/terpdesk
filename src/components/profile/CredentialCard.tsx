@@ -7,6 +7,7 @@ import { CredentialFileUpload } from "@/components/profile/CredentialFileUpload"
 import { CredentialSharing } from "@/components/profile/CredentialSharing";
 import { actionButton, badgeBase, credentialLines, expiryStatus, neutralBadge } from "@/components/profile/credentialFormat";
 import type { CredentialShare, MyCredential } from "@/lib/validation/credential";
+import type { CredentialFile } from "@/lib/validation/file";
 
 interface CredentialCardProps {
   credential: MyCredential;
@@ -16,10 +17,11 @@ interface CredentialCardProps {
   onEdit: () => void;
   onArchived: () => void;
   onSharesChange: (shares: CredentialShare[]) => void;
+  onFilesChange: (files: CredentialFile[]) => void;
 }
 
 /** One credential in display mode: details and badges, actions, supporting files, and who can see it. */
-export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onArchived, onSharesChange }: CredentialCardProps) => {
+export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onArchived, onSharesChange, onFilesChange }: CredentialCardProps) => {
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onAr
       </div>
       {error && <p role="alert" className="text-[12px] text-red-700">{error}</p>}
 
-      <CredentialFileUpload />
+      <CredentialFileUpload credentialId={c.id} files={c.files} onFilesChange={onFilesChange} />
 
       <CredentialSharing credentialId={c.id} shares={c.shares} agencies={agencies} onSharesChange={onSharesChange} />
     </li>

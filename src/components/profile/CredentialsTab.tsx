@@ -97,6 +97,7 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, time
                 // Archiving clears the credential's shares on the server, so mirror that here.
                 onArchived={() => replace({ ...c, isArchived: true, shares: [] })}
                 onSharesChange={(shares) => onChange((list) => list.map((x) => (x.id === c.id ? { ...x, shares } : x)))}
+                onFilesChange={(files) => onChange((list) => list.map((x) => (x.id === c.id ? { ...x, files } : x)))}
               />
             ))}
           </ul>
