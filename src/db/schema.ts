@@ -117,6 +117,11 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 export const connectionStatusValues = ['pending', 'approved', 'rejected', 'revoked'] as const;
 export type ConnectionStatus = (typeof connectionStatusValues)[number];
 
+// May the agency feature this interpreter's public profile on its website? The interpreter opts in ('pending'),
+// the agency approves ('approved'). Unchecking, declining or removing returns it to 'not_shared'.
+export const websitePermissionValues = ['not_shared', 'pending', 'approved'] as const;
+export type WebsitePermissionStatus = (typeof websitePermissionValues)[number];
+
 export const agencyInterpreters = pgTable('agency_interpreters', {
   id: uuid('id').defaultRandom().primaryKey(),
   agencyId: text('agency_id').notNull(),
@@ -126,6 +131,10 @@ export const agencyInterpreters = pgTable('agency_interpreters', {
   status: varchar('status', { length: 20, enum: connectionStatusValues }).notNull().default('pending'),
   // Roster toggle for approved rows: false = archived/deactivated (no dispatches; history and connection kept).
   isActive: boolean('is_active').notNull().default(true),
+  // Also added at runtime by ensureAgencyInterpreterColumns (src/lib/agencyInterpreterColumns.ts).
+  websitePermissionStatus: varchar('website_permission_status', { length: 20, enum: websitePermissionValues })
+    .notNull()
+    .default('not_shared'),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

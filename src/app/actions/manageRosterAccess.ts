@@ -8,6 +8,7 @@ import { agencyInterpreters, interpreters } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { notifyInterpreter } from "@/lib/notifications";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
+import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 
@@ -87,9 +88,11 @@ export async function removeFromAgency(interpreterIdInput: string): Promise<Rost
   if (!parsed.success) return INVALID;
 
   try {
+    await ensureAgencyInterpreterColumns();
     const [row] = await db
       .update(agencyInterpreters)
-      .set({ status: "revoked", isActive: false, updatedAt: new Date() })
+      // Leaving the agency also withdraws any website permission, so rejoining never revives an old approval.
+      .set({ status: "revoked", isActive: false, websitePermissionStatus: "not_shared", updatedAt: new Date() })
       .where(onThisRoster(parsed.data))
       .returning({ id: agencyInterpreters.id });
     if (!row) return NOT_ON_ROSTER;
@@ -135,6 +138,7 @@ export async function deleteShadowFromRoster(interpreterIdInput: string): Promis
   );
 
   try {
+    await ensureAgencyInterpreterColumns();
     const [target] = await db
       .select({ userId: interpreters.userId })
       .from(interpreters)
@@ -162,7 +166,7 @@ export async function deleteShadowFromRoster(interpreterIdInput: string): Promis
       if (pgCode(err) !== "23503") throw err;
       await db
         .update(agencyInterpreters)
-        .set({ status: "revoked", isActive: false, updatedAt: new Date() })
+        .set({ status: "revoked", isActive: false, websitePermissionStatus: "not_shared", updatedAt: new Date() })
         .where(thisAgencyRow);
       message = "This interpreter has job history, so they were removed from your roster and the history was kept.";
     }

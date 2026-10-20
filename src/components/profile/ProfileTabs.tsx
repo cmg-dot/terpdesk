@@ -4,8 +4,10 @@ import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CredentialsTab } from "@/components/profile/CredentialsTab";
 import { ProfileOverviewTab } from "@/components/profile/ProfileOverviewTab";
+import { VisibilitySharingTab } from "@/components/profile/VisibilitySharingTab";
 import type { MyCredential } from "@/lib/validation/credential";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
+import type { MyWebsiteSharing } from "@/lib/websiteProfile";
 
 type ProfileTab = "overview" | "credentials" | "visibility";
 
@@ -20,13 +22,16 @@ interface ProfileTabsProps {
   initialCredentials: MyCredential[];
   /** Agencies the interpreter is connected to; credentials can be shared with these. */
   connectedAgencyIds: string[];
+  /** Website permission per connected agency. */
+  initialWebsiteSharing: MyWebsiteSharing[];
 }
 
 /** Tab bar and animated panel for the "My Profile" page. The page's data lives here so tabs keep it while switching. */
-export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgencyIds }: ProfileTabsProps) => {
+export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgencyIds, initialWebsiteSharing }: ProfileTabsProps) => {
   const [tab, setTab] = useState<ProfileTab>("overview");
   const [profile, setProfile] = useState<MyProfile>(initialProfile);
   const [credentials, setCredentials] = useState<MyCredential[]>(initialCredentials);
+  const [websiteSharing, setWebsiteSharing] = useState<MyWebsiteSharing[]>(initialWebsiteSharing);
 
   return (
     <div className="space-y-6">
@@ -67,13 +72,7 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgenc
             <CredentialsTab credentials={credentials} onChange={setCredentials} connectedAgencyIds={connectedAgencyIds} />
           )}
           {tab === "visibility" && (
-            <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
-              <h2 className="text-lg font-semibold text-[var(--ink)]">Visibility &amp; sharing</h2>
-              <p className="mx-auto mt-1 max-w-md text-sm text-[var(--sage)]">
-                Controls for what each agency can see are coming in a later phase. For now, choose who sees your work
-                email and phone from Overview → Edit profile.
-              </p>
-            </div>
+            <VisibilitySharingTab profile={profile} sharing={websiteSharing} onSharingChange={setWebsiteSharing} />
           )}
         </motion.div>
       </AnimatePresence>

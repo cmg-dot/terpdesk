@@ -11,8 +11,9 @@ import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessM
 import { JoinRequestsTab } from "@/components/interpreters/JoinRequestsTab";
 import { RosterTab } from "@/components/interpreters/RosterTab";
 import type { RosterItem } from "@/components/interpreters/RosterTab";
-import { WebsiteProfilesTab, websiteProfileName } from "@/components/interpreters/WebsiteProfilesTab";
+import { WebsiteProfilesTab } from "@/components/interpreters/WebsiteProfilesTab";
 import type { PendingConnection } from "@/app/actions/approvalActions";
+import type { WebsitePermission, WebsiteProfileRequest } from "@/lib/websiteProfile";
 import { UserPlus, Search, CheckCircle2, X } from "lucide-react";
 
 export type InterpretersTab = "roster" | "requests" | "website";
@@ -22,6 +23,8 @@ interface InterpretersPageClientProps {
   registeredProfileIds: string[];
   /** Pending join requests for this agency, loaded on the server from agency_interpreters. */
   initialJoinRequests: PendingConnection[];
+  /** Website opt-ins (pending) and approved website profiles for this agency. */
+  initialWebsiteProfiles: WebsiteProfileRequest[];
   initialTab?: InterpretersTab;
 }
 
@@ -36,13 +39,15 @@ export function InterpretersPageClient({
   initialInterpreters,
   registeredProfileIds,
   initialJoinRequests,
+  initialWebsiteProfiles,
   initialTab = "roster",
 }: InterpretersPageClientProps) {
   const router = useRouter();
-  const { currentUser, website_profile_consent } = useGlobalState();
+  const { currentUser } = useGlobalState();
 
   const [interpreterList, setInterpreterList] = useState<RosterItem[]>(initialInterpreters);
   const [joinRequests, setJoinRequests] = useState<PendingConnection[]>(initialJoinRequests);
+  const [websiteProfiles, setWebsiteProfiles] = useState<WebsiteProfileRequest[]>(initialWebsiteProfiles);
   const [manageTarget, setManageTarget] = useState<ManageAccessTarget | null>(null);
   const [activeTab, setActiveTab] = useState<InterpretersTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
@@ -57,6 +62,10 @@ export function InterpretersPageClient({
   useEffect(() => {
     setJoinRequests(initialJoinRequests);
   }, [initialJoinRequests]);
+
+  useEffect(() => {
+    setWebsiteProfiles(initialWebsiteProfiles);
+  }, [initialWebsiteProfiles]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -82,10 +91,19 @@ export function InterpretersPageClient({
     return joinRequests.filter((r) => r.interpreterName.toLowerCase().includes(query) || r.email.toLowerCase().includes(query));
   }, [joinRequests, query]);
 
-  const agencyId = currentUser.agency_id || "agency-1";
-  const websiteProfiles = website_profile_consent
-    .filter((c) => c.agency_id === agencyId && c.allowed)
-    .filter((c) => websiteProfileName(c.interpreter_id).toLowerCase().includes(query));
+  const filteredWebsiteProfiles = useMemo(() => {
+    if (!query) return websiteProfiles;
+    return websiteProfiles.filter((p) => p.profile.name.toLowerCase().includes(query));
+  }, [websiteProfiles, query]);
+
+  const handleWebsiteDecided = (connectionId: string, status: WebsitePermission, message: string) => {
+    setWebsiteProfiles((prev) =>
+      status === "approved"
+        ? prev.map((p) => (p.connectionId === connectionId ? { ...p, status: "approved" } : p))
+        : prev.filter((p) => p.connectionId !== connectionId),
+    );
+    showToast(message);
+  };
 
   const handleInterpreterAdded = (newInterpreter: SelectInterpreter) => {
     // Optimistically update the list if not present
@@ -186,7 +204,7 @@ export function InterpretersPageClient({
           Join requests ({joinRequests.length})
         </button>
         <button onClick={() => setActiveTab("website")} className={tabButtonClass(activeTab === "website")}>
-          Website profiles
+          Website profiles ({websiteProfiles.filter((p) => p.status === "pending").length} waiting)
         </button>
       </div>
 
@@ -240,7 +258,9 @@ export function InterpretersPageClient({
           {activeTab === "requests" && (
             <JoinRequestsTab requests={filteredJoinRequests} onDecided={handleJoinRequestDecided} />
           )}
-          {activeTab === "website" && <WebsiteProfilesTab profiles={websiteProfiles} />}
+          {activeTab === "website" && (
+            <WebsiteProfilesTab profiles={filteredWebsiteProfiles} onDecided={handleWebsiteDecided} />
+          )}
         </motion.div>
       </AnimatePresence>
 

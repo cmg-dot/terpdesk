@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters, type SelectInterpreter } from "@/db/schema";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
+import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { ilike } from "drizzle-orm";
 
 export interface CreateShadowInterpreterData {
@@ -68,6 +69,7 @@ export async function createShadowInterpreter(
 
     // The creating agency has this person on its roster. Registered people join by request instead, so only
     // shadow profiles (which cannot have a login yet) get an automatic row.
+    await ensureAgencyInterpreterColumns();
     await db
       .insert(agencyInterpreters)
       .values({ agencyId: DEFAULT_AGENCY_ID, interpreterId: newInterpreter.id, status: "approved" })

@@ -2,6 +2,8 @@ import { db } from "@/db";
 import { interpreterProfiles } from "@/db/schema";
 import { getPendingConnectionRequests } from "@/app/actions/approvalActions";
 import type { PendingConnection } from "@/app/actions/approvalActions";
+import { getWebsiteProfileRequests } from "@/app/actions/websiteProfiles";
+import type { WebsiteProfileRequest } from "@/lib/websiteProfile";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { logError } from "@/lib/logError";
 import { getRosterInterpreters } from "@/lib/roster";
@@ -25,6 +27,14 @@ export default async function InterpretersPage({ searchParams }: { searchParams:
     logError("InterpretersPage.joinRequests", err);
   }
 
+  // Website profiles: interpreters who opted in (pending) or were approved. Public fields only.
+  let websiteProfiles: WebsiteProfileRequest[] = [];
+  try {
+    websiteProfiles = await getWebsiteProfileRequests();
+  } catch (err) {
+    logError("InterpretersPage.websiteProfiles", err);
+  }
+
   // Fetch interpreter profile IDs to identify registered app users
   let registeredProfileIds: string[] = [];
   try {
@@ -41,6 +51,7 @@ export default async function InterpretersPage({ searchParams }: { searchParams:
       initialInterpreters={dbInterpreters}
       registeredProfileIds={registeredProfileIds}
       initialJoinRequests={joinRequests}
+      initialWebsiteProfiles={websiteProfiles}
       initialTab={parseTab(searchParams.tab)}
     />
   );

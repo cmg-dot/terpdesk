@@ -10,6 +10,7 @@ import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { requireInterpreter, requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 
 export interface MyConnection {
   id: string;
@@ -57,6 +58,7 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
   const agencyId = parsed.data;
 
   try {
+    await ensureAgencyInterpreterColumns();
     const [existing] = await db
       .select({ status: agencyInterpreters.status })
       .from(agencyInterpreters)
@@ -73,7 +75,7 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
       // Removed earlier: asking again reopens the request for the agency to decide.
       await db
         .update(agencyInterpreters)
-        .set({ status: "pending", isActive: true, userId, updatedAt: new Date() })
+        .set({ status: "pending", isActive: true, websitePermissionStatus: "not_shared", userId, updatedAt: new Date() })
         .where(and(eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.interpreterId, interpreterId)));
     } else {
       await db.insert(agencyInterpreters).values({ agencyId, interpreterId, userId, status: "pending" });

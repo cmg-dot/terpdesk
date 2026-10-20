@@ -31,24 +31,14 @@ export interface Membership {
   active: boolean;
 }
 
-export interface WebsiteProfileConsent {
-  interpreter_id: string;
-  agency_id: string;
-  allowed: boolean;
-  review_state: 'not_shared' | 'pending' | 'approved' | 'declined' | 'removed';
-  approved_fields: any;
-}
-
-// Join requests and notifications live in the database (agency_interpreters, notifications), not in this context.
+// Join requests, notifications and website-profile permissions live in the database, not in this context.
 interface GlobalContextType {
   agencies: Agency[];
   memberships: Membership[];
-  website_profile_consent: WebsiteProfileConsent[];
   currentUser: DevUser;
   /** Agencies this interpreter is already on the roster of (from the database, not just local memberships). */
   rosterAgencyIds: string[];
   requestToJoinAgency: (inputCode: string) => Promise<{ error?: string; success?: boolean }>;
-  updateInterpreterProfile: (newFields: any) => void;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
@@ -56,7 +46,6 @@ const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
 export function GlobalProvider({ children }: { children: ReactNode }) {
   const [agencies, setAgencies] = useState<Agency[]>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
-  const [website_profile_consent, setWebsiteProfileConsent] = useState<WebsiteProfileConsent[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [rosterAgencyIds, setRosterAgencyIds] = useState<string[]>([]);
   // The signed-in user comes from the NextAuth session (provided by the root layout).
@@ -99,19 +88,12 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
       const storedMemberships = localStorage.getItem('terpdesk_memberships');
       if (storedMemberships) setMemberships(JSON.parse(storedMemberships));
 
-      const storedConsents = localStorage.getItem('terpdesk_website_profile_consents');
-      if (storedConsents) setWebsiteProfileConsent(JSON.parse(storedConsents));
-
       setIsLoaded(true);
     } catch (e) {
       console.error(e);
       setIsLoaded(true);
     }
   }, []);
-
-  const save = (key: string, data: any) => {
-    localStorage.setItem(key, JSON.stringify(data));
-  };
 
   const requestToJoinAgency = async (inputCode: string): Promise<{ error?: string; success?: boolean }> => {
     const cleanedCode = inputCode.replace(/\s+/g, '').toLowerCase();
@@ -135,33 +117,15 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
     return { success: true };
   };
 
-  const updateInterpreterProfile = (newFields: any) => {
-    const sensitiveFields = ['display_name', 'bio', 'photo_path', 'service_area'];
-    const hasSensitiveChanges = Object.keys(newFields).some(key => sensitiveFields.includes(key));
-
-    if (hasSensitiveChanges) {
-      const updatedConsents = website_profile_consent.map(consent => {
-        if (consent.interpreter_id === currentUser.id && consent.review_state === 'approved') {
-          return { ...consent, review_state: 'pending' as const, approved_fields: {} };
-        }
-        return consent;
-      });
-      setWebsiteProfileConsent(updatedConsents);
-      save('terpdesk_website_profile_consents', updatedConsents);
-    }
-  };
-
   if (!isLoaded) return null;
 
   return (
     <GlobalContext.Provider value={{
       agencies,
       memberships,
-      website_profile_consent,
       currentUser,
       rosterAgencyIds,
-      requestToJoinAgency,
-      updateInterpreterProfile
+      requestToJoinAgency
     }}>
       {children}
     </GlobalContext.Provider>

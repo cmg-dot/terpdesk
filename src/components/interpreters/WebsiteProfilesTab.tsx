@@ -1,113 +1,111 @@
 "use client";
 
-import { AnimatePresence, motion } from "framer-motion";
-import type { WebsiteProfileConsent } from "@/context/GlobalContext";
+import { useState } from "react";
+import { decideWebsiteProfile } from "@/app/actions/websiteProfiles";
+import { PublicProfileCard } from "@/components/profile/PublicProfileCard";
+import type { WebsitePermission, WebsiteProfileRequest } from "@/lib/websiteProfile";
 
 interface WebsiteProfilesTabProps {
-  /** Consents for this agency that the interpreter allowed, already filtered by the page's search box. */
-  profiles: WebsiteProfileConsent[];
+  /** Interpreters who opted in (pending) or were approved; already filtered by the page's search box. */
+  profiles: WebsiteProfileRequest[];
+  /** Called after a decision is saved, with the new status and a message for the page toast. */
+  onDecided: (connectionId: string, status: WebsitePermission, message: string) => void;
 }
 
-function getMockInterpreterDetails(id: string) {
-  if (id === "terp-1") {
-    return {
-      name: "Active Interpreter",
-      location: "Tacoma, WA · South Puget Sound, up to 40 miles",
-      initials: "AI",
-      color: "bg-[#E28373]",
-    };
-  } else if (id === "terp-new") {
-    return {
-      name: "New Interpreter",
-      location: "Olympia, WA",
-      initials: "NI",
-      color: "bg-[#D8B4E2]",
-    };
-  }
-  return {
-    name: `Interpreter ${id}`,
-    location: "Location not set",
-    initials: id.substring(0, 2).toUpperCase(),
-    color: "bg-[var(--forest)]",
-  };
-}
+type Decision = "approve" | "decline" | "remove";
 
-/** Name used by the page's search box to filter website profiles. */
-export const websiteProfileName = (interpreterId: string): string => getMockInterpreterDetails(interpreterId).name;
+const primaryButton =
+  "rounded-full bg-[#0B3B32] px-5 py-2 text-[13px] font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60";
+const secondaryButton =
+  "rounded-full border border-gray-200 bg-white px-5 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60";
 
-const getBadgeClass = (badge: string) => {
-  if (badge === "approved") return "bg-[#E5F0EB] text-[#0A3D31]";
-  if (badge === "declined") return "bg-[#FDE8E8] text-[#9B1C1C]";
-  return "bg-[#F4F3EF] text-gray-700";
+const DONE_MESSAGE: Record<Decision, (name: string) => string> = {
+  approve: (name) => `${name} is approved for your website.`,
+  decline: (name) => `Declined ${name}'s website request.`,
+  remove: (name) => `${name} was removed from your website.`,
 };
 
-/** Interpreters page "Website profiles" tab: interpreters who chose to let the agency feature them. */
-export const WebsiteProfilesTab = ({ profiles }: WebsiteProfilesTabProps) => (
-  <div className="space-y-6">
-    <div className="bg-white rounded-2xl border border-gray-200 p-8">
-      <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Website profiles</h2>
-      <p className="text-[14px] text-gray-600 leading-relaxed mb-4">
-        Interpreters who are active with this agency and chose to let you feature them. You decide whether each profile appears on your website. You cannot turn this permission on for someone; only they can. Approved profiles show exactly the four fields below — nothing else from their account, contact details or credential files.
-      </p>
-      <p className="text-[14px] text-[var(--sage)]">
-        Your website is not switched on, so approving a profile does not show it anywhere yet.
-      </p>
+/** Interpreters page "Website profiles" tab: approve opt-ins, and manage who is currently featured. */
+export const WebsiteProfilesTab = ({ profiles, onDecided }: WebsiteProfilesTabProps) => {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const pending = profiles.filter((p) => p.status === "pending");
+  const approved = profiles.filter((p) => p.status === "approved");
+
+  const decide = async (request: WebsiteProfileRequest, decision: Decision) => {
+    if (busyId) return;
+    setBusyId(request.connectionId);
+    setError(null);
+    try {
+      const result = await decideWebsiteProfile({ connectionId: request.connectionId, decision });
+      if (result.success) onDecided(request.connectionId, result.status, DONE_MESSAGE[decision](request.profile.name));
+      else setError(result.error);
+    } catch {
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const renderList = (items: WebsiteProfileRequest[], actions: (r: WebsiteProfileRequest) => JSX.Element) => (
+    <ul className="space-y-4">
+      {items.map((r) => (
+        <li key={r.connectionId} className="space-y-3 rounded-2xl border border-gray-200 bg-white p-5">
+          <PublicProfileCard profile={r.profile} />
+          <div className="flex flex-wrap gap-3">{actions(r)}</div>
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-gray-200 bg-white p-6">
+        <h2 className="mb-2 text-lg font-semibold text-[var(--ink)]">Website profiles</h2>
+        <p className="text-[14px] leading-relaxed text-gray-600">
+          Interpreters connected to this agency who chose to let you feature them. You decide whether each profile
+          appears on your website. Only you can approve, and only they can opt in. Approved profiles show the four
+          fields below and nothing else: no contact details, sign-in email or credential files.
+        </p>
+      </div>
+
+      {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{error}</p>}
+
+      <section aria-labelledby="website-pending" className="space-y-3">
+        <h3 id="website-pending" className="text-[15px] font-semibold text-[var(--ink)]">
+          Waiting for your approval ({pending.length})
+        </h3>
+        {pending.length === 0 ? (
+          <p className="pl-1 text-[14px] text-gray-600">No one is waiting for a decision.</p>
+        ) : (
+          renderList(pending, (r) => (
+            <>
+              <button type="button" onClick={() => decide(r, "approve")} disabled={busyId !== null} className={primaryButton}>
+                {busyId === r.connectionId ? "Saving…" : "Approve for website"}
+              </button>
+              <button type="button" onClick={() => decide(r, "decline")} disabled={busyId !== null} className={secondaryButton}>
+                Decline
+              </button>
+            </>
+          ))
+        )}
+      </section>
+
+      <section aria-labelledby="website-approved" className="space-y-3">
+        <h3 id="website-approved" className="text-[15px] font-semibold text-[var(--ink)]">
+          On your website ({approved.length})
+        </h3>
+        {approved.length === 0 ? (
+          <p className="pl-1 text-[14px] text-gray-600">No approved profiles yet.</p>
+        ) : (
+          renderList(approved, (r) => (
+            <button type="button" onClick={() => decide(r, "remove")} disabled={busyId !== null} className={secondaryButton}>
+              {busyId === r.connectionId ? "Saving…" : "Remove from website"}
+            </button>
+          ))
+        )}
+      </section>
     </div>
-
-    {profiles.length === 0 ? (
-      <p className="text-gray-600 pl-2">No website profiles found.</p>
-    ) : (
-      <ul className="space-y-4">
-        <AnimatePresence>
-          {profiles.map((profile, idx) => {
-            const details = getMockInterpreterDetails(profile.interpreter_id);
-            return (
-              <motion.li
-                layout
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                transition={{ duration: 0.2 }}
-                key={idx}
-                className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col sm:flex-row sm:items-start justify-between gap-6 hover:transition-shadow list-none"
-              >
-                <div className="flex items-start gap-4">
-                  <div
-                    className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-lg shrink-0 ${
-                      details.color || "bg-gray-300"
-                    }`}
-                  >
-                    {details.initials}
-                  </div>
-                  <div className="flex flex-col">
-                    <h3 className="text-[17px] font-medium text-[var(--ink)]">{details.name}</h3>
-                    <p className="text-[13px] text-[var(--sage)] mb-3">{details.location}</p>
-                    <div className="mb-4 flex gap-2">
-                      <span
-                        className={`px-3 py-1 rounded-full text-[11px] font-medium ${getBadgeClass(profile.review_state)} capitalize`}
-                      >
-                        {profile.review_state.replace("_", " ")}
-                      </span>
-                    </div>
-                    <p className="text-[13px] text-[var(--sage)]">
-                      This preview is exactly what the website would show: name, photo, bio and broad service area.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-4 pt-1">
-                  <button className="px-4 py-1.5 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors cursor-pointer">
-                    {profile.review_state === "approved" ? "Remove from website" : "Approve for website"}
-                  </button>
-                  <button className="text-sm font-medium text-[var(--sage)] hover:text-[var(--ink)] transition-colors cursor-pointer">
-                    Decline
-                  </button>
-                </div>
-              </motion.li>
-            );
-          })}
-        </AnimatePresence>
-      </ul>
-    )}
-  </div>
-);
+  );
+};
