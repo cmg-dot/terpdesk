@@ -1,20 +1,29 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
-import { interpreterProfiles, users } from "@/db/schema";
+import { agencyInterpreters, interpreterProfiles, users } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
+import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
+import { notifyAgencyAdmins } from "@/lib/notifications";
+import { publicFieldsChanged } from "@/lib/websiteProfile";
 import { interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
 
 export type GetMyProfileResult = { success: true; profile: MyProfile } | { success: false; error: string };
 
 export type UpdateMyProfileResult =
-  | { success: true; profile: MyProfile }
+  | {
+      success: true;
+      profile: MyProfile;
+      /** True when the edit sent an approved agency website profile back to review. */
+      websiteReReview: boolean;
+    }
   | { success: false; error: string; fieldErrors?: Partial<Record<InterpreterProfileField, string>> };
 
 const NOT_LINKED = "Connect your interpreter profile (use the link we emailed you) before editing it.";
@@ -91,11 +100,15 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
   }
 
   const d = parsed.data;
+  let accountName = session.user.name ?? "";
   try {
     // The form pre-fills the preferred name with the account name. Storing that as a preference would freeze it,
     // so a name equal to the account name is saved as "not set" and keeps following the account.
     const [account] = await db.select({ name: users.name }).from(users).where(eq(users.id, session.user.id)).limit(1);
-    if (account && d.preferredName.toLowerCase() === account.name.trim().toLowerCase()) d.preferredName = "";
+    if (account) {
+      accountName = account.name;
+      if (d.preferredName.toLowerCase() === account.name.trim().toLowerCase()) d.preferredName = "";
+    }
   } catch (err) {
     logError("updateMyProfile.accountName", err);
   }
@@ -119,16 +132,46 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
 
   try {
     await ensureAvailabilityTables();
+    await ensureAgencyInterpreterColumns();
     const existing = await findProfileRow(interpreterId);
-    if (existing) {
-      await db.update(interpreterProfiles).set(values).where(eq(interpreterProfiles.id, existing.id));
-    } else {
-      await db.insert(interpreterProfiles).values({ id: randomUUID(), interpreterId, ...values });
+
+    // Anything an agency website would show changed after the agency approved it? Then the agency must review it
+    // again. Save and downgrade together, so a profile can never be saved with a stale approval.
+    const publicFieldsEdited = publicFieldsChanged(accountName, existing, values);
+    const downgraded = await db.transaction(async (tx) => {
+      if (existing) {
+        await tx.update(interpreterProfiles).set(values).where(eq(interpreterProfiles.id, existing.id));
+      } else {
+        await tx.insert(interpreterProfiles).values({ id: randomUUID(), interpreterId, ...values });
+      }
+      if (!publicFieldsEdited) return 0;
+      const rows = await tx
+        .update(agencyInterpreters)
+        .set({ websitePermissionStatus: "pending", updatedAt: new Date() })
+        .where(and(eq(agencyInterpreters.interpreterId, interpreterId), eq(agencyInterpreters.websitePermissionStatus, "approved")))
+        .returning({ id: agencyInterpreters.id });
+      return rows.length;
+    });
+
+    if (downgraded > 0) {
+      await writeAuditLog({
+        userId: session.user.id,
+        userEmail: session.user.email ?? null,
+        action: "website_profile_re_review",
+        details: `interpreterId=${interpreterId}; agencies=${downgraded}`,
+      });
+      await notifyAgencyAdmins({
+        type: "agency",
+        href: "/interpreters?tab=website",
+        title: "Website profile needs review",
+        message: `${values.preferredName || accountName || "An interpreter"} changed their public profile. It is back in your review queue.`,
+      });
+      revalidatePath("/interpreters");
     }
 
     revalidatePath("/profile");
     revalidatePath("/interpreter-calendar");
-    return { success: true, profile: await loadProfile(session.user.id, interpreterId) };
+    return { success: true, profile: await loadProfile(session.user.id, interpreterId), websiteReReview: downgraded > 0 };
   } catch (err) {
     logError("updateMyProfile", err);
     return { success: false, error: "We could not save your profile. Please try again." };

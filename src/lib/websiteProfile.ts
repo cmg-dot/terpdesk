@@ -24,6 +24,30 @@ export interface WebsiteProfileRequest {
   profile: PublicProfile;
 }
 
+/** The stored values behind the four public fields (null = not set). */
+export interface PublicFieldValues {
+  preferredName: string | null;
+  photoUrl: string | null;
+  shortBio: string | null;
+  serviceArea: string | null;
+}
+
+/**
+ * Did an edit change anything an agency website would show? Compares the name as it would appear (preferred name,
+ * else the account name) plus photo, bio and service area. Private fields (phone, email, time zone, work modes)
+ * are not part of the comparison, so editing them never triggers a re-review.
+ */
+export const publicFieldsChanged = (accountName: string, before: PublicFieldValues | null, after: PublicFieldValues): boolean => {
+  const text = (v: string | null | undefined) => (v ?? "").trim();
+  const name = (v: PublicFieldValues | null) => text(v?.preferredName) || text(accountName);
+  return (
+    name(before) !== name(after) ||
+    text(before?.photoUrl) !== text(after.photoUrl) ||
+    text(before?.shortBio) !== text(after.shortBio) ||
+    text(before?.serviceArea) !== text(after.serviceArea)
+  );
+};
+
 export const toPublicProfile = (p: {
   preferredName: string;
   fullName: string;

@@ -102,8 +102,25 @@ export const VisibilitySharingTab = ({ profile, sharing, onSharingChange }: Visi
           Only your photo, preferred name, service area and bio. Edit them from Overview → Edit profile.
         </p>
         <PublicProfileCard profile={publicProfile} />
-        <p className="mt-3 text-[12px] text-gray-500">
-          Your contact details and sign-in email are never public.
+        <div className="mt-3 space-y-3 text-[12px] leading-relaxed text-gray-500">
+          <p>
+            Never included: your sign-in email, private contact details, credential documents, rates, availability, job
+            history and private notes. Your photo stays in private storage; a website copy would only be made after an
+            agency approves it.
+          </p>
+          <p>
+            If you change your name, photo, bio or service area after approval, the agency reviews it again before the
+            change can appear publicly. Withdrawing permission, or an agency connection ending, removes your profile
+            from that agency&apos;s website straight away.
+          </p>
+        </div>
+      </section>
+
+      <section className="rounded-2xl border border-gray-200 bg-white p-6">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">Private sharing with agency staff</h2>
+        <p className="mt-1 text-[13px] leading-relaxed text-gray-600">
+          Credentials, supporting files and contact details are shared privately with agency staff only, and are chosen
+          separately under the Credentials tab and in your contact details. Website permission never shares any of them.
         </p>
       </section>
     </div>

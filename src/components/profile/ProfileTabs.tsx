@@ -67,7 +67,16 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgenc
           exit={{ opacity: 0, y: -5 }}
           transition={{ duration: 0.18 }}
         >
-          {tab === "overview" && <ProfileOverviewTab profile={profile} onProfileChange={setProfile} />}
+          {tab === "overview" && (
+            <ProfileOverviewTab
+              profile={profile}
+              onProfileChange={setProfile}
+              // The server sent approved website profiles back to review; mirror that on the Visibility tab.
+              onWebsiteReReview={() =>
+                setWebsiteSharing((list) => list.map((s) => (s.status === "approved" ? { ...s, status: "pending" } : s)))
+              }
+            />
+          )}
           {tab === "credentials" && (
             <CredentialsTab credentials={credentials} onChange={setCredentials} connectedAgencyIds={connectedAgencyIds} />
           )}

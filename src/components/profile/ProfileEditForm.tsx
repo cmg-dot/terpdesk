@@ -13,7 +13,8 @@ type TextField = Exclude<InterpreterProfileField, "takesInPerson" | "takesVirtua
 
 interface ProfileEditFormProps {
   profile: MyProfile;
-  onSaved: (profile: MyProfile) => void;
+  /** `websiteReReview` is true when the edit sent an approved agency website profile back to review. */
+  onSaved: (profile: MyProfile, websiteReReview: boolean) => void;
   onCancel: () => void;
 }
 
@@ -74,7 +75,7 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
     try {
       const result = await updateMyProfile(values);
       if (result.success) {
-        onSaved(result.profile);
+        onSaved(result.profile, result.websiteReReview);
       } else {
         setErrors(result.fieldErrors ?? {});
         setFormError(result.error);

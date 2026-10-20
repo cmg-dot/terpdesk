@@ -10,16 +10,18 @@ interface ProfileOverviewTabProps {
   /** Owned by the page shell, so a saved profile is still there after visiting another tab. */
   profile: MyProfile;
   onProfileChange: (profile: MyProfile) => void;
+  /** Called when an edit sent approved agency website profiles back to review. */
+  onWebsiteReReview: () => void;
 }
 
 /** "My Profile" Overview tab: read-only view with an "Edit profile" mode. */
-export const ProfileOverviewTab = ({ profile, onProfileChange }: ProfileOverviewTabProps) => {
+export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview }: ProfileOverviewTabProps) => {
   const [editing, setEditing] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
   useEffect(() => {
     if (!savedMessage) return;
-    const timer = setTimeout(() => setSavedMessage(null), 4000);
+    const timer = setTimeout(() => setSavedMessage(null), 8000);
     return () => clearTimeout(timer);
   }, [savedMessage]);
 
@@ -28,10 +30,15 @@ export const ProfileOverviewTab = ({ profile, onProfileChange }: ProfileOverview
       <ProfileEditForm
         profile={profile}
         onCancel={() => setEditing(false)}
-        onSaved={(saved) => {
+        onSaved={(saved, websiteReReview) => {
           onProfileChange(saved);
+          if (websiteReReview) onWebsiteReReview();
           setEditing(false);
-          setSavedMessage("Profile saved.");
+          setSavedMessage(
+            websiteReReview
+              ? "Profile saved. Because you changed your public details, your agency will review your website profile again."
+              : "Profile saved.",
+          );
         }}
       />
     );
