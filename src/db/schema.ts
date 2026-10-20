@@ -266,10 +266,22 @@ export const clients = pgTable('clients', {
 export type SelectClient = typeof clients.$inferSelect;
 export type InsertClient = typeof clients.$inferInsert;
 
+// One row per interpreter (the calendar's time zone plus the "My Profile" fields the interpreter edits).
+// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
 export const interpreterProfiles = pgTable('interpreter_profiles', {
   id: text('id').primaryKey(),
   interpreterId: text('interpreter_id').notNull(),
   timeZone: text('time_zone').notNull().default('America/Los_Angeles'),
+  preferredName: varchar('preferred_name', { length: 80 }),
+  photoUrl: varchar('photo_url', { length: 500 }),
+  shortBio: text('short_bio'),
+  city: varchar('city', { length: 100 }),
+  stateOrRegion: varchar('state_or_region', { length: 100 }),
+  serviceArea: varchar('service_area', { length: 200 }),
+  takesInPerson: boolean('takes_in_person').notNull().default(true),
+  takesVirtual: boolean('takes_virtual').notNull().default(true),
+  workEmail: varchar('work_email', { length: 255 }),
+  workPhone: varchar('work_phone', { length: 30 }),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 

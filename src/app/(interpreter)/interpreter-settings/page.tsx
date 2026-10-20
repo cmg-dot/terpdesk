@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { ChangePasswordDialog } from "@/components/features/ChangePasswordDialog";
 import { authOptions } from "@/lib/auth/options";
@@ -30,14 +31,12 @@ export default async function InterpreterSettingsPage() {
         </div>
 
         <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <button
-            type="button"
-            disabled
-            title="Profile editing is coming soon"
-            className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-400 cursor-not-allowed opacity-60"
+          <Link
+            href="/profile"
+            className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-center text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
           >
             Edit my profile
-          </button>
+          </Link>
           <ChangePasswordDialog triggerClassName="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50" />
         </div>
       </section>

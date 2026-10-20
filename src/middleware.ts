@@ -59,5 +59,6 @@ export const config = {
     "/interpreter-calendar/:path*",
     "/interpreter-settings/:path*",
     "/agencies/:path*",
+    "/profile/:path*",
   ],
 };
