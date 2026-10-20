@@ -1,6 +1,7 @@
 "use server";
 
 import { requireRole, assertOwnInterpreterId } from "@/lib/auth/guards";
+import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { db } from "@/db";
 import {
   interpreterProfiles,
@@ -738,13 +739,14 @@ export type InterpreterFitStatus =
  * 6-Tier Classification Algorithm (First match wins):
  * 1. Double-booked -> "unavailable"
  * 2. Private busy -> "unavailable" (Privacy: unified status, never leak busy title or details!)
- * 3. Not shared -> "not_shared" (if explicitly disabled; otherwise assumes shared so testing proceeds)
+ * 3. Not shared -> "not_shared" (the interpreter has not switched sharing on for this agency, or never set it)
  * 4. Not provided -> "not_provided" (evaluated in interpreter's profile timezone)
  * 5. Outside hours -> "outside_hours" (evaluated in interpreter's profile timezone)
  * 6. Available -> "available"
  */
 export async function checkInterpreterFit(params: {
   interpreterId: string;
+  /** Accepted for older callers but ignored: the agency is always the signed-in staff member's own (never the browser's). */
   agencyId?: string;
   jobStartsAtUtc: string | Date;
   jobEndsAtUtc: string | Date;
@@ -752,7 +754,10 @@ export async function checkInterpreterFit(params: {
 }): Promise<{ fit: InterpreterFitStatus }> {
   await requireRole("agency");
   await ensureAvailabilityTables();
-  const { interpreterId, agencyId, jobStartsAtUtc, jobEndsAtUtc } = params;
+  const { interpreterId, jobStartsAtUtc, jobEndsAtUtc } = params;
+  // Staff accounts have no agency of their own yet, so the workspace's single agency is used. Always checking it
+  // (instead of an optional, browser-supplied id) means the sharing check can never be skipped.
+  const agencyId = DEFAULT_AGENCY_ID;
 
   const targetIds = await resolveInterpreterIds(interpreterId);
 
@@ -773,24 +778,14 @@ export async function checkInterpreterFit(params: {
   }
 
   // --- Tier 3: Not shared ---
-  // Temporarily bypass or auto-upsert: if share record doesn't exist between agency and interpreter,
-  // assume they ARE sharing for now so testing can proceed and algorithm reaches Available / Outside hours.
-  if (agencyId) {
-    const shares = await db
-      .select()
-      .from(availabilityShares)
-      .where(
-        and(
-          inArray(availabilityShares.interpreterId, targetIds),
-          eq(availabilityShares.agencyId, agencyId)
-        )
-      );
-
-    // Missing shares are temporarily treated as enabled so saved availability
-    // can be evaluated. Only an explicit disabled record blocks the agency.
-    if (shares.length > 0 && shares.every((share) => share.enabled === false)) {
-      return { fit: "not_shared" };
-    }
+  // Sharing is opt-in: the interpreter must have switched "Share my availability" on for this agency. No saved
+  // setting means they never did, so it counts as not shared (same rule as the agency's interpreter detail page).
+  const shares = await db
+    .select({ enabled: availabilityShares.enabled })
+    .from(availabilityShares)
+    .where(and(inArray(availabilityShares.interpreterId, targetIds), eq(availabilityShares.agencyId, agencyId)));
+  if (!shares.some((share) => share.enabled)) {
+    return { fit: "not_shared" };
   }
 
   // Fetch interpreter's profile timezone across target IDs
