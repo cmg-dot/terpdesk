@@ -9,6 +9,8 @@ import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { AddExternalInterpreterModal } from "@/components/interpreters/AddExternalInterpreterModal";
 import { ManageAccessModal } from "@/components/interpreters/ManageAccessModal";
 import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
+import { JoinRequestsTab } from "@/components/interpreters/JoinRequestsTab";
+import type { PendingConnection } from "@/app/actions/approvalActions";
 import {
   UserPlus,
   Mail,
@@ -24,9 +26,14 @@ import {
 /** A roster row; `rosterActive` is false for archived interpreters (missing = active, e.g. just added). */
 type RosterItem = SelectInterpreter & { rosterActive?: boolean };
 
+export type InterpretersTab = "roster" | "requests" | "website";
+
 interface InterpretersPageClientProps {
   initialInterpreters: RosterItem[];
   registeredProfileIds: string[];
+  /** Pending join requests for this agency, loaded on the server from agency_interpreters. */
+  initialJoinRequests: PendingConnection[];
+  initialTab?: InterpretersTab;
 }
 
 // Known emails that have registered dev/app user accounts
@@ -90,19 +97,16 @@ function getMockInterpreterDetails(id: string) {
 export function InterpretersPageClient({
   initialInterpreters,
   registeredProfileIds,
+  initialJoinRequests,
+  initialTab = "roster",
 }: InterpretersPageClientProps) {
   const router = useRouter();
-  const {
-    currentUser,
-    membership_requests,
-    approveMembershipRequest,
-    declineMembershipRequest,
-    website_profile_consent,
-  } = useGlobalState();
+  const { currentUser, website_profile_consent } = useGlobalState();
 
   const [interpreterList, setInterpreterList] = useState<RosterItem[]>(initialInterpreters);
+  const [joinRequests, setJoinRequests] = useState<PendingConnection[]>(initialJoinRequests);
   const [manageTarget, setManageTarget] = useState<ManageAccessTarget | null>(null);
-  const [activeTab, setActiveTab] = useState<"roster" | "requests" | "website">("roster");
+  const [activeTab, setActiveTab] = useState<InterpretersTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -111,6 +115,10 @@ export function InterpretersPageClient({
   useEffect(() => {
     setInterpreterList(initialInterpreters);
   }, [initialInterpreters]);
+
+  useEffect(() => {
+    setJoinRequests(initialJoinRequests);
+  }, [initialJoinRequests]);
 
   const showToast = (message: string) => {
     setToastMessage(message);
@@ -145,17 +153,12 @@ export function InterpretersPageClient({
 
   const agencyId = currentUser.agency_id || "agency-1";
 
-  // Join Requests Tab
-  const pendingRequests = membership_requests
-    .filter((r) => r.agency_id === agencyId && r.state === "pending")
-    .filter((r) =>
-      getMockInterpreterDetails(r.interpreter_id).name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  const answeredRequests = membership_requests
-    .filter((r) => r.agency_id === agencyId && r.state !== "pending")
-    .filter((r) =>
-      getMockInterpreterDetails(r.interpreter_id).name.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+  // Join Requests Tab (search applies to name and email)
+  const filteredJoinRequests = useMemo(() => {
+    const q = searchQuery.toLowerCase().trim();
+    if (!q) return joinRequests;
+    return joinRequests.filter((r) => r.interpreterName.toLowerCase().includes(q) || r.email.toLowerCase().includes(q));
+  }, [joinRequests, searchQuery]);
 
   // Website Profiles Tab
   const websiteProfiles = website_profile_consent
@@ -186,6 +189,13 @@ export function InterpretersPageClient({
     router.refresh();
 
     showToast(`Successfully added ${newInterpreter.name} to the roster.`);
+  };
+
+  const handleJoinRequestDecided = (requestId: string, message: string) => {
+    setJoinRequests((prev) => prev.filter((r) => r.id !== requestId));
+    // An approval adds someone to the roster, so pull the fresh list from the server.
+    router.refresh();
+    showToast(message);
   };
 
   const handleAccessChanged = (message: string, change: { id: string; removed: boolean; isActive: boolean }) => {
@@ -277,7 +287,7 @@ export function InterpretersPageClient({
               : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
           }`}
         >
-          Join requests ({pendingRequests.length})
+          Join requests ({joinRequests.length})
         </button>
         <button
           onClick={() => setActiveTab("website")}
@@ -464,116 +474,7 @@ export function InterpretersPageClient({
             transition={{ duration: 0.2 }}
             className="space-y-6"
           >
-            {pendingRequests.length === 0 ? (
-              <div className="bg-white rounded-2xl border border-gray-200 p-8">
-                <p className="text-gray-600">No one is waiting for a decision.</p>
-              </div>
-            ) : (
-              <ul className="space-y-4">
-                <AnimatePresence>
-                  {pendingRequests.map((req) => {
-                    const details = getMockInterpreterDetails(req.interpreter_id);
-                    return (
-                      <motion.li
-                        layout
-                        initial={{ opacity: 0, scale: 0.95 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                        key={req.id}
-                        className="bg-white rounded-2xl border border-gray-200 p-8 flex flex-col sm:flex-row sm:items-start justify-between gap-6 hover:shadow-sm transition-shadow list-none"
-                      >
-                        <div className="flex items-start gap-4">
-                          <div className="w-[52px] h-[52px] rounded-full flex items-center justify-center text-white font-semibold text-[17px] shrink-0 bg-[#0B3B32]">
-                            {details.initials}
-                          </div>
-                          <div className="flex flex-col">
-                            <h3 className="text-[19px] font-semibold text-[var(--ink)]">
-                              {details.name}
-                            </h3>
-                            <p className="text-[13px] text-[var(--sage)] mb-4">
-                              {details.location === "Location not set"
-                                ? "Location not set · Greater Tacoma area"
-                                : details.location}
-                            </p>
-
-                            <div className="flex flex-col space-y-1 mb-5">
-                              <p className="text-[13px] text-gray-700">
-                                QA Fictional Certification (expired) · Fictional Certifying Body · 2019
-                              </p>
-                              <p className="text-[13px] text-gray-700">
-                                QA Fictional Liability Policy · Fictional Insurer · 2026
-                              </p>
-                              <p className="text-[13px] text-gray-700">
-                                QA Fictional Mentorship (no expiration) · Fictional Training Co · 2023
-                              </p>
-                            </div>
-
-                            <p className="text-[11px] text-[#A0AAB4]">
-                              Self-reported by the interpreter. terpDESK has not checked these details, and they do not approve anyone for specialised work.
-                            </p>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-3 pt-1">
-                          <button
-                            onClick={() => approveMembershipRequest(req.id)}
-                            className="px-6 py-2 rounded-full bg-[#0B3B32] text-white text-[13px] font-medium hover:bg-[#082a23] transition-colors cursor-pointer"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => declineMembershipRequest(req.id)}
-                            className="px-6 py-2 rounded-full bg-white border border-gray-200 text-gray-700 text-[13px] font-medium hover:bg-gray-50 transition-colors cursor-pointer"
-                          >
-                            Decline
-                          </button>
-                        </div>
-                      </motion.li>
-                    );
-                  })}
-                </AnimatePresence>
-              </ul>
-            )}
-
-            <div className="bg-white rounded-2xl border border-gray-200 p-8">
-              <h2 className="text-lg font-semibold text-[var(--ink)] mb-6">Already answered</h2>
-              {answeredRequests.length === 0 ? (
-                <p className="text-gray-600">No answered requests yet.</p>
-              ) : (
-                <ul className="flex flex-col">
-                  <AnimatePresence>
-                    {answeredRequests.map((req, idx) => {
-                      const details = getMockInterpreterDetails(req.interpreter_id);
-                      return (
-                        <motion.li
-                          layout
-                          initial={{ opacity: 0, y: -10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          exit={{ opacity: 0, scale: 0.95 }}
-                          transition={{ duration: 0.2 }}
-                          key={req.id}
-                          className={`flex items-center gap-4 py-4 ${
-                            idx !== answeredRequests.length - 1 ? "border-b border-gray-200" : ""
-                          } list-none`}
-                        >
-                          <span className="text-[15px] font-medium text-[var(--ink)] min-w-[150px]">
-                            {details.name}
-                          </span>
-                          <span
-                            className={`px-3 py-1 rounded-full text-[11px] font-medium ${getBadgeClass(
-                              req.state
-                            )} capitalize`}
-                          >
-                            {req.state}
-                          </span>
-                        </motion.li>
-                      );
-                    })}
-                  </AnimatePresence>
-                </ul>
-              )}
-            </div>
+            <JoinRequestsTab requests={filteredJoinRequests} onDecided={handleJoinRequestDecided} />
           </motion.div>
         )}
 

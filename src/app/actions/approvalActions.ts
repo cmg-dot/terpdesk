@@ -82,8 +82,11 @@ export async function updateConnectionStatus(input: z.input<typeof updateSchema>
     await notifyInterpreter(updated.interpreterId, {
       type: "agency",
       href: "/agencies",
-      title: status === "approved" ? "Connection approved" : "Connection request declined",
-      message: status === "approved" ? "Your agency approved your connection request." : "Your agency declined your connection request.",
+      title: status === "approved" ? "Your request was approved" : "Your request was declined",
+      message:
+        status === "approved"
+          ? "You're now on the agency's roster and can receive job offers."
+          : "The agency declined your request to join its roster.",
     });
 
     revalidatePath("/dashboard");

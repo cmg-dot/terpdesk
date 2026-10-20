@@ -1,17 +1,19 @@
 "use server";
 
 import { and, eq, isNull, sql } from "drizzle-orm";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { z } from "zod";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters, users, verificationTokens } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { notifyAgencyAdmins } from "@/lib/notifications";
 import { hashToken } from "@/lib/timesheetToken";
 
 const tokenSchema = z.string().regex(/^[a-f0-9]{64}$/);
 
 type ClaimOutcome =
-  | { ok: true; userId: string; email: string; interpreterId: string }
+  | { ok: true; userId: string; email: string; name: string; interpreterId: string }
   | { ok: false; reason: "invalid" | "expired" | "unavailable" };
 
 /**
@@ -54,7 +56,7 @@ export async function verifyClaim(formData: FormData): Promise<never> {
       .set({ userId: user.id, updatedAt: new Date() })
       .where(and(eq(agencyInterpreters.interpreterId, linked[0].id), isNull(agencyInterpreters.userId)));
 
-    return { ok: true, userId: user.id, email: token.identifier, interpreterId: linked[0].id } as const;
+    return { ok: true, userId: user.id, email: token.identifier, name: user.name, interpreterId: linked[0].id } as const;
   });
 
   if (!outcome.ok) redirect(`/verify-claim?error=${outcome.reason}`);
@@ -65,6 +67,15 @@ export async function verifyClaim(formData: FormData): Promise<never> {
     action: "interpreter_profile_claimed",
     details: `interpreterId=${outcome.interpreterId}; verified by email link`,
   });
+
+  // The roster badge comes from the linked login, so the agency now sees a "Registered App User".
+  await notifyAgencyAdmins({
+    type: "agency",
+    href: "/interpreters",
+    title: "Profile claimed",
+    message: `${outcome.name} confirmed their email and linked an account to the profile you added.`,
+  });
+  revalidatePath("/interpreters");
 
   // Not signed in yet? The middleware sends them to log in and then on to this page.
   redirect("/interpreter-home?verified=true");

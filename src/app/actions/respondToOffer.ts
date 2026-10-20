@@ -202,7 +202,7 @@ export async function respondToOffer(
   await notifyAgencyAdmins({
     type: "job",
     href: `/requests/${offer.requestId}`,
-    title: normResponse === 'accepted' ? "Job offer accepted" : "Job offer declined",
+    title: normResponse === 'accepted' ? "Offer accepted" : "Offer declined",
     message: `${who_name} ${normResponse === 'accepted' ? "accepted the job" : "declined the offer"}.`,
   });
 

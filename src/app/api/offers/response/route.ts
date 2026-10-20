@@ -661,7 +661,7 @@ export async function GET(request: NextRequest) {
       await notifyAgencyAdmins({
         type: "job",
         href: `/requests/${requestId}`,
-        title: "Job offer accepted",
+        title: "Offer accepted",
         message: `${interpreterName || "An interpreter"} accepted the job.`,
       });
 
@@ -804,7 +804,7 @@ export async function GET(request: NextRequest) {
       await notifyAgencyAdmins({
         type: "job",
         href: `/requests/${requestId}`,
-        title: "Job offer declined",
+        title: "Offer declined",
         message: `${interpreterName || "An interpreter"} declined the offer.`,
       });
 

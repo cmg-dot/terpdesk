@@ -23,13 +23,6 @@ export interface Agency {
   accepts_join_requests: boolean;
 }
 
-export interface MembershipRequest {
-  id: string;
-  agency_id: string;
-  interpreter_id: string;
-  state: 'pending' | 'approved' | 'declined' | 'withdrawn';
-}
-
 export interface Membership {
   id: string;
   agency_id: string;
@@ -46,44 +39,24 @@ export interface WebsiteProfileConsent {
   approved_fields: any;
 }
 
-export interface AppNotification {
-  id: string;
-  recipient_id: string;
-  agency_id: string;
-  kind: string;
-  title: string;
-  body: string;
-  appointment_id?: string;
-  href?: string;
-  dedupe_key?: string;
-  created_at: string;
-  read_at: string | null;
-}
-
+// Join requests and notifications live in the database (agency_interpreters, notifications), not in this context.
 interface GlobalContextType {
   agencies: Agency[];
-  membership_requests: MembershipRequest[];
   memberships: Membership[];
   website_profile_consent: WebsiteProfileConsent[];
-  notifications: AppNotification[];
   currentUser: DevUser;
   /** Agencies this interpreter is already on the roster of (from the database, not just local memberships). */
   rosterAgencyIds: string[];
   requestToJoinAgency: (inputCode: string) => Promise<{ error?: string; success?: boolean }>;
-  approveMembershipRequest: (requestId: string) => void;
-  declineMembershipRequest: (requestId: string) => void;
   updateInterpreterProfile: (newFields: any) => void;
-  markNotificationAsRead: (notificationId: string) => void;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
 
 export function GlobalProvider({ children }: { children: ReactNode }) {
   const [agencies, setAgencies] = useState<Agency[]>([]);
-  const [membership_requests, setMembershipRequests] = useState<MembershipRequest[]>([]);
   const [memberships, setMemberships] = useState<Membership[]>([]);
   const [website_profile_consent, setWebsiteProfileConsent] = useState<WebsiteProfileConsent[]>([]);
-  const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [isLoaded, setIsLoaded] = useState(false);
   const [rosterAgencyIds, setRosterAgencyIds] = useState<string[]>([]);
   // The signed-in user comes from the NextAuth session (provided by the root layout).
@@ -123,30 +96,13 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
         localStorage.setItem('terpdesk_agencies', JSON.stringify(defaultAgencies));
       }
 
-      const storedReqs = localStorage.getItem('terpdesk_membership_requests');
-      if (storedReqs) setMembershipRequests(JSON.parse(storedReqs));
-
       const storedMemberships = localStorage.getItem('terpdesk_memberships');
       if (storedMemberships) setMemberships(JSON.parse(storedMemberships));
 
       const storedConsents = localStorage.getItem('terpdesk_website_profile_consents');
       if (storedConsents) setWebsiteProfileConsent(JSON.parse(storedConsents));
 
-      const loadNotifications = () => {
-        const storedNotifications = localStorage.getItem('terpdesk_notifications');
-        if (storedNotifications) setNotifications(JSON.parse(storedNotifications));
-      };
-      loadNotifications();
-
-      const handleStorage = (e: StorageEvent) => {
-        if (e.key === 'terpdesk_notifications') {
-          loadNotifications();
-        }
-      };
-      window.addEventListener('storage', handleStorage);
-      
       setIsLoaded(true);
-      return () => window.removeEventListener('storage', handleStorage);
     } catch (e) {
       console.error(e);
       setIsLoaded(true);
@@ -155,28 +111,6 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
 
   const save = (key: string, data: any) => {
     localStorage.setItem(key, JSON.stringify(data));
-  };
-
-  const sendNotification = (payload: Omit<AppNotification, 'id' | 'created_at' | 'read_at'>) => {
-    const newNotif: AppNotification = {
-      ...payload,
-      id: Math.random().toString(36).substring(7),
-      created_at: new Date().toISOString(),
-      read_at: null
-    };
-    setNotifications(prev => {
-      const updated = [newNotif, ...prev];
-      save('terpdesk_notifications', updated);
-      return updated;
-    });
-  };
-
-  const markNotificationAsRead = (notificationId: string) => {
-    setNotifications(prev => {
-      const updated = prev.map(n => n.id === notificationId ? { ...n, read_at: new Date().toISOString() } : n);
-      save('terpdesk_notifications', updated);
-      return updated;
-    });
   };
 
   const requestToJoinAgency = async (inputCode: string): Promise<{ error?: string; success?: boolean }> => {
@@ -191,74 +125,14 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
       return { error: 'This agency is not currently accepting join requests.' };
     }
 
-    // The request is stored in the database as a 'pending' connection. The server also refuses duplicates
-    // ("already connected" / "already pending"), so this cannot be bypassed from the browser.
+    // The request is stored in the database as a 'pending' connection, and the server notifies the agency.
+    // The server also refuses duplicates ("already connected" / "already pending"), so this cannot be bypassed.
     const result = await requestAgencyConnection(agency.id);
     if (!result.success) {
       return { error: result.error };
     }
 
-    sendNotification({
-      recipient_id: agency.id,
-      agency_id: agency.id,
-      kind: 'join_request',
-      title: 'New Join Request',
-      body: 'A new interpreter has requested to join your roster.',
-      href: '/interpreters'
-    });
-
     return { success: true };
-  };
-
-  const approveMembershipRequest = (requestId: string) => {
-    const requestIndex = membership_requests.findIndex(r => r.id === requestId);
-    if (requestIndex > -1) {
-      const request = membership_requests[requestIndex];
-      const updatedRequests = [...membership_requests];
-      updatedRequests[requestIndex] = { ...request, state: 'approved' };
-      setMembershipRequests(updatedRequests);
-      save('terpdesk_membership_requests', updatedRequests);
-
-      const newMembership: Membership = {
-        id: Math.random().toString(36).substring(7),
-        agency_id: request.agency_id,
-        user_id: request.interpreter_id,
-        role: 'interpreter',
-        active: true
-      };
-      const updatedMemberships = [...memberships, newMembership];
-      setMemberships(updatedMemberships);
-      save('terpdesk_memberships', updatedMemberships);
-
-      sendNotification({
-        recipient_id: request.interpreter_id,
-        agency_id: request.agency_id,
-        kind: 'join_decision',
-        title: 'Agency Request Approved',
-        body: 'You have been approved to join the agency roster.',
-        href: '/agencies'
-      });
-    }
-  };
-
-  const declineMembershipRequest = (requestId: string) => {
-    const requestIndex = membership_requests.findIndex(r => r.id === requestId);
-    if (requestIndex > -1) {
-      const request = membership_requests[requestIndex];
-      const updatedRequests = [...membership_requests];
-      updatedRequests[requestIndex] = { ...request, state: 'declined' };
-      setMembershipRequests(updatedRequests);
-      save('terpdesk_membership_requests', updatedRequests);
-
-      sendNotification({
-        recipient_id: request.interpreter_id,
-        agency_id: request.agency_id,
-        kind: 'join_decision',
-        title: 'Agency Request Declined',
-        body: 'Your request to join the agency was declined.',
-        href: '/agencies'
-      });
-    }
   };
 
   const updateInterpreterProfile = (newFields: any) => {
@@ -282,17 +156,12 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
   return (
     <GlobalContext.Provider value={{
       agencies,
-      membership_requests,
       memberships,
       website_profile_consent,
-      notifications,
       currentUser,
       rosterAgencyIds,
       requestToJoinAgency,
-      approveMembershipRequest,
-      declineMembershipRequest,
-      updateInterpreterProfile,
-      markNotificationAsRead
+      updateInterpreterProfile
     }}>
       {children}
     </GlobalContext.Provider>

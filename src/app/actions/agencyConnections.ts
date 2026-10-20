@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { requireInterpreter, requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
+import { notifyAgencyAdmins } from "@/lib/notifications";
 
 export interface MyConnection {
   id: string;
@@ -39,11 +40,13 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
   let interpreterId: string;
   let userId: string;
   let userEmail: string | null;
+  let userName: string | null;
   try {
     const { session, interpreterId: id } = await requireInterpreter();
     interpreterId = id;
     userId = session.user.id;
     userEmail = session.user.email ?? null;
+    userName = session.user.name ?? null;
   } catch {
     return { success: false, error: "Verify your email before connecting with an agency." };
   }
@@ -76,6 +79,12 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
       await db.insert(agencyInterpreters).values({ agencyId, interpreterId, userId, status: "pending" });
     }
     await writeAuditLog({ userId, userEmail, action: "agency_connection_requested", details: `agencyId=${agencyId}` });
+    await notifyAgencyAdmins({
+      type: "agency",
+      href: "/interpreters?tab=requests",
+      title: "New join request",
+      message: `New join request from ${userName || userEmail || "an interpreter"}.`,
+    });
     return { success: true };
   } catch (err) {
     // Two clicks racing hit the unique (agency, interpreter) index.

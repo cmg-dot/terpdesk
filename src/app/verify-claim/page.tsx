@@ -6,7 +6,8 @@ export const metadata = { title: "Verify your email | terpDESK", robots: { index
 
 const ERRORS: Record<string, string> = {
   invalid: "This verification link is not valid. It may already have been used.",
-  expired: "This verification link has expired. Create your account again to get a new one.",
+  // Registering again is impossible (the email is taken), so point to the resend link instead.
+  expired: "This verification link has expired. Sign in and choose “Resend link” on your home page to get a new one.",
   unavailable: "We could not connect this profile. It may already be linked to an account.",
 };
 
