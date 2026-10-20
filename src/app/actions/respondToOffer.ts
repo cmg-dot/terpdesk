@@ -7,25 +7,34 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
+import { notifyAgencyAdmins } from "@/lib/notifications";
+
+type OfferRecord = typeof offers.$inferSelect;
+
+/**
+ * Expected refusals (expired, withdrawn, busy-time conflict, ...) are returned, not thrown: in production Next.js
+ * hides a thrown server-action message behind a generic "Server Components render" error with only a digest.
+ */
+export type RespondToOfferResult = { success: true; offer: OfferRecord } | { success: false; error: string };
 
 export async function respondToOffer(
-  offerId: string, 
+  offerId: string,
   response: 'accept' | 'decline' | 'accepted' | 'declined'
-) {
+): Promise<RespondToOfferResult> {
   const { interpreterId: sessionInterpreterId } = await requireInterpreter();
   const normResponse = (response === 'accept' || response === 'accepted') ? 'accepted' : 'declined';
 
   // 1. Fetch offer
   const [offer] = await db.select().from(offers).where(eq(offers.id, offerId));
   if (!offer) {
-    throw new Error("Offer not found");
+    return { success: false, error: "This offer could not be found. It may have been withdrawn." };
   }
   if (offer.interpreterId !== sessionInterpreterId) throw new Error(FORBIDDEN);
 
   // 2. Fetch parent request
   const [parentReq] = await db.select().from(requests).where(eq(requests.id, offer.requestId));
   if (!parentReq) {
-    throw new Error("Associated request not found");
+    return { success: false, error: "The request for this offer no longer exists." };
   }
 
   const { endsAt } = resolveRequestTimes(parentReq);
@@ -55,14 +64,14 @@ export async function respondToOffer(
     revalidatePath('/requests');
     revalidatePath('/dashboard');
 
-    throw new Error("This offer has expired because the scheduled appointment time has already ended.");
+    return { success: false, error: "This offer has expired because the scheduled appointment time has already ended." };
   }
 
   if (offer.status === 'expired') {
-    throw new Error("This offer has already expired.");
+    return { success: false, error: "This offer has already expired." };
   }
   if (offer.status === 'withdrawn') {
-    throw new Error("This offer has been withdrawn by the agency.");
+    return { success: false, error: "This offer has been withdrawn by the agency." };
   }
 
   // 4. Hard-block acceptance if there is an overlapping booked reservation or busy block
@@ -76,7 +85,7 @@ export async function respondToOffer(
     });
 
     if (conflict.hasConflict) {
-      throw new Error("Unable to accept: this time conflicts with an existing commitment.");
+      return { success: false, error: "You cannot accept this job because it conflicts with your scheduled busy time." };
     }
   }
 
@@ -181,12 +190,21 @@ export async function respondToOffer(
       .where(eq(requests.id, offer.requestId));
   }
 
+  if (normResponse === 'accepted') {
+    await notifyAgencyAdmins({
+      type: "job",
+      href: `/requests/${offer.requestId}`,
+      title: "Job offer accepted",
+      message: "An interpreter accepted the job.",
+    });
+  }
+
   revalidatePath('/interpreter-home');
   revalidatePath('/jobs');
   revalidatePath(`/requests/${offer.requestId}`);
   revalidatePath('/requests');
   revalidatePath('/dashboard');
-  return updatedOffer;
+  return { success: true, offer: updatedOffer };
 }
 
 export const td_respond_offer = respondToOffer;

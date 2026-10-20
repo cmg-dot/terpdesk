@@ -117,8 +117,11 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
 
   const acceptJobOffer = async (jobId: string) => {
     try {
-      await updateOfferStatus(jobId, 'accepted');
-      setJobs(prevJobs => prevJobs.map(job => 
+      const result = await updateOfferStatus(jobId, 'accepted');
+      // Expected refusals (busy-time conflict, expired, withdrawn) come back as { success: false, error }.
+      // Raised here, in the browser, so the callers' existing error banners show the real message.
+      if ('success' in result && !result.success) throw new Error(result.error);
+      setJobs(prevJobs => prevJobs.map(job =>
         job.id === jobId ? { ...job, status: 'booked' } : job
       ));
     } catch (err: any) {
@@ -130,7 +133,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
 
   const declineOffer = async (jobId: string) => {
     try {
-      await updateOfferStatus(jobId, 'declined');
+      const result = await updateOfferStatus(jobId, 'declined');
+      if ('success' in result && !result.success) throw new Error(result.error);
       setJobs(prevJobs => prevJobs.map(job => 
         job.id === jobId ? { ...job, status: 'declined' } : job
       ));
