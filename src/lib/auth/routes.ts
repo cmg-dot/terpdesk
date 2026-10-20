@@ -24,6 +24,7 @@ export const INTERPRETER_PREFIXES = [
   "/interpreter-settings",
   "/agencies",
   "/profile",
+  "/prep",
 ] as const;
 
 const matchesPrefix = (path: string, prefix: string): boolean => path === prefix || path.startsWith(`${prefix}/`);

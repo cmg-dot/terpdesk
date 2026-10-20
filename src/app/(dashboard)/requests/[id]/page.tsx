@@ -23,6 +23,7 @@ import { getInterpretersFitForJob } from "@/app/actions/availability";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { InterpreterFitBadge, FitWarningNotice } from "@/components/scheduling-ui";
 import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
+import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -1352,18 +1353,7 @@ export default function AssignmentDetailPage() {
 
  {/* Interactive / Staffing */}
  
- <div className={cardClass}>
- <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Prep materials</h2>
- <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 flex flex-col gap-4">
- <div className="flex justify-between items-center">
- <span className="text-sm text-gray-600">Who can see this file?</span>
- <span className="text-sm font-medium text-[var(--ink)]">Agency only</span>
- </div>
- <button className="w-full bg-white border border-gray-200 rounded-full px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
- Add a file
- </button>
- </div>
- </div>
+ <PrepMaterialsSection requestId={id} cardClass={cardClass} />
 
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Service verification</h2>

@@ -114,6 +114,22 @@ export async function ensureAvailabilityTables(): Promise<void> {
       CREATE UNIQUE INDEX IF NOT EXISTS credential_agency_shares_credential_agency_idx
         ON credential_agency_shares (credential_id, agency_id);
 
+      CREATE TABLE IF NOT EXISTS files (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        file_url TEXT NOT NULL,
+        storage_key TEXT NOT NULL UNIQUE,
+        file_name VARCHAR(255) NOT NULL,
+        content_type VARCHAR(100) NOT NULL,
+        size_bytes INTEGER NOT NULL,
+        uploaded_by_agency_id TEXT,
+        uploaded_by_interpreter_id UUID REFERENCES interpreters(id) ON DELETE SET NULL,
+        linked_job_id UUID REFERENCES requests(id) ON DELETE CASCADE,
+        linked_credential_id UUID REFERENCES credentials(id) ON DELETE CASCADE,
+        shared_with_interpreters BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS files_linked_job_idx ON files (linked_job_id);
+
       CREATE INDEX IF NOT EXISTS idx_avail_rules_interp ON availability_rules (interpreter_id);
       CREATE INDEX IF NOT EXISTS idx_avail_exceptions_interp ON availability_exceptions (interpreter_id);
       CREATE INDEX IF NOT EXISTS idx_busy_blocks_interp ON busy_blocks (interpreter_id);

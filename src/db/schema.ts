@@ -339,6 +339,30 @@ export const credentialAgencyShares = pgTable('credential_agency_shares', {
   credentialAgencyIdx: uniqueIndex('credential_agency_shares_credential_agency_idx').on(t.credentialId, t.agencyId),
 }));
 
+// Files in S3 (prep materials now; profile photos and credential documents later). The bucket is PRIVATE:
+// `file_url` is the object's address for reference only, and every view goes through a short-lived signed link
+// issued after an authorization check. `storage_key` is the S3 object key used for signing.
+// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
+export const files = pgTable('files', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  fileUrl: text('file_url').notNull(),
+  storageKey: text('storage_key').notNull().unique(),
+  fileName: varchar('file_name', { length: 255 }).notNull(),
+  contentType: varchar('content_type', { length: 100 }).notNull(),
+  sizeBytes: integer('size_bytes').notNull(),
+  uploadedByAgencyId: text('uploaded_by_agency_id'),
+  uploadedByInterpreterId: uuid('uploaded_by_interpreter_id').references(() => interpreters.id, { onDelete: 'set null' }),
+  linkedJobId: uuid('linked_job_id').references(() => requests.id, { onDelete: 'cascade' }),
+  linkedCredentialId: uuid('linked_credential_id').references(() => credentials.id, { onDelete: 'cascade' }),
+  // Prep materials: false = agency only; true = interpreters booked on the linked job can open it.
+  sharedWithInterpreters: boolean('shared_with_interpreters').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  linkedJobIdx: index('files_linked_job_idx').on(t.linkedJobId),
+}));
+
+export type SelectFile = typeof files.$inferSelect;
+
 export const availabilityRules = pgTable('availability_rules', {
   id: text('id').primaryKey(),
   interpreterId: text('interpreter_id').notNull(),

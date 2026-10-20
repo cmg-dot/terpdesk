@@ -60,5 +60,6 @@ export const config = {
     "/interpreter-settings/:path*",
     "/agencies/:path*",
     "/profile/:path*",
+    "/prep/:path*",
   ],
 };
