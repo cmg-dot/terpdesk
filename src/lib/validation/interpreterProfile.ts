@@ -45,7 +45,14 @@ export const interpreterProfileSchema = z.object({
     (v) => v === "" || /^[0-9+()\-.\s]{7,30}$/.test(v),
     "Use digits, spaces and + ( ) - . only.",
   ),
+  contactVisibility: z.enum(["private", "shared"], { errorMap: () => ({ message: "Choose who can see these details." }) }),
 });
+
+/** Options for the "Who can see these details" dropdown. */
+export const CONTACT_VISIBILITY_OPTIONS = [
+  { value: "private", label: "Only me" },
+  { value: "shared", label: "Agencies I am connected to" },
+] as const;
 
 export type InterpreterProfileInput = z.input<typeof interpreterProfileSchema>;
 export type InterpreterProfileField = keyof InterpreterProfileInput;

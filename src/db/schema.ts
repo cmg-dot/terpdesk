@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index, date } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
 export type Program = 'General' | 'WA ODHH' | 'WA Apple Health';
@@ -266,6 +266,9 @@ export const clients = pgTable('clients', {
 export type SelectClient = typeof clients.$inferSelect;
 export type InsertClient = typeof clients.$inferInsert;
 
+export const contactVisibilityValues = ['private', 'shared'] as const;
+export type ContactVisibility = (typeof contactVisibilityValues)[number];
+
 // One row per interpreter (the calendar's time zone plus the "My Profile" fields the interpreter edits).
 // Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
 export const interpreterProfiles = pgTable('interpreter_profiles', {
@@ -282,11 +285,37 @@ export const interpreterProfiles = pgTable('interpreter_profiles', {
   takesVirtual: boolean('takes_virtual').notNull().default(true),
   workEmail: varchar('work_email', { length: 255 }),
   workPhone: varchar('work_phone', { length: 30 }),
+  // Who may see the work email/phone: 'private' = only the interpreter, 'shared' = agencies they are connected to.
+  contactVisibility: varchar('contact_visibility', { length: 10, enum: contactVisibilityValues }).notNull().default('private'),
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
 export type SelectInterpreterProfile = typeof interpreterProfiles.$inferSelect;
 export type InsertInterpreterProfile = typeof interpreterProfiles.$inferInsert;
+
+// Certifications, insurance, training... an interpreter lists on their profile. Dates are plain calendar dates.
+// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
+export const credentialTypeValues = ['Certification', 'Qualification', 'Training', 'Insurance', 'Other'] as const;
+export type CredentialType = (typeof credentialTypeValues)[number];
+
+export const credentials = pgTable('credentials', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  interpreterId: uuid('interpreter_id').notNull().references(() => interpreters.id, { onDelete: 'cascade' }),
+  name: varchar('name', { length: 150 }).notNull(),
+  type: varchar('type', { length: 20, enum: credentialTypeValues }).notNull(),
+  issuedBy: varchar('issued_by', { length: 150 }),
+  credentialNumber: varchar('credential_number', { length: 100 }),
+  issueDate: date('issue_date', { mode: 'string' }),
+  expirationDate: date('expiration_date', { mode: 'string' }),
+  notes: text('notes'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+}, (t) => ({
+  interpreterIdx: index('credentials_interpreter_idx').on(t.interpreterId),
+}));
+
+export type SelectCredential = typeof credentials.$inferSelect;
+export type InsertCredential = typeof credentials.$inferInsert;
 
 export const availabilityRules = pgTable('availability_rules', {
   id: text('id').primaryKey(),

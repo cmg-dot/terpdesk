@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
-import { PROFILE_TIME_ZONES } from "@/lib/validation/interpreterProfile";
+import { CONTACT_VISIBILITY_OPTIONS, PROFILE_TIME_ZONES } from "@/lib/validation/interpreterProfile";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
 
 const NOT_SET = <span className="text-gray-400">Not set</span>;
@@ -72,6 +72,9 @@ export const ProfileOverviewView = ({ profile }: { profile: MyProfile }) => {
       <Section title="Contact details">
         <Row label="Work email">{profile.workEmail || NOT_SET}</Row>
         <Row label="Work phone">{profile.workPhone || NOT_SET}</Row>
+        <Row label="Who can see these details">
+          {CONTACT_VISIBILITY_OPTIONS.find((o) => o.value === profile.contactVisibility)?.label ?? "Only me"}
+        </Row>
       </Section>
     </div>
   );

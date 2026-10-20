@@ -6,9 +6,14 @@ import { ProfileEditForm } from "@/components/profile/ProfileEditForm";
 import { ProfileOverviewView } from "@/components/profile/ProfileOverviewView";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
 
+interface ProfileOverviewTabProps {
+  /** Owned by the page shell, so a saved profile is still there after visiting another tab. */
+  profile: MyProfile;
+  onProfileChange: (profile: MyProfile) => void;
+}
+
 /** "My Profile" Overview tab: read-only view with an "Edit profile" mode. */
-export const ProfileOverviewTab = ({ initialProfile }: { initialProfile: MyProfile }) => {
-  const [profile, setProfile] = useState<MyProfile>(initialProfile);
+export const ProfileOverviewTab = ({ profile, onProfileChange }: ProfileOverviewTabProps) => {
   const [editing, setEditing] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
 
@@ -24,7 +29,7 @@ export const ProfileOverviewTab = ({ initialProfile }: { initialProfile: MyProfi
         profile={profile}
         onCancel={() => setEditing(false)}
         onSaved={(saved) => {
-          setProfile(saved);
+          onProfileChange(saved);
           setEditing(false);
           setSavedMessage("Profile saved.");
         }}

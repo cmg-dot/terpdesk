@@ -85,6 +85,22 @@ export async function ensureAvailabilityTables(): Promise<void> {
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS takes_virtual BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS work_email VARCHAR(255);
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS work_phone VARCHAR(30);
+      ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS contact_visibility VARCHAR(10) NOT NULL DEFAULT 'private';
+
+      CREATE TABLE IF NOT EXISTS credentials (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        interpreter_id UUID NOT NULL REFERENCES interpreters(id) ON DELETE CASCADE,
+        name VARCHAR(150) NOT NULL,
+        type VARCHAR(20) NOT NULL,
+        issued_by VARCHAR(150),
+        credential_number VARCHAR(100),
+        issue_date DATE,
+        expiration_date DATE,
+        notes TEXT,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE INDEX IF NOT EXISTS credentials_interpreter_idx ON credentials (interpreter_id);
 
       CREATE INDEX IF NOT EXISTS idx_avail_rules_interp ON availability_rules (interpreter_id);
       CREATE INDEX IF NOT EXISTS idx_avail_exceptions_interp ON availability_exceptions (interpreter_id);

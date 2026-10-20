@@ -47,6 +47,7 @@ const loadProfile = async (userId: string, interpreterId: string): Promise<MyPro
     takesVirtual: row?.takesVirtual ?? true,
     workEmail: row?.workEmail ?? "",
     workPhone: row?.workPhone ?? "",
+    contactVisibility: row?.contactVisibility ?? "private",
     updatedAt: row?.updatedAt ? row.updatedAt.toISOString() : null,
   };
 };
@@ -112,6 +113,7 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
     takesVirtual: d.takesVirtual,
     workEmail: d.workEmail ? d.workEmail.toLowerCase() : null,
     workPhone: d.workPhone || null,
+    contactVisibility: d.contactVisibility,
     updatedAt: new Date(),
   };
 

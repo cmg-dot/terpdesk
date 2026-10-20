@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import type { ChangeEvent, FormEvent, ReactNode } from "react";
+import type { ChangeEvent, FormEvent } from "react";
 import { updateMyProfile } from "@/app/actions/interpreterProfile";
+import { Field, FormCard as Card, inputClass } from "@/components/profile/formParts";
 import { ProfilePhotoPicker } from "@/components/profile/ProfilePhotoPicker";
-import { PROFILE_TIME_ZONES, interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
+import { CONTACT_VISIBILITY_OPTIONS, PROFILE_TIME_ZONES, interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
 
 type FieldErrors = Partial<Record<InterpreterProfileField, string>>;
@@ -15,30 +16,6 @@ interface ProfileEditFormProps {
   onSaved: (profile: MyProfile) => void;
   onCancel: () => void;
 }
-
-// Off-white fill so inputs stand out on the white cards; a dark green border and ring show focus.
-const inputClass =
-  "w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-colors focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40 aria-[invalid=true]:border-red-400";
-
-const Field = ({ id, label, hint, error, className = "", children }: { id: string; label: string; hint?: string; error?: string; className?: string; children: ReactNode }) => (
-  <div className={`space-y-1.5 ${className}`}>
-    <label htmlFor={id} className="block text-[13px] font-medium text-gray-700">{label}</label>
-    {children}
-    {error ? (
-      <p id={`${id}-error`} className="text-[12px] text-red-700">{error}</p>
-    ) : (
-      hint && <p className="text-[12px] text-gray-500">{hint}</p>
-    )}
-  </div>
-);
-
-const Card = ({ title, children }: { title: string; children: ReactNode }) => (
-  <fieldset className="rounded-2xl border border-gray-200 bg-white p-6">
-    <legend className="sr-only">{title}</legend>
-    <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">{title}</h2>
-    <div className="grid gap-4 md:grid-cols-2">{children}</div>
-  </fieldset>
-);
 
 const toInput = (p: MyProfile): InterpreterProfileInput => ({
   // Empty preferred name starts as the account name, so the field is never blank.
@@ -53,6 +30,7 @@ const toInput = (p: MyProfile): InterpreterProfileInput => ({
   takesVirtual: p.takesVirtual,
   workEmail: p.workEmail,
   workPhone: p.workPhone,
+  contactVisibility: p.contactVisibility,
 });
 
 /** Edit mode of the profile Overview. The sign-in email is shown for reference only and is never sent. */
@@ -188,6 +166,19 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
         </Field>
         <Field id="profile-workPhone" label="Work phone" error={errors.workPhone}>
           <input type="tel" autoComplete="tel" className={inputClass} {...text("workPhone")} />
+        </Field>
+        <Field
+          id="profile-contactVisibility"
+          label="Who can see these details"
+          hint="Applies to your work email and work phone."
+          error={errors.contactVisibility}
+          className="md:col-span-2"
+        >
+          <select className={inputClass} {...text("contactVisibility")}>
+            {CONTACT_VISIBILITY_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </Field>
       </Card>
 
