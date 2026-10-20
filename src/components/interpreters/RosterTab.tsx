@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { Mail, Phone, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
@@ -105,17 +106,24 @@ export const RosterTab = ({ items, searchQuery, registeredProfileIds, onManage, 
             className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4 hover:shadow-sm transition-all list-none"
           >
             <div className="flex items-start gap-4">
-              {/* Avatar Circle */}
-              <div
+              {/* Avatar Circle (also opens the interpreter's detail page; hidden from screen readers to avoid a duplicate link) */}
+              <Link
+                href={`/interpreters/${interpreter.id}`}
+                tabIndex={-1}
+                aria-hidden="true"
                 className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-base shrink-0 shadow-sm ${avatarBg}`}
               >
                 {initials}
-              </div>
+              </Link>
 
               {/* Profile Details */}
               <div className="flex flex-col space-y-1">
                 <div className="flex flex-wrap items-center gap-2.5">
-                  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{interpreter.name}</h3>
+                  <h3 className="text-[17px] font-semibold text-[var(--ink)]">
+                    <Link href={`/interpreters/${interpreter.id}`} className="hover:underline focus:underline focus:outline-none">
+                      {interpreter.name}
+                    </Link>
+                  </h3>
 
                   {/* UI Badging: Registered App User vs Shadow / External */}
                   {isRegistered ? (
