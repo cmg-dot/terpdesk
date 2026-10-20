@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { notifyInterpreter } from "@/lib/notifications";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
@@ -98,6 +99,12 @@ export async function removeFromAgency(interpreterIdInput: string): Promise<Rost
       userEmail: session.user.email ?? null,
       action: "roster_interpreter_removed",
       details: `interpreterId=${parsed.data}`,
+    });
+    await notifyInterpreter(parsed.data, {
+      type: "agency",
+      href: "/agencies",
+      title: "Agency connection removed",
+      message: "Your connection to the agency was removed.",
     });
     refresh();
     return { success: true, message: "Interpreter removed from your agency." };

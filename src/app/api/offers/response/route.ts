@@ -7,6 +7,7 @@ import { verifyOfferToken } from "@/lib/jwt";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
+import { notifyAgencyAdmins } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
@@ -656,6 +657,13 @@ export async function GET(request: NextRequest) {
           updatedAt: now,
         })
         .where(eq(requests.id, requestId));
+
+      await notifyAgencyAdmins({
+        type: "job",
+        href: `/requests/${requestId}`,
+        title: "Job offer accepted",
+        message: "An interpreter accepted the job.",
+      });
 
       try {
         revalidatePath(`/requests/${requestId}`);

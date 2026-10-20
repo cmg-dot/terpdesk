@@ -88,6 +88,27 @@ export const auditLogs = pgTable('audit_logs', {
 }));
 
 export type SelectAuditLog = typeof auditLogs.$inferSelect;
+
+// In-app notifications (bell icon). `message` must never contain PHI: no client names or appointment details.
+export const notificationTypeValues = ['system', 'job', 'agency'] as const;
+export type NotificationType = (typeof notificationTypeValues)[number];
+
+export const notifications = pgTable('notifications', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // The login that receives it.
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: varchar('title', { length: 200 }).notNull(),
+  message: text('message').notNull(),
+  type: varchar('type', { length: 20, enum: notificationTypeValues }).notNull().default('system'),
+  // Optional in-app path to open when the notification is clicked.
+  href: varchar('href', { length: 300 }),
+  isRead: boolean('is_read').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  userReadCreatedIdx: index('notifications_user_read_created_idx').on(t.userId, t.isRead, t.createdAt),
+}));
+
+export type SelectNotification = typeof notifications.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 
 // Which agencies an interpreter belongs to. One row per (agency, interpreter profile).

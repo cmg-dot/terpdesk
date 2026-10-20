@@ -6,6 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
+import { notifyInterpreter } from "@/lib/notifications";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
@@ -76,6 +77,13 @@ export async function updateConnectionStatus(input: z.input<typeof updateSchema>
       userEmail: session.user.email ?? null,
       action: status === "approved" ? "agency_connection_approved" : "agency_connection_rejected",
       details: `connectionId=${connectionId}; interpreterId=${updated.interpreterId}`,
+    });
+
+    await notifyInterpreter(updated.interpreterId, {
+      type: "agency",
+      href: "/agencies",
+      title: status === "approved" ? "Connection approved" : "Connection request declined",
+      message: status === "approved" ? "Your agency approved your connection request." : "Your agency declined your connection request.",
     });
 
     revalidatePath("/dashboard");
