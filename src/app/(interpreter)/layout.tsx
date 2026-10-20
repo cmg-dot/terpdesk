@@ -44,9 +44,9 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
   const displayEmail = session?.user?.email ?? "";
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[#F9F8F4] font-sans text-slate-900">
-      {/* Sidebar */}
-      <aside className="hidden md:flex w-64 flex-col bg-[#0B3B32] text-white shrink-0">
+    <div className="flex min-h-screen bg-[#F9F8F4] font-sans text-slate-900">
+      {/* Sidebar (stays in view while the page scrolls with the browser's own scrollbar) */}
+      <aside className="hidden md:flex sticky top-0 h-screen self-start w-64 flex-col bg-[#0B3B32] text-white shrink-0">
         <div className="flex flex-col p-5 pb-2">
           <div className="flex items-center gap-3 mb-1">
             <Image
@@ -136,7 +136,7 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
       </aside>
 
       {/* Main Content Area */}
-      <main className="flex flex-1 flex-col overflow-y-auto relative">
+      <main className="flex min-w-0 flex-1 flex-col relative">
         {/* Header */}
         <header className="sticky top-0 z-40 bg-[#F9F8F4]">
           <div className="max-w-[1200px] mx-auto px-4 md:px-8 py-5 flex items-center justify-between w-full">

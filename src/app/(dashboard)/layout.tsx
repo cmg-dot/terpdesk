@@ -34,9 +34,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <ClientsProvider>
       <RequestsProvider>
-        <div className="flex h-screen overflow-hidden bg-[#F9F8F4] font-sans text-slate-900">
+        {/* The page scrolls with the browser's own scrollbar (no inner scroll container); the sidebar stays put. */}
+        <div className="flex min-h-screen bg-[#F9F8F4] font-sans text-slate-900">
           {/* Sidebar */}
-          <aside className="hidden md:flex w-64 flex-col bg-[#0B3B32] text-white shrink-0">
+          <aside className="hidden md:flex sticky top-0 h-screen self-start overflow-y-auto w-64 flex-col bg-[#0B3B32] text-white shrink-0">
             <div className="flex flex-col p-6">
               <div className="flex items-center gap-3 mb-1">
                 <Image
@@ -101,7 +102,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </aside>
 
           {/* Main Content Area */}
-          <main className="flex flex-1 flex-col overflow-y-auto">
+          <main className="flex min-w-0 flex-1 flex-col">
             {/* Header */}
             <header className="flex items-center justify-between px-4 md:px-8 py-5 sticky top-0 z-40 bg-[#F9F8F4]">
               <div className="text-sm text-slate-500">

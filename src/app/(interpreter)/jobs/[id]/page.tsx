@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Copy, Check, Building2, ExternalLink, Video, Lock } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
+import { JobPrepMaterials } from "@/components/prep/JobPrepMaterials";
 import { format } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { giveBackAssignment } from "@/app/actions/giveBackAssignment";
@@ -1510,10 +1511,10 @@ export default function JobDetailPage() {
           </div>
 
           {/* Card 3 */}
-          <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
-            <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Prep materials</h2>
-            <p className="text-[14px] text-[var(--sage)]">No prep materials have been shared for this job.</p>
-          </div>
+          <JobPrepMaterials
+            requestId={job.requestId}
+            cardClass="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 "
+          />
 
           {/* Actual Service Time Component */}
           <ServiceTimeBlock job={job} />
