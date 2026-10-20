@@ -308,6 +308,8 @@ export const credentials = pgTable('credentials', {
   issueDate: date('issue_date', { mode: 'string' }),
   expirationDate: date('expiration_date', { mode: 'string' }),
   notes: text('notes'),
+  // Soft delete: archived credentials are hidden from the profile and from agencies, but kept.
+  isArchived: boolean('is_archived').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({
@@ -316,6 +318,17 @@ export const credentials = pgTable('credentials', {
 
 export type SelectCredential = typeof credentials.$inferSelect;
 export type InsertCredential = typeof credentials.$inferInsert;
+
+// Which agency may see which credential. A row exists only while it is shared; `include_files` adds its files.
+export const credentialAgencyShares = pgTable('credential_agency_shares', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  credentialId: uuid('credential_id').notNull().references(() => credentials.id, { onDelete: 'cascade' }),
+  agencyId: text('agency_id').notNull(),
+  includeFiles: boolean('include_files').notNull().default(false),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+}, (t) => ({
+  credentialAgencyIdx: uniqueIndex('credential_agency_shares_credential_agency_idx').on(t.credentialId, t.agencyId),
+}));
 
 export const availabilityRules = pgTable('availability_rules', {
   id: text('id').primaryKey(),

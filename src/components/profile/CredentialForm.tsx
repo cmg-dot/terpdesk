@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { addCredential } from "@/app/actions/credentials";
+import { addCredential, updateCredential } from "@/app/actions/credentials";
 import { Field, FormCard, inputClass } from "@/components/profile/formParts";
 import { CREDENTIAL_TYPES, credentialSchema } from "@/lib/validation/credential";
 import type { CredentialField, CredentialInput, MyCredential } from "@/lib/validation/credential";
@@ -20,13 +20,25 @@ const EMPTY: CredentialInput = {
 };
 
 interface CredentialFormProps {
-  onAdded: (credential: MyCredential) => void;
+  /** The credential being edited; omit to add a new one. */
+  initial?: MyCredential;
+  onSaved: (credential: MyCredential) => void;
   onCancel: () => void;
 }
 
-/** "Add a credential" form. Layout: name/type, issued by/number, issue/expiration date, then notes. */
-export const CredentialForm = ({ onAdded, onCancel }: CredentialFormProps) => {
-  const [values, setValues] = useState<CredentialInput>(EMPTY);
+const toInput = (c: MyCredential): CredentialInput => ({
+  name: c.name,
+  type: c.type,
+  issuedBy: c.issuedBy,
+  credentialNumber: c.credentialNumber,
+  issueDate: c.issueDate,
+  expirationDate: c.expirationDate,
+  notes: c.notes,
+});
+
+/** "Add a credential" / edit form. Layout: name/type, issued by/number, issue/expiration date, then notes. */
+export const CredentialForm = ({ initial, onSaved, onCancel }: CredentialFormProps) => {
+  const [values, setValues] = useState<CredentialInput>(() => (initial ? toInput(initial) : EMPTY));
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -60,9 +72,9 @@ export const CredentialForm = ({ onAdded, onCancel }: CredentialFormProps) => {
     setErrors({});
     setSaving(true);
     try {
-      const result = await addCredential(values);
+      const result = initial ? await updateCredential(initial.id, values) : await addCredential(values);
       if (result.success) {
-        onAdded(result.credential);
+        onSaved(result.credential);
       } else {
         setErrors(result.fieldErrors ?? {});
         setFormError(result.error);
@@ -76,7 +88,7 @@ export const CredentialForm = ({ onAdded, onCancel }: CredentialFormProps) => {
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
-      <FormCard title="Add a credential">
+      <FormCard title={initial ? "Edit credential" : "Add a credential"}>
         <Field id="credential-name" label="Name" error={errors.name}>
           <input type="text" placeholder="For example: NIC Certification" className={inputClass} {...bind("name")} />
         </Field>
@@ -122,7 +134,7 @@ export const CredentialForm = ({ onAdded, onCancel }: CredentialFormProps) => {
           disabled={saving}
           className="rounded-full bg-[#0B3B32] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {saving ? "Saving…" : "Add credential"}
+          {saving ? "Saving…" : initial ? "Save changes" : "Add credential"}
         </button>
       </div>
     </form>

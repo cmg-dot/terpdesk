@@ -1,137 +1,160 @@
 "use server";
 
-import { and, asc, count, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { credentials } from "@/db/schema";
-import type { SelectCredential } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
 import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
+import { connectedAgencyIds, loadCredentials, sharesFor, toMyCredential } from "@/lib/credentials";
 import { logError } from "@/lib/logError";
 import { credentialSchema } from "@/lib/validation/credential";
 import type { CredentialField, CredentialInput, MyCredential } from "@/lib/validation/credential";
 
-export type AddCredentialResult =
-  | { success: true; credential: MyCredential }
-  | { success: false; error: string; fieldErrors?: Partial<Record<CredentialField, string>> };
+type FieldErrors = Partial<Record<CredentialField, string>>;
 
-export type DeleteCredentialResult = { success: true } | { success: false; error: string };
+export type SaveCredentialResult =
+  | { success: true; credential: MyCredential }
+  | { success: false; error: string; fieldErrors?: FieldErrors };
+
+export type ArchiveCredentialResult = { success: true } | { success: false; error: string };
 
 const MAX_CREDENTIALS = 50;
 const idSchema = z.string().uuid();
 const NOT_LINKED = "Connect your interpreter profile (use the link we emailed you) before adding credentials.";
 
-const toMyCredential = (row: SelectCredential): MyCredential => ({
-  id: row.id,
-  name: row.name,
-  type: row.type,
-  issuedBy: row.issuedBy ?? "",
-  credentialNumber: row.credentialNumber ?? "",
-  issueDate: row.issueDate ?? "",
-  expirationDate: row.expirationDate ?? "",
-  notes: row.notes ?? "",
+const sessionInterpreter = async () => {
+  try {
+    const { session, interpreterId } = await requireInterpreter();
+    return { session, interpreterId };
+  } catch {
+    return null;
+  }
+};
+
+const parseCredential = (input: CredentialInput) => {
+  const parsed = credentialSchema.safeParse(input);
+  if (parsed.success) return { ok: true as const, data: parsed.data };
+  const fieldErrors: FieldErrors = {};
+  for (const issue of parsed.error.issues) {
+    const field = issue.path[0] as CredentialField | undefined;
+    if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
+  }
+  return { ok: false as const, result: { success: false as const, error: "Please fix the highlighted fields.", fieldErrors } };
+};
+
+/** Only validated, picked fields reach the database. Empty strings are stored as "not set". */
+const toColumns = (d: z.output<typeof credentialSchema>) => ({
+  name: d.name,
+  type: d.type,
+  issuedBy: d.issuedBy || null,
+  credentialNumber: d.credentialNumber || null,
+  issueDate: d.issueDate || null,
+  expirationDate: d.expirationDate || null,
+  notes: d.notes || null,
 });
 
-/** The signed-in interpreter's own credentials, by name. Never accepts an id from the browser. */
+/** The signed-in interpreter's active credentials with their shares. Never accepts an id from the browser. */
 export async function getCredentials(): Promise<MyCredential[]> {
   const { interpreterId } = await requireInterpreter();
   await ensureAvailabilityTables();
-  const rows = await db
-    .select()
-    .from(credentials)
-    .where(eq(credentials.interpreterId, interpreterId))
-    .orderBy(asc(credentials.name));
-  return rows.map(toMyCredential);
+  return loadCredentials(interpreterId);
 }
 
-/** Adds a credential to the signed-in interpreter's profile. */
-export async function addCredential(input: CredentialInput): Promise<AddCredentialResult> {
-  let session;
-  let interpreterId: string;
-  try {
-    ({ session, interpreterId } = await requireInterpreter());
-  } catch {
-    return { success: false, error: NOT_LINKED };
-  }
-
-  const parsed = credentialSchema.safeParse(input);
-  if (!parsed.success) {
-    const fieldErrors: Partial<Record<CredentialField, string>> = {};
-    for (const issue of parsed.error.issues) {
-      const field = issue.path[0] as CredentialField | undefined;
-      if (field && !fieldErrors[field]) fieldErrors[field] = issue.message;
-    }
-    return { success: false, error: "Please fix the highlighted fields.", fieldErrors };
-  }
-  const d = parsed.data;
+/** Adds a credential to the signed-in interpreter's profile. New credentials are visible only to them. */
+export async function addCredential(input: CredentialInput): Promise<SaveCredentialResult> {
+  const me = await sessionInterpreter();
+  if (!me) return { success: false, error: NOT_LINKED };
+  const parsed = parseCredential(input);
+  if (!parsed.ok) return parsed.result;
 
   try {
     await ensureAvailabilityTables();
-    const [existing] = await db.select({ total: count() }).from(credentials).where(eq(credentials.interpreterId, interpreterId));
+    const [existing] = await db
+      .select({ total: count() })
+      .from(credentials)
+      .where(and(eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)));
     if (Number(existing?.total ?? 0) >= MAX_CREDENTIALS) {
-      return { success: false, error: `You can list up to ${MAX_CREDENTIALS} credentials. Delete one to add another.` };
+      return { success: false, error: `You can list up to ${MAX_CREDENTIALS} credentials. Archive one to add another.` };
     }
 
-    // Only validated, picked fields reach the database. Empty strings are stored as "not set".
     const [created] = await db
       .insert(credentials)
-      .values({
-        interpreterId,
-        name: d.name,
-        type: d.type,
-        issuedBy: d.issuedBy || null,
-        credentialNumber: d.credentialNumber || null,
-        issueDate: d.issueDate || null,
-        expirationDate: d.expirationDate || null,
-        notes: d.notes || null,
-      })
+      .values({ interpreterId: me.interpreterId, ...toColumns(parsed.data) })
       .returning();
 
     // Identifiers only: the credential's name and number are not written to the audit trail.
     await writeAuditLog({
-      userId: session.user.id,
-      userEmail: session.user.email ?? null,
+      userId: me.session.user.id,
+      userEmail: me.session.user.email ?? null,
       action: "credential_added",
       details: `credentialId=${created.id}; type=${created.type}`,
     });
-    return { success: true, credential: toMyCredential(created) };
+    return { success: true, credential: toMyCredential(created, []) };
   } catch (err) {
     logError("addCredential", err);
     return { success: false, error: "We could not save this credential. Please try again." };
   }
 }
 
-/** Deletes one of the signed-in interpreter's own credentials. Someone else's id matches nothing. */
-export async function deleteCredential(idInput: string): Promise<DeleteCredentialResult> {
-  let session;
-  let interpreterId: string;
-  try {
-    ({ session, interpreterId } = await requireInterpreter());
-  } catch {
-    return { success: false, error: NOT_LINKED };
-  }
-
-  const parsed = idSchema.safeParse(idInput);
-  if (!parsed.success) return { success: false, error: "Invalid request." };
+/** Edits one of the signed-in interpreter's own (active) credentials. Sharing is left as it was. */
+export async function updateCredential(idInput: string, input: CredentialInput): Promise<SaveCredentialResult> {
+  const me = await sessionInterpreter();
+  if (!me) return { success: false, error: NOT_LINKED };
+  const id = idSchema.safeParse(idInput);
+  if (!id.success) return { success: false, error: "Invalid request." };
+  const parsed = parseCredential(input);
+  if (!parsed.ok) return parsed.result;
 
   try {
     await ensureAvailabilityTables();
-    const removed = await db
-      .delete(credentials)
-      .where(and(eq(credentials.id, parsed.data), eq(credentials.interpreterId, interpreterId)))
-      .returning({ id: credentials.id });
-    if (removed.length === 0) return { success: false, error: "This credential was not found. It may already be deleted." };
+    const [updated] = await db
+      .update(credentials)
+      .set({ ...toColumns(parsed.data), updatedAt: new Date() })
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
+      .returning();
+    if (!updated) return { success: false, error: "This credential was not found. It may have been archived." };
 
     await writeAuditLog({
-      userId: session.user.id,
-      userEmail: session.user.email ?? null,
-      action: "credential_deleted",
-      details: `credentialId=${parsed.data}`,
+      userId: me.session.user.id,
+      userEmail: me.session.user.email ?? null,
+      action: "credential_updated",
+      details: `credentialId=${updated.id}`,
+    });
+    const shares = await sharesFor([updated.id], await connectedAgencyIds(me.interpreterId));
+    return { success: true, credential: toMyCredential(updated, shares.get(updated.id) ?? []) };
+  } catch (err) {
+    logError("updateCredential", err);
+    return { success: false, error: "We could not save this credential. Please try again." };
+  }
+}
+
+/** Soft delete: hides the credential from the profile and from every agency, but keeps the record. */
+export async function archiveCredential(idInput: string): Promise<ArchiveCredentialResult> {
+  const me = await sessionInterpreter();
+  if (!me) return { success: false, error: NOT_LINKED };
+  const id = idSchema.safeParse(idInput);
+  if (!id.success) return { success: false, error: "Invalid request." };
+
+  try {
+    await ensureAvailabilityTables();
+    const archived = await db
+      .update(credentials)
+      .set({ isArchived: true, updatedAt: new Date() })
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
+      .returning({ id: credentials.id });
+    if (archived.length === 0) return { success: false, error: "This credential was not found. It may already be archived." };
+
+    await writeAuditLog({
+      userId: me.session.user.id,
+      userEmail: me.session.user.email ?? null,
+      action: "credential_archived",
+      details: `credentialId=${id.data}`,
     });
     return { success: true };
   } catch (err) {
-    logError("deleteCredential", err);
-    return { success: false, error: "We could not delete this credential. Please try again." };
+    logError("archiveCredential", err);
+    return { success: false, error: "We could not archive this credential. Please try again." };
   }
 }

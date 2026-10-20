@@ -34,8 +34,16 @@ export const credentialSchema = z
 export type CredentialInput = z.input<typeof credentialSchema>;
 export type CredentialField = keyof CredentialInput;
 
+/** One agency a credential is shared with. */
+export interface CredentialShare {
+  agencyId: string;
+  includeFiles: boolean;
+}
+
 /** A saved credential as the browser sees it (dates stay as yyyy-mm-dd text). */
 export interface MyCredential {
+  /** Only agencies the interpreter is currently connected to. */
+  shares: CredentialShare[];
   id: string;
   name: string;
   type: CredentialTypeName;

@@ -101,6 +101,17 @@ export async function ensureAvailabilityTables(): Promise<void> {
         updated_at TIMESTAMP NOT NULL DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS credentials_interpreter_idx ON credentials (interpreter_id);
+      ALTER TABLE credentials ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT false;
+
+      CREATE TABLE IF NOT EXISTS credential_agency_shares (
+        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+        credential_id UUID NOT NULL REFERENCES credentials(id) ON DELETE CASCADE,
+        agency_id TEXT NOT NULL,
+        include_files BOOLEAN NOT NULL DEFAULT false,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      );
+      CREATE UNIQUE INDEX IF NOT EXISTS credential_agency_shares_credential_agency_idx
+        ON credential_agency_shares (credential_id, agency_id);
 
       CREATE INDEX IF NOT EXISTS idx_avail_rules_interp ON availability_rules (interpreter_id);
       CREATE INDEX IF NOT EXISTS idx_avail_exceptions_interp ON availability_exceptions (interpreter_id);

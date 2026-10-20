@@ -18,10 +18,12 @@ const TABS: { id: ProfileTab; label: string }[] = [
 interface ProfileTabsProps {
   initialProfile: MyProfile;
   initialCredentials: MyCredential[];
+  /** Agencies the interpreter is connected to; credentials can be shared with these. */
+  connectedAgencyIds: string[];
 }
 
 /** Tab bar and animated panel for the "My Profile" page. The page's data lives here so tabs keep it while switching. */
-export const ProfileTabs = ({ initialProfile, initialCredentials }: ProfileTabsProps) => {
+export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgencyIds }: ProfileTabsProps) => {
   const [tab, setTab] = useState<ProfileTab>("overview");
   const [profile, setProfile] = useState<MyProfile>(initialProfile);
   const [credentials, setCredentials] = useState<MyCredential[]>(initialCredentials);
@@ -61,7 +63,9 @@ export const ProfileTabs = ({ initialProfile, initialCredentials }: ProfileTabsP
           transition={{ duration: 0.18 }}
         >
           {tab === "overview" && <ProfileOverviewTab profile={profile} onProfileChange={setProfile} />}
-          {tab === "credentials" && <CredentialsTab credentials={credentials} onChange={setCredentials} />}
+          {tab === "credentials" && (
+            <CredentialsTab credentials={credentials} onChange={setCredentials} connectedAgencyIds={connectedAgencyIds} />
+          )}
           {tab === "visibility" && (
             <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
               <h2 className="text-lg font-semibold text-[var(--ink)]">Visibility &amp; sharing</h2>
