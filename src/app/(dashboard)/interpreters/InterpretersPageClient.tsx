@@ -7,6 +7,8 @@ import { useGlobalState } from "@/context/GlobalContext";
 import type { SelectInterpreter } from "@/db/schema";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { AddExternalInterpreterModal } from "@/components/interpreters/AddExternalInterpreterModal";
+import { ManageAccessModal } from "@/components/interpreters/ManageAccessModal";
+import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
 import {
   UserPlus,
   Mail,
@@ -19,8 +21,11 @@ import {
   Sparkles,
 } from "lucide-react";
 
+/** A roster row; `rosterActive` is false for archived interpreters (missing = active, e.g. just added). */
+type RosterItem = SelectInterpreter & { rosterActive?: boolean };
+
 interface InterpretersPageClientProps {
-  initialInterpreters: SelectInterpreter[];
+  initialInterpreters: RosterItem[];
   registeredProfileIds: string[];
 }
 
@@ -95,7 +100,8 @@ export function InterpretersPageClient({
     website_profile_consent,
   } = useGlobalState();
 
-  const [interpreterList, setInterpreterList] = useState<SelectInterpreter[]>(initialInterpreters);
+  const [interpreterList, setInterpreterList] = useState<RosterItem[]>(initialInterpreters);
+  const [manageTarget, setManageTarget] = useState<ManageAccessTarget | null>(null);
   const [activeTab, setActiveTab] = useState<"roster" | "requests" | "website">("roster");
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -182,6 +188,16 @@ export function InterpretersPageClient({
     showToast(`Successfully added ${newInterpreter.name} to the roster.`);
   };
 
+  const handleAccessChanged = (message: string, change: { id: string; removed: boolean; isActive: boolean }) => {
+    setInterpreterList((prev) =>
+      change.removed
+        ? prev.filter((i) => i.id !== change.id)
+        : prev.map((i) => (i.id === change.id ? { ...i, rosterActive: change.isActive } : i)),
+    );
+    router.refresh();
+    showToast(message);
+  };
+
   if (currentUser.role !== "agency") {
     return (
       <div className="p-8 text-center text-slate-500">
@@ -197,6 +213,8 @@ export function InterpretersPageClient({
       transition={{ duration: 0.3 }}
       className="max-w-[1200px] mx-auto p-6 space-y-6 pb-24 antialiased"
     >
+      <ManageAccessModal target={manageTarget} onClose={() => setManageTarget(null)} onChanged={handleAccessChanged} />
+
       {/* Toast Notification */}
       <AnimatePresence>
         {toastMessage && (
@@ -380,7 +398,7 @@ export function InterpretersPageClient({
                               )}
 
                               <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F4F3EF] text-gray-600 border border-gray-200/60">
-                                Active on Roster
+                                {interpreter.rosterActive === false ? "Archived" : "Active on Roster"}
                               </span>
                             </div>
 
@@ -414,6 +432,15 @@ export function InterpretersPageClient({
                         <div className="flex items-center gap-3 sm:pt-1 self-start sm:self-auto">
                           <button
                             type="button"
+                            onClick={() =>
+                              setManageTarget({
+                                id: interpreter.id,
+                                name: interpreter.name,
+                                email: interpreter.email,
+                                isRegistered,
+                                isActive: interpreter.rosterActive !== false,
+                              })
+                            }
                             className="text-xs px-3.5 py-1.5 rounded-full border border-gray-200 text-gray-700 hover:bg-gray-50 font-medium transition-colors cursor-pointer"
                           >
                             Manage access

@@ -4,8 +4,8 @@ import { requireRole } from "@/lib/auth/guards";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { getRosterInterpreters } from "@/lib/roster";
 
-/** Interpreters on the staff member's agency roster (approved connections). Used for offers and auto-book. */
+/** Interpreters the staff member can dispatch to: approved and not archived. */
 export async function getInterpreters() {
   await requireRole("agency");
-  return getRosterInterpreters(DEFAULT_AGENCY_ID);
+  return getRosterInterpreters(DEFAULT_AGENCY_ID, { activeOnly: true });
 }

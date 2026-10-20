@@ -93,7 +93,7 @@ export type InsertAuditLog = typeof auditLogs.$inferInsert;
 // Which agencies an interpreter belongs to. One row per (agency, interpreter profile).
 //  - 'approved': on the agency's roster (e.g. the agency added them as a shadow profile, or approved a request)
 //  - 'pending' : the interpreter asked to join with a join code and the agency has not decided yet
-export const connectionStatusValues = ['pending', 'approved', 'rejected'] as const;
+export const connectionStatusValues = ['pending', 'approved', 'rejected', 'revoked'] as const;
 export type ConnectionStatus = (typeof connectionStatusValues)[number];
 
 export const agencyInterpreters = pgTable('agency_interpreters', {
@@ -103,6 +103,8 @@ export const agencyInterpreters = pgTable('agency_interpreters', {
   // The login that owns the profile. NULL while it is still a shadow profile nobody has claimed.
   userId: uuid('user_id').references(() => users.id),
   status: varchar('status', { length: 20, enum: connectionStatusValues }).notNull().default('pending'),
+  // Roster toggle for approved rows: false = archived/deactivated (no dispatches; history and connection kept).
+  isActive: boolean('is_active').notNull().default(true),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

@@ -66,7 +66,15 @@ export async function requestAgencyConnection(agencyIdInput: string): Promise<Re
       return { success: false, error: "This agency declined your earlier request. Contact the agency if this is a mistake." };
     }
 
-    await db.insert(agencyInterpreters).values({ agencyId, interpreterId, userId, status: "pending" });
+    if (existing?.status === "revoked") {
+      // Removed earlier: asking again reopens the request for the agency to decide.
+      await db
+        .update(agencyInterpreters)
+        .set({ status: "pending", isActive: true, userId, updatedAt: new Date() })
+        .where(and(eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.interpreterId, interpreterId)));
+    } else {
+      await db.insert(agencyInterpreters).values({ agencyId, interpreterId, userId, status: "pending" });
+    }
     await writeAuditLog({ userId, userEmail, action: "agency_connection_requested", details: `agencyId=${agencyId}` });
     return { success: true };
   } catch (err) {
