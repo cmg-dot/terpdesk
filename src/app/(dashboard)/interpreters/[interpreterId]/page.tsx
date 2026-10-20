@@ -96,7 +96,7 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
         )}
       </section>
 
-      <SharedCredentialsSection credentials={view.credentials} />
+      <SharedCredentialsSection credentials={view.credentials} timeZone={view.timeZone} />
 
       <AvailabilitySection days={view.days} sharesAvailability={view.sharesAvailability} timeZoneLabel={zoneLabel} />
     </div>

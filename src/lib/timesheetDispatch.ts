@@ -10,6 +10,7 @@ import { sendTimesheetEmail } from "@/lib/timesheetEmail";
 import { hashToken } from "@/lib/timesheetToken";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 /**
  * Shared timesheet-dispatch logic. It is a plain module (not a server action), so it can be called by
@@ -77,8 +78,9 @@ export async function dispatchTimesheetCore(input: DispatchTimesheetInput): Prom
     .limit(1);
   if (!booking) return fail("This interpreter is not assigned to the request.");
 
+  await ensureDisplayNameColumns();
   const [interpreter] = await db
-    .select({ name: interpreters.name, email: interpreters.email })
+    .select({ name: interpreterDisplayName, email: interpreters.email })
     .from(interpreters)
     .where(eq(interpreters.id, interpreterId))
     .limit(1);

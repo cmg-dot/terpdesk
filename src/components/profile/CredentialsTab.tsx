@@ -16,12 +16,14 @@ interface CredentialsTabProps {
   onChange: Dispatch<SetStateAction<MyCredential[]>>;
   /** Agencies the interpreter is connected to (from approved roster rows). */
   connectedAgencyIds: string[];
+  /** The interpreter's profile time zone, for expiry badges. */
+  timeZone: string;
 }
 
 const byName = (a: MyCredential, b: MyCredential) => a.name.localeCompare(b.name);
 
 /** "My Profile" Credentials tab: active credentials with sharing, and an Archived section when there are any. */
-export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds }: CredentialsTabProps) => {
+export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, timeZone }: CredentialsTabProps) => {
   const { agencies: knownAgencies } = useGlobalState();
   // null = list view; "new" = add form; otherwise the id being edited.
   const [formFor, setFormFor] = useState<"new" | string | null>(null);
@@ -90,6 +92,7 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds }: Cr
                 key={c.id}
                 credential={c}
                 agencies={agencies}
+                timeZone={timeZone}
                 onEdit={() => setFormFor(c.id)}
                 // Archiving clears the credential's shares on the server, so mirror that here.
                 onArchived={() => replace({ ...c, isArchived: true, shares: [] })}

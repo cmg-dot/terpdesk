@@ -2,11 +2,12 @@
 
 import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
-import { requests, offers, interpreters } from "@/db/schema";
+import { requests, offers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
+import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 
 type OfferRecord = typeof offers.$inferSelect;
@@ -197,8 +198,7 @@ export async function respondToOffer(
       .where(eq(requests.id, offer.requestId));
   }
 
-  const [who] = await db.select({ name: interpreters.name }).from(interpreters).where(eq(interpreters.id, offer.interpreterId));
-  const who_name = who?.name ?? "An interpreter";
+  const who_name = (await getInterpreterDisplayName(offer.interpreterId)) ?? "An interpreter";
   await notifyAgencyAdmins({
     type: "job",
     href: `/requests/${offer.requestId}`,

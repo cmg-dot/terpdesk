@@ -1,8 +1,11 @@
 import { expiryStatus, formatDay, neutralBadge, badgeBase } from "@/components/profile/credentialFormat";
 import type { SharedCredentialView } from "@/lib/agencyInterpreterView";
 
-/** "Qualifications they report": active credentials the interpreter chose to share with this agency. */
-export const SharedCredentialsSection = ({ credentials }: { credentials: SharedCredentialView[] }) => (
+/**
+ * "Qualifications they report": active credentials the interpreter chose to share with this agency.
+ * Expiry is judged in the interpreter's time zone (`timeZone`), not the agency's.
+ */
+export const SharedCredentialsSection = ({ credentials, timeZone }: { credentials: SharedCredentialView[]; timeZone: string }) => (
   <section className="rounded-2xl border border-gray-200 bg-white p-6">
     <h2 className="mb-1 text-lg font-semibold text-[var(--ink)]">Qualifications they report</h2>
     <p className="mb-4 text-[12px] text-gray-500">
@@ -18,7 +21,7 @@ export const SharedCredentialsSection = ({ credentials }: { credentials: SharedC
     ) : (
       <ul className="space-y-3">
         {credentials.map((c) => {
-          const status = expiryStatus(c.expirationDate);
+          const status = expiryStatus(c.expirationDate, timeZone);
           const dates = [c.issueDate && `Issued ${formatDay(c.issueDate)}`, c.expirationDate && `Expires ${formatDay(c.expirationDate)}`]
             .filter(Boolean)
             .join(" · ");

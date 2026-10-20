@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { interpreters, requests, timesheets } from "@/db/schema";
 import type { TimesheetTravelLeg } from "@/db/schema";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 export interface SubmittedTimesheet {
   timesheetId: string;
@@ -44,11 +45,12 @@ interface LooseData {
 /** Magic-link timesheets that were submitted (awaiting review) or already approved. */
 export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
   await requireRole("agency");
+  await ensureDisplayNameColumns();
   const rows = await db
     .select({
       timesheetId: timesheets.id,
       requestId: timesheets.requestId,
-      interpreterName: interpreters.name,
+      interpreterName: interpreterDisplayName,
       actualStart: timesheets.actualStartTime,
       actualEnd: timesheets.actualEndTime,
       billableHours: timesheets.billableHours,

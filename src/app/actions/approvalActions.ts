@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { notifyInterpreter } from "@/lib/notifications";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { requireRole } from "@/lib/auth/guards";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 import { logError } from "@/lib/logError";
 
 /**
@@ -35,11 +36,12 @@ export type UpdateConnectionResult = { success: true } | { success: false; error
 /** Pending connection requests for the staff member's agency, oldest first. */
 export async function getPendingConnectionRequests(): Promise<PendingConnection[]> {
   await requireRole("agency");
+  await ensureDisplayNameColumns();
 
   const rows = await db
     .select({
       id: agencyInterpreters.id,
-      name: interpreters.name,
+      name: interpreterDisplayName,
       email: interpreters.email,
       createdAt: agencyInterpreters.createdAt,
     })

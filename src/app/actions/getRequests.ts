@@ -6,6 +6,7 @@ import { requests, offers, interpreters } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { formatReference, isNeedsReplacementStatus } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 function mapRequestRow(row: any, requestOffers: any[]) {
   const rowData = (row.data as any) || {};
@@ -214,12 +215,13 @@ function mapRequestRow(row: any, requestOffers: any[]) {
 
 export async function fetchLiveRequests() {
   await requireRole("agency");
+  await ensureDisplayNameColumns();
   const dbRows = await db.select().from(requests).orderBy(desc(requests.createdAt));
   const allOffers = await db.select({
     id: offers.id,
     requestId: offers.requestId,
     interpreterId: offers.interpreterId,
-    interpreterName: interpreters.name,
+    interpreterName: interpreterDisplayName,
     state: offers.status,
     status: offers.status,
     expiresAt: offers.expiresAt
@@ -289,15 +291,16 @@ export async function fetchLiveRequests() {
 
 export async function fetchLiveRequestById(id: string) {
   await requireRole("agency");
+  await ensureDisplayNameColumns();
   const dbRows = await db.select().from(requests).where(eq(requests.id, id));
   if (!dbRows || dbRows.length === 0) return null;
   const row = dbRows[0];
-  
+
   const requestOffers = await db.select({
     id: offers.id,
     requestId: offers.requestId,
     interpreterId: offers.interpreterId,
-    interpreterName: interpreters.name,
+    interpreterName: interpreterDisplayName,
     state: offers.status,
     status: offers.status,
     expiresAt: offers.expiresAt

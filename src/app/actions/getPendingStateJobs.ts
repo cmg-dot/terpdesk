@@ -8,6 +8,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { formatReference } from "@/utils/statusEngine";
 import { getIanaZone, resolveRequestTimes, utcToWallClock } from "@/utils/timezone";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 export interface PendingStateJob {
   requestId: string;
@@ -37,12 +38,13 @@ const MAX_RESULTS = 200;
  */
 export async function getPendingStateJobs(): Promise<PendingStateJob[]> {
   await requireRole("agency");
+  await ensureDisplayNameColumns();
 
   const assigned = await db
     .select({
       requestId: offers.requestId,
       interpreterId: offers.interpreterId,
-      interpreterName: interpreters.name,
+      interpreterName: interpreterDisplayName,
       status: requests.status,
       isStateJob: requests.isStateJob,
       createdAt: requests.createdAt,

@@ -1,6 +1,7 @@
 import { asc, and, eq, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters } from "@/db/schema";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 /**
  * An agency's roster = interpreters with an APPROVED connection to it (agency_interpreters). That includes shadow /
@@ -8,18 +9,20 @@ import { agencyInterpreters, interpreters } from "@/db/schema";
  * or whose join request is pending, rejected, or revoked, is not on the roster.
  * `rosterActive` is false for archived people: they stay listed (so they can be reactivated) but must not be
  * dispatched, so dispatch callers pass `activeOnly`.
+ * `name` is the display name (preferred name, else account name), so the roster and offer dropdowns agree.
  *
  * SERVER ONLY: queries the database.
  */
 export async function getRosterInterpreters(agencyId: string, opts: { activeOnly?: boolean } = {}) {
+  await ensureDisplayNameColumns();
   const conditions = [eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.status, "approved")];
   if (opts.activeOnly) conditions.push(eq(agencyInterpreters.isActive, true));
   return db
-    .select({ ...getTableColumns(interpreters), rosterActive: agencyInterpreters.isActive })
+    .select({ ...getTableColumns(interpreters), name: interpreterDisplayName, rosterActive: agencyInterpreters.isActive })
     .from(interpreters)
     .innerJoin(agencyInterpreters, eq(agencyInterpreters.interpreterId, interpreters.id))
     .where(and(...conditions))
-    .orderBy(asc(interpreters.name));
+    .orderBy(asc(interpreterDisplayName));
 }
 
 export type RosterInterpreter = Awaited<ReturnType<typeof getRosterInterpreters>>[number];

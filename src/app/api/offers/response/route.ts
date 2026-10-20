@@ -1,12 +1,13 @@
 import { NextRequest } from "next/server";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { requests, offers, interpreters } from "@/db/schema";
+import { requests, offers } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
 import { verifyOfferToken } from "@/lib/jwt";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
+import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
@@ -340,14 +341,8 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // 4. Fetch interpreter details for name formatting
-    const [interpreterRecord] = await db
-      .select()
-      .from(interpreters)
-      .where(eq(interpreters.id, interpreterId))
-      .limit(1);
-
-    const interpreterName = interpreterRecord?.name || "Assigned Interpreter";
+    // 4. The name agencies see (preferred name, else account name); it is also stored on the booking below.
+    const interpreterName = (await getInterpreterDisplayName(interpreterId)) || "Assigned Interpreter";
 
     // Extract request details for HTML card
     const existingData = (parentReq.data as Record<string, any>) || {};

@@ -78,7 +78,12 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgenc
             />
           )}
           {tab === "credentials" && (
-            <CredentialsTab credentials={credentials} onChange={setCredentials} connectedAgencyIds={connectedAgencyIds} />
+            <CredentialsTab
+              credentials={credentials}
+              onChange={setCredentials}
+              connectedAgencyIds={connectedAgencyIds}
+              timeZone={profile.timeZone}
+            />
           )}
           {tab === "visibility" && (
             <VisibilitySharingTab profile={profile} sharing={websiteSharing} onSharingChange={setWebsiteSharing} />

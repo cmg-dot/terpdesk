@@ -19,6 +19,10 @@ export interface DayAvailability {
   booked: (DaySpan & { requestId: string })[];
   /** The interpreter marked the whole day as unavailable. */
   dayOff: boolean;
+  /** Time zone abbreviation for that day in the interpreter's zone, e.g. "PDT" or "PST" (changes with DST). */
+  tzAbbr: string;
+  /** Real length of the local day (1380 or 1500 on DST change days, otherwise 1440). */
+  minutesInDay: number;
 }
 
 export interface AvailabilityInputs {
@@ -115,10 +119,22 @@ export function summarizeAvailability(input: AvailabilityInputs, now: Date, days
       busy,
       booked,
       dayOff: Boolean(exception && !exception.available),
+      // Taken at midday, so a DST switch at 2 AM still yields that day's prevailing abbreviation.
+      tzAbbr: formatInTimeZone(new Date(dayStart.getTime() + 12 * 3_600_000), zone, "zzz"),
+      minutesInDay: Math.round((dayEnd.getTime() - dayStart.getTime()) / 60000),
     });
   }
   return result;
 }
+
+/**
+ * A span as shown to agencies, in the interpreter's zone: "12:30 PM – 5:00 PM (PDT)", or "All day" when it covers
+ * the whole local day (midnight to midnight).
+ */
+export const formatSpan = (span: DaySpan, day: Pick<DayAvailability, "tzAbbr" | "minutesInDay">): string => {
+  if (span.start <= 0 && span.end >= Math.min(DAY, day.minutesInDay)) return "All day";
+  return `${formatMinute(span.start)} – ${formatMinute(span.end)} (${day.tzAbbr})`;
+};
 
 /** 540 -> "9:00 AM"; 1440 -> "midnight". */
 export const formatMinute = (minute: number): string => {

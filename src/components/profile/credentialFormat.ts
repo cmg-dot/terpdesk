@@ -1,4 +1,6 @@
+import { formatInTimeZone } from "date-fns-tz";
 import type { MyCredential } from "@/lib/validation/credential";
+import { getIanaZone } from "@/utils/timezone";
 
 const EXPIRING_SOON_DAYS = 60;
 
@@ -15,12 +17,25 @@ export const formatDay = (value: string): string => {
   return new Date(y, m - 1, d).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
 };
 
-export const expiryStatus = (expirationDate: string): { label: string; className: string } | null => {
-  if (!expirationDate) return null;
-  const [y, m, d] = expirationDate.split("-").map(Number);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const days = Math.round((new Date(y, m - 1, d).getTime() - today.getTime()) / 86_400_000);
+/** A yyyy-MM-dd calendar date as a whole day count (no clock time, so no time zone can shift it). */
+const dayNumber = (value: string): number => {
+  const [y, m, d] = value.split("-").map(Number);
+  return Date.UTC(y, m - 1, d) / 86_400_000;
+};
+
+/**
+ * Expired / expiring-soon badge. "Today" is the calendar date in the interpreter's own time zone, never the
+ * server's (UTC) or the viewer's browser zone, so an agency in another zone sees the same answer the interpreter does.
+ * A credential is still valid on its expiration date and expired from the next day.
+ */
+export const expiryStatus = (
+  expirationDate: string,
+  timeZone: string,
+  now: Date = new Date(),
+): { label: string; className: string } | null => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(expirationDate)) return null;
+  const today = formatInTimeZone(now, getIanaZone(timeZone), "yyyy-MM-dd");
+  const days = dayNumber(expirationDate) - dayNumber(today);
   if (days < 0) return { label: "Expired", className: "border-red-200 bg-red-50 text-red-700" };
   if (days <= EXPIRING_SOON_DAYS) return { label: "Expires soon", className: "border-amber-200 bg-amber-50 text-amber-800" };
   return null;

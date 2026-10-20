@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { formatMinute } from "@/lib/availabilitySummary";
+import { formatSpan } from "@/lib/availabilitySummary";
 import type { DayAvailability, DaySpan } from "@/lib/availabilitySummary";
 
 interface AvailabilitySectionProps {
@@ -8,7 +8,11 @@ interface AvailabilitySectionProps {
   timeZoneLabel: string;
 }
 
-const range = (s: DaySpan) => `${formatMinute(s.start)} – ${formatMinute(s.end)}`;
+/** "Free 9:00 AM – 5:00 PM (PDT)" or "Free all day". Times are already in the interpreter's zone. */
+const label = (prefix: string, s: DaySpan, d: DayAvailability): string => {
+  const text = formatSpan(s, d);
+  return text === "All day" ? `${prefix} all day` : `${prefix} ${text}`;
+};
 
 /**
  * Read-only next-two-weeks view. Free hours and private busy time appear only when the interpreter shares their
@@ -38,7 +42,7 @@ export const AvailabilitySection = ({ days, sharesAvailability, timeZoneLabel }:
                 {d.dayOff && <span className="rounded-full bg-gray-100 px-2.5 py-0.5 text-[12px] text-gray-600">Unavailable all day</span>}
                 {d.free.map((s) => (
                   <span key={`f-${s.start}`} className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[12px] text-emerald-800">
-                    Free {range(s)}
+                    {label("Free", s, d)}
                   </span>
                 ))}
                 {d.booked.map((s) => (
@@ -47,12 +51,12 @@ export const AvailabilitySection = ({ days, sharesAvailability, timeZoneLabel }:
                     href={`/requests/${s.requestId}`}
                     className="rounded-full border border-[#BCE1D1] bg-[#E5F0EB] px-2.5 py-0.5 text-[12px] text-[#0A3D31] hover:underline"
                   >
-                    Booked with you {range(s)}
+                    {label("Booked with you", s, d)}
                   </Link>
                 ))}
                 {d.busy.map((s) => (
                   <span key={`x-${s.start}`} className="rounded-full border border-gray-200 bg-gray-100 px-2.5 py-0.5 text-[12px] text-gray-600">
-                    Busy {range(s)}
+                    {label("Busy", s, d)}
                   </span>
                 ))}
                 {!d.dayOff && d.free.length === 0 && d.booked.length === 0 && d.busy.length === 0 && (
@@ -76,7 +80,7 @@ export const AvailabilitySection = ({ days, sharesAvailability, timeZoneLabel }:
                     href={`/requests/${s.requestId}`}
                     className="rounded-full border border-[#BCE1D1] bg-[#E5F0EB] px-2.5 py-0.5 text-[12px] text-[#0A3D31] hover:underline"
                   >
-                    Booked with you {range(s)}
+                    {label("Booked with you", s, d)}
                   </Link>
                 ))}
               </div>

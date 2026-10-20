@@ -11,18 +11,20 @@ import type { CredentialShare, MyCredential } from "@/lib/validation/credential"
 interface CredentialCardProps {
   credential: MyCredential;
   agencies: { id: string; name: string }[];
+  /** The interpreter's profile time zone: expiry is judged against "today" there. */
+  timeZone: string;
   onEdit: () => void;
   onArchived: () => void;
   onSharesChange: (shares: CredentialShare[]) => void;
 }
 
 /** One credential in display mode: details and badges, actions, supporting files, and who can see it. */
-export const CredentialCard = ({ credential: c, agencies, onEdit, onArchived, onSharesChange }: CredentialCardProps) => {
+export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onArchived, onSharesChange }: CredentialCardProps) => {
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const status = expiryStatus(c.expirationDate);
+  const status = expiryStatus(c.expirationDate, timeZone);
   const sharedCount = c.shares.length;
   const { details, dates } = credentialLines(c);
 

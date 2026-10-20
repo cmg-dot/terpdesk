@@ -10,6 +10,7 @@ import { interpreters, requests, timesheets } from "@/db/schema";
 import { sendApprovalEmail } from "@/lib/timesheetEmail";
 import { writeAuditLog } from "@/lib/audit";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
+import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
 const REQUEST_COMPLETED_STATUS = "completed";
@@ -79,9 +80,10 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
     revalidatePath("/requests");
     revalidatePath(`/requests/${approved.requestId}`);
 
+    await ensureDisplayNameColumns();
     const [row] = await db
       .select({
-        name: interpreters.name,
+        name: interpreterDisplayName,
         email: interpreters.email,
         createdAt: requests.createdAt,
         data: requests.data,
