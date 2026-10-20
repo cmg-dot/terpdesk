@@ -2,16 +2,24 @@ import { z } from "zod";
 
 /** Time zones offered on the profile form (the ones the calendar understands). */
 export const PROFILE_TIME_ZONES = [
-  { value: "Pacific/Honolulu", label: "Hawaii (HST)" },
-  { value: "America/Anchorage", label: "Alaska (AKT)" },
-  { value: "America/Los_Angeles", label: "Pacific (PT)" },
-  { value: "America/Phoenix", label: "Arizona (MST, no daylight saving)" },
-  { value: "America/Denver", label: "Mountain (MT)" },
-  { value: "America/Chicago", label: "Central (CT)" },
-  { value: "America/New_York", label: "Eastern (ET)" },
+  { value: "America/Los_Angeles", label: "Pacific Time — Seattle, Los Angeles" },
+  { value: "America/Denver", label: "Mountain Time — Denver" },
+  { value: "America/Phoenix", label: "Arizona (no daylight saving)" },
+  { value: "America/Chicago", label: "Central Time — Chicago" },
+  { value: "America/New_York", label: "Eastern Time — New York" },
+  { value: "America/Anchorage", label: "Alaska Time" },
+  { value: "Pacific/Honolulu", label: "Hawaii Time" },
 ] as const;
 
-const ZONE_VALUES = new Set<string>(PROFILE_TIME_ZONES.map((z) => z.value));
+/** Any real IANA zone is accepted, so a zone the calendar already saved never blocks saving the profile. */
+const isKnownZone = (value: string): boolean => {
+  try {
+    new Intl.DateTimeFormat("en-US", { timeZone: value });
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const text = (max: number, label: string) => z.string().trim().max(max, `${label} must be ${max} characters or fewer.`);
 
@@ -26,7 +34,7 @@ export const interpreterProfileSchema = z.object({
   city: text(100, "City"),
   stateOrRegion: text(100, "State or region"),
   serviceArea: text(200, "Service area"),
-  timeZone: z.string().refine((v) => ZONE_VALUES.has(v), "Choose a time zone from the list."),
+  timeZone: z.string().max(64).refine(isKnownZone, "Choose a time zone from the list."),
   takesInPerson: z.boolean(),
   takesVirtual: z.boolean(),
   workEmail: text(255, "Work email").refine(

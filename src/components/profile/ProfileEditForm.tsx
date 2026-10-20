@@ -3,7 +3,7 @@
 import { useState } from "react";
 import type { ChangeEvent, FormEvent, ReactNode } from "react";
 import { updateMyProfile } from "@/app/actions/interpreterProfile";
-import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ProfilePhotoPicker } from "@/components/profile/ProfilePhotoPicker";
 import { PROFILE_TIME_ZONES, interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
 
@@ -16,11 +16,12 @@ interface ProfileEditFormProps {
   onCancel: () => void;
 }
 
+// Off-white fill so inputs stand out on the white cards; a dark green border and ring show focus.
 const inputClass =
-  "w-full rounded-xl border border-gray-200 bg-white px-4 py-2.5 text-sm text-gray-900 outline-none transition-shadow focus:ring-2 focus:ring-[#0B3B32] aria-[invalid=true]:border-red-400";
+  "w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-colors focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40 aria-[invalid=true]:border-red-400";
 
-const Field = ({ id, label, hint, error, children }: { id: string; label: string; hint?: string; error?: string; children: ReactNode }) => (
-  <div className="space-y-1.5">
+const Field = ({ id, label, hint, error, className = "", children }: { id: string; label: string; hint?: string; error?: string; className?: string; children: ReactNode }) => (
+  <div className={`space-y-1.5 ${className}`}>
     <label htmlFor={id} className="block text-[13px] font-medium text-gray-700">{label}</label>
     {children}
     {error ? (
@@ -32,15 +33,16 @@ const Field = ({ id, label, hint, error, children }: { id: string; label: string
 );
 
 const Card = ({ title, children }: { title: string; children: ReactNode }) => (
-  <fieldset className="space-y-4 rounded-2xl border border-gray-200 bg-white p-6">
+  <fieldset className="rounded-2xl border border-gray-200 bg-white p-6">
     <legend className="sr-only">{title}</legend>
-    <h2 className="text-lg font-semibold text-[var(--ink)]">{title}</h2>
-    {children}
+    <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">{title}</h2>
+    <div className="grid gap-4 md:grid-cols-2">{children}</div>
   </fieldset>
 );
 
 const toInput = (p: MyProfile): InterpreterProfileInput => ({
-  preferredName: p.preferredName,
+  // Empty preferred name starts as the account name, so the field is never blank.
+  preferredName: p.preferredName || p.fullName,
   photoUrl: p.photoUrl,
   shortBio: p.shortBio,
   city: p.city,
@@ -68,6 +70,9 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
     onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
       setValues((v) => ({ ...v, [field]: e.target.value })),
   });
+
+  // A zone the calendar saved that is not one of the seven choices stays selectable instead of silently changing.
+  const knownZone = PROFILE_TIME_ZONES.some((z) => z.value === values.timeZone);
 
   const onSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -105,19 +110,18 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
 
   return (
     <form onSubmit={onSubmit} noValidate className="space-y-6">
-      <Card title="Photo">
-        <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-          <ProfileAvatar photoUrl={values.photoUrl} name={values.preferredName || profile.fullName} />
-          <div className="flex-1">
-            <Field id="profile-photoUrl" label="Photo link" hint="A link to an image of you, starting with https://" error={errors.photoUrl}>
-              <input type="url" inputMode="url" placeholder="https://" className={inputClass} {...text("photoUrl")} />
-            </Field>
-          </div>
-        </div>
-      </Card>
+      <fieldset className="rounded-2xl border border-gray-200 bg-white p-6">
+        <legend className="sr-only">Photo</legend>
+        <h2 className="mb-4 text-lg font-semibold text-[var(--ink)]">Photo</h2>
+        <ProfilePhotoPicker
+          currentPhotoUrl={values.photoUrl}
+          name={values.preferredName || profile.fullName}
+          onRemove={() => setValues((v) => ({ ...v, photoUrl: "" }))}
+        />
+      </fieldset>
 
       <Card title="About you">
-        <Field id="profile-preferredName" label="Preferred name" hint={`Leave blank to use ${profile.fullName || "your account name"}.`} error={errors.preferredName}>
+        <Field id="profile-preferredName" label="Preferred name" hint="The name agencies see. Starts as your account name." error={errors.preferredName}>
           <input type="text" autoComplete="nickname" className={inputClass} {...text("preferredName")} />
         </Field>
         <Field id="profile-signInEmail" label="Sign-in email" hint="This is the email you sign in with. It can't be changed here.">
@@ -127,34 +131,43 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
             value={profile.signInEmail}
             readOnly
             disabled
-            className={`${inputClass} cursor-not-allowed bg-gray-100 text-gray-500`}
+            className={`${inputClass} cursor-not-allowed bg-stone-200/60 text-gray-500`}
           />
         </Field>
-        <Field id="profile-shortBio" label="Short bio" hint="Up to 600 characters." error={errors.shortBio}>
-          <textarea rows={4} className={inputClass} {...text("shortBio")} />
+        <Field id="profile-shortBio" label="Short bio" hint="Up to 600 characters." error={errors.shortBio} className="md:col-span-2">
+          <textarea
+            rows={4}
+            placeholder="How you work, settings you enjoy, anything an agency should know."
+            className={inputClass}
+            {...text("shortBio")}
+          />
         </Field>
       </Card>
 
       <Card title="Where and how you work">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="profile-city" label="City" error={errors.city}>
-            <input type="text" autoComplete="address-level2" className={inputClass} {...text("city")} />
-          </Field>
-          <Field id="profile-stateOrRegion" label="State or region" error={errors.stateOrRegion}>
-            <input type="text" autoComplete="address-level1" className={inputClass} {...text("stateOrRegion")} />
-          </Field>
-        </div>
-        <Field id="profile-serviceArea" label="Service area" hint="For example: South Puget Sound, up to 40 miles." error={errors.serviceArea}>
-          <input type="text" className={inputClass} {...text("serviceArea")} />
+        <Field id="profile-city" label="City" error={errors.city}>
+          <input type="text" autoComplete="address-level2" className={inputClass} {...text("city")} />
+        </Field>
+        <Field id="profile-stateOrRegion" label="State or region" error={errors.stateOrRegion}>
+          <input type="text" autoComplete="address-level1" className={inputClass} {...text("stateOrRegion")} />
+        </Field>
+        <Field id="profile-serviceArea" label="Service area" error={errors.serviceArea}>
+          <input
+            type="text"
+            placeholder="For example: Seattle metro, up to 40 miles"
+            className={inputClass}
+            {...text("serviceArea")}
+          />
         </Field>
         <Field id="profile-timeZone" label="Time zone" hint="Also used by your calendar." error={errors.timeZone}>
           <select className={inputClass} {...text("timeZone")}>
+            {!knownZone && <option value={values.timeZone}>{values.timeZone}</option>}
             {PROFILE_TIME_ZONES.map((z) => (
               <option key={z.value} value={z.value}>{z.label}</option>
             ))}
           </select>
         </Field>
-        <div className="flex flex-col gap-3 sm:flex-row sm:gap-8">
+        <div className="flex flex-col gap-3 sm:flex-row sm:gap-8 md:col-span-2">
           {(["takesInPerson", "takesVirtual"] as const).map((field) => (
             <label key={field} className="inline-flex items-center gap-2.5 text-sm text-gray-800">
               <input
@@ -170,14 +183,12 @@ export const ProfileEditForm = ({ profile, onSaved, onCancel }: ProfileEditFormP
       </Card>
 
       <Card title="Contact details">
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field id="profile-workEmail" label="Work email" hint="Can differ from your sign-in email." error={errors.workEmail}>
-            <input type="email" autoComplete="email" className={inputClass} {...text("workEmail")} />
-          </Field>
-          <Field id="profile-workPhone" label="Work phone" error={errors.workPhone}>
-            <input type="tel" autoComplete="tel" className={inputClass} {...text("workPhone")} />
-          </Field>
-        </div>
+        <Field id="profile-workEmail" label="Work email" hint="Can differ from your sign-in email." error={errors.workEmail}>
+          <input type="email" autoComplete="email" className={inputClass} {...text("workEmail")} />
+        </Field>
+        <Field id="profile-workPhone" label="Work phone" error={errors.workPhone}>
+          <input type="tel" autoComplete="tel" className={inputClass} {...text("workPhone")} />
+        </Field>
       </Card>
 
       {formError && (

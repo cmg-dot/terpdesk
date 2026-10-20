@@ -90,6 +90,15 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
   }
 
   const d = parsed.data;
+  try {
+    // The form pre-fills the preferred name with the account name. Storing that as a preference would freeze it,
+    // so a name equal to the account name is saved as "not set" and keeps following the account.
+    const [account] = await db.select({ name: users.name }).from(users).where(eq(users.id, session.user.id)).limit(1);
+    if (account && d.preferredName.toLowerCase() === account.name.trim().toLowerCase()) d.preferredName = "";
+  } catch (err) {
+    logError("updateMyProfile.accountName", err);
+  }
+
   // Only validated, picked fields reach the database. Empty strings are stored as "not set".
   const values = {
     preferredName: d.preferredName || null,
