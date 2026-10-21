@@ -12,6 +12,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 import { mirrorTimesheetApproval } from "@/lib/timesheetSync";
+import { logActivity } from "@/lib/requestActivity";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
 const REQUEST_COMPLETED_STATUS = "completed";
@@ -77,6 +78,8 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
       action: "timesheet_approved",
       details: `timesheetId=${timesheetId}; requestId=${approved.requestId}; approvedMileage=${approvedMileage.toFixed(1)}`,
     });
+
+    await logActivity({ requestId: approved.requestId, interpreterId: approved.interpreterId, audience: "shared", kind: "hours_approved", message: "Hours approved", actorLabel: session.user.name ?? "Agency staff" });
 
     revalidatePath("/hours-review");
     revalidatePath("/dashboard");

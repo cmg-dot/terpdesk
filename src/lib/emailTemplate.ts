@@ -40,6 +40,16 @@ export const emailActionCard = (innerHtml: string): string =>
 export const emailButton = (label: string, href: string): string =>
   `<a href="${escapeHtml(href)}" target="_blank" style="background-color:${EMAIL_COLORS.brand};color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;font-weight:700;font-size:15px;font-family:${FONT_STACK};">${escapeHtml(label)}</a>`;
 
+/**
+ * Full-width, extra-large button for the one action an email exists for. Table-based ("bulletproof") so the whole
+ * area stays a solid, clickable button in Outlook too.
+ */
+export const emailHeroButton = (label: string, href: string): string =>
+  `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:separate;"><tr>` +
+  `<td align="center" bgcolor="${EMAIL_COLORS.brand}" style="border-radius:10px;background-color:${EMAIL_COLORS.brand};">` +
+  `<a href="${escapeHtml(href)}" target="_blank" style="display:block;padding:16px 24px;color:#ffffff;text-decoration:none;font-weight:700;font-size:17px;font-family:${FONT_STACK};border-radius:10px;">${escapeHtml(label)}</a>` +
+  `</td></tr></table>`;
+
 /** Secondary (outlined) button for a less prominent action. */
 export const emailSecondaryButton = (label: string, href: string): string =>
   `<a href="${escapeHtml(href)}" target="_blank" style="background-color:#ffffff;color:${EMAIL_COLORS.brand};padding:11px 23px;border:1px solid ${EMAIL_COLORS.brand};border-radius:8px;text-decoration:none;display:inline-block;font-weight:700;font-size:15px;font-family:${FONT_STACK};">${escapeHtml(label)}</a>`;

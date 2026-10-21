@@ -139,10 +139,18 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
         ? { ...fromSheet, ...storedHours, ...(sheet?.status === 'approved' ? { status: 'approved', approvedMileage: fromSheet.approvedMileage } : {}) }
         : { ...(storedHours || {}), ...fromSheet, isDraft: false };
 
+    // Set by a post-booking edit for the offers that were booked at the time (see jobUpdateNotice.ts).
+    const update = rowData.detailsUpdate as { at?: unknown; fields?: unknown; offerIds?: unknown } | undefined;
+    const detailsUpdated =
+      row.offer.status === 'accepted' && Array.isArray(update?.offerIds) && update.offerIds.includes(row.offer.id) && typeof update.at === 'string'
+        ? { at: update.at, fields: Array.isArray(update.fields) ? update.fields.filter((f): f is string => typeof f === 'string') : [] }
+        : null;
+
     return {
       id: row.offer.id,
       requestId: row.request.id,
       positionIndex: posIdx,
+      detailsUpdated,
       title: row.request.title,
       startsAt,
       endsAt,

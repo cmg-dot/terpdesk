@@ -426,10 +426,23 @@ export default function EditRequestPage() {
   const isDuplicateUnconfirmed = Boolean(duplicateClient && !confirmDuplicateOrg);
 
   const realOffers = existingRequest?.offers || [];
-  const hasActiveOrAcceptedOffers = Boolean(
-    realOffers.some((o: any) => ['pending', 'accepted'].includes(o.state || o.status)) ||
-    ['assigned', 'booked', 'Cancelled', 'cancelled'].includes(existingRequest?.status)
+  // Same rule as offerLock.ts (enforced again on the server): a live offer locks; a booking locks only once the
+  // appointment has started. A booked future job can be edited, and the booked interpreter is emailed what changed.
+  const nowMs = Date.now();
+  const apptStartMs = new Date(existingRequest?.startsAt ?? Number.NaN).getTime();
+  const apptEndMs = new Date(existingRequest?.endsAt ?? Number.NaN).getTime();
+  const hasLivePendingOffer = realOffers.some((o: any) =>
+    (o.state || o.status) === 'pending' && new Date(o.expiresAt).getTime() > nowMs && !(apptEndMs < nowMs)
   );
+  const isBookedRequest = realOffers.some((o: any) => (o.state || o.status) === 'accepted') ||
+    ['assigned', 'booked', 'Fully staffed'].includes(existingRequest?.status);
+  const isCancelledRequest = ['Cancelled', 'cancelled'].includes(existingRequest?.status);
+  const isEditLocked = isCancelledRequest || hasLivePendingOffer || (isBookedRequest && !Number.isNaN(apptStartMs) && nowMs >= apptStartMs);
+  const editLockMessage = isCancelledRequest
+    ? "This appointment was cancelled, so it can't be edited."
+    : hasLivePendingOffer
+      ? "This appointment can't be edited while an offer is waiting for a response. Once every pending offer has been accepted, declined or has expired, you can edit it."
+      : "This appointment has already started, so its booked details can no longer be edited.";
 
   const handleChange = (field: keyof typeof formData, value: string | boolean) => {
     if (field === "requesterOrgOrContact") {
@@ -580,7 +593,7 @@ export default function EditRequestPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSave = async () => {
-    if (hasActiveOrAcceptedOffers || isTimeInvalid || isDuplicateUnconfirmed || isAnyEmailInvalid) return;
+    if (isEditLocked || isTimeInvalid || isDuplicateUnconfirmed || isAnyEmailInvalid) return;
     setIsSaving(true);
     try {
       const { startsAt: startsAtStr, endsAt: endsAtStr } = buildAppointmentUtcTimes({
@@ -776,10 +789,15 @@ export default function EditRequestPage() {
  <p className="text-[15px] text-[var(--sage)]">
  Update the details for this assignment.
  </p>
- {hasActiveOrAcceptedOffers && (
+ {isEditLocked && (
  <div className="mt-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-xl p-4 text-sm flex items-center gap-2.5">
  <Lock className="w-4 h-4 flex-shrink-0 text-amber-700" />
- <span>This appointment cannot currently be edited because offers have already been sent.</span>
+ <span>{editLockMessage}</span>
+ </div>
+ )}
+ {!isEditLocked && isBookedRequest && (
+ <div className="mt-4 bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-4 text-sm">
+ An interpreter is booked on this job. When you save, each booked interpreter is emailed exactly what changed, and the job is marked “Updated” in their app.
  </div>
  )}
  </div>
@@ -1195,10 +1213,10 @@ export default function EditRequestPage() {
      The end time must be after the start time.
    </div>
  )}
- {hasActiveOrAcceptedOffers && (
+ {isEditLocked && (
    <div className="text-amber-700 text-sm font-medium mb-2 flex items-center gap-1.5">
      <Lock className="w-4 h-4 flex-shrink-0" />
-     <span>This appointment cannot currently be edited because offers have already been sent.</span>
+     <span>{editLockMessage}</span>
    </div>
  )}
  {saveError && (
@@ -1207,7 +1225,7 @@ export default function EditRequestPage() {
  <div className="flex items-center gap-4 pt-4">
  <button
    onClick={handleSave}
-   disabled={isSaving || isTimeInvalid || hasActiveOrAcceptedOffers || isDuplicateUnconfirmed || isAnyEmailInvalid}
+   disabled={isSaving || isTimeInvalid || isEditLocked || isDuplicateUnconfirmed || isAnyEmailInvalid}
    className="bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full font-medium transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
  >
    {isSaving ? "Saving..." : "Save changes"}

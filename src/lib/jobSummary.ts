@@ -32,6 +32,8 @@ export interface JobSummary {
   role: string;
   /** Broad program type only: "WA ODHH", "WA Apple Health" or "Agency (general)". Never the client. */
   program: string;
+  /** IANA zone the times above are shown in (not rendered in emails). */
+  timeZone: string;
 }
 
 export interface JobDetails extends JobSummary {
@@ -79,6 +81,7 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     role: positionNumber === 2 ? "Position 2 (team)" : positionNumber === 1 ? "Position 1" : "Interpreter",
     // Mapped to a fixed label so a free-text program value can never leak client detail into an email.
     program: /odhh/i.test(rawProgram) ? "WA ODHH" : /apple/i.test(rawProgram) ? "WA Apple Health" : "Agency (general)",
+    timeZone: zone,
   };
 }
 

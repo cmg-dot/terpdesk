@@ -6,7 +6,8 @@ import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { buildAppointmentUtcTimes } from "@/utils/timezone";
-import { EDIT_LOCKED_MESSAGE, isRequestEditLocked } from "@/lib/offerLock";
+import { getRequestEditLock } from "@/lib/offerLock";
+import { announceEdit, detailsUpdateFlag, planEditNotice } from "@/lib/jobUpdateNotice";
 
 export interface UpdateRequestDetailsPayload {
   requestId: string;
@@ -33,21 +34,22 @@ export interface UpdateRequestDetailsPayload {
 }
 
 export type UpdateRequestDetailsResult =
-  | { success: true; request: typeof requests.$inferSelect }
+  | { success: true; request: typeof requests.$inferSelect; notifiedInterpreters: number }
   | { success: false; error: string };
 
 /**
- * Quick edit. Refused while offers are live or an interpreter is booked (same rule as "Edit assignment", enforced
- * here on the server). Problems are returned, not thrown: in production a thrown message is hidden from the browser.
+ * Quick edit. Same lock as "Edit assignment" (see offerLock.ts), enforced here on the server. Booked interpreters
+ * are told what changed. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
  */
 export async function updateRequestDetails(payload: UpdateRequestDetailsPayload): Promise<UpdateRequestDetailsResult> {
-  await requireRole("agency");
+  const session = await requireRole("agency");
   const rows = await db.select().from(requests).where(eq(requests.id, payload.requestId));
   if (!rows || rows.length === 0) {
     return { success: false, error: "This request no longer exists." };
   }
   const existing = rows[0];
-  if (await isRequestEditLocked(payload.requestId)) return { success: false, error: EDIT_LOCKED_MESSAGE };
+  const lock = await getRequestEditLock(payload.requestId);
+  if (lock.locked) return { success: false, error: lock.message };
 
   const existingData = (existing.data as any) || {};
   const existingDetails = existingData.details || {};
@@ -151,14 +153,21 @@ export async function updateRequestDetails(payload: UpdateRequestDetailsPayload)
     }
   };
 
+  // Post-booking edit: work out what the booked interpreter(s) will see change, and flag it in this same write.
+  const notice = await planEditNotice(existing, { ...existing, createdAt: new Date(startsAtIso), data: updatedData });
+  const flag = detailsUpdateFlag(notice);
+  const finalData = flag ? { ...updatedData, detailsUpdate: flag } : updatedData;
+
   const [updated] = await db.update(requests)
     .set({
       createdAt: new Date(startsAtIso),
-      data: updatedData,
+      data: finalData,
       updatedAt: new Date()
     })
     .where(eq(requests.id, payload.requestId))
     .returning();
+
+  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff");
 
   revalidatePath(`/requests/${payload.requestId}`);
   revalidatePath('/requests');
@@ -168,5 +177,5 @@ export async function updateRequestDetails(payload: UpdateRequestDetailsPayload)
   revalidatePath('/interpreter-home');
   revalidatePath('/interpreter-calendar');
 
-  return { success: true, request: updated };
+  return { success: true, request: updated, notifiedInterpreters: notified };
 }

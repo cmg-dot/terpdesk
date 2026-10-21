@@ -27,6 +27,7 @@ import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection
 import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
+import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -445,6 +446,23 @@ export default function AssignmentDetailPage() {
   const hasActiveOrAcceptedOffers = hasLivePendingOffer || hasAcceptedBooking;
   const isFrozen = isCancelled || hasActiveOrAcceptedOffers;
 
+  // Edit lock, mirroring offerLock.ts (the server enforces it too): a live offer always locks; a booking only once the
+  // appointment has started. Editing a booked future job is allowed and emails the booked interpreter what changed.
+  const editLockStartMs = (() => {
+    try {
+      return new Date(resolveRequestTimes({ createdAt: foundRequest?.createdAt, data: foundRequest?.data || foundRequest }).startsAt).getTime();
+    } catch {
+      return Number.NaN;
+    }
+  })();
+  const bookingStarted = hasAcceptedBooking && !Number.isNaN(editLockStartMs) && currentTime >= editLockStartMs;
+  const isEditLocked = hasLivePendingOffer || bookingStarted;
+  const editLockMessage = hasLivePendingOffer
+    ? "This appointment can't be edited while an offer is waiting for a response. Once every pending offer has been accepted, declined or has expired, you can edit it."
+    : "This appointment has already started, so its booked details can no longer be edited.";
+  const [editNotice, setEditNotice] = useState<string | null>(null);
+  const [activityVersion, setActivityVersion] = useState(0);
+
  const [showCancelModal, setShowCancelModal] = useState(false);
  const [cancelReasonInput, setCancelReasonInput] = useState('');
  const [clientRequested, setClientRequested] = useState(false);
@@ -518,8 +536,8 @@ export default function AssignmentDetailPage() {
 
   const handleSaveAccess = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (hasActiveOrAcceptedOffers) {
-      setSaveError('This appointment cannot currently be edited because offers have already been sent.');
+    if (isEditLocked) {
+      setSaveError(editLockMessage);
       return;
     }
     if (isQuickEditTimeInvalid) return;
@@ -552,6 +570,12 @@ export default function AssignmentDetailPage() {
         return;
       }
       const updatedRow = result.request;
+      setActivityVersion((v) => v + 1);
+      setEditNotice(
+        result.notifiedInterpreters > 0
+          ? `Saved. ${result.notifiedInterpreters === 1 ? "The booked interpreter was" : `${result.notifiedInterpreters} booked interpreters were`} emailed what changed.`
+          : null,
+      );
 
       const updated = await fetchLiveRequestById(id);
       setFoundRequest(updated);
@@ -1049,10 +1073,10 @@ export default function AssignmentDetailPage() {
  View in calendar
  </button>
  {!isCancelled && (
- hasActiveOrAcceptedOffers ? (
+ isEditLocked ? (
  <button
  disabled
- title="This appointment cannot currently be edited because offers have already been sent."
+ title={editLockMessage}
  className="rounded-full px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed inline-flex items-center gap-1.5"
  >
  <Lock className="w-3.5 h-3.5 text-gray-400" />
@@ -1069,10 +1093,10 @@ export default function AssignmentDetailPage() {
  )
  )}
  {!isCancelled && (
- hasActiveOrAcceptedOffers ? (
+ isEditLocked ? (
  <button
  disabled
- title="This appointment cannot currently be edited because offers have already been sent."
+ title={editLockMessage}
  className="rounded-full px-5 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed inline-flex items-center gap-1.5"
  >
  <Lock className="w-3.5 h-3.5 text-gray-400" />
@@ -1095,14 +1119,28 @@ export default function AssignmentDetailPage() {
  </div>
  </div>
 
- {hasActiveOrAcceptedOffers && !isCancelled && (
+ {isEditLocked && !isCancelled && (
  <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl px-5 py-3.5 text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
  <div className="flex items-center gap-2.5">
  <Lock className="w-4 h-4 text-amber-700 shrink-0" />
- <span>This appointment cannot currently be edited because offers have already been sent. Once every offer has expired or been declined, you can edit it and send new offers.</span>
+ <span>{editLockMessage}</span>
  </div>
  </div>
  )}
+ {!isEditLocked && hasAcceptedBooking && !isCancelled && (
+ <div className="bg-sky-50 border border-sky-200 rounded-2xl px-5 py-3.5 text-sm text-sky-900 mb-6">
+ An interpreter is booked. You can still edit this job: when you save, each booked interpreter is emailed exactly what changed, and the job is marked “Updated” in their app.
+ </div>
+ )}
+ {editNotice && (
+ <div role="status" className="bg-emerald-50 border border-emerald-200 rounded-2xl px-5 py-3.5 text-sm text-emerald-900 mb-6 flex items-start justify-between gap-3">
+ <span>{editNotice}</span>
+ <button type="button" onClick={() => setEditNotice(null)} className="text-emerald-700 hover:text-emerald-900" aria-label="Dismiss"><X className="w-4 h-4" /></button>
+ </div>
+ )}
+
+ {/* Questions from interpreters: first, so staff see them immediately. */}
+ <ClarificationsCard clarifications={foundRequest?.data?.clarifications} />
 
  {isCancelled && (
  <div className="space-y-4 mb-6">
@@ -1384,8 +1422,6 @@ export default function AssignmentDetailPage() {
 
  {/* Interactive / Staffing */}
  
- <ClarificationsCard clarifications={foundRequest?.data?.clarifications} cardClass={cardClass} />
-
  <PrepMaterialsSection requestId={id} cardClass={cardClass} />
 
  <div className={cardClass}>
@@ -2056,12 +2092,12 @@ export default function AssignmentDetailPage() {
  </p>
  </div>
 
- <div className={cardClass}>
- <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Activity</h2>
- <p className="text-[var(--sage)] text-sm">
- {assignment.activity}
- </p>
- </div>
+ <RequestActivityCard
+ requestId={id}
+ timeZone={getIanaZone(assignment.details?.timeZone || assignment.timeZone)}
+ refreshKey={`${activityVersion}-${foundRequest?.status ?? ""}-${(foundRequest?.offers || []).length}`}
+ cardClass={cardClass}
+ />
 
  </div>
 
@@ -2163,7 +2199,7 @@ export default function AssignmentDetailPage() {
 
         <form onSubmit={handleSaveAccess} className="space-y-4">
           {/* Schedule & Time */}
-          {hasActiveOrAcceptedOffers ? (
+          {isEditLocked ? (
             <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-2.5">
               <div className="flex items-center gap-2 text-amber-900 font-semibold text-xs">
                 <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
@@ -2418,7 +2454,7 @@ export default function AssignmentDetailPage() {
             </button>
             <button
               type="submit"
-              disabled={isSavingAccess || (!hasActiveOrAcceptedOffers && isQuickEditTimeInvalid)}
+              disabled={isSavingAccess || (!isEditLocked && isQuickEditTimeInvalid)}
               className="px-6 py-2 rounded-full text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSavingAccess ? 'Saving...' : 'Save details'}

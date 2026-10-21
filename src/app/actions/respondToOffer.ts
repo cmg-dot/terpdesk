@@ -10,6 +10,7 @@ import { td_conflict } from "./availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { logActivity } from "@/lib/requestActivity";
 
 type OfferRecord = typeof offers.$inferSelect;
 
@@ -205,6 +206,15 @@ export async function respondToOffer(
     href: `/requests/${offer.requestId}`,
     title: normResponse === 'accepted' ? "Offer accepted" : "Offer declined",
     message: `${who_name} ${normResponse === 'accepted' ? "accepted the job" : "declined the offer"}.`,
+  });
+  await logActivity({
+    requestId: offer.requestId,
+    interpreterId: offer.interpreterId,
+    // The interpreter sees their own booking in the shared history; a decline stays staff-only.
+    audience: normResponse === 'accepted' ? 'shared' : 'agency',
+    kind: normResponse === 'accepted' ? 'offer_accepted' : 'offer_declined',
+    message: normResponse === 'accepted' ? `Offer accepted · booked for Position ${posIdx}` : `Offer declined (Position ${posIdx})`,
+    actorLabel: 'Interpreter (in app)',
   });
   // Booked: send the confirmation with the secure full-details link (same email as the magic-link path).
   if (normResponse === 'accepted') {

@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
 import { td_availability_view } from "@/app/actions/availability";
@@ -555,6 +556,7 @@ export default function InterpreterHomePage() {
  <div className="inline-flex h-6 items-center bg-[#E2EBE5] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
  Booked
  </div>
+ <UpdatedBadge update={job.detailsUpdated} endsAt={job.endsAt} />
  {job.hasAutoFill && (
  <div className="inline-flex h-6 items-center bg-[#FCE8E6] text-[#A0522D] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
  Auto Fill

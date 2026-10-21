@@ -1,4 +1,4 @@
-import { and, eq, gt } from 'drizzle-orm';
+import { and, eq, gt, inArray } from 'drizzle-orm';
 import { db } from '@/db';
 import { requests, timesheets } from '@/db/schema';
 import { getIanaZone, resolveRequestTimes, utcToWallClock } from '@/utils/timezone';
@@ -85,4 +85,23 @@ export async function getPendingTimesheetByToken(token: string): Promise<Timeshe
     isOdhh,
     odhhPortalUrl: isOdhh ? buildOdhhPortalUrl(srn) : null,
   };
+}
+
+/** How long after submitting the same link still shows the success page; afterwards it shows the generic fallback. */
+const SUCCESS_WINDOW_MS = 15 * 60_000;
+
+/**
+ * A link whose timesheet was submitted moments ago (so the page re-render right after submitting, or a quick reload,
+ * shows the success screen). Returns null for anything else, including the same link opened later.
+ */
+export async function getRecentTimesheetSubmission(token: string): Promise<{ title: string; submittedAt: string } | null> {
+  if (!TOKEN_PATTERN.test(token)) return null;
+  const since = new Date(Date.now() - SUCCESS_WINDOW_MS);
+  const [row] = await db
+    .select({ title: requests.title, submittedAt: timesheets.submittedAt })
+    .from(timesheets)
+    .innerJoin(requests, eq(timesheets.requestId, requests.id))
+    .where(and(eq(timesheets.tokenHash, hashToken(token)), inArray(timesheets.status, ['submitted', 'approved']), gt(timesheets.submittedAt, since)))
+    .limit(1);
+  return row?.submittedAt ? { title: row.title, submittedAt: row.submittedAt.toISOString() } : null;
 }

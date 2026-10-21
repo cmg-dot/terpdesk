@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { logActivity } from "@/lib/requestActivity";
 
 export async function approveHours(
   requestId: string,
@@ -79,6 +80,7 @@ export async function approveHours(
       .where(eq(requests.id, requestId));
   });
 
+  await logActivity({ requestId, kind: "hours_approved", message: `Hours approved (Position ${positionIndex || 1})`, actorLabel: "Agency staff" });
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
   revalidatePath("/dashboard");
@@ -148,6 +150,7 @@ export async function requestHoursCorrection(
       .where(eq(requests.id, requestId));
   });
 
+  await logActivity({ requestId, kind: "hours_correction_requested", message: `Hours correction requested (Position ${positionIndex || 1})`, actorLabel: "Agency staff" });
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
   revalidatePath("/dashboard");

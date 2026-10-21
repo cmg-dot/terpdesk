@@ -10,6 +10,7 @@ import { hashToken, TOKEN_PATTERN } from "@/lib/timesheetToken";
 import { wallClockToUtc } from "@/utils/timezone";
 import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
 import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
+import { logActivity } from "@/lib/requestActivity";
 
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -136,14 +137,14 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
         ),
       )
       .returning();
-    if (!row) return false;
+    if (!row) return null;
     await mirrorTimesheetSubmission(tx, row.requestId, row.interpreterId, row);
-    return true;
+    return row;
   });
 
   if (!submitted) return { success: false, error: INVALID_LINK };
+  await logActivity({ requestId: submitted.requestId, interpreterId: submitted.interpreterId, audience: "shared", kind: "hours_submitted", message: "Hours submitted (secure link)", actorLabel: "Interpreter" });
 
-  revalidatePath(`/timesheet/${token}`);
   revalidatePath(`/requests/${appointment.requestId}`);
   revalidatePath("/hours-review");
   revalidatePath("/dashboard");

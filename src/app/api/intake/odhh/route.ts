@@ -1,6 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
+import { logActivity } from "@/lib/requestActivity";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
@@ -211,6 +212,8 @@ export async function POST(req: Request): Promise<NextResponse> {
         data: requestData,
       })
       .returning({ id: requests.id });
+
+    await logActivity({ requestId: inserted.id, kind: "created", audience: "shared", message: "Request created", actorLabel: "ODHH intake" });
 
     revalidatePath("/requests");
     revalidatePath("/dashboard");

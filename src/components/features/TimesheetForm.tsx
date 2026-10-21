@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
 import type { MileageLeg } from "@/components/features/InterpreterSubmitForm";
 import { submitTimesheet } from "@/app/actions/submitTimesheet";
+import { TimesheetSubmitted } from "@/components/features/TimesheetSubmitted";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 
@@ -49,6 +51,7 @@ export const TimesheetForm = ({
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<DateFieldErrors>({});
   const [done, setDone] = useState(false);
+  const router = useRouter();
   const [isPending, setIsPending] = useState(false);
 
   const totalMileage = legs.reduce(
@@ -93,7 +96,11 @@ export const TimesheetForm = ({
             }
           : { breakMinutes: effectiveBreak }),
       });
-      if (result.success) setDone(true);
+      if (result.success) {
+        setDone(true);
+        // Re-render the page so the whole card becomes the success screen (not just this form area).
+        router.refresh();
+      }
       else {
         const split = splitTimesheetError(result.error);
         setFieldErrors(split.fieldErrors);
@@ -107,11 +114,7 @@ export const TimesheetForm = ({
   };
 
   if (done) {
-    return (
-      <div className="rounded-lg bg-green-50 p-4 text-sm text-green-800" role="status">
-        Thank you — your timesheet has been submitted for review.
-      </div>
-    );
+    return <TimesheetSubmitted />;
   }
 
   return (

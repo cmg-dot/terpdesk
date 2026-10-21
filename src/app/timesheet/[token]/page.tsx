@@ -1,5 +1,6 @@
 import { TimesheetForm } from "@/components/features/TimesheetForm";
-import { getPendingTimesheetByToken } from "@/lib/timesheets";
+import { TimesheetSubmitted } from "@/components/features/TimesheetSubmitted";
+import { getPendingTimesheetByToken, getRecentTimesheetSubmission } from "@/lib/timesheets";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Submit Timesheet | terpDESK", robots: { index: false, follow: false } };
@@ -30,6 +31,16 @@ export default async function TimesheetPage({ params }: PageProps) {
   const appointment = await getPendingTimesheetByToken(params.token);
 
   if (!appointment) {
+    // Just submitted (this render follows the submission): dedicated success screen.
+    const recent = await getRecentTimesheetSubmission(params.token);
+    if (recent) {
+      return (
+        <Shell>
+          <TimesheetSubmitted title={recent.title} />
+        </Shell>
+      );
+    }
+    // Opened later (already submitted, expired or invalid): the generic fallback.
     return (
       <Shell>
         <h1 className="mb-2 text-lg font-semibold text-gray-900">Link unavailable</h1>

@@ -6,43 +6,56 @@ import { resolveRequestTimes } from "@/utils/timezone";
 /**
  * The edit lock for a request, enforced on the server so it cannot be bypassed from the browser.
  *
- * A request is LOCKED while any offer is live (pending and not past its deadline, before the appointment ends) or any
- * interpreter is booked (an accepted offer, or the request is already assigned / booked / fully staffed).
- * It is UNLOCKED again once every offer has expired, been declined or been withdrawn: the agency may then edit the
- * request (time included) and send new offers. This mirrors the request page's own rule, which used to be the only
- * place it was applied.
+ * LOCKED while any offer is live (pending and not past its deadline, before the appointment ends): the interpreter is
+ * deciding on the details they were sent, so those details must not move under them.
+ * LOCKED once a booked appointment has started (in progress or over): hours are reported against it.
+ * UNLOCKED otherwise, including when an interpreter is booked for a future appointment. Saving such an edit notifies
+ * the booked interpreter of exactly what changed (see jobUpdateNotice.ts).
  *
  * SERVER ONLY: queries the database.
  */
 
-export const EDIT_LOCKED_MESSAGE =
-  "This request can't be edited while offers are pending or an interpreter is booked. Once every offer has expired or been declined, you can edit it and send new offers.";
+export const OFFERS_PENDING_MESSAGE =
+  "This request can't be edited while an offer is waiting for a response. Once every pending offer has been accepted, declined or has expired, you can edit it.";
+export const BOOKING_STARTED_MESSAGE =
+  "This appointment has already started, so its booked details can no longer be edited.";
 
 const BOOKED_STATUSES = ["assigned", "booked", "Fully staffed"];
 
-export async function isRequestEditLocked(requestId: string, now: Date = new Date()): Promise<boolean> {
+export type EditLock = { locked: false } | { locked: true; message: string };
+
+export async function getRequestEditLock(requestId: string, now: Date = new Date()): Promise<EditLock> {
   const [request] = await db
     .select({ status: requests.status, createdAt: requests.createdAt, data: requests.data })
     .from(requests)
     .where(eq(requests.id, requestId))
     .limit(1);
-  if (!request) return false;
-  if (BOOKED_STATUSES.includes(request.status)) return true;
+  if (!request) return { locked: false };
 
-  let appointmentEnded = false;
+  let startMs = Number.NaN;
+  let endMs = Number.NaN;
   try {
-    const ends = new Date(resolveRequestTimes(request).endsAt).getTime();
-    appointmentEnded = !Number.isNaN(ends) && now.getTime() > ends;
+    const times = resolveRequestTimes(request);
+    startMs = new Date(times.startsAt).getTime();
+    endMs = new Date(times.endsAt).getTime();
   } catch {
-    appointmentEnded = false;
+    // Unknown times: only the pending-offer rule can apply.
   }
+  const appointmentEnded = !Number.isNaN(endMs) && now.getTime() > endMs;
+  const appointmentStarted = !Number.isNaN(startMs) && now.getTime() >= startMs;
 
   const requestOffers = await db
     .select({ status: offers.status, expiresAt: offers.expiresAt })
     .from(offers)
     .where(eq(offers.requestId, requestId));
 
-  return requestOffers.some(
-    (o) => o.status === "accepted" || (o.status === "pending" && !appointmentEnded && o.expiresAt.getTime() > now.getTime()),
+  const hasLivePending = requestOffers.some(
+    (o) => o.status === "pending" && !appointmentEnded && o.expiresAt.getTime() > now.getTime(),
   );
+  if (hasLivePending) return { locked: true, message: OFFERS_PENDING_MESSAGE };
+
+  const isBooked = BOOKED_STATUSES.includes(request.status) || requestOffers.some((o) => o.status === "accepted");
+  if (isBooked && appointmentStarted) return { locked: true, message: BOOKING_STARTED_MESSAGE };
+
+  return { locked: false };
 }

@@ -7,7 +7,8 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { isStateProgram } from "@/lib/stateJob";
 import { buildAppointmentUtcTimes, getIanaZone } from "@/utils/timezone";
-import { EDIT_LOCKED_MESSAGE, isRequestEditLocked } from "@/lib/offerLock";
+import { getRequestEditLock } from "@/lib/offerLock";
+import { announceEdit, detailsUpdateFlag, planEditNotice } from "@/lib/jobUpdateNotice";
 
 export interface UpdateRequestPayload {
   title?: string;
@@ -37,21 +38,22 @@ export interface UpdateRequestPayload {
 }
 
 export type UpdateRequestResult =
-  | { success: true; request: typeof requests.$inferSelect }
+  | { success: true; request: typeof requests.$inferSelect; notifiedInterpreters: number }
   | { success: false; error: string };
 
 /**
- * Full edit. Refused while offers are live or an interpreter is booked (enforced here on the server, so opening
- * the edit page by URL does not get around it). Problems are returned, not thrown: in production a thrown message
+ * Full edit. Refused while an offer is live or once a booked appointment has started (enforced here on the server,
+ * so opening the edit page by URL does not get around it). Booked interpreters are told what changed. Problems are returned, not thrown: in production a thrown message
  * is hidden from the browser.
  */
 export async function updateRequestAction(requestId: string, payload: UpdateRequestPayload): Promise<UpdateRequestResult> {
-  await requireRole("agency");
+  const session = await requireRole("agency");
   const rows = await db.select().from(requests).where(eq(requests.id, requestId));
   if (!rows || rows.length === 0) {
     return { success: false, error: "This request no longer exists." };
   }
-  if (await isRequestEditLocked(requestId)) return { success: false, error: EDIT_LOCKED_MESSAGE };
+  const lock = await getRequestEditLock(requestId);
+  if (lock.locked) return { success: false, error: lock.message };
   const existing = rows[0];
   const existingData = (existing.data as any) || {};
   const existingDetails = existingData.details || {};
@@ -208,17 +210,24 @@ export async function updateRequestAction(requestId: string, payload: UpdateRequ
   // State job = funding program is ODHH or Apple Health. Derived here, never sent by the client.
   const isStateJob = isStateProgram(payload.data?.intake?.program ?? payload.intake?.program ?? existingData.intake?.program);
 
+  // Post-booking edit: work out what the booked interpreter(s) will see change, and flag it in this same write.
+  const notice = await planEditNotice(existing, { ...existing, title: newTitle, createdAt: new Date(startsAtIso), data: updatedData });
+  const flag = detailsUpdateFlag(notice);
+  const finalData = flag ? { ...updatedData, detailsUpdate: flag } : updatedData;
+
   // 4. Update Database Row
   const [updated] = await db.update(requests)
     .set({
       title: newTitle,
       createdAt: new Date(startsAtIso),
-      data: updatedData,
+      data: finalData,
       isStateJob,
       updatedAt: new Date(),
     })
     .where(eq(requests.id, requestId))
     .returning();
+
+  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff");
 
   // 5. Revalidate All Platform Routes
   revalidatePath(`/requests/${requestId}`);
@@ -231,5 +240,5 @@ export async function updateRequestAction(requestId: string, payload: UpdateRequ
   revalidatePath('/interpreter-home');
   revalidatePath('/interpreter-calendar');
 
-  return { success: true, request: updated };
+  return { success: true, request: updated, notifiedInterpreters: notified };
 }

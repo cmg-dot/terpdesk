@@ -12,6 +12,7 @@ import { giveBackAssignment } from "@/app/actions/giveBackAssignment";
 import { submitInterpreterHours } from "@/app/actions/submitInterpreterHours";
 import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { getJobHoursState } from "@/utils/hoursState";
@@ -1294,11 +1295,14 @@ export default function JobDetailPage() {
                 Booked
               </span>
             )}
+            {job.status === 'booked' && <UpdatedBadge update={job.detailsUpdated} endsAt={job.endsAt} className="h-7 text-[12px]" />}
             <Link href="/interpreter-calendar" className="bg-white border border-gray-200 text-[var(--ink)] text-sm px-4 py-1.5 rounded-full hover:bg-gray-50 transition-colors ">
               View in calendar
             </Link>
           </div>
         </div>
+
+        {job.status === 'booked' && <UpdatedNotice update={job.detailsUpdated} endsAt={job.endsAt} />}
 
         <div className="space-y-4">
           

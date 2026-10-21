@@ -4,7 +4,7 @@ import { interpreters, requests } from "@/db/schema";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { writeAuditLog } from "@/lib/audit";
 import { getInterpreterDisplayName } from "@/lib/displayName";
-import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, emailSecondaryButton, escapeHtml } from "@/lib/emailTemplate";
+import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, emailHeroButton, emailSecondaryButton, escapeHtml } from "@/lib/emailTemplate";
 import { createJobDetailsToken } from "@/lib/jobDetailsToken";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { JobSummary } from "@/lib/jobSummary";
@@ -12,9 +12,9 @@ import { sendEmail } from "@/lib/timesheetEmail";
 import { resolveRequestTimes } from "@/utils/timezone";
 
 /**
- * Job emails with progressive disclosure. Both emails carry the restricted summary only (reference, title, date and
- * time, format, generic setting, role). Addresses, program, prep notes and materials are never emailed; after
- * acceptance they are on the secure details page that the confirmation links to.
+ * Job emails with progressive disclosure. These emails carry the restricted summary only (reference, title, date and
+ * time, format, generic setting, role, broad program type). Addresses, prep notes and materials are never emailed;
+ * after acceptance they are on the secure details page that the confirmation links to.
  *
  * SERVER ONLY.
  */
@@ -109,8 +109,9 @@ export async function sendOdhhPostJobReminder(params: { to: string; name: string
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">Post-job action required</h1>
       <p style="margin:0 0 4px;">${params.name ? `Hi ${escapeHtml(params.name)}, y` : "Y"}our ODHH assignment has ended. Please submit your hours in the ODHH Assignment Report portal so you are paid.</p>
       ${emailActionCard(`
+        ${emailHeroButton("Submit via ODHH Portal", ODHH_ASSIGNMENT_REPORT_URL)}
+        <p style="margin:10px 0 20px;font-size:12px;color:#6B7280;text-align:center;">Button not working? Copy this link: ${escapeHtml(ODHH_ASSIGNMENT_REPORT_URL)}</p>
         ${emailDetailsTable(summaryRows(s))}
-        <p style="margin:20px 0 0;">${emailButton("Open the ODHH Assignment Report", ODHH_ASSIGNMENT_REPORT_URL)}</p>
       `)}
       <p style="margin:0;font-size:13px;color:#6B7280;">If you already submitted these hours, you can ignore this reminder.</p>`,
   });
@@ -121,7 +122,7 @@ export async function sendOdhhPostJobReminder(params: { to: string; name: string
     "",
     summaryText(s),
     "",
-    `ODHH Assignment Report: ${ODHH_ASSIGNMENT_REPORT_URL}`,
+    `Submit via ODHH Portal: ${ODHH_ASSIGNMENT_REPORT_URL}`,
     "",
     "If you already submitted these hours, you can ignore this reminder.",
   ].join("\n");

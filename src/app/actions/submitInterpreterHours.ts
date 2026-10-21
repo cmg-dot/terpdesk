@@ -4,6 +4,7 @@ import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { logActivity } from "@/lib/requestActivity";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { z } from "zod";
@@ -184,6 +185,8 @@ export async function submitInterpreterHours(
       })
       .where(eq(requests.id, requestId));
   });
+
+  await logActivity({ requestId, interpreterId: sessionInterpreterId, audience: "shared", kind: "hours_submitted", message: (extra?.version ?? 1) > 1 ? "Corrected hours submitted (in app)" : "Hours submitted (in app)", actorLabel: "Interpreter" });
 
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");

@@ -3,9 +3,12 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { ClarificationButton } from "@/components/jobDetails/ClarificationButton";
+import { ActivityLog } from "@/components/requests/ActivityLog";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveJobDetailsLink } from "@/lib/jobDetailsAccess";
 import { logError } from "@/lib/logError";
+import { listActivityForInterpreter } from "@/lib/requestActivity";
+import type { ActivityItem } from "@/lib/requestActivity";
 import { formatFileSize } from "@/lib/validation/file";
 
 // Private page: keep it out of search engines and never send its URL (which holds the token) as a referrer.
@@ -48,8 +51,14 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
     access = { ok: false, reason: "invalid" };
   }
 
+  let activity: ActivityItem[] = [];
   if (access.ok) {
     await writeAuditLog({ action: "job_details_viewed", details: `requestId=${access.requestId}; interpreterId=${access.interpreterId}` });
+    // Only shared entries (job changes, cancellation) and this interpreter's own booking events; never other interpreters'.
+    activity = await listActivityForInterpreter(access.requestId, access.interpreterId).catch((err: unknown) => {
+      logError("JobDetailsPage.activity", err);
+      return [];
+    });
   }
 
   return (
@@ -145,6 +154,11 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                 </ul>
               )}
               <p className="mt-3 text-[12px] text-gray-500">Prep materials are also available in the terpDESK app under Prep.</p>
+            </Card>
+
+            <Card title="Activity">
+              <p className="mb-4 text-[13px] text-[var(--sage)]">Every change the agency makes to this booking, newest first.</p>
+              <ActivityLog items={activity} timeZone={access.details.timeZone} emptyText="No changes have been recorded for this booking." />
             </Card>
 
             <section className="rounded-2xl border border-gray-200 bg-white p-6 text-center">

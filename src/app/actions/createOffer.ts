@@ -7,6 +7,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { notifyInterpreter } from "@/lib/notifications";
+import { logActivity } from "@/lib/requestActivity";
 
 interface CreateOfferPayload {
   requestId: string;
@@ -77,6 +78,8 @@ export async function createOffer(payload: CreateOfferPayload): Promise<CreateOf
       updatedAt: new Date()
     })
     .where(eq(requests.id, payload.requestId));
+
+  await logActivity({ requestId: payload.requestId, interpreterId: payload.interpreterId, kind: "offer_sent", message: `Offer sent (Position ${positionIndex})` });
 
   await notifyInterpreter(payload.interpreterId, {
     type: "job",

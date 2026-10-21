@@ -108,6 +108,35 @@ export const notifications = pgTable('notifications', {
   userReadCreatedIdx: index('notifications_user_read_created_idx').on(t.userId, t.isRead, t.createdAt),
 }));
 
+export const activityAudienceValues = ['agency', 'shared'] as const;
+export type ActivityAudience = (typeof activityAudienceValues)[number];
+
+/** One field change in an activity entry, e.g. { field: "Time", from: "9:00 AM", to: "10:00 AM" }. */
+export interface ActivityChange {
+  field: string;
+  from: string;
+  to: string;
+}
+
+/**
+ * Timestamped history of a request ("Request created", "Time changed from X to Y").
+ * 'agency' entries are staff-only. 'shared' entries are also shown to booked interpreters on their secure job page;
+ * when `interpreterId` is set, a shared entry is shown only to that interpreter (e.g. their own booking).
+ */
+export const requestActivity = pgTable('request_activity', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requestId: uuid('request_id').notNull().references(() => requests.id, { onDelete: 'cascade' }),
+  interpreterId: uuid('interpreter_id').references(() => interpreters.id, { onDelete: 'set null' }),
+  audience: varchar('audience', { length: 10, enum: activityAudienceValues }).notNull().default('agency'),
+  kind: varchar('kind', { length: 40 }).notNull(),
+  message: text('message').notNull(),
+  changes: jsonb('changes').$type<ActivityChange[]>(),
+  actorLabel: varchar('actor_label', { length: 120 }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  requestCreatedIdx: index('request_activity_request_created_idx').on(t.requestId, t.createdAt),
+}));
+
 export type SelectNotification = typeof notifications.$inferSelect;
 export type InsertAuditLog = typeof auditLogs.$inferInsert;
 

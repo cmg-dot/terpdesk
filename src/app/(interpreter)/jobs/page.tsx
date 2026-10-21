@@ -11,6 +11,7 @@ import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
@@ -260,6 +261,7 @@ export default function InterpreterJobsPage() {
                           Booked
                         </div>
                       )}
+                      {job.status === 'booked' && <UpdatedBadge update={job.detailsUpdated} endsAt={job.endsAt} />}
                       {hoursState === 'correction_requested' && (
                         <span className={`inline-flex h-6 items-center text-[11px] px-2.5 rounded-full whitespace-nowrap ${badgeInfo.badgeClass}`}>
                           {badgeInfo.label}

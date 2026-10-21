@@ -6,6 +6,7 @@ import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { logActivity } from "@/lib/requestActivity";
 
 const cancelSchema = z.object({
   id: z.string().min(1),
@@ -27,6 +28,9 @@ export async function cancelRequest(id: string, reason?: string, clientRequested
     })
     .where(eq(requests.id, parsed.id))
     .returning();
+
+  // The reason is internal, so the shared entry never includes it.
+  if (updated) await logActivity({ requestId: parsed.id, audience: "shared", kind: "cancelled", message: parsed.clientRequested ? "Appointment cancelled (client request)" : "Appointment cancelled", actorLabel: "Agency staff" });
 
   revalidatePath(`/requests/${parsed.id}`);
   revalidatePath('/dashboard');

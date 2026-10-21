@@ -9,6 +9,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { logActivity } from "@/lib/requestActivity";
 import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { renderOfferConfirmPage } from "@/lib/offerConfirmPage";
@@ -703,6 +704,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       });
       if (!claimed) return blockedCard();
       committed = "accepted";
+      await logActivity({ requestId, interpreterId, audience: "shared", kind: "offer_accepted", message: `Offer accepted · booked for Position ${positionIndex}`, actorLabel: "Interpreter (email link)" });
 
       await notifyAgencyAdmins({
         type: "job",
@@ -855,6 +857,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       });
       if (!declined) return blockedCard();
       committed = "declined";
+      await logActivity({ requestId, interpreterId, kind: "offer_declined", message: `Offer declined (Position ${positionIndex})`, actorLabel: "Interpreter (email link)" });
 
       await notifyAgencyAdmins({
         type: "job",
