@@ -20,7 +20,8 @@ type OfferRecord = typeof offers.$inferSelect;
 /** Problems are returned, not thrown: in production a thrown message is hidden from the browser. */
 export type CreateOfferResult = { success: true; offer: OfferRecord & { positionIndex: 1 | 2 } } | { success: false; error: string };
 
-export const PAST_APPOINTMENT_MESSAGE =
+// Not exported: a "use server" file may only export async functions (types are fine).
+const PAST_APPOINTMENT_MESSAGE =
   "This appointment's scheduled time has already started or passed, so new offers can't be sent. Edit the time to a future date to offer it again.";
 
 export async function createOffer(payload: CreateOfferPayload): Promise<CreateOfferResult> {
