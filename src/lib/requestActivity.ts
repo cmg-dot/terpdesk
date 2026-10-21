@@ -1,4 +1,4 @@
-import { and, desc, eq, isNull, or, sql } from "drizzle-orm";
+import { and, desc, eq, isNull, ne, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { interpreters, requestActivity } from "@/db/schema";
 import type { ActivityAudience, ActivityChange } from "@/db/schema";
@@ -14,6 +14,8 @@ import { logError } from "@/lib/logError";
  */
 
 const MAX_ENTRIES = 100;
+/** Kind of an agency message to one booked interpreter (see jobUpdateNotice.ts). Shown in its own "Messages" card. */
+export const AGENCY_MESSAGE_KIND = "agency_message";
 let tableEnsured = false;
 let ensureInFlight: Promise<void> | null = null;
 
@@ -61,7 +63,7 @@ export async function logActivity(entry: ActivityInput): Promise<void> {
     await db.insert(requestActivity).values({
       requestId: entry.requestId,
       kind: entry.kind.slice(0, 40),
-      message: entry.message.slice(0, 500),
+      message: entry.message.slice(0, 2000),
       audience: entry.audience ?? "agency",
       interpreterId: entry.interpreterId ?? null,
       changes: entry.changes && entry.changes.length > 0 ? entry.changes : null,
@@ -145,9 +147,36 @@ export async function listActivityForInterpreter(requestId: string, interpreterI
         eq(requestActivity.requestId, requestId),
         eq(requestActivity.audience, "shared"),
         or(isNull(requestActivity.interpreterId), eq(requestActivity.interpreterId, interpreterId)),
+        // Agency messages have their own card (listAgencyMessages).
+        ne(requestActivity.kind, AGENCY_MESSAGE_KIND),
       ),
     )
     .orderBy(desc(requestActivity.createdAt))
     .limit(MAX_ENTRIES);
   return rows.map(toItem);
+}
+
+export interface AgencyMessage {
+  id: string;
+  text: string;
+  from: string | null;
+  sentAt: string;
+}
+
+/** Messages the agency sent to THIS interpreter about a request, newest first. Never another interpreter's. */
+export async function listAgencyMessages(requestId: string, interpreterId: string): Promise<AgencyMessage[]> {
+  await ensureActivityTable();
+  const rows = await db
+    .select({ id: requestActivity.id, message: requestActivity.message, actorLabel: requestActivity.actorLabel, createdAt: requestActivity.createdAt })
+    .from(requestActivity)
+    .where(
+      and(
+        eq(requestActivity.requestId, requestId),
+        eq(requestActivity.kind, AGENCY_MESSAGE_KIND),
+        eq(requestActivity.interpreterId, interpreterId),
+      ),
+    )
+    .orderBy(desc(requestActivity.createdAt))
+    .limit(50);
+  return rows.map((r) => ({ id: r.id, text: r.message, from: r.actorLabel, sentAt: r.createdAt.toISOString() }));
 }

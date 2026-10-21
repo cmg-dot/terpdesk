@@ -2,10 +2,11 @@
 
 import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
-import { requests } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { offers, requests } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/requestActivity";
+import { legacyPosition1Hours } from "@/utils/hoursState";
 
 export async function approveHours(
   requestId: string,
@@ -25,7 +26,7 @@ export async function approveHours(
 
     const posIdx = positionIndex || 1;
     const existingData = (existing.data as any) || {};
-    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? existingData.hoursSubmission : {}) || {};
+    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(existingData) : null) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
 
     const approveHistoryEntry = {
@@ -59,8 +60,16 @@ export async function approveHours(
     // Check if other position is awaiting review or correction
     const otherPos = posIdx === 1 ? 2 : 1;
     const otherPosHours = updatedHoursSubmissions[otherPos];
+    // Team job: if the other position is booked but has no approved hours yet, the request is not done.
+    const acceptedOffers = await tx
+      .select({ id: offers.id })
+      .from(offers)
+      .where(and(eq(offers.requestId, requestId), eq(offers.status, 'accepted')));
+    const otherPosBooked = acceptedOffers.some((o) => (existingData.offerPositions?.[o.id] === 2 ? 2 : 1) === otherPos);
     let overallStatus = "approved";
-    if (otherPosHours && otherPosHours.status === 'awaiting_review') {
+    if (otherPosBooked && (!otherPosHours || !otherPosHours.status)) {
+      overallStatus = "awaiting_review";
+    } else if (otherPosHours && otherPosHours.status === 'awaiting_review') {
       overallStatus = "awaiting_review";
     } else if (otherPosHours && otherPosHours.status === 'correction_requested') {
       overallStatus = "correction_requested";
@@ -73,7 +82,8 @@ export async function approveHours(
         data: {
           ...existingData,
           hoursSubmissions: updatedHoursSubmissions,
-          hoursSubmission: posIdx === 1 ? updatedPosHours : (existingData.hoursSubmission || updatedPosHours),
+          // Legacy single-position field: Position 1 only, so Position 2 can never leak into it.
+          ...(posIdx === 1 ? { hoursSubmission: updatedPosHours } : {}),
         },
         updatedAt: new Date(),
       })
@@ -108,7 +118,7 @@ export async function requestHoursCorrection(
 
     const posIdx = positionIndex || 1;
     const existingData = (existing.data as any) || {};
-    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? existingData.hoursSubmission : {}) || {};
+    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(existingData) : null) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
 
     const corrReqHistoryEntry = {
@@ -143,7 +153,8 @@ export async function requestHoursCorrection(
         data: {
           ...existingData,
           hoursSubmissions: updatedHoursSubmissions,
-          hoursSubmission: posIdx === 1 ? updatedPosHours : (existingData.hoursSubmission || updatedPosHours),
+          // Legacy single-position field: Position 1 only, so Position 2 can never leak into it.
+          ...(posIdx === 1 ? { hoursSubmission: updatedPosHours } : {}),
         },
         updatedAt: new Date(),
       })

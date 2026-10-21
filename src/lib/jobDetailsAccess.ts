@@ -6,9 +6,18 @@ import { verifyJobDetailsToken } from "@/lib/jobDetailsToken";
 import { jobDetailsFor } from "@/lib/jobSummary";
 import type { JobDetails } from "@/lib/jobSummary";
 import { bookedRequestIds } from "@/lib/prepAccess";
+import { resolveRequestTimes } from "@/utils/timezone";
 
 export type JobDetailsAccess =
-  | { ok: true; requestId: string; interpreterId: string; details: JobDetails; files: { id: string; fileName: string; sizeBytes: number }[] }
+  | {
+      ok: true;
+      requestId: string;
+      interpreterId: string;
+      details: JobDetails;
+      files: { id: string; fileName: string; sizeBytes: number }[];
+      /** Scheduled start (ISO), or null if unknown. Give back is only offered before it. */
+      startsAt: string | null;
+    }
   | { ok: false; reason: "invalid" | "not_booked" };
 
 /**
@@ -47,8 +56,17 @@ export async function resolveJobDetailsLink(token: string): Promise<JobDetailsAc
     .where(and(eq(files.linkedJobId, request.id), eq(files.sharedWithInterpreters, true)))
     .orderBy(desc(files.createdAt));
 
+  let startsAt: string | null = null;
+  try {
+    const start = new Date(resolveRequestTimes(request).startsAt);
+    startsAt = Number.isNaN(start.getTime()) ? null : start.toISOString();
+  } catch {
+    startsAt = null;
+  }
+
   return {
     ok: true,
+    startsAt,
     requestId: request.id,
     interpreterId: payload.interpreterId,
     details: jobDetailsFor(request, positionNumber),

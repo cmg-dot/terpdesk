@@ -3,6 +3,7 @@
 import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
+import type { RequestData } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
@@ -10,6 +11,7 @@ import { readPermission } from "@/lib/agencyPermissions";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { logActivity } from "@/lib/requestActivity";
 import { ensureAvailabilityTables } from "./availability";
+import { lockRequestForPosition } from "@/lib/positionClaim";
 
 const AUTO_BOOK_NOT_ALLOWED = "This interpreter has not enabled auto-booking for your agency. You must send an offer instead.";
 
@@ -26,25 +28,32 @@ export async function assignInterpreter(
   await ensureAvailabilityTables();
   const permission = await readPermission(DEFAULT_AGENCY_ID, interpreterId);
   if (!permission.allowsAutoBook) return { error: AUTO_BOOK_NOT_ALLOWED };
-  const [request] = await db.select().from(requests).where(eq(requests.id, requestId));
-  if (!request) throw new Error("Request not found");
+  // One locked transaction (see positionClaim.ts): the assignment only touches its own position and is written from
+  // the fresh row, so an interpreter accepting the other position at the same moment is never overwritten.
+  const assigned = await db.transaction(async (tx) => {
+  const locked = await lockRequestForPosition(tx, requestId);
+  if (!locked) throw new Error("Request not found");
 
-  const existingData = (request.data as any) || {};
+  const existingData = locked.data as Record<string, any>;
   const existingOfferPositions = existingData.offerPositions || {};
 
   // 1. Withdraw offers specifically for this positionIndex on this request
-  const allReqOffers = await db.select().from(offers).where(eq(offers.requestId, requestId));
+  const allReqOffers = await tx.select().from(offers).where(eq(offers.requestId, requestId));
+  // The same interpreter can't hold both positions of a team job.
+  if (allReqOffers.some(o => o.status === 'accepted' && o.interpreterId === interpreterId && (existingOfferPositions[o.id] || 1) !== positionIndex)) {
+    return { error: "This interpreter is already booked in the other position of this job." } as const;
+  }
   for (const off of allReqOffers) {
     const offPos = existingOfferPositions[off.id] || 1;
     if (offPos === positionIndex && (off.status === 'pending' || off.status === 'accepted')) {
-      await db.update(offers)
+      await tx.update(offers)
         .set({ status: 'withdrawn', updatedAt: new Date() })
         .where(eq(offers.id, off.id));
     }
   }
 
   // 2. Insert new accepted offer
-  const [newOffer] = await db.insert(offers).values({
+  const [newOffer] = await tx.insert(offers).values({
     requestId,
     interpreterId,
     status: 'accepted',
@@ -103,7 +112,7 @@ export async function assignInterpreter(
   ];
 
   // 3. Update request row
-  const [updated] = await db.update(requests)
+  const [updated] = await tx.update(requests)
     .set({ 
       status: newStatus,
       data: {
@@ -111,12 +120,20 @@ export async function assignInterpreter(
         offerPositions: updatedOfferPositions,
         slotReplacements: updatedSlotReplacements,
         slots: updatedSlots,
-        assignedInterpreterName: positionIndex === 1 ? (interpreterName || 'Assigned') : (existingData.assignedInterpreterName || interpreterName)
-      },
+        // Each position has its own name field, so Position 2 never fills in Position 1's.
+        ...(positionIndex === 1
+          ? { assignedInterpreterName: interpreterName || 'Assigned' }
+          : { position2InterpreterName: interpreterName || 'Assigned' }),
+        // existingData is a loose record, so the spread loses the typed `brief` / `intake` keys.
+      } as unknown as RequestData,
       updatedAt: new Date() 
     })
     .where(eq(requests.id, requestId))
     .returning();
+  return { request: updated, newOffer } as const;
+  });
+  if ("error" in assigned) return { error: assigned.error };
+  const { request: updated, newOffer } = assigned;
 
   // Assigned without an Accept click, so send the same booking confirmation (with the secure full-details link) the
   // interpreter would have received by accepting. It never throws: a failed email can't undo the assignment.

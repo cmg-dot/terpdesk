@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { isStateProgram } from "@/lib/stateJob";
 import { buildAppointmentUtcTimes, getIanaZone } from "@/utils/timezone";
 import { getRequestEditLock } from "@/lib/offerLock";
-import { announceEdit, detailsUpdateFlag, planEditNotice } from "@/lib/jobUpdateNotice";
+import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 
 export interface UpdateRequestPayload {
@@ -37,6 +37,8 @@ export interface UpdateRequestPayload {
   status?: string;
   /** Optional note for the booked interpreter(s), included in the "Job details updated" email. */
   messageToInterpreter?: string;
+  /** On a team job: which booked interpreter the message is for (the one being replied to). */
+  messageRecipientId?: string;
   [key: string]: any;
 }
 
@@ -218,6 +220,9 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
 
   // Post-booking edit: work out what the booked interpreter(s) will see change, and flag it in this same write.
   const notice = await planEditNotice(existing, { ...existing, title: newTitle, createdAt: new Date(startsAtIso), data: updatedData });
+  // The message goes to ONE booked interpreter; on a team job the agency must say which. Checked before saving.
+  const recipient = resolveMessageRecipient(notice, message, requested.messageRecipientId);
+  if (!recipient.ok) return { success: false, error: recipient.error };
   const flag = detailsUpdateFlag(notice);
   const finalData = flag ? { ...updatedData, detailsUpdate: flag } : updatedData;
 
@@ -233,7 +238,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     .where(eq(requests.id, requestId))
     .returning();
 
-  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", message);
+  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", recipient.message);
 
   // 5. Revalidate All Platform Routes
   revalidatePath(`/requests/${requestId}`);

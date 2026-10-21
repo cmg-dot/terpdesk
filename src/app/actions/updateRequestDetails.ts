@@ -7,13 +7,15 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { buildAppointmentUtcTimes } from "@/utils/timezone";
 import { getRequestEditLock } from "@/lib/offerLock";
-import { announceEdit, detailsUpdateFlag, planEditNotice } from "@/lib/jobUpdateNotice";
+import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 
 export interface UpdateRequestDetailsPayload {
   requestId: string;
   /** Optional note for the booked interpreter(s), included in the "Job details updated" email. */
   messageToInterpreter?: string;
+  /** On a team job: which booked interpreter the message is for (the one being replied to). */
+  messageRecipientId?: string;
   setting?: string;
   format?: string;
   location?: string;
@@ -161,6 +163,9 @@ export async function updateRequestDetails(requested: UpdateRequestDetailsPayloa
 
   // Post-booking edit: work out what the booked interpreter(s) will see change, and flag it in this same write.
   const notice = await planEditNotice(existing, { ...existing, createdAt: new Date(startsAtIso), data: updatedData });
+  // The message goes to ONE booked interpreter; on a team job the agency must say which. Checked before saving.
+  const recipient = resolveMessageRecipient(notice, message, requested.messageRecipientId);
+  if (!recipient.ok) return { success: false, error: recipient.error };
   const flag = detailsUpdateFlag(notice);
   const finalData = flag ? { ...updatedData, detailsUpdate: flag } : updatedData;
 
@@ -173,7 +178,7 @@ export async function updateRequestDetails(requested: UpdateRequestDetailsPayloa
     .where(eq(requests.id, payload.requestId))
     .returning();
 
-  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", message);
+  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", recipient.message);
 
   revalidatePath(`/requests/${payload.requestId}`);
   revalidatePath('/requests');

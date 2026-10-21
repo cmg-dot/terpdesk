@@ -3,7 +3,9 @@
 import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import type { RequestData } from "@/db/schema";
+import { and, eq, gt } from "drizzle-orm";
+import { isPositionTakenByOther, lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
@@ -92,113 +94,133 @@ export async function respondToOffer(
     }
   }
 
-  // 5. Update offer
-  const updatedOffers = await db.update(offers)
-    .set({ status: normResponse, updatedAt: now })
-    .where(eq(offers.id, offerId))
-    .returning();
+  // 5. One transaction, locked on the request row: only THIS offer's position is touched, and two interpreters
+  // (or an accept and a give-back) on the same job are serialised, so neither can overwrite the other.
+  const outcome = await db.transaction(async (tx): Promise<{ ok: true; offer: OfferRecord; posIdx: 1 | 2 } | { ok: false; error: string }> => {
+    const locked = await lockRequestForPosition(tx, offer.requestId);
+    if (!locked) return { ok: false, error: "The request for this offer no longer exists." };
+    const existingData = locked.data as Record<string, any>;
+    const offerPositions = locked.offerPositions;
+    const posIdx = positionOfOffer(offerPositions, offerId);
 
-  const updatedOffer = updatedOffers[0];
-  const existingData = (parentReq.data as any) || {};
-  const offerPositions = existingData.offerPositions || {};
-  const posIdx = (offerPositions[offerId] || 1) as 1 | 2;
-  const totalPositions = (existingData.slotCount === 2 || existingData.details?.slotCount === 2 || existingData.positions === "Team — two independent positions" || existingData.requiredPositions === 2) ? 2 : 1;
-  const otherPos = posIdx === 1 ? 2 : 1;
-
-  const allReqOffers = await db.select().from(offers).where(eq(offers.requestId, offer.requestId));
-
-  if (normResponse === 'accepted') {
-    // Withdraw any other pending offers for THIS specific position
-    for (const off of allReqOffers) {
-      if (off.id !== updatedOffer.id && (offerPositions[off.id] || 1) === posIdx && off.status === 'pending') {
-        await db.update(offers)
-          .set({ status: 'withdrawn', updatedAt: now })
-          .where(eq(offers.id, off.id));
-      }
+    if (normResponse === 'accepted' && (await isPositionTakenByOther(tx, offer.requestId, locked, posIdx, offer.interpreterId))) {
+      await tx.update(offers).set({ status: 'withdrawn', updatedAt: now }).where(and(eq(offers.id, offerId), eq(offers.status, 'pending')));
+      return { ok: false, error: "This position has already been filled by another interpreter." };
     }
 
-    const updatedSlotReplacements = {
-      ...(existingData.slotReplacements || {}),
-      [posIdx]: false
-    };
+    // Only a still-pending, unexpired offer can be answered (an accepted job is handed back with "Give back").
+    const [updatedOffer] = await tx.update(offers)
+      .set({ status: normResponse, updatedAt: now })
+      .where(and(eq(offers.id, offerId), eq(offers.status, 'pending'), gt(offers.expiresAt, now)))
+      .returning();
+    if (!updatedOffer) return { ok: false, error: "This offer is no longer open. It may have expired, been withdrawn or already been answered." };
 
-    const otherPosBooked = totalPositions === 2 && allReqOffers.some(o => {
-      const p = offerPositions[o.id] || 1;
-      return o.id !== updatedOffer.id && p === otherPos && o.status === 'accepted';
-    });
+    const totalPositions = (existingData.slotCount === 2 || existingData.details?.slotCount === 2 || existingData.positions === "Team — two independent positions" || existingData.requiredPositions === 2) ? 2 : 1;
+    const otherPos = posIdx === 1 ? 2 : 1;
+    const allReqOffers = await tx.select().from(offers).where(eq(offers.requestId, offer.requestId));
 
-    let newStatus = 'booked';
-    if (totalPositions === 2) {
-      if (otherPosBooked) {
+    if (normResponse === 'accepted') {
+      // Withdraw any other pending offers for THIS specific position only.
+      for (const off of allReqOffers) {
+        if (off.id !== updatedOffer.id && positionOfOffer(offerPositions, off.id) === posIdx && off.status === 'pending') {
+          await tx.update(offers)
+            .set({ status: 'withdrawn', updatedAt: now })
+            .where(and(eq(offers.id, off.id), eq(offers.status, 'pending')));
+        }
+      }
+
+      const updatedSlotReplacements = {
+        ...(existingData.slotReplacements || {}),
+        [posIdx]: false
+      };
+
+      const otherPosBooked = totalPositions === 2 && allReqOffers.some(o =>
+        o.id !== updatedOffer.id && positionOfOffer(offerPositions, o.id) === otherPos && o.status === 'accepted'
+      );
+
+      let newStatus = 'booked';
+      if (totalPositions === 2) {
+        if (otherPosBooked) {
+          newStatus = 'booked';
+        } else if (updatedSlotReplacements[otherPos]) {
+          newStatus = 'Needs replacement';
+        } else {
+          newStatus = 'Partially staffed';
+        }
+      }
+
+      let updatedOffersArray = existingData.offers;
+      if (Array.isArray(updatedOffersArray)) {
+        updatedOffersArray = updatedOffersArray.map((o: any) =>
+          o.id === offerId ? { ...o, status: 'accepted', state: 'accepted' } : o
+        );
+      }
+
+      await tx.update(requests)
+        .set({
+          status: newStatus,
+          data: {
+            ...existingData,
+            slotReplacements: updatedSlotReplacements,
+            ...(updatedOffersArray ? { offers: updatedOffersArray } : {})
+            // existingData is a loose record, so the spread loses the typed `brief` / `intake` keys.
+          } as unknown as RequestData,
+          updatedAt: now
+        })
+        .where(eq(requests.id, offer.requestId));
+    } else {
+      // Declined
+      const remainingAccepted = allReqOffers.filter(o => o.id !== updatedOffer.id && o.status === 'accepted');
+      const hasOtherAccepted = remainingAccepted.length > 0;
+      const hasPending = allReqOffers.some(o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now);
+      const hasReplacement = Boolean(existingData.slotReplacements?.[1] || existingData.slotReplacements?.[2]);
+
+      // No other live offer for THIS position means it still needs coverage: flag it instead of leaving a draft.
+      const hasPendingForPosition = allReqOffers.some(
+        o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now && positionOfOffer(offerPositions, o.id) === posIdx
+      );
+
+      let newStatus = 'Needs replacement';
+      if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
         newStatus = 'booked';
-      } else if (updatedSlotReplacements[otherPos]) {
+      } else if (!hasPendingForPosition) {
         newStatus = 'Needs replacement';
-      } else {
+      } else if (hasReplacement) {
+        newStatus = 'Needs replacement';
+      } else if (hasOtherAccepted) {
         newStatus = 'Partially staffed';
+      } else if (hasPending) {
+        newStatus = 'Offer awaiting response';
       }
+
+      let updatedOffersArray = existingData.offers;
+      if (Array.isArray(updatedOffersArray)) {
+        updatedOffersArray = updatedOffersArray.map((o: any) =>
+          o.id === offerId ? { ...o, status: 'declined', state: 'declined' } : o
+        );
+      }
+
+      await tx.update(requests)
+        .set({
+          status: newStatus,
+          data: {
+            ...existingData,
+            ...(updatedOffersArray ? { offers: updatedOffersArray } : {})
+            // existingData is a loose record, so the spread loses the typed `brief` / `intake` keys.
+          } as unknown as RequestData,
+          updatedAt: now
+        })
+        .where(eq(requests.id, offer.requestId));
     }
+    return { ok: true, offer: updatedOffer, posIdx };
+  });
 
-    let updatedOffersArray = existingData.offers;
-    if (Array.isArray(updatedOffersArray)) {
-      updatedOffersArray = updatedOffersArray.map((o: any) =>
-        o.id === offerId ? { ...o, status: 'accepted', state: 'accepted' } : o
-      );
-    }
-
-    await db.update(requests)
-      .set({ 
-        status: newStatus,
-        data: {
-          ...existingData,
-          slotReplacements: updatedSlotReplacements,
-          ...(updatedOffersArray ? { offers: updatedOffersArray } : {})
-        },
-        updatedAt: now 
-      })
-      .where(eq(requests.id, offer.requestId));
-  } else {
-    // Declined
-    const remainingAccepted = allReqOffers.filter(o => o.id !== updatedOffer.id && o.status === 'accepted');
-    const hasOtherAccepted = remainingAccepted.length > 0;
-    const hasPending = allReqOffers.some(o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now);
-    const hasReplacement = Boolean(existingData.slotReplacements?.[1] || existingData.slotReplacements?.[2]);
-
-    // No other live offer for THIS position means it still needs coverage: flag it instead of leaving a draft.
-    const hasPendingForPosition = allReqOffers.some(
-      o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now && (offerPositions[o.id] || 1) === posIdx
-    );
-
-    let newStatus = 'Needs replacement';
-    if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
-      newStatus = 'booked';
-    } else if (!hasPendingForPosition) {
-      newStatus = 'Needs replacement';
-    } else if (hasReplacement) {
-      newStatus = 'Needs replacement';
-    } else if (hasOtherAccepted) {
-      newStatus = 'Partially staffed';
-    } else if (hasPending) {
-      newStatus = 'Offer awaiting response';
-    }
-
-    let updatedOffersArray = existingData.offers;
-    if (Array.isArray(updatedOffersArray)) {
-      updatedOffersArray = updatedOffersArray.map((o: any) =>
-        o.id === offerId ? { ...o, status: 'declined', state: 'declined' } : o
-      );
-    }
-
-    await db.update(requests)
-      .set({ 
-        status: newStatus,
-        data: {
-          ...existingData,
-          ...(updatedOffersArray ? { offers: updatedOffersArray } : {})
-        },
-        updatedAt: now 
-      })
-      .where(eq(requests.id, offer.requestId));
+  if (!outcome.ok) {
+    revalidatePath('/jobs');
+    revalidatePath('/interpreter-home');
+    return { success: false, error: outcome.error };
   }
+  const { offer: updatedOffer, posIdx } = outcome;
 
   const who_name = (await getInterpreterDisplayName(offer.interpreterId)) ?? "An interpreter";
   await notifyAgencyAdmins({

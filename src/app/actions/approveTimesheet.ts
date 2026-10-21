@@ -11,7 +11,7 @@ import { sendApprovalEmail } from "@/lib/timesheetEmail";
 import { writeAuditLog } from "@/lib/audit";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
-import { mirrorTimesheetApproval } from "@/lib/timesheetSync";
+import { allBookedPositionsApproved, mirrorTimesheetApproval } from "@/lib/timesheetSync";
 import { logActivity } from "@/lib/requestActivity";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
@@ -48,7 +48,7 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
 
   try {
     // Guarded update: only a 'submitted' timesheet can be approved, and only once.
-    // The parent request is moved to 'completed' in the same transaction so the two cannot diverge.
+    // The parent request's status is updated in the same transaction so the two cannot diverge.
     const approved = await db.transaction(async (tx) => {
       const now = new Date();
       const [row] = await tx
@@ -62,12 +62,15 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
           travelLegs: timesheets.travelLegs,
         });
       if (!row) return null;
-      await tx
-        .update(requests)
-        .set({ status: REQUEST_COMPLETED_STATUS, updatedAt: now })
-        .where(eq(requests.id, row.requestId));
       // Keep the interpreter app's copy of these hours (requests.data.hoursSubmissions) in step.
       await mirrorTimesheetApproval(tx, row.requestId, timesheetId, approvedMileage);
+      // Team jobs: the request is 'completed' only once every booked position is approved; until then it stays in
+      // review, so the other interpreter's job never shows as approved because of this approval.
+      const everyoneApproved = await allBookedPositionsApproved(tx, row.requestId);
+      await tx
+        .update(requests)
+        .set({ status: everyoneApproved ? REQUEST_COMPLETED_STATUS : "awaiting_review", updatedAt: now })
+        .where(eq(requests.id, row.requestId));
       return row;
     });
     if (!approved) return fail("This timesheet is not awaiting review.");

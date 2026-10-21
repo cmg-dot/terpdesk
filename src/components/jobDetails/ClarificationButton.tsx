@@ -2,16 +2,19 @@
 
 import { useState } from "react";
 import { MessageCircleQuestion } from "lucide-react";
-import { requestJobClarification } from "@/app/actions/jobClarification";
+import { requestJobClarification, requestJobClarificationInApp } from "@/app/actions/jobClarification";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 const MAX = 500;
 
 /**
- * "Request clarification" on the secure job-details page: a short question for the agency (e.g. "Suite number?").
- * The page's signed link authorizes it; the question is only shown to agency staff inside terpDESK.
+ * "Request clarification": a short question for the agency (e.g. "Suite number?"). Used on the secure job-details page
+ * (the signed link authorizes it) and on the app's job page (the session does). Either way the question is only shown
+ * to agency staff inside terpDESK, and their reply comes back to this interpreter only.
  */
-export function ClarificationButton({ token }: { token: string }) {
+export type ClarificationTarget = { kind: "link"; token: string } | { kind: "app"; offerId: string };
+
+export function ClarificationButton({ target }: { target: ClarificationTarget }) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -24,7 +27,10 @@ export function ClarificationButton({ token }: { token: string }) {
     setBusy(true);
     setError(null);
     try {
-      const result = await requestJobClarification({ token, question });
+      const result =
+        target.kind === "link"
+          ? await requestJobClarification({ token: target.token, question })
+          : await requestJobClarificationInApp({ offerId: target.offerId, question });
       if (result.success) {
         setSent(true);
         setQuestion("");

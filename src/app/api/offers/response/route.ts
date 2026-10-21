@@ -9,6 +9,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { isPositionTakenByOther, lockRequestForPosition } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
 import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
@@ -601,6 +602,13 @@ async function processResponse(token: string | null, actionParam: string | undef
 
       // One transaction: claim the offer, withdraw the position's other offers and book the request, or none of it.
       const claimed = await db.transaction(async (tx) => {
+      // Lock the request row and re-check the position inside the transaction: two interpreters accepting the same
+      // position at the same moment are serialised here, so only the first one gets it.
+      const lockedReq = await lockRequestForPosition(tx, requestId);
+      if (!lockedReq || (await isPositionTakenByOther(tx, requestId, lockedReq, positionIndex, interpreterId))) return null;
+      // Write from the locked snapshot, not the one read before the transaction: the other position may have changed since.
+      const existingData = lockedReq.data as Record<string, any>;
+
       // Atomically claim the offer: only succeeds if it is still pending at write time
       const [targetOffer] = await tx
         .update(offers)
@@ -690,10 +698,10 @@ async function processResponse(token: string | null, actionParam: string | undef
             offerPositions: updatedOfferPositions,
             slotReplacements: updatedSlotReplacements,
             slots: updatedSlots,
-            assignedInterpreterId:
-              positionIndex === 1 ? interpreterId : existingData.assignedInterpreterId || null,
-            assignedInterpreterName:
-              positionIndex === 1 ? interpreterName : existingData.assignedInterpreterName || interpreterName,
+            // Each position has its own fields, so accepting Position 2 never writes into Position 1's.
+            ...(positionIndex === 1
+              ? { assignedInterpreterId: interpreterId, assignedInterpreterName: interpreterName }
+              : { position2InterpreterId: interpreterId, position2InterpreterName: interpreterName }),
           // existingData is a loose Record, so the spread loses the typed `brief` / `intake` keys.
           } as unknown as RequestData,
           updatedAt: now,
@@ -742,6 +750,10 @@ async function processResponse(token: string | null, actionParam: string | undef
       // Action is 'decline'
       // One transaction, same as accepting: all of the decline is recorded, or none of it.
       const declined = await db.transaction(async (tx) => {
+      // Locked, fresh snapshot (see the accept branch): a decline must not undo the other position's booking.
+      const lockedReq = await lockRequestForPosition(tx, requestId);
+      if (!lockedReq) return null;
+      const existingData = lockedReq.data as Record<string, any>;
       const [targetOffer] = await tx
         .update(offers)
         .set({ status: "declined", updatedAt: now })
@@ -810,7 +822,9 @@ async function processResponse(token: string | null, actionParam: string | undef
       ];
 
       const updatedSlots = currentSlots.map((s: any) => {
-        if (s.positionIndex === positionIndex || (!s.positionIndex && positionIndex === 1)) {
+        // Only a slot that is empty or held by THIS interpreter is reset; another interpreter's booking is never touched.
+        const ownsOrEmpty = !s.reservedBy || s.reservedBy === interpreterId;
+        if ((s.positionIndex === positionIndex || (!s.positionIndex && positionIndex === 1)) && ownsOrEmpty) {
           return {
             ...s,
             active: false,
@@ -828,10 +842,11 @@ async function processResponse(token: string | null, actionParam: string | undef
         slots: updatedSlots,
       };
 
-      if (positionIndex === 1) {
+      // Same rule for the per-position name fields: clear them only if they are empty or this interpreter's.
+      if (positionIndex === 1 && (!existingData.assignedInterpreterId || existingData.assignedInterpreterId === interpreterId)) {
         updatedData.assignedInterpreterId = null;
         updatedData.assignedInterpreterName = null;
-      } else if (positionIndex === 2) {
+      } else if (positionIndex === 2 && (!existingData.position2InterpreterId || existingData.position2InterpreterId === interpreterId)) {
         updatedData.position2InterpreterId = null;
         updatedData.position2InterpreterName = null;
       }

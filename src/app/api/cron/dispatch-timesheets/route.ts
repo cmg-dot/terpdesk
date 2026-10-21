@@ -6,6 +6,7 @@ import { dispatchTimesheetCore } from "@/lib/timesheetDispatch";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { isCronAuthorized } from "@/lib/cronAuth";
+import { legacyPosition1Hours } from "@/utils/hoursState";
 
 export const dynamic = "force-dynamic";
 
@@ -16,10 +17,20 @@ const MAX_PER_RUN = 25;
 
 /** Request statuses where hours are already in (or the job is closed), so no timesheet should be sent. */
 const SKIP_STATUSES = ["awaiting_review", "correction_requested", "approved", "completed", "billed"];
+/**
+ * Team jobs: the request status covers both positions ("awaiting_review" once EITHER submits), so only closed
+ * statuses skip the whole job; otherwise each position is checked on its own hours.
+ */
+const TEAM_SKIP_STATUSES = ["approved", "completed", "billed"];
 
 interface HoursData {
   hoursSubmission?: unknown;
   hoursSubmissions?: Record<string, unknown>;
+  offerPositions?: Record<string, number>;
+  slotCount?: number;
+  requiredPositions?: number;
+  positions?: string;
+  details?: { slotCount?: number };
 }
 
 interface Candidate {
@@ -47,6 +58,7 @@ export async function GET(request: Request) {
     // "Assigned" = an accepted offer. Cancelled requests are excluded in the query.
     const assigned = await db
       .select({
+        offerId: offers.id,
         requestId: offers.requestId,
         interpreterId: offers.interpreterId,
         status: requests.status,
@@ -69,11 +81,14 @@ export async function GET(request: Request) {
 
       if (isStateJobRequest(row)) continue;
 
-      const status = (row.status ?? "").toLowerCase();
-      if (status.includes("cancel") || status.includes("draft") || SKIP_STATUSES.includes(status)) continue;
-
       const data = (row.data ?? {}) as unknown as HoursData;
-      if (data.hoursSubmission || Object.keys(data.hoursSubmissions ?? {}).length > 0) continue;
+      const isTeam = data.slotCount === 2 || data.requiredPositions === 2 || data.details?.slotCount === 2 || data.positions === "Team — two independent positions";
+      const status = (row.status ?? "").toLowerCase();
+      if (status.includes("cancel") || status.includes("draft") || (isTeam ? TEAM_SKIP_STATUSES : SKIP_STATUSES).includes(status)) continue;
+
+      // Skip only if THIS interpreter's position already has hours (in-app or mirrored), never the other position's.
+      const position = data.offerPositions?.[row.offerId] === 2 ? 2 : 1;
+      if (data.hoursSubmissions?.[String(position)] || (position === 1 && legacyPosition1Hours(data))) continue;
 
       const { endsAt } = resolveRequestTimes({ createdAt: row.createdAt, data: row.data });
       const endsAtMs = new Date(endsAt).getTime();

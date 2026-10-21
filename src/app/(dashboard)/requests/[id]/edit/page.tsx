@@ -11,6 +11,8 @@ import { Lock, AlertTriangle } from "lucide-react";
 import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, type SavedAgencyRequester } from "@/utils/savedRequesters";
 import { getClientsAction, saveRequesterToClientsAction, type ClientWithStats } from "@/app/actions/clients";
 import { isInvalidEmail } from "@/utils/validation";
+import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
+import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
 
 function CustomSelect({ options, value, onChange, disabled = false }: { options: string[], value?: string, onChange?: (val: string) => void, disabled?: boolean }) {
  const [isOpen, setIsOpen] = useState(false);
@@ -443,6 +445,14 @@ export default function EditRequestPage() {
   // While an interpreter is booked, date, time, time zone and program are fixed (the server ignores them too).
   const isScheduleLocked = isBookedRequest && !isEditLocked;
   const [messageToInterpreter, setMessageToInterpreter] = useState("");
+  // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
+  const messageRecipients = bookedRecipients(realOffers);
+  const [messageRecipient, setMessageRecipient] = useState("");
+  const recipientDefault = defaultRecipient(messageRecipients, existingRequest?.data?.clarifications);
+  useEffect(() => {
+    setMessageRecipient((current) => current || recipientDefault);
+  }, [recipientDefault]);
+  const needsRecipient = isScheduleLocked && Boolean(messageToInterpreter.trim()) && messageRecipients.length > 1 && !messageRecipient;
   const editLockMessage = isCancelledRequest
     ? "This appointment was cancelled, so it can't be edited."
     : hasLivePendingOffer
@@ -598,7 +608,7 @@ export default function EditRequestPage() {
   const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSave = async () => {
-    if (isEditLocked || isTimeInvalid || isDuplicateUnconfirmed || isAnyEmailInvalid) return;
+    if (isEditLocked || isTimeInvalid || isDuplicateUnconfirmed || isAnyEmailInvalid || needsRecipient) return;
     setIsSaving(true);
     try {
       const { startsAt: startsAtStr, endsAt: endsAtStr } = buildAppointmentUtcTimes({
@@ -678,6 +688,7 @@ export default function EditRequestPage() {
         prepNotes: formData.prepNotes,
         privateNotes: formData.privateNotes,
         messageToInterpreter: isScheduleLocked ? messageToInterpreter : undefined,
+        messageRecipientId: isScheduleLocked && messageRecipient ? messageRecipient : undefined,
         activity: "updated just now",
         positions: formData.positions,
         requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
@@ -1226,7 +1237,7 @@ export default function EditRequestPage() {
  <h2 className={sectionTitleClass}>Message to interpreter</h2>
  <Field
  label="Message to interpreter (Optional)"
- subtext="Added to the “Job details updated” email the booked interpreter receives when you save. Use it to answer their question. It is sent by email, so don't include client names or health information."
+ subtext="Added to the “Job details updated” email the booked interpreter receives when you save, and kept on their job page. Use it to answer their question. It is sent by email, so don't include client names or health information."
  >
  <textarea
  className={`${textareaClass} min-h-[100px]`}
@@ -1236,6 +1247,9 @@ export default function EditRequestPage() {
  />
  </Field>
  <p className="text-right text-xs text-gray-400">{messageToInterpreter.length}/1000</p>
+ {messageToInterpreter.trim() && (
+ <MessageRecipientSelect id="edit-message-recipient" recipients={messageRecipients} value={messageRecipient} onChange={setMessageRecipient} />
+ )}
  </div>
  )}
 
@@ -1257,7 +1271,7 @@ export default function EditRequestPage() {
  <div className="flex items-center gap-4 pt-4">
  <button
    onClick={handleSave}
-   disabled={isSaving || isTimeInvalid || isEditLocked || isDuplicateUnconfirmed || isAnyEmailInvalid}
+   disabled={isSaving || isTimeInvalid || isEditLocked || isDuplicateUnconfirmed || isAnyEmailInvalid || needsRecipient}
    className="bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full font-medium transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
  >
    {isSaving ? "Saving..." : "Save changes"}

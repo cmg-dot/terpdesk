@@ -13,6 +13,7 @@ import { submitInterpreterHours } from "@/app/actions/submitInterpreterHours";
 import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
+import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { getJobHoursState } from "@/utils/hoursState";
@@ -399,7 +400,9 @@ function ServiceTimeBlock({ job }: { job: any }) {
       const hs = (job as any).hoursSubmission || {};
       // Server-side state (covers hours sent through the emailed secure link as well as in-app ones).
       const serverState = getJobHoursState(job);
-      const serverHasHours = Boolean((job as any).hoursSubmission || (job as any).travelStartTime) || serverState !== 'not_submitted';
+      // Request-level travel columns are a Position 1 legacy field; on a team job they never stand in for Position 2.
+      const isPos1 = ((job as any).positionIndex ?? 1) === 1;
+      const serverHasHours = Boolean((job as any).hoursSubmission || (isPos1 && (job as any).travelStartTime)) || serverState !== 'not_submitted';
       // The database is the source of truth; a browser copy only wins while it holds newer, unsent work.
       const localIsNewer = local && Number(local.version || 1) > Number(hs.version || 1);
       const serverIsFinal = serverState === 'approved' || serverState === 'awaiting_review';
@@ -418,9 +421,9 @@ function ServiceTimeBlock({ job }: { job: any }) {
           reportedMileage: hs.miles || 0,
           mileageNote: hs.mileageNote || "",
           serviceNote: hs.note || "",
-          travelStart: (job as any).travelStartTime || hs.travelStartTime || job.startsAt,
-          travelEnd: (job as any).travelEndTime || hs.travelEndTime || job.endsAt,
-          serviceCompleted: (job as any).serviceCompleted ?? hs.serviceCompleted ?? "yes",
+          travelStart: hs.travelStartTime || (isPos1 ? (job as any).travelStartTime : null) || job.startsAt,
+          travelEnd: hs.travelEndTime || (isPos1 ? (job as any).travelEndTime : null) || job.endsAt,
+          serviceCompleted: hs.serviceCompleted ?? (isPos1 ? (job as any).serviceCompleted : null) ?? "yes",
           isOdhh: isOdhh,
           approvedMileage: hs.approvedMileage ?? null,
           reviewMessage: hs.reviewMessage ?? null,
@@ -1182,9 +1185,13 @@ export default function JobDetailPage() {
     setActingAction('decline'); // Reuse 'decline' or create a new 'giveBack' state, but 'decline' disables buttons which is good
     startTransition(async () => {
       if (job) {
-        await giveBackAssignment(job.id, job.requestId, giveBackReason);
-        setShowGiveBackModal(false);
+        const result = await giveBackAssignment(job.id, job.requestId, giveBackReason);
         setActingAction(null);
+        if (!result.success) {
+          alert(result.error);
+          return;
+        }
+        setShowGiveBackModal(false);
         markJobReleased(job.id);
         router.refresh();
         router.push('/jobs');
@@ -1305,6 +1312,10 @@ export default function JobDetailPage() {
         {job.status === 'booked' && <UpdatedNotice update={job.detailsUpdated} endsAt={job.endsAt} />}
 
         <div className="space-y-4">
+          {/* Agency messages + "Request clarification" (parity with the secure job-details page). */}
+          {job.status === 'booked' && (
+            <JobQuestionsAndMessages offerId={job.id} timeZone={(job as any).details?.timeZone || job.timeZone} />
+          )}
           
           {/* Overview Card */}
           <div className="bg-white rounded-2xl border border-gray-200 p-6 ">

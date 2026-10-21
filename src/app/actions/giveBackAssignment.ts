@@ -1,54 +1,68 @@
 "use server";
 
-import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
-import { db } from "@/db";
-import { requests, offers } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
+import { requireInterpreter, NOT_ALLOWED_MESSAGE } from "@/lib/auth/guards";
+import { giveBackBooking } from "@/lib/giveBack";
+import type { GiveBackResult } from "@/lib/giveBack";
+import { resolveJobDetailsLink } from "@/lib/jobDetailsAccess";
+import { db } from "@/db";
+import { offers } from "@/db/schema";
+import { and, eq } from "drizzle-orm";
+import { logError } from "@/lib/logError";
 
-export async function giveBackAssignment(offerId: string, requestId: string, reason: string) {
-  const { interpreterId } = await requireInterpreter();
-  const [ownOffer] = await db
-    .select({ id: offers.id })
-    .from(offers)
-    .where(and(eq(offers.id, offerId), eq(offers.requestId, requestId), eq(offers.interpreterId, interpreterId)))
-    .limit(1);
-  if (!ownOffer) throw new Error(FORBIDDEN);
+const reasonSchema = z.string().max(1000, "Please keep the reason under 1000 characters.");
 
-  await db.transaction(async (tx) => {
-    // 1. Update offer to 'returned'
-    await tx.update(offers)
-      .set({ status: 'returned', updatedAt: new Date() })
-      .where(eq(offers.id, offerId));
-
-    // 2. Lookup request data to find position
-    const [existing] = await tx.select().from(requests).where(eq(requests.id, requestId));
-    const existingData = (existing?.data as any) || {};
-    const offerPositions = existingData.offerPositions || {};
-    const posIdx = offerPositions[offerId] || 1;
-
-    const updatedSlotReplacements = {
-      ...(existingData.slotReplacements || {}),
-      [posIdx]: true
-    };
-
-    // 3. Update request to 'Needs replacement'
-    await tx.update(requests)
-      .set({ 
-        status: 'Needs replacement',
-        data: {
-          ...existingData,
-          slotReplacements: updatedSlotReplacements
-        },
-        updatedAt: new Date() 
-      })
-      .where(eq(requests.id, requestId));
-  });
-
-  // Revalidate routes to instantly update UI
-  revalidatePath('/jobs');
-  revalidatePath('/interpreter-home');
-  revalidatePath('/dashboard');
+const revalidate = (requestId: string) => {
+  revalidatePath("/jobs");
+  revalidatePath("/interpreter-home");
+  revalidatePath("/dashboard");
+  revalidatePath("/requests");
   revalidatePath(`/requests/${requestId}`);
-  revalidatePath('/requests');
+};
+
+/** In-app "Give back this assignment". Only the signed-in interpreter's own booking (session-scoped, never trusted ids). */
+export async function giveBackAssignment(offerId: string, requestId: string, reason: string): Promise<GiveBackResult> {
+  let interpreterId: string;
+  try {
+    ({ interpreterId } = await requireInterpreter());
+  } catch {
+    return { success: false, error: NOT_ALLOWED_MESSAGE };
+  }
+  const ids = z.object({ offerId: z.string().uuid(), requestId: z.string().uuid() }).safeParse({ offerId, requestId });
+  const why = reasonSchema.safeParse(reason ?? "");
+  if (!ids.success) return { success: false, error: "This booking could not be found." };
+  if (!why.success) return { success: false, error: why.error.issues[0]?.message ?? "Invalid reason." };
+
+  try {
+    const result = await giveBackBooking({ offerId: ids.data.offerId, interpreterId, reason: why.data, via: "app" });
+    if (result.success) revalidate(ids.data.requestId);
+    return result;
+  } catch (err) {
+    logError("giveBackAssignment", err);
+    return { success: false, error: "We could not give back this assignment. Please try again or contact the agency." };
+  }
+}
+
+/** "Give back assignment" from the secure job-details page: the signed link plus a live "still booked" check authorize it. */
+export async function giveBackViaDetailsLink(input: { token: string; reason: string }): Promise<GiveBackResult> {
+  const parsed = z.object({ token: z.string().min(1).max(2000), reason: reasonSchema }).safeParse(input);
+  if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid request." };
+  try {
+    const access = await resolveJobDetailsLink(parsed.data.token);
+    if (!access.ok) return { success: false, error: "This link is no longer valid, or you're no longer booked on this job." };
+    // The link names the job and the interpreter, not the offer: give back that interpreter's own accepted offer.
+    const [own] = await db
+      .select({ id: offers.id })
+      .from(offers)
+      .where(and(eq(offers.requestId, access.requestId), eq(offers.interpreterId, access.interpreterId), eq(offers.status, "accepted")))
+      .limit(1);
+    if (!own) return { success: false, error: "You're no longer booked on this job." };
+    const result = await giveBackBooking({ offerId: own.id, interpreterId: access.interpreterId, reason: parsed.data.reason, via: "secure link" });
+    if (result.success) revalidate(access.requestId);
+    return result;
+  } catch (err) {
+    logError("giveBackViaDetailsLink", err);
+    return { success: false, error: "We could not give back this assignment. Please try again or contact the agency." };
+  }
 }

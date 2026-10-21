@@ -1,7 +1,8 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { offers, requests } from "@/db/schema";
+import { offers, requests, timesheets } from "@/db/schema";
 import type { RequestData, SelectTimesheet, TimesheetTravelLeg } from "@/db/schema";
+import { legacyPosition1Hours } from "@/utils/hoursState";
 
 /**
  * Keeps magic-link timesheets and in-app hours on ONE source of truth.
@@ -98,7 +99,7 @@ export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, int
   if (!pos) return;
 
   const all = asObject(data.hoursSubmissions);
-  const existing = asObject(all[pos] ?? (pos === 1 ? data.hoursSubmission : null));
+  const existing = asObject(all[pos] ?? (pos === 1 ? legacyPosition1Hours(data) : null));
   // Never overwrite another interpreter's hours for this position.
   if (typeof existing.interpreterId === "string" && existing.interpreterId !== interpreterId) return;
 
@@ -126,12 +127,14 @@ export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, int
     .update(requests)
     .set({
       ...(FINAL_REQUEST_STATUSES.has(status) ? {} : { status: "awaiting_review" }),
-      ...(ts.travelStartTime ? { travelStartTime: ts.travelStartTime, travelEndTime: ts.travelEndTime } : {}),
-      ...(ts.serviceCompleted !== null ? { serviceCompleted: ts.serviceCompleted } : {}),
+      // Request-level columns are a Position 1 legacy field; Position 2's values live only in its own slot.
+      ...(pos === 1 && ts.travelStartTime ? { travelStartTime: ts.travelStartTime, travelEndTime: ts.travelEndTime } : {}),
+      ...(pos === 1 && ts.serviceCompleted !== null ? { serviceCompleted: ts.serviceCompleted } : {}),
       data: {
         ...data,
         hoursSubmissions: { ...all, [pos]: submission },
-        hoursSubmission: pos === 1 ? submission : (data.hoursSubmission ?? submission),
+        // Legacy single-position field: Position 1 only, so Position 2 can never leak into it.
+        ...(pos === 1 ? { hoursSubmission: submission } : {}),
       },
       updatedAt: new Date(),
     })
@@ -174,4 +177,30 @@ export async function mirrorTimesheetApproval(tx: DbTx, requestId: string, times
       updatedAt: new Date(),
     })
     .where(eq(requests.id, requestId));
+}
+
+/**
+ * Team jobs: true only when EVERY currently booked position has approved hours (in-app or secure-link), so approving
+ * Position 1 never marks the whole request completed while Position 2 is still waiting.
+ */
+export async function allBookedPositionsApproved(tx: DbTx, requestId: string): Promise<boolean> {
+  const [req] = await tx.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).limit(1);
+  if (!req) return false;
+  const data = requestData(req.data);
+  const positions = asObject(data.offerPositions);
+  const hours = asObject(data.hoursSubmissions);
+  const booked = await tx
+    .select({ id: offers.id, interpreterId: offers.interpreterId })
+    .from(offers)
+    .where(and(eq(offers.requestId, requestId), eq(offers.status, "accepted")));
+  if (booked.length === 0) return true;
+  const approvedSheets = await tx
+    .select({ interpreterId: timesheets.interpreterId })
+    .from(timesheets)
+    .where(and(eq(timesheets.requestId, requestId), eq(timesheets.status, "approved")));
+  const approvedBySheet = new Set(approvedSheets.map((t) => t.interpreterId));
+  return booked.every((b) => {
+    const pos = positions[b.id] === 2 ? 2 : 1;
+    return asObject(hours[pos]).status === "approved" || approvedBySheet.has(b.interpreterId);
+  });
 }

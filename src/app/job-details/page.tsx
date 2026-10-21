@@ -4,11 +4,13 @@ import Link from "next/link";
 import { Logo } from "@/components/logo";
 import { ClarificationButton } from "@/components/jobDetails/ClarificationButton";
 import { ActivityLog } from "@/components/requests/ActivityLog";
+import { AgencyMessageList } from "@/components/jobDetails/AgencyMessageList";
+import { GiveBackButton } from "@/components/jobDetails/GiveBackButton";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveJobDetailsLink } from "@/lib/jobDetailsAccess";
 import { logError } from "@/lib/logError";
-import { listActivityForInterpreter } from "@/lib/requestActivity";
-import type { ActivityItem } from "@/lib/requestActivity";
+import { listActivityForInterpreter, listAgencyMessages } from "@/lib/requestActivity";
+import type { ActivityItem, AgencyMessage } from "@/lib/requestActivity";
 import { formatFileSize } from "@/lib/validation/file";
 
 // Private page: keep it out of search engines and never send its URL (which holds the token) as a referrer.
@@ -52,7 +54,15 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
   }
 
   let activity: ActivityItem[] = [];
+  let messages: AgencyMessage[] = [];
+  let canGiveBack = false;
   if (access.ok) {
+    // Only messages addressed to THIS interpreter (on a team job, never the other interpreter's).
+    messages = await listAgencyMessages(access.requestId, access.interpreterId).catch((err: unknown) => {
+      logError("JobDetailsPage.messages", err);
+      return [];
+    });
+    canGiveBack = Boolean(access.startsAt && new Date(access.startsAt).getTime() > Date.now());
     await writeAuditLog({ action: "job_details_viewed", details: `requestId=${access.requestId}; interpreterId=${access.interpreterId}` });
     // Only shared entries (job changes, cancellation) and this interpreter's own booking events; never other interpreters'.
     activity = await listActivityForInterpreter(access.requestId, access.interpreterId).catch((err: unknown) => {
@@ -77,6 +87,12 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
               <h1 className="text-[24px] font-semibold tracking-tight">{access.details.title}</h1>
               <p className="text-[14px] text-[var(--sage)]">Booking {access.details.reference} · Please don&apos;t share this page.</p>
             </div>
+
+            {messages.length > 0 && (
+              <Card title="Messages from the agency">
+                <AgencyMessageList messages={messages} timeZone={access.details.timeZone} />
+              </Card>
+            )}
 
             <Card title="Booking">
               <dl>
@@ -164,8 +180,16 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
             <section className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
               <h2 className="mb-1 text-lg font-semibold text-[var(--ink)]">Something unclear?</h2>
               <p className="mb-4 text-[13px] text-[var(--sage)]">Ask the agency a short question about this booking.</p>
-              <ClarificationButton token={token} />
+              <ClarificationButton target={{ kind: "link", token }} />
             </section>
+
+            {canGiveBack && (
+              <section className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+                <h2 className="mb-1 text-lg font-semibold text-[var(--ink)]">Can&apos;t make it?</h2>
+                <p className="mb-4 text-[13px] text-[var(--sage)]">Give the assignment back so the agency can find a replacement. Only possible before it starts.</p>
+                <GiveBackButton token={token} />
+              </section>
+            )}
           </>
         )}
       </div>

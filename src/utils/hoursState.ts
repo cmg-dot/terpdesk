@@ -35,8 +35,12 @@ export function getJobHoursState(job: any, serviceRecords: any[] = []): HoursWor
     );
   });
 
-  const reqStatus = String(job.requestStatus || job.status || '').toLowerCase();
   const hs = job.hoursSubmission || {};
+  // Team jobs: each position's own hours decide its state. The request-wide status reflects BOTH positions, so it is
+  // ignored here, otherwise one interpreter's approval or submission would show on the other's job.
+  const data = job.data || {};
+  const isTeam = data.slotCount === 2 || data.requiredPositions === 2 || data.details?.slotCount === 2 || data.positions === 'Team — two independent positions';
+  const reqStatus = isTeam ? '' : String(job.requestStatus || job.status || '').toLowerCase();
 
   // Check for approved
   if (record?.state === 'approved' || reqStatus === 'approved' || reqStatus === 'completed' || reqStatus === 'billed' || hs.status === 'approved') {
@@ -146,4 +150,15 @@ export function getHoursBadgeInfo(state: HoursWorkflowState): HoursBadgeInfo {
         isCorrection: false,
       };
   }
+}
+
+/**
+ * The single `hoursSubmission` field from before team jobs. It only ever means Position 1: older code could copy
+ * Position 2's hours into it when Position 2 submitted first, so a copy marked as Position 2 is ignored.
+ */
+export function legacyPosition1Hours(data: unknown): Record<string, unknown> | null {
+  if (!data || typeof data !== "object") return null;
+  const legacy = (data as { hoursSubmission?: unknown }).hoursSubmission;
+  if (!legacy || typeof legacy !== "object" || Array.isArray(legacy)) return null;
+  return (legacy as { positionIndex?: unknown }).positionIndex === 2 ? null : (legacy as Record<string, unknown>);
 }

@@ -5,10 +5,12 @@ import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { logActivity } from "@/lib/requestActivity";
+import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { z } from "zod";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { legacyPosition1Hours } from "@/utils/hoursState";
 import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
 import type { TravelLeg } from "@/lib/timesheetSchemas";
 
@@ -73,16 +75,16 @@ export async function submitInterpreterHours(
   }
 
   await db.transaction(async (tx) => {
-    const [existing] = await tx
-      .select({ createdAt: requests.createdAt, data: requests.data })
-      .from(requests)
-      .where(eq(requests.id, requestId));
+    // Row lock: on a team job, both interpreters submitting at once are serialised, so neither overwrites the other.
+    const existing = await lockRequestForPosition(tx, requestId);
 
     if (!existing) {
       throw new Error("Request not found");
     }
 
-    const posIdx = extra?.positionIndex || 1;
+    // The position comes from the interpreter's OWN accepted offer, never from the browser, so a team member can only
+    // ever write their own position's hours.
+    const posIdx = positionOfOffer(existing.offerPositions, ownBooking.id);
     const existingData = (existing.data as any) || {};
 
     const { startsAt } = resolveRequestTimes({
@@ -108,7 +110,9 @@ export async function submitInterpreterHours(
       throw new Error("A reason is required when the service was not completed.");
     }
 
-    const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? existingData.hoursSubmission : {}) || {};
+    const storedHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(existingData) : null) || {};
+    // Hours left in this position by a previous (since replaced) interpreter are never merged into these.
+    const existingHours = storedHours.interpreterId && storedHours.interpreterId !== sessionInterpreterId ? {} : storedHours;
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
     const isCorrection = (extra?.version ?? 1) > 1;
     const historyEntry = {
@@ -132,9 +136,8 @@ export async function submitInterpreterHours(
       }
     };
 
-    const finalHistory = Array.isArray(extra?.history) && extra.history.length > 0
-      ? extra.history
-      : [...existingHistory, historyEntry];
+    // History is kept server-side (the browser's copy is never trusted): the stored entries plus this submission.
+    const finalHistory = [...existingHistory, historyEntry];
 
     const submissionForPos = {
       ...existingHours,
@@ -143,7 +146,7 @@ export async function submitInterpreterHours(
       source: 'in_app',
       positionIndex: posIdx,
       interpreterName: extra?.interpreterName || existingHours.interpreterName,
-      interpreterId: extra?.interpreterId || existingHours.interpreterId,
+      interpreterId: sessionInterpreterId,
       actualStartTime,
       actualEndTime,
       miles: totalMiles,
@@ -173,13 +176,20 @@ export async function submitInterpreterHours(
       .update(requests)
       .set({
         status: "awaiting_review",
-        travelStartTime: travelStart && !isNaN(travelStart.getTime()) ? travelStart : null,
-        travelEndTime: travelEnd && !isNaN(travelEnd.getTime()) ? travelEnd : null,
-        serviceCompleted: isCompleted,
+        // The request-level columns are single-position legacy fields: only Position 1 writes them, so Position 2's
+        // submission can't overwrite them. Each position's own values live in hoursSubmissions[position].
+        ...(posIdx === 1
+          ? {
+              travelStartTime: travelStart && !isNaN(travelStart.getTime()) ? travelStart : null,
+              travelEndTime: travelEnd && !isNaN(travelEnd.getTime()) ? travelEnd : null,
+              serviceCompleted: isCompleted,
+            }
+          : {}),
         data: {
           ...existingData,
           hoursSubmissions: updatedHoursSubmissions,
-          hoursSubmission: posIdx === 1 ? submissionForPos : (existingData.hoursSubmission || submissionForPos),
+          // Legacy single-position field: Position 1 only, so Position 2 can never leak into it.
+          ...(posIdx === 1 ? { hoursSubmission: submissionForPos } : {}),
         },
         updatedAt: new Date(),
       })

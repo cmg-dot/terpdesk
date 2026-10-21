@@ -28,6 +28,9 @@ import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/Expired
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
+import { legacyPosition1Hours } from "@/utils/hoursState";
+import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
+import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -463,6 +466,9 @@ export default function AssignmentDetailPage() {
   // While an interpreter is booked, date, time and time zone are fixed (the server ignores them too).
   const isScheduleLocked = hasAcceptedBooking && !isEditLocked;
   const [quickEditMessage, setQuickEditMessage] = useState('');
+  // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
+  const messageRecipients = bookedRecipients(realOffers);
+  const [quickEditRecipient, setQuickEditRecipient] = useState('');
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const [activityVersion, setActivityVersion] = useState(0);
 
@@ -535,6 +541,7 @@ export default function AssignmentDetailPage() {
 
     setSaveError(null);
     setQuickEditMessage('');
+    setQuickEditRecipient(defaultRecipient(messageRecipients, foundRequest?.data?.clarifications));
     setIsEditAccessOpen(true);
   };
 
@@ -563,7 +570,7 @@ export default function AssignmentDetailPage() {
         contact: editContact,
         contactMethod: editContactMethod,
         ...(isScheduleLocked
-          ? { messageToInterpreter: quickEditMessage }
+          ? { messageToInterpreter: quickEditMessage, messageRecipientId: quickEditRecipient || undefined }
           : {
               startDate: editStartDate,
               startTime: editStartTime,
@@ -1444,8 +1451,10 @@ export default function AssignmentDetailPage() {
  {(() => {
    const isOdhh = foundRequest?.data?.intake?.program === 'WA ODHH' || foundRequest?.data?.intake?.program === 'wa_odhh' || foundRequest?.program === 'WA ODHH' || foundRequest?.program === 'wa_odhh';
    const hoursMap = (foundRequest?.hoursSubmissions || foundRequest?.data?.hoursSubmissions || {}) as Record<number, any>;
-   if (!hoursMap[1] && (foundRequest?.data?.hoursSubmission || foundRequest?.hoursSubmission)) {
-     hoursMap[1] = foundRequest?.data?.hoursSubmission || foundRequest?.hoursSubmission;
+   // Legacy single-position field = Position 1 only (a copy marked Position 2 is ignored).
+   const legacyHours = legacyPosition1Hours(foundRequest?.data) || legacyPosition1Hours(foundRequest);
+   if (!hoursMap[1] && legacyHours) {
+     hoursMap[1] = legacyHours;
    }
 
    const positionsWithHours = ([1, 2] as const).filter(pos => {
@@ -1495,7 +1504,7 @@ export default function AssignmentDetailPage() {
 
        <div className="space-y-6">
          {positionsWithHours.map(posIdx => {
-           const hoursSub = hoursMap[posIdx] || (posIdx === 1 ? foundRequest?.data?.hoursSubmission : null);
+           const hoursSub = hoursMap[posIdx] || null;
            const posAccepted = posIdx === 1 ? slot1Accepted : slot2Accepted;
            const posInterpreterName = posAccepted?.interpreterName || hoursSub?.interpreterName || (posIdx === 1 ? 'Position 1 interpreter' : 'Position 2 interpreter');
            
@@ -2461,8 +2470,11 @@ export default function AssignmentDetailPage() {
                 className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]"
               />
               <p className="mt-1 text-[11px] text-gray-500">
-                Added to the “Job details updated” email the booked interpreter gets when you save, e.g. to answer their question. It is emailed, so don't include client names or health information. ({quickEditMessage.length}/1000)
+                Added to the “Job details updated” email the booked interpreter gets when you save, e.g. to answer their question, and kept on their job page. It is emailed, so don't include client names or health information. ({quickEditMessage.length}/1000)
               </p>
+              {quickEditMessage.trim() && (
+                <MessageRecipientSelect id="quick-edit-recipient" className="mt-3" recipients={messageRecipients} value={quickEditRecipient} onChange={setQuickEditRecipient} />
+              )}
             </div>
           )}
 
@@ -2480,7 +2492,7 @@ export default function AssignmentDetailPage() {
             </button>
             <button
               type="submit"
-              disabled={isSavingAccess || (!isScheduleLocked && isQuickEditTimeInvalid)}
+              disabled={isSavingAccess || (!isScheduleLocked && isQuickEditTimeInvalid) || (isScheduleLocked && Boolean(quickEditMessage.trim()) && messageRecipients.length > 1 && !quickEditRecipient)}
               className="px-6 py-2 rounded-full text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSavingAccess ? 'Saving...' : 'Save details'}

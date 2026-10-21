@@ -6,6 +6,7 @@ import { requests, offers, interpreters, timesheets } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { legacyPosition1Hours } from "@/utils/hoursState";
 import { timesheetToHoursSubmission, type TimesheetForSync } from "@/lib/timesheetSync";
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
@@ -127,7 +128,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
     );
 
     const posIdx = (rowData.offerPositions?.[row.offer.id] || 1) as 1 | 2;
-    const storedHours = rowData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? rowData.hoursSubmission : null);
+    const storedHours = rowData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(rowData) : null);
     const sheet = row.offer.status === 'accepted' ? sheetByRequest.get(row.request.id) : undefined;
     // Used when the request holds no submitted in-app hours, or holds this timesheet's own mirror. A mirror keeps
     // its stored review state (e.g. a correction request); only the timesheet's approval is layered on top.
