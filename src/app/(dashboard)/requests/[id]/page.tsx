@@ -25,6 +25,8 @@ import { InterpreterFitBadge, FitWarningNotice } from "@/components/scheduling-u
 import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
 import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
+import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
+import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -864,13 +866,14 @@ export default function AssignmentDetailPage() {
     setIsSending(true);
 
     try {
-      // 1. Create the offer in the database
-      await createOffer({
+      // 1. Create the offer in the database (refused for past jobs and bad deadlines, with a readable reason)
+      const created = await createOffer({
         requestId: id,
         interpreterId: rec,
         expiresAt: expiryUtc,
         positionIndex: posIdx
       });
+      if (!created.success) throw new Error(created.error);
 
       // 2. Dispatch offer email with magic link
       const dispatchRes = await fetch('/api/offers/dispatch', {
@@ -1031,6 +1034,12 @@ export default function AssignmentDetailPage() {
  {!isCancelled && isUnfilledPastDue(assignment, currentTime) && (
    <span className="inline-flex items-center bg-red-50 text-red-700 border border-red-200 text-[13px] font-semibold px-3 py-1 rounded-full">
      Unfilled - Past Due
+   </span>
+ )}
+ {/* Scheduled end has passed and someone was booked: the job is done. */}
+ {!isCancelled && isAppointmentPassed && hasAcceptedBooking && (
+   <span className="inline-flex items-center bg-gray-100 text-gray-700 border border-gray-200 text-[13px] font-semibold px-3 py-1 rounded-full">
+     Completed
    </span>
  )}
  {isCancelled && (
@@ -1375,6 +1384,8 @@ export default function AssignmentDetailPage() {
 
  {/* Interactive / Staffing */}
  
+ <ClarificationsCard clarifications={foundRequest?.data?.clarifications} cardClass={cardClass} />
+
  <PrepMaterialsSection requestId={id} cardClass={cardClass} />
 
  <div className={cardClass}>
@@ -1746,6 +1757,18 @@ export default function AssignmentDetailPage() {
                     Withdraw offer
                   </button>
                 </div>
+              ) : !isFutureAppointment ? (
+                // Started or past: no new offers (the server refuses them too) until the time is edited forward.
+                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
+                  <p className="flex items-center gap-2 font-medium text-[var(--ink)]">
+                    <Lock className="h-4 w-4 text-gray-500" aria-hidden="true" />
+                    {isAppointmentInProgress ? "This appointment is under way" : "This appointment's time has passed"}
+                  </p>
+                  <p className="mt-1 text-xs text-[var(--sage)]">
+                    New offers can&apos;t be sent for a job that has started or ended. To offer it again, edit the request
+                    to a future date and time.
+                  </p>
+                </div>
               ) : (
                 <>
                   <label className="flex items-start gap-3 cursor-pointer mb-6">
@@ -1980,6 +2003,8 @@ export default function AssignmentDetailPage() {
                         />
                       );
                     })()}
+                    {/* Booked: staff can re-send the booking confirmation (with the secure details link). */}
+                    {!isCancelled && <ResendDetailsButton requestId={id} positionIndex={posIdx} />}
                     {isBookingLocked ? (
                       <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-200/70 text-gray-600 text-xs font-medium">
                         <Lock className="w-3.5 h-3.5 text-gray-500" />

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { ClarificationButton } from "@/components/jobDetails/ClarificationButton";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveJobDetailsLink } from "@/lib/jobDetailsAccess";
 import { logError } from "@/lib/logError";
@@ -145,6 +146,12 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
               )}
               <p className="mt-3 text-[12px] text-gray-500">Prep materials are also available in the terpDESK app under Prep.</p>
             </Card>
+
+            <section className="rounded-2xl border border-gray-200 bg-white p-6 text-center">
+              <h2 className="mb-1 text-lg font-semibold text-[var(--ink)]">Something unclear?</h2>
+              <p className="mb-4 text-[13px] text-[var(--sage)]">Ask the agency a short question about this booking.</p>
+              <ClarificationButton token={token} />
+            </section>
           </>
         )}
       </div>

@@ -1,4 +1,3 @@
-import { createHash, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
@@ -6,11 +5,9 @@ import { offers, requests, timesheets } from "@/db/schema";
 import { dispatchTimesheetCore } from "@/lib/timesheetDispatch";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { isCronAuthorized } from "@/lib/cronAuth";
 
 export const dynamic = "force-dynamic";
-
-/** Used only when CRON_SECRET is not set AND this is not a production build. */
-const LOCAL_DEV_SECRET = "local-dev-cron-secret";
 
 /** Only jobs that ended within this window are considered, so a first run never mass-emails old history. */
 const LOOKBACK_DAYS = Number(process.env.CRON_TIMESHEET_LOOKBACK_DAYS) || 14;
@@ -23,15 +20,6 @@ const SKIP_STATUSES = ["awaiting_review", "correction_requested", "approved", "c
 interface HoursData {
   hoursSubmission?: unknown;
   hoursSubmissions?: Record<string, unknown>;
-}
-
-const digest = (value: string): Buffer => createHash("sha256").update(value).digest();
-
-/** Vercel Cron sends `Authorization: Bearer <CRON_SECRET>`. Compared as SHA-256 digests in constant time. */
-function isAuthorized(header: string | null): boolean {
-  const secret = process.env.CRON_SECRET || (process.env.NODE_ENV !== "production" ? LOCAL_DEV_SECRET : "");
-  if (!secret || !header || !header.startsWith("Bearer ")) return false;
-  return timingSafeEqual(digest(header.slice("Bearer ".length)), digest(secret));
 }
 
 interface Candidate {
@@ -48,7 +36,7 @@ interface JobOutcome {
 }
 
 export async function GET(request: Request) {
-  if (!isAuthorized(request.headers.get("authorization"))) {
+  if (!isCronAuthorized(request.headers.get("authorization"))) {
     return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
   }
 

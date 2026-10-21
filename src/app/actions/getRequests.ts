@@ -224,7 +224,9 @@ export async function fetchLiveRequests() {
     interpreterName: interpreterDisplayName,
     state: offers.status,
     status: offers.status,
-    expiresAt: offers.expiresAt
+    expiresAt: offers.expiresAt,
+    // When the offer last changed (sent, accepted, declined, expired): tells which answer is the latest.
+    updatedAt: offers.updatedAt
   })
   .from(offers)
   .leftJoin(interpreters, eq(offers.interpreterId, interpreters.id));
@@ -305,7 +307,9 @@ export async function fetchLiveRequestById(id: string) {
     interpreterName: interpreterDisplayName,
     state: offers.status,
     status: offers.status,
-    expiresAt: offers.expiresAt
+    expiresAt: offers.expiresAt,
+    // When the offer last changed (sent, accepted, declined, expired): tells which answer is the latest.
+    updatedAt: offers.updatedAt
   })
   .from(offers)
   .leftJoin(interpreters, eq(offers.interpreterId, interpreters.id))
@@ -367,7 +371,8 @@ export async function fetchLiveRequestById(id: string) {
     interpreterName: o.interpreterName || 'Unknown Interpreter',
     state: o.state,
     status: o.status,
-    expiresAt: o.expiresAt.toISOString()
+    expiresAt: o.expiresAt.toISOString(),
+    updatedAt: o.updatedAt.toISOString()
   }));
 
   return mapRequestRow(row, mappedOffers);

@@ -92,11 +92,47 @@ function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: string 
   return { subject: `Booking confirmed ${s.reference} - terpDESK`, html, text };
 }
 
+/** The external portal where ODHH interpreters report the assignment (kept exactly as the state publishes it). */
+export const ODHH_ASSIGNMENT_REPORT_URL = "https://fortress.wa.gov/dshs/odhhapps/Interpreters/AssignmentReport.aspx/";
+
 /**
- * Sends the booking confirmation after an interpreter accepts (in the app or through the email link).
- * Never throws: a failed email must not undo or block the acceptance.
+ * "Post-Job Action Required" for an ODHH job that has ended: submit the hours in the state portal.
+ * Restricted summary only (no address, client or notes). Throws if the email cannot be sent, so the caller can retry.
  */
-export async function sendBookingConfirmation(params: { requestId: string; interpreterId: string; positionNumber?: number }): Promise<void> {
+export async function sendOdhhPostJobReminder(params: { to: string; name: string; summary: JobSummary }): Promise<void> {
+  const s = params.summary;
+  const html = buildTerpDeskEmail({
+    title: `Post-job action required ${s.reference}`,
+    preheader: "Your ODHH assignment has ended. Please submit your hours.",
+    bodyContent: `
+      <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">Post-job action required</h1>
+      <p style="margin:0 0 4px;">${params.name ? `Hi ${escapeHtml(params.name)}, y` : "Y"}our ODHH assignment has ended. Please submit your hours in the ODHH Assignment Report portal so you are paid.</p>
+      ${emailActionCard(`
+        ${emailDetailsTable(summaryRows(s))}
+        <p style="margin:20px 0 0;">${emailButton("Open the ODHH Assignment Report", ODHH_ASSIGNMENT_REPORT_URL)}</p>
+      `)}
+      <p style="margin:0;font-size:13px;color:#6B7280;">If you already submitted these hours, you can ignore this reminder.</p>`,
+  });
+  const text = [
+    "Post-job action required.",
+    "",
+    "Your ODHH assignment has ended. Please submit your hours in the ODHH Assignment Report portal so you are paid.",
+    "",
+    summaryText(s),
+    "",
+    `ODHH Assignment Report: ${ODHH_ASSIGNMENT_REPORT_URL}`,
+    "",
+    "If you already submitted these hours, you can ignore this reminder.",
+  ].join("\n");
+  await sendEmail(params.to, `Post-job action required: submit your ODHH hours (${s.reference})`, html, text);
+}
+
+/**
+ * Sends the booking confirmation after an interpreter accepts (in the app or through the email link), is assigned
+ * directly, or when staff choose "Resend details". Never throws: a failed email must not undo or block the booking.
+ * Returns whether the email went out.
+ */
+export async function sendBookingConfirmation(params: { requestId: string; interpreterId: string; positionNumber?: number }): Promise<boolean> {
   try {
     const [request] = await db
       .select({ id: requests.id, title: requests.title, createdAt: requests.createdAt, data: requests.data })
@@ -108,7 +144,7 @@ export async function sendBookingConfirmation(params: { requestId: string; inter
       .from(interpreters)
       .where(eq(interpreters.id, params.interpreterId))
       .limit(1);
-    if (!request || !interpreter?.email) return;
+    if (!request || !interpreter?.email) return false;
 
     const summary = summarizeJob(request, params.positionNumber);
     let endsAt = new Date(NaN);
@@ -127,8 +163,10 @@ export async function sendBookingConfirmation(params: { requestId: string; inter
       action: "booking_confirmation_sent",
       details: `requestId=${request.id}; interpreterId=${params.interpreterId}`,
     });
+    return true;
   } catch {
     // Never log the error object here: it can include the recipient address.
     console.error("[jobEmails] could not send the booking confirmation");
+    return false;
   }
 }
