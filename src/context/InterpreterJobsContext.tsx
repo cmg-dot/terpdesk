@@ -23,6 +23,8 @@ export interface Job {
   isStateJob?: boolean;
   timeZone?: string;
   hoursSubmission?: any;
+  /** Two-interpreter job: request-wide hours status/travel must never be used for this interpreter's hours. */
+  isTeamJob?: boolean;
   /** The agency changed the job after this interpreter was booked (drives the "Updated" badge). */
   detailsUpdated?: { at: string; fields: string[] } | null;
   travelStartTime?: string | null;
@@ -79,6 +81,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           isStateJob: (o as any).isStateJob === true,
           timeZone: o.timeZone,
           hoursSubmission: (o as any).hoursSubmission,
+          isTeamJob: o.isTeamJob,
           detailsUpdated: o.detailsUpdated,
           travelStartTime: (o as any).travelStartTime,
           travelEndTime: (o as any).travelEndTime,

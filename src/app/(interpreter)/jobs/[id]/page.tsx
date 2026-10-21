@@ -16,7 +16,7 @@ import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadg
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
-import { getJobHoursState } from "@/utils/hoursState";
+import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
@@ -113,8 +113,10 @@ function buildAuditLog(serviceRecord: any, job: any, isOdhh: boolean) {
 
   const events: any[] = [];
   const version = serviceRecord.version || 1;
-  const isApproved = serviceRecord.state === 'approved' || ['approved', 'completed', 'billed'].includes(job?.requestStatus);
-  const isCorrectionReq = serviceRecord.state === 'changes_requested' || serviceRecord.state === 'correction_requested' || job?.requestStatus === 'correction_requested';
+  // Team jobs: the request-wide status covers both positions, so it never decides this interpreter's history.
+  const ownRequestStatus = job ? scopedRequestStatus(job) : '';
+  const isApproved = serviceRecord.state === 'approved' || ['approved', 'completed', 'billed'].includes(ownRequestStatus);
+  const isCorrectionReq = serviceRecord.state === 'changes_requested' || serviceRecord.state === 'correction_requested' || ownRequestStatus === 'correction_requested';
   const hasAgencyMessage = Boolean(serviceRecord.reviewMessage);
 
   // 1. Initial Submission
@@ -391,7 +393,8 @@ function ServiceTimeBlock({ job }: { job: any }) {
         if (stored) {
           try {
             const records = JSON.parse(stored);
-            local = records.find((r: any) => r.appointmentId === job.id || r.appointmentId === job.requestId) || null;
+            // Only this booking's own cached record (by offer id), never another interpreter's on the same job.
+            local = findOwnServiceRecord(records, job) || null;
           } catch (e) {
             console.error(e);
           }
@@ -478,6 +481,8 @@ function ServiceTimeBlock({ job }: { job: any }) {
     const draftRecord = {
       id: serviceRecord?.id || Math.random().toString(36).substring(7),
       appointmentId: job.requestId || job.id,
+      // Ties the cached record to THIS booking, so it never shows on another interpreter's job.
+      offerId: job.id,
       interpreterName: "Jamie Fictional",
       state: 'draft',
       scheduledStart: job.startsAt,
@@ -500,7 +505,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
     if (typeof window !== 'undefined') {
       const stored = localStorage.getItem('terpdesk_service_records');
       const records = stored ? JSON.parse(stored) : [];
-      const idx = records.findIndex((r: any) => r.appointmentId === (job.requestId || job.id) || r.appointmentId === job.id);
+      const idx = records.findIndex((r: any) => r?.offerId === job.id);
       if (idx > -1) {
         records[idx] = draftRecord;
       } else {
@@ -524,7 +529,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
       alert("Please give a reason the service was not completed.");
       return;
     }
-    const isCorrection = serviceRecord?.state === 'approved' || serviceRecord?.state === 'changes_requested' || serviceRecord?.state === 'correction_requested' || job.requestStatus === 'correction_requested';
+    const isCorrection = serviceRecord?.state === 'approved' || serviceRecord?.state === 'changes_requested' || serviceRecord?.state === 'correction_requested' || scopedRequestStatus(job) === 'correction_requested';
     const nextVersion = isCorrection ? (serviceRecord?.version || 1) + 1 : (serviceRecord?.version || 1);
 
     const safeZone = mapSafeZone((job as any).details?.timeZone || job.timeZone);
@@ -572,6 +577,8 @@ function ServiceTimeBlock({ job }: { job: any }) {
     const newRecord = {
       id: serviceRecord?.id || Math.random().toString(36).substring(7),
       appointmentId: job.requestId || job.id,
+      // Ties the cached record to THIS booking, so it never shows on another interpreter's job.
+      offerId: job.id,
       interpreterName: "Jamie Fictional",
       state: 'awaiting_review',
       scheduledStart: job.startsAt,
@@ -639,7 +646,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('terpdesk_service_records');
         const records = stored ? JSON.parse(stored) : [];
-        const idx = records.findIndex((r: any) => r.appointmentId === (job.requestId || job.id) || r.appointmentId === job.id);
+        const idx = records.findIndex((r: any) => r?.offerId === job.id);
         if (idx > -1) {
           records[idx] = newRecord;
         } else {
@@ -692,13 +699,15 @@ function ServiceTimeBlock({ job }: { job: any }) {
       return 'draft';
     }
 
-    if (job.requestStatus === 'awaiting_review') {
+    // Request-wide status only for single-interpreter jobs; on a team job it reflects the other position too.
+    const ownRequestStatus = scopedRequestStatus(job);
+    if (ownRequestStatus === 'awaiting_review') {
       return 'awaiting_review';
     }
-    if (job.requestStatus === 'approved' || ['completed', 'billed'].includes(job.requestStatus)) {
+    if (ownRequestStatus === 'approved' || ['completed', 'billed'].includes(ownRequestStatus)) {
       return 'approved';
     }
-    if (job.requestStatus === 'correction_requested') {
+    if (ownRequestStatus === 'correction_requested') {
       return 'correction_requested';
     }
 

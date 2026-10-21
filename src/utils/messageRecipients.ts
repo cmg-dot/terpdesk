@@ -3,6 +3,9 @@
  * declined, given-back, withdrawn and pending offers never appear). Client-safe.
  */
 
+/** Recipient value meaning "every interpreter booked on this job" (the agency's explicit broadcast choice). */
+export const ALL_BOOKED_RECIPIENTS = "all";
+
 export interface MessageRecipient {
   interpreterId: string;
   label: string;

@@ -21,26 +21,13 @@ export function parseSafeDate(dateVal: any): Date | null {
 export function getJobHoursState(job: any, serviceRecords: any[] = []): HoursWorkflowState {
   if (!job) return 'not_submitted';
 
-  const jobId = String(job.id || '');
-  const reqId = String(job.requestId || '');
-
-  // 1. Check local service records (which includes recent client submissions / drafts)
-  const record = (serviceRecords || []).find((r: any) => {
-    if (!r) return false;
-    const rAppt = String(r.appointmentId || '');
-    const rId = String(r.id || '');
-    return (
-      (rAppt && (rAppt === jobId || rAppt === reqId)) ||
-      (rId && (rId === jobId || rId === reqId))
-    );
-  });
+  // 1. This browser's cached record for THIS booking only (matched by offer id, never by the shared request id).
+  const record = findOwnServiceRecord(serviceRecords, job);
 
   const hs = job.hoursSubmission || {};
   // Team jobs: each position's own hours decide its state. The request-wide status reflects BOTH positions, so it is
   // ignored here, otherwise one interpreter's approval or submission would show on the other's job.
-  const data = job.data || {};
-  const isTeam = data.slotCount === 2 || data.requiredPositions === 2 || data.details?.slotCount === 2 || data.positions === 'Team — two independent positions';
-  const reqStatus = isTeam ? '' : String(job.requestStatus || job.status || '').toLowerCase();
+  const reqStatus = scopedRequestStatus(job);
 
   // Check for approved
   if (record?.state === 'approved' || reqStatus === 'approved' || reqStatus === 'completed' || reqStatus === 'billed' || hs.status === 'approved') {
@@ -161,4 +148,32 @@ export function legacyPosition1Hours(data: unknown): Record<string, unknown> | n
   const legacy = (data as { hoursSubmission?: unknown }).hoursSubmission;
   if (!legacy || typeof legacy !== "object" || Array.isArray(legacy)) return null;
   return (legacy as { positionIndex?: unknown }).positionIndex === 2 ? null : (legacy as Record<string, unknown>);
+}
+
+const TEAM_LABEL = "Team — two independent positions";
+
+/** True for a two-interpreter (team) job, however the request stored it. */
+export function isTeamRequestData(data: unknown): boolean {
+  if (!data || typeof data !== "object") return false;
+  const d = data as Record<string, unknown>;
+  const pick = (o: unknown): Record<string, unknown> => (o && typeof o === "object" ? (o as Record<string, unknown>) : {});
+  return [d, pick(d.details), pick(d.intake)].some(
+    (o) => o.slotCount === 2 || o.requiredPositions === 2 || o.positions === TEAM_LABEL,
+  );
+}
+
+/**
+ * The request-wide status, but ONLY where it can describe the viewer's own hours: on a team job it reflects both
+ * positions, so it is never used for one interpreter's hours state (it returns "").
+ */
+export function scopedRequestStatus(job: { isTeamJob?: boolean; data?: unknown; requestStatus?: string; status?: string }): string {
+  const team = job.isTeamJob ?? isTeamRequestData(job.data);
+  return team ? "" : String(job.requestStatus || job.status || "").toLowerCase();
+}
+
+/** Browser-cached service records belong to ONE booking (offer), so another interpreter's never matches. */
+export function findOwnServiceRecord<T extends { offerId?: unknown }>(records: T[] | null | undefined, job: { id?: unknown }): T | undefined {
+  const offerId = String(job.id ?? "");
+  if (!offerId || !Array.isArray(records)) return undefined;
+  return records.find((r) => Boolean(r) && r.offerId === offerId);
 }

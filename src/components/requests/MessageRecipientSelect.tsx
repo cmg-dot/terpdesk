@@ -1,10 +1,11 @@
 "use client";
 
+import { ALL_BOOKED_RECIPIENTS } from "@/utils/messageRecipients";
 import type { MessageRecipient } from "@/utils/messageRecipients";
 
 /**
- * "Send this message to" for a team job: the agency's message goes to ONE booked interpreter (the one being replied
- * to), never the whole team. Hidden when only one interpreter is booked (they are the recipient).
+ * "Send this message to" for a team job: one booked interpreter (the one being replied to) or, chosen explicitly,
+ * every booked interpreter. Hidden when only one interpreter is booked (they are the recipient).
  */
 export function MessageRecipientSelect({
   id,
@@ -33,8 +34,14 @@ export function MessageRecipientSelect({
         {recipients.map((r) => (
           <option key={r.interpreterId} value={r.interpreterId}>{r.label}</option>
         ))}
+        <option value={ALL_BOOKED_RECIPIENTS}>Send to all booked interpreters</option>
       </select>
-      <p className="mt-1 text-[11px] text-gray-500">Only this interpreter receives the message. Every booked interpreter is still told about changed job details.</p>
+      <p className="mt-1 text-[11px] text-gray-500">
+        {value === ALL_BOOKED_RECIPIENTS
+          ? "Every interpreter booked on this job receives the message."
+          : "Only this interpreter receives the message."}{" "}
+        Every booked interpreter is still told about changed job details.
+      </p>
     </div>
   );
 }

@@ -13,7 +13,7 @@ import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappe
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
-import { getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
+import { getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 
 type Tab = "upcoming" | "past";
@@ -347,7 +347,7 @@ export default function InterpreterJobsPage() {
                 const locSecondary = locationParts[1]?.trim() || job.agencyName || "North Fictional Interpreting";
                 const hoursState = getJobHoursState(job, serviceRecords);
                 const isCorrection = hoursState === 'correction_requested';
-                const record = serviceRecords.find((r: any) => r.appointmentId === job.id || r.appointmentId === job.requestId);
+                const record = findOwnServiceRecord(serviceRecords, job);
                 const reviewMsg = record?.reviewMessage || (job.hoursSubmission as any)?.reviewMessage;
                 
                 return (

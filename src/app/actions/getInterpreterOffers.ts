@@ -6,7 +6,7 @@ import { requests, offers, interpreters, timesheets } from "@/db/schema";
 import { and, eq, inArray } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
-import { legacyPosition1Hours } from "@/utils/hoursState";
+import { isTeamRequestData, legacyPosition1Hours } from "@/utils/hoursState";
 import { timesheetToHoursSubmission, type TimesheetForSync } from "@/lib/timesheetSync";
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
@@ -127,8 +127,18 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
         : (onsite.venue ? (onsite.address ? `${onsite.venue} · ${onsite.address}` : onsite.venue) : (onsite.address || "Location pending"))
     );
 
-    const posIdx = (rowData.offerPositions?.[row.offer.id] || 1) as 1 | 2;
-    const storedHours = rowData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(rowData) : null);
+    const isTeamJob = isTeamRequestData(rowData);
+    const knownPosition = rowData.offerPositions?.[row.offer.id];
+    const posIdx = (knownPosition || 1) as 1 | 2;
+    const slotHours = rowData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(rowData) : null);
+    // Only the viewer's OWN hours: an entry recorded for another interpreter is never returned. On a team job an
+    // entry without an owner is trusted only when this offer's position is known for certain.
+    const ownerId = slotHours && typeof slotHours.interpreterId === 'string' ? slotHours.interpreterId : null;
+    const storedHours = !slotHours
+      ? null
+      : ownerId
+        ? (ownerId === interpreter.id ? slotHours : null)
+        : (!isTeamJob || knownPosition ? slotHours : null);
     const sheet = row.offer.status === 'accepted' ? sheetByRequest.get(row.request.id) : undefined;
     // Used when the request holds no submitted in-app hours, or holds this timesheet's own mirror. A mirror keeps
     // its stored review state (e.g. a correction request); only the timesheet's approval is layered on top.
@@ -158,15 +168,20 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       status: row.offer.status,
       expiredAt: row.offer.status === 'expired' ? (row.offer.updatedAt ? row.offer.updatedAt.toISOString() : endsAt) : null,
       requestStatus: row.request.status,
+      // Team jobs: request-wide status/travel describe both positions, so the UI must not use them for this
+      // interpreter's hours (see scopedRequestStatus).
+      isTeamJob,
       agencyName: "North Fictional Interpreting",
       interpreterId: row.offer.interpreterId,
       program: rowData?.intake?.program || "General",
       isStateJob: isStateJobRequest(row.request),
       timeZone: details.timeZone || "America/Los_Angeles",
       hoursSubmission: hoursSub,
-      travelStartTime: row.request.travelStartTime ? row.request.travelStartTime.toISOString() : null,
-      travelEndTime: row.request.travelEndTime ? row.request.travelEndTime.toISOString() : null,
-      serviceCompleted: row.request.serviceCompleted,
+      // Request-level columns are a single-position legacy field; never shown on a team job (each position's own
+      // values are in hoursSubmission).
+      travelStartTime: !isTeamJob && row.request.travelStartTime ? row.request.travelStartTime.toISOString() : null,
+      travelEndTime: !isTeamJob && row.request.travelEndTime ? row.request.travelEndTime.toISOString() : null,
+      serviceCompleted: isTeamJob ? null : row.request.serviceCompleted,
       setting,
       format,
       isVirtual,

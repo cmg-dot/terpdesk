@@ -12,6 +12,7 @@ import { AGENCY_MESSAGE_KIND, logActivity } from "@/lib/requestActivity";
 import { agencyOnlyChangedSections, describeChange, diffJobForInterpreter } from "@/lib/requestChanges";
 import type { JobFieldChange } from "@/lib/requestChanges";
 import { sendEmail } from "@/lib/timesheetEmail";
+import { ALL_BOOKED_RECIPIENTS } from "@/utils/messageRecipients";
 import { resolveRequestTimes } from "@/utils/timezone";
 
 /**
@@ -117,15 +118,19 @@ async function emailInterpreter(after: JobRequestRow, b: BookedInterpreter, chan
   }
 }
 
-/** An agency message for ONE booked interpreter (e.g. the answer to their clarification question). */
+/**
+ * An agency message and exactly who it is for: one booked interpreter (e.g. the answer to their clarification
+ * question), or every booked interpreter when the agency chose "Send to all booked interpreters".
+ */
 export interface ScopedMessage {
   text: string;
-  interpreterId: string;
+  interpreterIds: string[];
 }
 
+
 /**
- * Decides who an optional agency message is for, BEFORE the edit is saved. It must name one booked interpreter: on a
- * team job the agency picks who they are replying to, so the message never goes to the whole team.
+ * Decides who an optional agency message is for, BEFORE the edit is saved. On a team job the agency must choose:
+ * one interpreter (the one being replied to) or explicitly everyone booked. It never defaults to the whole team.
  */
 export function resolveMessageRecipient(
   notice: EditNotice,
@@ -135,12 +140,13 @@ export function resolveMessageRecipient(
   if (!text) return { ok: true };
   const bookedIds = Array.from(new Set(notice.booked.map((b) => b.interpreterId)));
   if (bookedIds.length === 0) return { ok: true };
+  if (recipientId === ALL_BOOKED_RECIPIENTS) return { ok: true, message: { text, interpreterIds: bookedIds } };
   if (typeof recipientId === "string" && recipientId) {
     return bookedIds.includes(recipientId)
-      ? { ok: true, message: { text, interpreterId: recipientId } }
+      ? { ok: true, message: { text, interpreterIds: [recipientId] } }
       : { ok: false, error: "That interpreter is no longer booked on this job. Choose who the message is for again." };
   }
-  if (bookedIds.length === 1) return { ok: true, message: { text, interpreterId: bookedIds[0] } };
+  if (bookedIds.length === 1) return { ok: true, message: { text, interpreterIds: [bookedIds[0]] } };
   return { ok: false, error: "Choose which booked interpreter the message is for." };
 }
 
@@ -148,8 +154,9 @@ export function resolveMessageRecipient(
  * Logs the edit and tells the booked interpreters.
  *  - Field changes (shared job details) go to EVERY interpreter still booked on the request, re-checked right now:
  *    anyone who declined, gave back, was removed or only has a pending offer is skipped. One email per interpreter.
- *  - The optional message goes ONLY to its recipient (added to their email, or sent alone if nothing changed), and is
- *    stored in the activity log for that interpreter, where their app job page and secure job page show it.
+ *  - The optional message goes ONLY to its chosen recipients (one interpreter, or everyone booked if the agency chose
+ *    that): added to their email, or sent alone if nothing changed, and stored in the activity log for each of them,
+ *    where their app job page and secure job page show it.
  * Never throws: the edit is already saved.
  */
 export async function announceEdit(after: JobRequestRow, notice: EditNotice, actorLabel: string | null, message?: ScopedMessage): Promise<{ notified: number }> {
@@ -189,23 +196,26 @@ export async function announceEdit(after: JobRequestRow, notice: EditNotice, act
     seen.add(b.interpreterId);
     return true;
   });
-  const scoped = message && booked.some((b) => b.interpreterId === message.interpreterId) ? message : undefined;
+  // Recipients who are still booked right now; anyone who left since the form was opened is dropped.
+  const messageTo = new Set((message?.interpreterIds ?? []).filter((id) => booked.some((b) => b.interpreterId === id)));
+  const messageText = messageTo.size > 0 ? message?.text : undefined;
 
-  if (scoped) {
+  // Stored once per recipient, so each interpreter's job pages show it and only to them.
+  for (const interpreterId of Array.from(messageTo)) {
     await logActivity({
       requestId: after.id,
       kind: AGENCY_MESSAGE_KIND,
       audience: "shared",
-      interpreterId: scoped.interpreterId,
-      message: scoped.text,
+      interpreterId,
+      message: messageText ?? "",
       actorLabel,
     });
   }
-  if ((changes.length === 0 && !scoped) || booked.length === 0) return { notified: 0 };
+  if ((changes.length === 0 && !messageText) || booked.length === 0) return { notified: 0 };
 
   let notified = 0;
   for (const b of booked) {
-    const forThem = scoped?.interpreterId === b.interpreterId ? scoped.text : undefined;
+    const forThem = messageTo.has(b.interpreterId) ? messageText : undefined;
     if (changes.length === 0 && !forThem) continue;
     if (await emailInterpreter(after, b, changes, forThem)) notified += 1;
     await notifyInterpreter(b.interpreterId, {
@@ -220,7 +230,7 @@ export async function announceEdit(after: JobRequestRow, notice: EditNotice, act
   await writeAuditLog({
     action: "job_update_notice_sent",
     // The message text itself is never logged here, only whether one was included and for whom.
-    details: `requestId=${after.id}; booked=${booked.length}; emailed=${notified}; messageFor=${scoped?.interpreterId ?? "none"}; fields=${changes.map((c) => c.field).join("|")}`,
+    details: `requestId=${after.id}; booked=${booked.length}; emailed=${notified}; messageFor=${messageTo.size > 0 ? Array.from(messageTo).join("|") : "none"}; fields=${changes.map((c) => c.field).join("|")}`,
   });
   return { notified };
 }

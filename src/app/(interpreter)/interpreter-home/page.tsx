@@ -17,7 +17,7 @@ import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappe
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
-import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo } from "@/utils/hoursState";
+import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord } from "@/utils/hoursState";
 import { td_availability_view } from "@/app/actions/availability";
 
 export default function InterpreterHomePage() {
@@ -646,7 +646,7 @@ export default function InterpreterHomePage() {
  const locPrimary = locationParts[0]?.trim() || job.location;
  const locSecondary = locationParts[1]?.trim();
 
- const record = serviceRecords.find((r: any) => r.appointmentId === job.id || r.appointmentId === job.requestId);
+ const record = findOwnServiceRecord(serviceRecords, job);
  const reviewMsg = record?.reviewMessage || (job.hoursSubmission as any)?.reviewMessage;
 
  return (
