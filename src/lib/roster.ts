@@ -1,7 +1,8 @@
 import { asc, and, eq, getTableColumns } from "drizzle-orm";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters } from "@/db/schema";
-import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
+import { ensureDisplayNameColumns } from "@/lib/displayName";
+import { interpreterDisplayName, interpreterPhotoUrl } from "@/lib/displayNameSql";
 
 /**
  * An agency's roster = interpreters with an APPROVED connection to it (agency_interpreters). That includes shadow /
@@ -10,6 +11,7 @@ import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayN
  * `rosterActive` is false for archived people: they stay listed (so they can be reactivated) but must not be
  * dispatched, so dispatch callers pass `activeOnly`.
  * `name` is the display name (preferred name, else account name), so the roster and offer dropdowns agree.
+ * `photoUrl` is the profile photo path ("/api/files/<id>") or null, so lists can show it instead of initials.
  *
  * SERVER ONLY: queries the database.
  */
@@ -18,7 +20,12 @@ export async function getRosterInterpreters(agencyId: string, opts: { activeOnly
   const conditions = [eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.status, "approved")];
   if (opts.activeOnly) conditions.push(eq(agencyInterpreters.isActive, true));
   return db
-    .select({ ...getTableColumns(interpreters), name: interpreterDisplayName, rosterActive: agencyInterpreters.isActive })
+    .select({
+      ...getTableColumns(interpreters),
+      name: interpreterDisplayName,
+      photoUrl: interpreterPhotoUrl,
+      rosterActive: agencyInterpreters.isActive,
+    })
     .from(interpreters)
     .innerJoin(agencyInterpreters, eq(agencyInterpreters.interpreterId, interpreters.id))
     .where(and(...conditions))

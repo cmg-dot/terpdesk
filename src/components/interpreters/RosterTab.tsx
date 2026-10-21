@@ -6,10 +6,14 @@ import { motion } from "framer-motion";
 import { Mail, Phone, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
+import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import type { SelectInterpreter } from "@/db/schema";
 
-/** A roster row; `rosterActive` is false for archived interpreters (missing = active, e.g. just added). */
-export type RosterItem = SelectInterpreter & { rosterActive?: boolean };
+/**
+ * A roster row. `rosterActive` is false for archived interpreters (missing = active, e.g. just added);
+ * `photoUrl` is the profile photo path, shown instead of initials when present.
+ */
+export type RosterItem = SelectInterpreter & { rosterActive?: boolean; photoUrl?: string | null };
 
 interface RosterTabProps {
   /** Rows to show (already filtered by the page's search box). */
@@ -106,14 +110,17 @@ export const RosterTab = ({ items, searchQuery, registeredProfileIds, onManage, 
             className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4 hover:shadow-sm transition-all list-none"
           >
             <div className="flex items-start gap-4">
-              {/* Avatar Circle (also opens the interpreter's detail page; hidden from screen readers to avoid a duplicate link) */}
+              {/* Avatar: the profile photo when there is one, otherwise initials. It also opens the interpreter's
+                  detail page; hidden from screen readers to avoid a duplicate link. */}
               <Link
                 href={`/interpreters/${interpreter.id}`}
                 tabIndex={-1}
                 aria-hidden="true"
-                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-base shrink-0 shadow-sm ${avatarBg}`}
+                className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-base shrink-0 shadow-sm ${
+                  interpreter.photoUrl ? "" : avatarBg
+                }`}
               >
-                {initials}
+                {interpreter.photoUrl ? <ProfileAvatar photoUrl={interpreter.photoUrl} name={interpreter.name} size={48} /> : initials}
               </Link>
 
               {/* Profile Details */}

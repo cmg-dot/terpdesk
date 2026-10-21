@@ -3,48 +3,46 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { useSession } from "next-auth/react";
-import { getMyDisplayName } from "@/app/actions/myDisplayName";
 
 interface InterpreterNameValue {
   /** Preferred name, else the account name. */
   name: string;
-  /** Show a new name at once (e.g. right after the profile is saved). */
+  /** Show a new name at once (right after the profile is saved) and refresh the session behind the scenes. */
   setName: (name: string) => void;
 }
 
 const InterpreterNameContext = createContext<InterpreterNameValue | null>(null);
 
-/** Supplies the interpreter's display name to the workspace (sidebar, top bar, Home greeting). */
+/**
+ * Supplies the interpreter's display name to the workspace (sidebar, top bar, Home greeting).
+ * The name comes from the session (`session.user.displayName`, resolved on the server and carried in the token), so
+ * the very first paint already shows the right name. Saving the profile calls `update()`, which re-reads it.
+ */
 export function InterpreterNameProvider({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession();
-  const accountName = session?.user?.name?.trim() ?? "";
-  const [preferred, setPreferred] = useState<string | null>(null);
+  const { data: session, update } = useSession();
+  const sessionName = session?.user?.displayName?.trim() || session?.user?.name?.trim() || "";
+  // Shown until the refreshed session catches up with a name that was just saved.
+  const [override, setOverride] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    try {
-      const name = await getMyDisplayName();
-      setPreferred(name?.trim() || null);
-    } catch {
-      // Keep the account name.
-    }
-  }, []);
-
-  // Re-read when the session changes (sign-in, or the profile getting linked after email verification).
   useEffect(() => {
-    if (status === "authenticated") void load();
-  }, [status, session?.user?.interpreterId, load]);
+    if (override !== null && sessionName === override) setOverride(null);
+  }, [override, sessionName]);
 
-  const value = useMemo<InterpreterNameValue>(
-    () => ({ name: preferred || accountName, setName: (name: string) => setPreferred(name.trim() || null) }),
-    [preferred, accountName],
+  const setName = useCallback(
+    (name: string) => {
+      setOverride(name.trim() || null);
+      void update();
+    },
+    [update],
   );
 
+  const value = useMemo<InterpreterNameValue>(() => ({ name: override ?? sessionName, setName }), [override, sessionName, setName]);
   return <InterpreterNameContext.Provider value={value}>{children}</InterpreterNameContext.Provider>;
 }
 
-/** The interpreter's display name. Outside the provider it falls back to the session's account name. */
+/** The interpreter's display name. Outside the provider it falls back to the session's name. */
 export function useInterpreterName(): InterpreterNameValue {
   const ctx = useContext(InterpreterNameContext);
   const { data: session } = useSession();
-  return ctx ?? { name: session?.user?.name?.trim() ?? "", setName: () => undefined };
+  return ctx ?? { name: session?.user?.displayName?.trim() || session?.user?.name?.trim() || "", setName: () => undefined };
 }

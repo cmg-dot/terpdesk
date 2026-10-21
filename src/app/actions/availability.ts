@@ -26,13 +26,32 @@ function isUuid(value: string): boolean {
   return UUID_PATTERN.test(value);
 }
 
+let ensureInFlight: Promise<void> | null = null;
+
+// Any constant: all instances that run the schema script below take the same lock.
+const SCHEMA_LOCK_KEY = 727346101;
+
 /**
  * Auto-migration pattern: creates availability tables in PostgreSQL if not present.
+ * Pages call this from several actions at once (e.g. the dashboard on a cold start). Callers in the same process share
+ * one run, and the script holds a Postgres advisory lock, so two server instances can't run it at the same time and
+ * collide on "concurrent create" errors.
  */
 export async function ensureAvailabilityTables(): Promise<void> {
   if (tablesEnsured) return;
+  if (!ensureInFlight) {
+    ensureInFlight = runEnsureAvailabilityTables().finally(() => {
+      ensureInFlight = null;
+    });
+  }
+  await ensureInFlight;
+}
+
+async function runEnsureAvailabilityTables(): Promise<void> {
   try {
-    await db.execute(sql`
+    await db.transaction(async (tx) => {
+    await tx.execute(sql`SELECT pg_advisory_xact_lock(${SCHEMA_LOCK_KEY})`);
+    await tx.execute(sql`
       CREATE TABLE IF NOT EXISTS interpreter_profiles (
         id TEXT PRIMARY KEY,
         interpreter_id TEXT NOT NULL,
@@ -135,6 +154,7 @@ export async function ensureAvailabilityTables(): Promise<void> {
       CREATE INDEX IF NOT EXISTS idx_busy_blocks_interp ON busy_blocks (interpreter_id);
       CREATE INDEX IF NOT EXISTS idx_avail_shares_interp ON availability_shares (interpreter_id);
     `);
+    });
     tablesEnsured = true;
 
     // Seed default Mon-Fri rules for terp-1 if no rules exist in the table

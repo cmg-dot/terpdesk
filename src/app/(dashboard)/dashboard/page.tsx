@@ -19,7 +19,7 @@ import { useSession } from "next-auth/react";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
-  const welcomeName = session?.user?.name?.trim();
+  const welcomeName = (session?.user?.displayName || session?.user?.name)?.trim();
   const [requests, setRequests] = React.useState<any[]>([]);
   const [interpreterJobs, setInterpreterJobs] = React.useState<any[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
@@ -39,16 +39,19 @@ export default function DashboardPage() {
         fetchLiveRequests(),
         getSubmittedTimesheets().catch((): SubmittedTimesheet[] => []),
       ]);
-      setRequests(data);
+      // Only well-formed rows reach the render code below; one bad row must not take the whole page down.
+      const rows = (Array.isArray(data) ? data : []).filter((r) => r && typeof r === 'object' && r.id);
+      setRequests(rows);
 
       // Same records, same merge and same predicate as the /hours-review "Awaiting review" tab.
       let localRecords: ServiceRecord[] = [];
       try {
-        localRecords = JSON.parse(localStorage.getItem('terpdesk_service_records') || '[]');
+        const parsed: unknown = JSON.parse(localStorage.getItem('terpdesk_service_records') || '[]');
+        localRecords = Array.isArray(parsed) ? (parsed as ServiceRecord[]) : [];
       } catch {
         localRecords = [];
       }
-      const records = mergeHoursRecords({ localRecords, requests: data, timesheets: submitted });
+      const records = mergeHoursRecords({ localRecords, requests: rows, timesheets: Array.isArray(submitted) ? submitted : [] });
       setAwaitingReviewCount(records.filter(isAwaitingReview).length);
     } catch (e) {
       console.error(e);
@@ -60,8 +63,9 @@ export default function DashboardPage() {
 
     const loadJobs = () => {
       try {
-        const storedJobs = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
-        setInterpreterJobs(storedJobs);
+        // Browser storage can hold anything (another account's data, "null", a half-written value): keep objects only.
+        const storedJobs: unknown = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
+        setInterpreterJobs(Array.isArray(storedJobs) ? storedJobs.filter((j) => j && typeof j === 'object') : []);
       } catch (e) {
         console.error(e);
       }
@@ -149,7 +153,7 @@ export default function DashboardPage() {
   const needsReplacementCount = enrichedRequests.filter(r => getStatusFilters(r as any).needsReplacement).length;
 
   const getNeedsAttentionPriority = (status: string) => {
-    const s = status.toLowerCase();
+    const s = String(status ?? '').toLowerCase();
     if (s === 'needs replacement') return 1;
     if (s === 'staff follow-up') return 2;
     if (s.includes('awaiting') || s.includes('offer') || s.includes('pending')) return 3;
@@ -172,7 +176,7 @@ export default function DashboardPage() {
 
   const upcomingBookingsJobs = sortUpcomingWithHappeningNow(
     [...enrichedRequests].filter(r => {
-      const s = r.status.toLowerCase();
+      const s = String(r.status ?? '').toLowerCase();
       if (s.includes('cancel')) return false;
       
       const reqJobs = interpreterJobs.filter(j => j.id === r.id || j.requestId === r.id);
@@ -327,10 +331,10 @@ export default function DashboardPage() {
                 className="space-y-2.5"
                 getKey={(request) => request.id}
                 renderItem={(request) => {
-                const s = (request as any).displayStatus;
+                const s = String((request as any).displayStatus ?? '');
                 let dotColor = "bg-[#B59A6D]";
                 let btnLabel = "Manage slots";
-                
+
                 const statusLower = s.toLowerCase();
                 
                 if (s === 'Needs replacement' || s === 'Staff follow-up') {
@@ -400,7 +404,7 @@ export default function DashboardPage() {
                   const tz = job.details?.timeZone || job.data?.details?.timeZone;
                   const setting = job.setting || job.details?.setting || "Medical";
                   const format = job.format || job.details?.format || (job.isVirtual ? "Virtual" : "In person");
-                  const venue = job.location || job.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
+                  const venue = job.location || job.onsite?.venue || (String(format).toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
                   const org = job.requester?.org;
                   const formattedBadge = formatStatusBadge(job.status);
                   
