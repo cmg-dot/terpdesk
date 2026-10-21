@@ -9,6 +9,7 @@ import { isStateProgram } from "@/lib/stateJob";
 import { buildAppointmentUtcTimes, getIanaZone } from "@/utils/timezone";
 import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice } from "@/lib/jobUpdateNotice";
+import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 
 export interface UpdateRequestPayload {
   title?: string;
@@ -34,6 +35,8 @@ export interface UpdateRequestPayload {
   slotCount?: number;
   data?: Record<string, any>;
   status?: string;
+  /** Optional note for the booked interpreter(s), included in the "Job details updated" email. */
+  messageToInterpreter?: string;
   [key: string]: any;
 }
 
@@ -43,10 +46,11 @@ export type UpdateRequestResult =
 
 /**
  * Full edit. Refused while an offer is live or once a booked appointment has started (enforced here on the server,
- * so opening the edit page by URL does not get around it). Booked interpreters are told what changed. Problems are returned, not thrown: in production a thrown message
- * is hidden from the browser.
+ * so opening the edit page by URL does not get around it). While an interpreter is booked, the date, time, time zone
+ * and program are ignored (kept as stored). Booked interpreters are told what changed, plus the agency's optional
+ * message. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
  */
-export async function updateRequestAction(requestId: string, payload: UpdateRequestPayload): Promise<UpdateRequestResult> {
+export async function updateRequestAction(requestId: string, requested: UpdateRequestPayload): Promise<UpdateRequestResult> {
   const session = await requireRole("agency");
   const rows = await db.select().from(requests).where(eq(requests.id, requestId));
   if (!rows || rows.length === 0) {
@@ -54,6 +58,8 @@ export async function updateRequestAction(requestId: string, payload: UpdateRequ
   }
   const lock = await getRequestEditLock(requestId);
   if (lock.locked) return { success: false, error: lock.message };
+  const payload = lock.booked ? stripLockedFields(requested) : requested;
+  const message = lock.booked ? cleanInterpreterMessage(requested.messageToInterpreter) : undefined;
   const existing = rows[0];
   const existingData = (existing.data as any) || {};
   const existingDetails = existingData.details || {};
@@ -227,7 +233,7 @@ export async function updateRequestAction(requestId: string, payload: UpdateRequ
     .where(eq(requests.id, requestId))
     .returning();
 
-  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff");
+  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", message);
 
   // 5. Revalidate All Platform Routes
   revalidatePath(`/requests/${requestId}`);

@@ -12,7 +12,7 @@ import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, ty
 import { getClientsAction, saveRequesterToClientsAction, type ClientWithStats } from "@/app/actions/clients";
 import { isInvalidEmail } from "@/utils/validation";
 
-function CustomSelect({ options, value, onChange }: { options: string[], value?: string, onChange?: (val: string) => void }) {
+function CustomSelect({ options, value, onChange, disabled = false }: { options: string[], value?: string, onChange?: (val: string) => void, disabled?: boolean }) {
  const [isOpen, setIsOpen] = useState(false);
  const [selected, setSelected] = useState(value || options[0]);
  const dropdownRef = useRef<HTMLDivElement>(null);
@@ -35,10 +35,12 @@ function CustomSelect({ options, value, onChange }: { options: string[], value?:
  <div className="relative w-full" ref={dropdownRef}>
  <button
  type="button"
- onClick={() => setIsOpen(!isOpen)}
- className={`w-full bg-[#F4F3EF] rounded-full px-4 py-2.5 text-sm text-left text-gray-800 relative outline-none transition-shadow ${
- isOpen ? "ring-1 ring-[#0B3B32] border-[#0B3B32]" : ""
- }`}
+ disabled={disabled}
+ aria-disabled={disabled}
+ onClick={() => !disabled && setIsOpen(!isOpen)}
+ className={`w-full bg-[#F4F3EF] rounded-full px-4 py-2.5 text-sm text-left relative outline-none transition-shadow ${
+ disabled ? "text-gray-500 opacity-70 cursor-not-allowed" : "text-gray-800"
+ } ${isOpen ? "ring-1 ring-[#0B3B32] border-[#0B3B32]" : ""}`}
  >
  <span className="block truncate pr-6">{selected}</span>
  <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
@@ -438,6 +440,9 @@ export default function EditRequestPage() {
     ['assigned', 'booked', 'Fully staffed'].includes(existingRequest?.status);
   const isCancelledRequest = ['Cancelled', 'cancelled'].includes(existingRequest?.status);
   const isEditLocked = isCancelledRequest || hasLivePendingOffer || (isBookedRequest && !Number.isNaN(apptStartMs) && nowMs >= apptStartMs);
+  // While an interpreter is booked, date, time, time zone and program are fixed (the server ignores them too).
+  const isScheduleLocked = isBookedRequest && !isEditLocked;
+  const [messageToInterpreter, setMessageToInterpreter] = useState("");
   const editLockMessage = isCancelledRequest
     ? "This appointment was cancelled, so it can't be edited."
     : hasLivePendingOffer
@@ -672,6 +677,7 @@ export default function EditRequestPage() {
         },
         prepNotes: formData.prepNotes,
         privateNotes: formData.privateNotes,
+        messageToInterpreter: isScheduleLocked ? messageToInterpreter : undefined,
         activity: "updated just now",
         positions: formData.positions,
         requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
@@ -758,6 +764,7 @@ export default function EditRequestPage() {
   };
 
  const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow appearance-none";
+ const lockedInputClass = `${inputClass} opacity-70 cursor-not-allowed`;
  const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] resize-none outline-none transition-shadow";
  const cardClass = "bg-white rounded-2xl border border-gray-200 p-6 border border-gray-200/50 shadow-none space-y-6";
  const sectionTitleClass = "text-[18px] font-medium text-[var(--ink)] mb-4";
@@ -797,7 +804,7 @@ export default function EditRequestPage() {
  )}
  {!isEditLocked && isBookedRequest && (
  <div className="mt-4 bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-4 text-sm">
- An interpreter is booked on this job. When you save, each booked interpreter is emailed exactly what changed, and the job is marked “Updated” in their app.
+ An interpreter is booked on this job, so the date, time, time zone and program are locked. You can still edit the location, contacts, notes and credentials. When you save, each booked interpreter is emailed exactly what changed (plus an optional message from you), and the job is marked “Updated” in their app.
  </div>
  )}
  </div>
@@ -958,22 +965,28 @@ export default function EditRequestPage() {
  {/* Schedule and modality Section */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Schedule and modality</h2>
+ {isScheduleLocked && (
+ <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900">
+ <Lock className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-700" />
+ <span>The date, time and time zone are locked because an interpreter is booked. Changing them would skip the availability check they were booked under. To move the appointment, remove the booking first.</span>
+ </div>
+ )}
  
  <Field label="Appointment time zone" subtext="Times are entered in the appointment time zone, not your computer's location.">
- <CustomSelect options={["Pacific Time — Seattle, Los Angeles", "Mountain Time — Denver", "Arizona (no daylight saving)", "Central Time — Chicago", "Eastern Time — New York", "Alaska Time", "Hawaii Time"]} value={formData.timeZone} onChange={(val) => handleChange("timeZone", val)} />
+ <CustomSelect disabled={isScheduleLocked} options={["Pacific Time — Seattle, Los Angeles", "Mountain Time — Denver", "Arizona (no daylight saving)", "Central Time — Chicago", "Eastern Time — New York", "Alaska Time", "Hawaii Time"]} value={formData.timeZone} onChange={(val) => handleChange("timeZone", val)} />
  </Field>
 
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-6">
  <Field label="Starts" subtext={getHelperText(formData.startDate, formData.startTime, formData.timeZone)}>
  <div className="flex flex-col sm:flex-row gap-2">
- <input type="date" className={inputClass} value={formData.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
- <input type="time" className={inputClass} value={formData.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
+ <input type="date" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
+ <input type="time" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
  </div>
  </Field>
  <Field label="Ends" subtext={getHelperText(formData.endDate, formData.endTime, formData.timeZone)}>
  <div className="flex flex-col sm:flex-row gap-2">
- <input type="date" className={inputClass} value={formData.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
- <input type="time" className={inputClass} value={formData.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
+ <input type="date" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
+ <input type="time" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
  </div>
  </Field>
  </div>
@@ -1134,8 +1147,8 @@ export default function EditRequestPage() {
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Program and state identifiers</h2>
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
- <Field label="Funding program">
- <CustomSelect options={["General", "WA ODHH", "WA Apple Health"]} value={formData.program} onChange={(val) => handleChange("program", val)} />
+ <Field label="Funding program" subtext={isScheduleLocked ? "Locked while an interpreter is booked: it decides how the job is reported." : undefined}>
+ <CustomSelect disabled={isScheduleLocked} options={["General", "WA ODHH", "WA Apple Health"]} value={formData.program} onChange={(val) => handleChange("program", val)} />
  </Field>
  {formData.program === "WA ODHH" && (
  <Field label="Service Request Number (SRN)">
@@ -1206,6 +1219,25 @@ export default function EditRequestPage() {
  )}
  </Field>
  </div>
+
+ {/* Message to the booked interpreter */}
+ {isScheduleLocked && (
+ <div className={cardClass}>
+ <h2 className={sectionTitleClass}>Message to interpreter</h2>
+ <Field
+ label="Message to interpreter (Optional)"
+ subtext="Added to the “Job details updated” email the booked interpreter receives when you save. Use it to answer their question. It is sent by email, so don't include client names or health information."
+ >
+ <textarea
+ className={`${textareaClass} min-h-[100px]`}
+ maxLength={1000}
+ value={messageToInterpreter}
+ onChange={(e) => setMessageToInterpreter(e.target.value)}
+ />
+ </Field>
+ <p className="text-right text-xs text-gray-400">{messageToInterpreter.length}/1000</p>
+ </div>
+ )}
 
  {/* Bottom Actions */}
  {isTimeInvalid && (

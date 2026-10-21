@@ -10,7 +10,9 @@ import { resolveRequestTimes } from "@/utils/timezone";
  * deciding on the details they were sent, so those details must not move under them.
  * LOCKED once a booked appointment has started (in progress or over): hours are reported against it.
  * UNLOCKED otherwise, including when an interpreter is booked for a future appointment. Saving such an edit notifies
- * the booked interpreter of exactly what changed (see jobUpdateNotice.ts).
+ * the booked interpreter of exactly what changed (see jobUpdateNotice.ts). While an interpreter is booked, the date,
+ * time, time zone and program stay fixed (see bookedEditLimits.ts): changing them would bypass the availability check
+ * they were booked under and the program-specific routing.
  *
  * SERVER ONLY: queries the database.
  */
@@ -22,7 +24,7 @@ export const BOOKING_STARTED_MESSAGE =
 
 const BOOKED_STATUSES = ["assigned", "booked", "Fully staffed"];
 
-export type EditLock = { locked: false } | { locked: true; message: string };
+export type EditLock = { locked: false; booked: boolean } | { locked: true; message: string };
 
 export async function getRequestEditLock(requestId: string, now: Date = new Date()): Promise<EditLock> {
   const [request] = await db
@@ -30,7 +32,7 @@ export async function getRequestEditLock(requestId: string, now: Date = new Date
     .from(requests)
     .where(eq(requests.id, requestId))
     .limit(1);
-  if (!request) return { locked: false };
+  if (!request) return { locked: false, booked: false };
 
   let startMs = Number.NaN;
   let endMs = Number.NaN;
@@ -57,5 +59,5 @@ export async function getRequestEditLock(requestId: string, now: Date = new Date
   const isBooked = BOOKED_STATUSES.includes(request.status) || requestOffers.some((o) => o.status === "accepted");
   if (isBooked && appointmentStarted) return { locked: true, message: BOOKING_STARTED_MESSAGE };
 
-  return { locked: false };
+  return { locked: false, booked: isBooked };
 }

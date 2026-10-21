@@ -8,9 +8,12 @@ import { revalidatePath } from "next/cache";
 import { buildAppointmentUtcTimes } from "@/utils/timezone";
 import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice } from "@/lib/jobUpdateNotice";
+import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 
 export interface UpdateRequestDetailsPayload {
   requestId: string;
+  /** Optional note for the booked interpreter(s), included in the "Job details updated" email. */
+  messageToInterpreter?: string;
   setting?: string;
   format?: string;
   location?: string;
@@ -38,18 +41,21 @@ export type UpdateRequestDetailsResult =
   | { success: false; error: string };
 
 /**
- * Quick edit. Same lock as "Edit assignment" (see offerLock.ts), enforced here on the server. Booked interpreters
- * are told what changed. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
+ * Quick edit. Same lock as "Edit assignment" (see offerLock.ts), enforced here on the server. While an interpreter is
+ * booked, the date, time and time zone are ignored. Booked interpreters are told what changed, plus the optional message. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
  */
-export async function updateRequestDetails(payload: UpdateRequestDetailsPayload): Promise<UpdateRequestDetailsResult> {
+export async function updateRequestDetails(requested: UpdateRequestDetailsPayload): Promise<UpdateRequestDetailsResult> {
   const session = await requireRole("agency");
-  const rows = await db.select().from(requests).where(eq(requests.id, payload.requestId));
+  const rows = await db.select().from(requests).where(eq(requests.id, requested.requestId));
   if (!rows || rows.length === 0) {
     return { success: false, error: "This request no longer exists." };
   }
   const existing = rows[0];
-  const lock = await getRequestEditLock(payload.requestId);
+  const lock = await getRequestEditLock(requested.requestId);
   if (lock.locked) return { success: false, error: lock.message };
+  // While an interpreter is booked, the date, time and time zone are ignored (kept as stored).
+  const payload = lock.booked ? stripLockedFields(requested) : requested;
+  const message = lock.booked ? cleanInterpreterMessage(requested.messageToInterpreter) : undefined;
 
   const existingData = (existing.data as any) || {};
   const existingDetails = existingData.details || {};
@@ -167,7 +173,7 @@ export async function updateRequestDetails(payload: UpdateRequestDetailsPayload)
     .where(eq(requests.id, payload.requestId))
     .returning();
 
-  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff");
+  const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", message);
 
   revalidatePath(`/requests/${payload.requestId}`);
   revalidatePath('/requests');

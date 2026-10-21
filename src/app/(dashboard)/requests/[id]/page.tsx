@@ -460,6 +460,9 @@ export default function AssignmentDetailPage() {
   const editLockMessage = hasLivePendingOffer
     ? "This appointment can't be edited while an offer is waiting for a response. Once every pending offer has been accepted, declined or has expired, you can edit it."
     : "This appointment has already started, so its booked details can no longer be edited.";
+  // While an interpreter is booked, date, time and time zone are fixed (the server ignores them too).
+  const isScheduleLocked = hasAcceptedBooking && !isEditLocked;
+  const [quickEditMessage, setQuickEditMessage] = useState('');
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const [activityVersion, setActivityVersion] = useState(0);
 
@@ -531,6 +534,7 @@ export default function AssignmentDetailPage() {
     setEditTimeZone(apptTz);
 
     setSaveError(null);
+    setQuickEditMessage('');
     setIsEditAccessOpen(true);
   };
 
@@ -540,7 +544,7 @@ export default function AssignmentDetailPage() {
       setSaveError(editLockMessage);
       return;
     }
-    if (isQuickEditTimeInvalid) return;
+    if (!isScheduleLocked && isQuickEditTimeInvalid) return;
     setIsSavingAccess(true);
     setSaveError(null);
     try {
@@ -558,11 +562,15 @@ export default function AssignmentDetailPage() {
         building: editBuilding,
         contact: editContact,
         contactMethod: editContactMethod,
-        startDate: editStartDate,
-        startTime: editStartTime,
-        endDate: editEndDate,
-        endTime: editEndTime,
-        timeZone: editTimeZone,
+        ...(isScheduleLocked
+          ? { messageToInterpreter: quickEditMessage }
+          : {
+              startDate: editStartDate,
+              startTime: editStartTime,
+              endDate: editEndDate,
+              endTime: editEndTime,
+              timeZone: editTimeZone,
+            }),
       });
       if (!result.success) {
         // The server enforces the same lock; show its reason instead of a generic failure.
@@ -571,6 +579,7 @@ export default function AssignmentDetailPage() {
       }
       const updatedRow = result.request;
       setActivityVersion((v) => v + 1);
+      setQuickEditMessage('');
       setEditNotice(
         result.notifiedInterpreters > 0
           ? `Saved. ${result.notifiedInterpreters === 1 ? "The booked interpreter was" : `${result.notifiedInterpreters} booked interpreters were`} emailed what changed.`
@@ -1129,7 +1138,7 @@ export default function AssignmentDetailPage() {
  )}
  {!isEditLocked && hasAcceptedBooking && !isCancelled && (
  <div className="bg-sky-50 border border-sky-200 rounded-2xl px-5 py-3.5 text-sm text-sky-900 mb-6">
- An interpreter is booked. You can still edit this job: when you save, each booked interpreter is emailed exactly what changed, and the job is marked “Updated” in their app.
+ An interpreter is booked. The date, time, time zone and program are locked, but you can still edit the location, contacts, notes and credentials. When you save, each booked interpreter is emailed exactly what changed (plus an optional message from you), and the job is marked “Updated” in their app.
  </div>
  )}
  {editNotice && (
@@ -2199,14 +2208,14 @@ export default function AssignmentDetailPage() {
 
         <form onSubmit={handleSaveAccess} className="space-y-4">
           {/* Schedule & Time */}
-          {isEditLocked ? (
+          {isScheduleLocked ? (
             <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-2.5">
               <div className="flex items-center gap-2 text-amber-900 font-semibold text-xs">
                 <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                 <span>Date, time & timezone are locked</span>
               </div>
               <p className="text-xs text-amber-800 leading-relaxed">
-                Core appointment schedule terms cannot be edited while offers or bookings are active. You can still update virtual meeting credentials, venue instructions, and onsite contacts below.
+                The date, time and time zone cannot be changed while an interpreter is booked: moving them would skip the availability check they were booked under. You can still update meeting credentials, venue instructions, contacts and notes below.
               </p>
               <div className="text-xs text-gray-700 bg-white/90 p-2.5 rounded-lg border border-amber-200/50 flex items-center justify-between">
                 <span>{formatDetailsDate(assignment.startsAt, assignment.endsAt, editTimeZone)}</span>
@@ -2440,6 +2449,23 @@ export default function AssignmentDetailPage() {
             </div>
           )}
 
+          {isScheduleLocked && (
+            <div>
+              <label htmlFor="quick-edit-interpreter-message" className="block text-xs font-medium text-gray-700 mb-1">Message to interpreter (Optional)</label>
+              <textarea
+                id="quick-edit-interpreter-message"
+                rows={3}
+                maxLength={1000}
+                value={quickEditMessage}
+                onChange={(e) => setQuickEditMessage(e.target.value)}
+                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]"
+              />
+              <p className="mt-1 text-[11px] text-gray-500">
+                Added to the “Job details updated” email the booked interpreter gets when you save, e.g. to answer their question. It is emailed, so don't include client names or health information. ({quickEditMessage.length}/1000)
+              </p>
+            </div>
+          )}
+
           {saveError && (
             <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">{saveError}</p>
           )}
@@ -2454,7 +2480,7 @@ export default function AssignmentDetailPage() {
             </button>
             <button
               type="submit"
-              disabled={isSavingAccess || (!isEditLocked && isQuickEditTimeInvalid)}
+              disabled={isSavingAccess || (!isScheduleLocked && isQuickEditTimeInvalid)}
               className="px-6 py-2 rounded-full text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isSavingAccess ? 'Saving...' : 'Save details'}
