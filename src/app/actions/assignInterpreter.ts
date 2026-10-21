@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { readPermission } from "@/lib/agencyPermissions";
+import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { ensureAvailabilityTables } from "./availability";
 
 const AUTO_BOOK_NOT_ALLOWED = "This interpreter has not enabled auto-booking for your agency. You must send an offer instead.";
@@ -115,6 +116,10 @@ export async function assignInterpreter(
     })
     .where(eq(requests.id, requestId))
     .returning();
+
+  // Assigned without an Accept click, so send the same booking confirmation (with the secure full-details link) the
+  // interpreter would have received by accepting. It never throws: a failed email can't undo the assignment.
+  await sendBookingConfirmation({ requestId, interpreterId, positionNumber: positionIndex });
 
   revalidatePath(`/requests/${requestId}`);
   revalidatePath('/requests');

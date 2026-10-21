@@ -1,4 +1,5 @@
 import jwt, { type SignOptions } from "jsonwebtoken";
+import { getAuthSecret } from "@/lib/auth/secret";
 
 export interface OfferTokenPayload {
   interpreterId: string;
@@ -6,10 +7,21 @@ export interface OfferTokenPayload {
   positionNumber?: number;
 }
 
+/**
+ * Secret for the zero-login Accept / Decline links.
+ *
+ * Uses JWT_SECRET when set (preferred: a long random value, separate from the sign-in secret). Otherwise it falls
+ * back to the NextAuth secret, which production must have anyway. There is deliberately NO hard-coded default: with
+ * neither secret, links can't be created or accepted, because a secret written in the source code would let anyone
+ * who has seen it forge Accept / Decline links. Local development gets getAuthSecret()'s dev-only value.
+ *
+ * Tokens that share this secret are told apart by audience: offer tokens carry none, and verifyOfferToken rejects any
+ * token that has one (e.g. the job-details link), so one kind can never stand in for the other.
+ */
 function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || "terpdesk_dev_jwt_secret_key_2026_secure";
+  const secret = process.env.JWT_SECRET || getAuthSecret();
   if (!secret) {
-    throw new Error("JWT_SECRET environment variable is not defined");
+    throw new Error("No signing secret is configured. Set JWT_SECRET (or NEXTAUTH_SECRET) in the environment.");
   }
   return secret;
 }
@@ -26,18 +38,27 @@ export function generateOfferToken(
 }
 
 export function verifyOfferToken(token: string): OfferTokenPayload | null {
-  try {
-    const secret = process.env.JWT_SECRET || "terpdesk_dev_jwt_secret_key_2026_secure";
-    if (!secret || !token || typeof token !== "string") {
-      return null;
-    }
+  if (!token || typeof token !== "string") return null;
 
+  let secret: string;
+  try {
+    secret = getJwtSecret();
+  } catch {
+    // Fail closed: with no secret, no link is valid.
+    console.error("[jwt] offer links are disabled: no signing secret is configured");
+    return null;
+  }
+
+  try {
     const decoded = jwt.verify(token, secret);
     if (!decoded || typeof decoded !== "object") {
       return null;
     }
 
     const raw = decoded as Record<string, unknown>;
+
+    // Any audience means it was issued for something else (e.g. the job-details page).
+    if (raw.aud !== undefined) return null;
 
     if (
       typeof raw.interpreterId !== "string" ||
