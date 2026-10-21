@@ -58,10 +58,15 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
     for (const req of requests) {
       const totalPos = (req.totalPositions || req.slotCount || (req.positions === "Team — two independent positions" ? 2 : 1)) as 1 | 2;
       const posList: (1 | 2)[] = totalPos === 2 ? [1, 2] : [1];
+      // Once any position has real hours, only positions with hours get a record (no empty placeholder twin).
+      const hasAnyHours = Object.keys(req.data?.hoursSubmissions ?? {}).length > 0 || Boolean(req.data?.hoursSubmission);
 
       for (const pos of posList) {
         const hoursSub = req.data?.hoursSubmissions?.[pos] || (pos === 1 ? req.data?.hoursSubmission : null);
-        const isEligibleStatus = ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
+        // Mirrored from a magic-link timesheet: that timesheet's own record (below) represents it,
+        // unless the agency has since sent it back for correction (tracked on the request, as before).
+        if (hoursSub?.timesheetId && hoursSub.status !== 'correction_requested') continue;
+        const isEligibleStatus = !hasAnyHours && ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
         if (hoursSub || isEligibleStatus) {
           const recordId = totalPos === 2 ? `${req.id}-pos-${pos}` : req.id;
           const existingIdx = merged.findIndex(r => r.id === recordId || (totalPos === 1 && r.appointmentId === req.id));

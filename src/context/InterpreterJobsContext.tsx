@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { useGlobalState } from "@/context/GlobalContext";
@@ -107,6 +107,23 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
     } else {
       setIsMounted(true);
     }
+  }, [currentUser?.email]);
+
+  // Hours can be submitted outside this tab (e.g. via the emailed secure link), so re-sync when the app regains focus.
+  const lastSyncRef = useRef(0);
+  useEffect(() => {
+    if (!currentUser?.email) return;
+    const resync = () => {
+      if (document.visibilityState !== 'visible' || Date.now() - lastSyncRef.current < 5000) return;
+      lastSyncRef.current = Date.now();
+      void reloadJobs();
+    };
+    window.addEventListener('focus', resync);
+    document.addEventListener('visibilitychange', resync);
+    return () => {
+      window.removeEventListener('focus', resync);
+      document.removeEventListener('visibilitychange', resync);
+    };
   }, [currentUser?.email]);
 
   useEffect(() => {

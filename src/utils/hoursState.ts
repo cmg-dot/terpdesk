@@ -59,6 +59,11 @@ export function getJobHoursState(job: any, serviceRecords: any[] = []): HoursWor
     return 'correction_requested';
   }
 
+  // Hours the server already holds (in-app or secure-link submission) outrank a draft cached in this browser.
+  if (!hs.isDraft && (reqStatus === 'awaiting_review' || hs.status === 'awaiting_review' || hs.submittedAt)) {
+    return 'awaiting_review';
+  }
+
   // Check for draft
   if (record?.state === 'draft' || hs.isDraft) {
     return 'draft';

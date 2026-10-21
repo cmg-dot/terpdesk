@@ -27,6 +27,7 @@ const summaryRows = (s: JobSummary) => [
   { label: "Format", value: s.format },
   { label: "Setting", value: s.setting },
   { label: "Role", value: s.role },
+  { label: "Program", value: s.program },
 ];
 
 const summaryText = (s: JobSummary) => summaryRows(s).map((r) => `${r.label}: ${r.value}`).join("\n");

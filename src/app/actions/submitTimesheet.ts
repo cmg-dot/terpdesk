@@ -9,6 +9,7 @@ import { getPendingTimesheetByToken } from "@/lib/timesheets";
 import { hashToken, TOKEN_PATTERN } from "@/lib/timesheetToken";
 import { wallClockToUtc } from "@/utils/timezone";
 import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
+import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
 
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -104,41 +105,50 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
 
   const now = new Date();
   // Single conditional UPDATE: the status/expiry guard and the write are one atomic statement,
-  // so concurrent submissions of the same link cannot both succeed.
-  const updated = await db
-    .update(timesheets)
-    .set({
-      actualStartTime: start,
-      actualEndTime: end,
-      breakMinutes,
-      travelStartTime: travelStart,
-      travelEndTime: travelEnd,
-      billableHours: hours.toFixed(2),
-      mileage: mileage.toFixed(1),
-      travelLegs: legs,
-      mileageNote: mileageNote || null,
-      serviceCompleted,
-      cancellationReason,
-      serviceNote: serviceNote || null,
-      signatureDataUrl,
-      status: "submitted",
-      submittedAt: now,
-      updatedAt: now,
-    })
-    .where(
-      and(
-        eq(timesheets.tokenHash, hashToken(token)),
-        eq(timesheets.status, "pending"),
-        gt(timesheets.tokenExpiresAt, now),
-      ),
-    )
-    .returning({ id: timesheets.id });
+  // so concurrent submissions of the same link cannot both succeed. The same transaction mirrors the hours into
+  // the request (the record the interpreter app reads), so the two can never disagree.
+  const submitted = await db.transaction(async (tx) => {
+    const [row] = await tx
+      .update(timesheets)
+      .set({
+        actualStartTime: start,
+        actualEndTime: end,
+        breakMinutes,
+        travelStartTime: travelStart,
+        travelEndTime: travelEnd,
+        billableHours: hours.toFixed(2),
+        mileage: mileage.toFixed(1),
+        travelLegs: legs,
+        mileageNote: mileageNote || null,
+        serviceCompleted,
+        cancellationReason,
+        serviceNote: serviceNote || null,
+        signatureDataUrl,
+        status: "submitted",
+        submittedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          eq(timesheets.tokenHash, hashToken(token)),
+          eq(timesheets.status, "pending"),
+          gt(timesheets.tokenExpiresAt, now),
+        ),
+      )
+      .returning();
+    if (!row) return false;
+    await mirrorTimesheetSubmission(tx, row.requestId, row.interpreterId, row);
+    return true;
+  });
 
-  if (updated.length === 0) return { success: false, error: INVALID_LINK };
+  if (!submitted) return { success: false, error: INVALID_LINK };
 
   revalidatePath(`/timesheet/${token}`);
   revalidatePath(`/requests/${appointment.requestId}`);
   revalidatePath("/hours-review");
+  revalidatePath("/dashboard");
+  revalidatePath("/jobs");
+  revalidatePath("/interpreter-home");
 
   return { success: true };
 }

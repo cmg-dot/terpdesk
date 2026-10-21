@@ -16,6 +16,7 @@ export function renderOfferConfirmPage(params: { token: string; action: "accept"
     ["Format", s.format],
     ["Setting", s.setting],
     ["Role", s.role],
+    ["Program", s.program],
   ];
   const rowsHtml = rows
     .map(

@@ -11,6 +11,7 @@ import { sendApprovalEmail } from "@/lib/timesheetEmail";
 import { writeAuditLog } from "@/lib/audit";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
+import { mirrorTimesheetApproval } from "@/lib/timesheetSync";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
 const REQUEST_COMPLETED_STATUS = "completed";
@@ -64,6 +65,8 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
         .update(requests)
         .set({ status: REQUEST_COMPLETED_STATUS, updatedAt: now })
         .where(eq(requests.id, row.requestId));
+      // Keep the interpreter app's copy of these hours (requests.data.hoursSubmissions) in step.
+      await mirrorTimesheetApproval(tx, row.requestId, timesheetId, approvedMileage);
       return row;
     });
     if (!approved) return fail("This timesheet is not awaiting review.");
@@ -79,6 +82,8 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
     revalidatePath("/dashboard");
     revalidatePath("/requests");
     revalidatePath(`/requests/${approved.requestId}`);
+    revalidatePath("/jobs");
+    revalidatePath("/interpreter-home");
 
     await ensureDisplayNameColumns();
     const [row] = await db

@@ -6,7 +6,8 @@ import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
  * Progressive disclosure for job emails.
  *
  * `summarizeJob` returns ONLY what an interpreter may see before accepting (and what goes in any email): reference,
- * title, date/time, format, generic setting and role. No address, client, program, notes or materials.
+ * title, date/time, format, generic setting, role and broad program type (e.g. "WA ODHH"). No address, client, notes
+ * or materials.
  * `jobDetailsFor` returns the full picture; it is only rendered on the secure details page after acceptance, never
  * put in an email (security.md: no PHI in outbound email).
  */
@@ -29,10 +30,11 @@ export interface JobSummary {
   isVirtual: boolean;
   setting: string;
   role: string;
+  /** Broad program type only: "WA ODHH", "WA Apple Health" or "Agency (general)". Never the client. */
+  program: string;
 }
 
 export interface JobDetails extends JobSummary {
-  program: string;
   prepNotes: string;
   location: { venue: string; address: string; building: string; entrance: string; parking: string; contact: string; contactMethod: string } | null;
   virtual: { platform: string; meetingLink: string; meetingId: string; passcode: string; instructions: string } | null;
@@ -63,6 +65,8 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
 
   const rawFormat = text(details.format) || text(data.format) || (data.isVirtual ? "Virtual" : "In person");
   const rawSetting = text(details.setting) || text(data.setting);
+  const intake = (data.intake ?? {}) as LooseData;
+  const rawProgram = text(intake.program) || text(data.program);
   return {
     reference: formatReference(request.id),
     title: text(request.title) || text(details.title) || "Interpreting assignment",
@@ -73,6 +77,8 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     // Generic setting only (e.g. Medical, Legal, Educational).
     setting: rawSetting && rawSetting !== "Choose a setting" ? rawSetting : "General interpreting",
     role: positionNumber === 2 ? "Position 2 (team)" : positionNumber === 1 ? "Position 1" : "Interpreter",
+    // Mapped to a fixed label so a free-text program value can never leak client detail into an email.
+    program: /odhh/i.test(rawProgram) ? "WA ODHH" : /apple/i.test(rawProgram) ? "WA Apple Health" : "Agency (general)",
   };
 }
 
@@ -82,14 +88,10 @@ export function jobDetailsFor(request: JobRequestRow, positionNumber?: number): 
   const data = (request.data ?? {}) as LooseData;
   const details = (data.details ?? {}) as LooseData;
   const onsite = (data.onsite ?? {}) as LooseData;
-  const intake = (data.intake ?? {}) as LooseData;
-
-  const program = text(intake.program) || text(data.program) || "General";
   const meetingLink = text(details.meetingLink) || text(details.virtualLink) || text(data.meetingLink) || text(data.virtualLink);
 
   return {
     ...summary,
-    program: /odhh/i.test(program) ? "WA ODHH" : /apple/i.test(program) ? "WA Apple Health" : "Agency (general)",
     prepNotes: text(data.prepNotes),
     location: summary.isVirtual
       ? null

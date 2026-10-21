@@ -14,6 +14,7 @@ import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
+import { getJobHoursState } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
@@ -382,24 +383,32 @@ function ServiceTimeBlock({ job }: { job: any }) {
   useEffect(() => {
     const loadRecord = () => {
       let found: any = null;
+      let local: any = null;
       if (typeof window !== 'undefined') {
         const stored = localStorage.getItem('terpdesk_service_records');
         if (stored) {
           try {
             const records = JSON.parse(stored);
-            found = records.find((r: any) => r.appointmentId === job.id || r.appointmentId === job.requestId);
+            local = records.find((r: any) => r.appointmentId === job.id || r.appointmentId === job.requestId) || null;
           } catch (e) {
             console.error(e);
           }
         }
       }
-      if (!found && ((job as any).hoursSubmission || (job as any).travelStartTime || ['awaiting_review', 'correction_requested', 'approved'].includes(job.requestStatus))) {
-        const hs = (job as any).hoursSubmission || {};
+      const hs = (job as any).hoursSubmission || {};
+      // Server-side state (covers hours sent through the emailed secure link as well as in-app ones).
+      const serverState = getJobHoursState(job);
+      const serverHasHours = Boolean((job as any).hoursSubmission || (job as any).travelStartTime) || serverState !== 'not_submitted';
+      // The database is the source of truth; a browser copy only wins while it holds newer, unsent work.
+      const localIsNewer = local && Number(local.version || 1) > Number(hs.version || 1);
+      const serverIsFinal = serverState === 'approved' || serverState === 'awaiting_review';
+      if (local && !(serverHasHours && serverIsFinal && !localIsNewer)) found = local;
+      if (!found && serverHasHours) {
         found = {
           id: (job as any).requestId || job.id,
           appointmentId: (job as any).requestId || job.id,
           interpreterName: "Jamie Fictional",
-          state: job.requestStatus === 'approved' ? 'approved' : job.requestStatus === 'correction_requested' ? 'correction_requested' : 'awaiting_review',
+          state: serverState === 'not_submitted' ? 'awaiting_review' : serverState,
           scheduledStart: job.startsAt,
           scheduledEnd: job.endsAt,
           actualStart: hs.actualStartTime || job.startsAt,
@@ -436,7 +445,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
     loadRecord();
     window.addEventListener('storage', loadRecord);
     return () => window.removeEventListener('storage', loadRecord);
-  }, [job.id, job.requestId, job.requestStatus]);
+  }, [job.id, job.requestId, job.requestStatus, (job as any).hoursSubmission?.status, (job as any).hoursSubmission?.submittedAt]);
 
   if (job.status !== 'booked') return null;
 

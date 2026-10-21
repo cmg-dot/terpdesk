@@ -137,6 +137,9 @@ export async function submitInterpreterHours(
 
     const submissionForPos = {
       ...existingHours,
+      // An in-app (re)submission replaces any secure-link mirror, so the review panel shows this version.
+      timesheetId: null,
+      source: 'in_app',
       positionIndex: posIdx,
       interpreterName: extra?.interpreterName || existingHours.interpreterName,
       interpreterId: extra?.interpreterId || existingHours.interpreterId,
