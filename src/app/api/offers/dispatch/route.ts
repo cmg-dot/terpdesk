@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
-import { eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { interpreters, requests } from "@/db/schema";
+import { interpreters, offers, requests } from "@/db/schema";
 import { hasRole } from "@/lib/auth/guards";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { buildOfferEmail } from "@/lib/jobEmails";
@@ -57,10 +57,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "This interpreter has no email address on file." }, { status: 400 });
     }
 
+    // Bind the link to the offer that was just created (the newest pending one for this interpreter on this request).
+    const [offer] = await db
+      .select({ id: offers.id })
+      .from(offers)
+      .where(and(eq(offers.requestId, body.requestId), eq(offers.interpreterId, body.interpreterId), eq(offers.status, "pending")))
+      .orderBy(desc(offers.createdAt))
+      .limit(1);
+
     const token = generateOfferToken({
       interpreterId: body.interpreterId,
       requestId: body.requestId,
       ...(body.positionNumber ? { positionNumber: body.positionNumber } : {}),
+      ...(offer ? { offerId: offer.id } : {}),
     });
     const appUrl = getBaseUrl();
     const acceptUrl = `${appUrl}/api/offers/response?token=${token}&action=accept`;

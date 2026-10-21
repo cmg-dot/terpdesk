@@ -231,14 +231,16 @@ export async function fetchLiveRequests() {
   
   const now = new Date();
 
-  // Auto-expire pending offers whose parent request has passed
+  // Auto-expire pending offers whose appointment has passed OR whose response deadline has passed. The interpreter
+  // stays on the request as an "Expired" offer (it is kept, not removed), so the agency can re-send quickly.
   for (const off of allOffers) {
     if (off.status === 'pending' || off.state === 'pending') {
       const parentRow = dbRows.find(r => r.id === off.requestId);
       if (parentRow) {
         const { endsAt } = resolveRequestTimes(parentRow);
         const endsAtDate = new Date(endsAt);
-        if (!isNaN(endsAtDate.getTime()) && now > endsAtDate) {
+        const deadlinePassed = Boolean(off.expiresAt) && new Date(off.expiresAt).getTime() <= now.getTime();
+        if ((!isNaN(endsAtDate.getTime()) && now > endsAtDate) || deadlinePassed) {
           await db.update(offers)
             .set({ status: 'expired', updatedAt: now })
             .where(eq(offers.id, off.id));
@@ -314,10 +316,11 @@ export async function fetchLiveRequestById(id: string) {
   const endsAtDate = new Date(endsAt);
   const isAppointmentPassed = !isNaN(endsAtDate.getTime()) && now > endsAtDate;
 
-  // Auto-expire pending offers if appointment passed
+  // Auto-expire pending offers if the appointment passed or the offer's response deadline passed
   let anyExpired = false;
   for (const o of requestOffers) {
-    if ((o.status === 'pending' || o.state === 'pending') && isAppointmentPassed) {
+    const deadlinePassed = Boolean(o.expiresAt) && new Date(o.expiresAt).getTime() <= now.getTime();
+    if ((o.status === 'pending' || o.state === 'pending') && (isAppointmentPassed || deadlinePassed)) {
       await db.update(offers)
         .set({ status: 'expired', updatedAt: now })
         .where(eq(offers.id, o.id));

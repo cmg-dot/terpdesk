@@ -24,6 +24,7 @@ import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { InterpreterFitBadge, FitWarningNotice } from "@/components/scheduling-ui";
 import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
+import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -46,12 +47,16 @@ function getInterpreterOptionLabel(
   email: string | undefined,
   fit: InterpreterFitStatus | undefined,
   isLoading: boolean,
-  hasError: boolean
+  hasError: boolean,
+  pastNote?: string | null
 ): string {
   const identifier = email ? `${name} (${email})` : name;
-  if (fit) return `${identifier} — ${fitOptionLabels[fit]}`;
-  if (hasError) return `${identifier} — Availability check failed`;
-  return isLoading ? `${identifier} — Checking availability…` : `${identifier} — Availability status unavailable`;
+  let label: string;
+  if (fit) label = `${identifier} — ${fitOptionLabels[fit]}`;
+  else if (hasError) label = `${identifier} — Availability check failed`;
+  else label = isLoading ? `${identifier} — Checking availability…` : `${identifier} — Availability status unavailable`;
+  // An interpreter who already had an offer on this slot stays in the list, flagged (e.g. "Offer expired").
+  return pastNote ? `${label} · ${pastNote}` : label;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -187,7 +192,9 @@ function CollapsiblePreviousOffers({
         <div className="mt-3.5 space-y-3 pt-3 border-t border-gray-200/60">
           {pastOffers.map((offer: any, idx: number) => {
             const rawState = offer.status || offer.state || 'pending';
-            const isExpired = rawState === 'expired' || (rawState === 'pending' && isAppointmentFinished);
+            const deadlineMs = offer.expiresAt ? new Date(offer.expiresAt).getTime() : NaN;
+            const deadlinePassed = !Number.isNaN(deadlineMs) && Date.now() > deadlineMs;
+            const isExpired = rawState === 'expired' || (rawState === 'pending' && (isAppointmentFinished || deadlinePassed));
             const displayState = isExpired ? 'expired' : rawState;
 
             let badgeClass = "bg-white border border-gray-200 text-gray-600";
@@ -209,7 +216,7 @@ function CollapsiblePreviousOffers({
                 </div>
                 <div className="text-xs sm:text-sm text-[var(--sage)] pl-6 mt-1 text-wrap">
                   {isExpired ? (
-                    <span>Expired · Appointment ended before response was submitted</span>
+                    <span>{isAppointmentFinished ? 'Expired · Appointment ended before response was submitted' : 'Expired · No response before the offer deadline'}</span>
                   ) : (
                     <span>
                       {displayState.charAt(0).toUpperCase() + displayState.slice(1)} {(() => {
@@ -509,11 +516,15 @@ export default function AssignmentDetailPage() {
 
   const handleSaveAccess = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!hasActiveOrAcceptedOffers && isQuickEditTimeInvalid) return;
+    if (hasActiveOrAcceptedOffers) {
+      setSaveError('This appointment cannot currently be edited because offers have already been sent.');
+      return;
+    }
+    if (isQuickEditTimeInvalid) return;
     setIsSavingAccess(true);
     setSaveError(null);
     try {
-      const updatedRow = await updateRequestDetails({
+      const result = await updateRequestDetails({
         requestId: id,
         setting: editSetting,
         format: editFormat,
@@ -533,6 +544,12 @@ export default function AssignmentDetailPage() {
         endTime: editEndTime,
         timeZone: editTimeZone,
       });
+      if (!result.success) {
+        // The server enforces the same lock; show its reason instead of a generic failure.
+        setSaveError(result.error);
+        return;
+      }
+      const updatedRow = result.request;
 
       const updated = await fetchLiveRequestById(id);
       setFoundRequest(updated);
@@ -1023,6 +1040,16 @@ export default function AssignmentDetailPage() {
  View in calendar
  </button>
  {!isCancelled && (
+ hasActiveOrAcceptedOffers ? (
+ <button
+ disabled
+ title="This appointment cannot currently be edited because offers have already been sent."
+ className="rounded-full px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed inline-flex items-center gap-1.5"
+ >
+ <Lock className="w-3.5 h-3.5 text-gray-400" />
+ <span>Quick edit</span>
+ </button>
+ ) : (
  <button
  onClick={openEditAccessModal}
  className="rounded-full px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 transition-colors inline-flex items-center gap-1.5"
@@ -1030,6 +1057,7 @@ export default function AssignmentDetailPage() {
  <Edit2 className="w-3.5 h-3.5 text-gray-500" />
  <span>Quick edit</span>
  </button>
+ )
  )}
  {!isCancelled && (
  hasActiveOrAcceptedOffers ? (
@@ -1062,14 +1090,8 @@ export default function AssignmentDetailPage() {
  <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl px-5 py-3.5 text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
  <div className="flex items-center gap-2.5">
  <Lock className="w-4 h-4 text-amber-700 shrink-0" />
- <span>This appointment cannot currently be edited because offers have already been sent.</span>
+ <span>This appointment cannot currently be edited because offers have already been sent. Once every offer has expired or been declined, you can edit it and send new offers.</span>
  </div>
- <button
- onClick={openEditAccessModal}
- className="inline-flex items-center gap-1 text-xs font-semibold text-amber-900 hover:text-amber-950 underline underline-offset-2 shrink-0 self-start sm:self-auto cursor-pointer"
- >
- Manage access & virtual credentials →
- </button>
  </div>
  )}
 
@@ -1673,6 +1695,15 @@ export default function AssignmentDetailPage() {
 
           {!accepted ? (
             <>
+              {!activeOffer && (
+                <ExpiredOfferNotice
+                  pastOffers={pastOffers}
+                  appointmentFinished={isAppointmentFinished}
+                  now={currentTime}
+                  onOfferAgain={setRec}
+                />
+              )}
+
               {pastOffers.length > 0 && (
                 <CollapsiblePreviousOffers
                   pastOffers={pastOffers}
@@ -1741,7 +1772,8 @@ export default function AssignmentDetailPage() {
                               interpreter.email,
                               interpreterFitMap[interpreter.id],
                               isInterpreterFitLoading,
-                              Boolean(interpreterFitError)
+                              Boolean(interpreterFitError),
+                              pastOfferNote(pastOffers, interpreter.id, isAppointmentFinished, currentTime)
                             )}
                           </option>
                         ))}
@@ -1864,7 +1896,8 @@ export default function AssignmentDetailPage() {
                                 interpreter.email,
                                 interpreterFitMap[interpreter.id],
                                 isInterpreterFitLoading,
-                                Boolean(interpreterFitError)
+                                Boolean(interpreterFitError),
+                                pastOfferNote(pastOffers, interpreter.id, isAppointmentFinished, currentTime)
                               )}
                             </option>
                           ))}

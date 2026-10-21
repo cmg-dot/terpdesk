@@ -577,6 +577,7 @@ export default function EditRequestPage() {
   const isAnyEmailInvalid = isEmailInvalid || isBillEmailInvalid;
 
   const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
 
   const handleSave = async () => {
     if (hasActiveOrAcceptedOffers || isTimeInvalid || isDuplicateUnconfirmed || isAnyEmailInvalid) return;
@@ -687,7 +688,13 @@ export default function EditRequestPage() {
       };
 
       // 1. Persist to PostgreSQL database and revalidate server paths
-      await updateRequestAction(requestId, updatedRequest);
+      const saved = await updateRequestAction(requestId, updatedRequest);
+      if (!saved.success) {
+        // The server refuses edits while offers are live or an interpreter is booked; show why and stay here.
+        setSaveError(saved.error);
+        setIsSaving(false);
+        return;
+      }
 
       if (formData.saveOrg && isNewRequester) {
         await saveRequesterToClientsAction({
@@ -732,6 +739,7 @@ export default function EditRequestPage() {
       router.push(`/requests/${requestId}`);
     } catch (err) {
       console.error("Failed to save request:", err);
+      setSaveError("We could not save your changes. Please try again.");
       setIsSaving(false);
     }
   };
@@ -1192,6 +1200,9 @@ export default function EditRequestPage() {
      <Lock className="w-4 h-4 flex-shrink-0" />
      <span>This appointment cannot currently be edited because offers have already been sent.</span>
    </div>
+ )}
+ {saveError && (
+   <p role="alert" className="mb-2 text-sm font-medium text-red-700">{saveError}</p>
  )}
  <div className="flex items-center gap-4 pt-4">
  <button

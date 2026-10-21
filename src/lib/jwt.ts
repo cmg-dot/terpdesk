@@ -5,6 +5,12 @@ export interface OfferTokenPayload {
   interpreterId: string;
   requestId: string;
   positionNumber?: number;
+  /**
+   * The exact offer this link was sent for. When present, the link only works for THAT offer, so an older email stops
+   * working once the offer is replaced (e.g. the request was edited and re-offered). Links from before this field
+   * existed have none and keep working the old way until they expire.
+   */
+  offerId?: string;
 }
 
 /**
@@ -76,6 +82,9 @@ export function verifyOfferToken(token: string): OfferTokenPayload | null {
 
     if (typeof raw.positionNumber === "number" && !Number.isNaN(raw.positionNumber)) {
       payload.positionNumber = raw.positionNumber;
+    }
+    if (typeof raw.offerId === "string" && raw.offerId) {
+      payload.offerId = raw.offerId;
     }
 
     return payload;

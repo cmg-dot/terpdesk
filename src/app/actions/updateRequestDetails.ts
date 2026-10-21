@@ -6,6 +6,7 @@ import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { buildAppointmentUtcTimes } from "@/utils/timezone";
+import { EDIT_LOCKED_MESSAGE, isRequestEditLocked } from "@/lib/offerLock";
 
 export interface UpdateRequestDetailsPayload {
   requestId: string;
@@ -31,13 +32,22 @@ export interface UpdateRequestDetailsPayload {
   endsAt?: string | Date;
 }
 
-export async function updateRequestDetails(payload: UpdateRequestDetailsPayload) {
+export type UpdateRequestDetailsResult =
+  | { success: true; request: typeof requests.$inferSelect }
+  | { success: false; error: string };
+
+/**
+ * Quick edit. Refused while offers are live or an interpreter is booked (same rule as "Edit assignment", enforced
+ * here on the server). Problems are returned, not thrown: in production a thrown message is hidden from the browser.
+ */
+export async function updateRequestDetails(payload: UpdateRequestDetailsPayload): Promise<UpdateRequestDetailsResult> {
   await requireRole("agency");
   const rows = await db.select().from(requests).where(eq(requests.id, payload.requestId));
   if (!rows || rows.length === 0) {
-    throw new Error("Request not found");
+    return { success: false, error: "This request no longer exists." };
   }
   const existing = rows[0];
+  if (await isRequestEditLocked(payload.requestId)) return { success: false, error: EDIT_LOCKED_MESSAGE };
 
   const existingData = (existing.data as any) || {};
   const existingDetails = existingData.details || {};
@@ -89,7 +99,7 @@ export async function updateRequestDetails(payload: UpdateRequestDetailsPayload)
   }
 
   if (new Date(endsAtIso).getTime() <= new Date(startsAtIso).getTime()) {
-    throw new Error("The end time must be after the start time.");
+    return { success: false, error: "The end time must be after the start time." };
   }
 
   const updatedData = {
@@ -158,5 +168,5 @@ export async function updateRequestDetails(payload: UpdateRequestDetailsPayload)
   revalidatePath('/interpreter-home');
   revalidatePath('/interpreter-calendar');
 
-  return updated;
+  return { success: true, request: updated };
 }

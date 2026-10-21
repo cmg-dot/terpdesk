@@ -11,6 +11,8 @@ import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
+import { renderOfferConfirmPage } from "@/lib/offerConfirmPage";
+import { resolveOfferLinkState } from "@/lib/offerLinkState";
 
 export const dynamic = "force-dynamic";
 
@@ -305,10 +307,13 @@ function renderHtmlCard({
   });
 }
 
-export async function GET(request: NextRequest) {
-  const { searchParams } = request.nextUrl;
-  const token = searchParams.get("token");
-  const actionParam = searchParams.get("action")?.trim().toLowerCase();
+/**
+ * Applies the interpreter's answer. Called ONLY from POST (the confirm button), never from opening a link, so a mail
+ * scanner or link preview cannot book or decline anything. Every check runs before any write, all writes happen in
+ * one transaction, and the confirmation email and notifications are sent only after it has committed. An expired or
+ * invalid link therefore changes nothing and sends nothing.
+ */
+async function processResponse(token: string | null, actionParam: string | undefined): Promise<Response> {
 
   // 1. Validate query parameters
   if (!token || !actionParam || (actionParam !== "accept" && actionParam !== "decline")) {
@@ -333,6 +338,8 @@ export async function GET(request: NextRequest) {
 
   const { interpreterId, requestId, positionNumber } = payload;
   const positionIndex = (positionNumber === 2 ? 2 : 1) as 1 | 2;
+  // Set once the database write has committed. After that, nothing may report "expired": the answer is recorded.
+  let committed: "accepted" | "declined" | null = null;
 
   try {
     // 3. Fetch request from database
@@ -438,12 +445,37 @@ export async function GET(request: NextRequest) {
     );
     if (filledByOtherOffer || filledByOtherSlot) return blockedCard();
 
+    // A link made for one specific offer only ever means that offer, so an older email stops working once its offer
+    // has been replaced (for example after the request was edited and the interpreter was offered it again).
+    const forThisLink = (o: (typeof lockOffers)[number]) => !payload.offerId || o.id === payload.offerId;
+
+    // Already booked through this offer (a repeat click, or something opened the link first): say so truthfully and do
+    // nothing else, so there is no second write and no second email.
+    if (actionParam === "accept") {
+      const alreadyAccepted = lockOffers.find(
+        (o) =>
+          o.interpreterId === interpreterId &&
+          o.status === "accepted" &&
+          positionOf(o.id) === positionIndex &&
+          forThisLink(o)
+      );
+      if (alreadyAccepted) {
+        return renderHtmlCard({
+          status: "accepted",
+          title: "You're already booked",
+          message: "This offer was already accepted, so there is nothing more to do. Your confirmation email has been sent.",
+          jobDetails: { title: jobTitle, date: jobDate, time: jobTime, position: roleLabel },
+        });
+      }
+    }
+
     // The offer must still be Pending (and unexpired) for this interpreter and position
     const pendingOffer = lockOffers.find(
       (o) =>
         o.interpreterId === interpreterId &&
         o.status === "pending" &&
         positionOf(o.id) === positionIndex &&
+        forThisLink(o) &&
         new Date(o.expiresAt) > now
     );
     if (!pendingOffer) return blockedCard();
@@ -566,16 +598,18 @@ export async function GET(request: NextRequest) {
         });
       }
 
+      // One transaction: claim the offer, withdraw the position's other offers and book the request, or none of it.
+      const claimed = await db.transaction(async (tx) => {
       // Atomically claim the offer: only succeeds if it is still pending at write time
-      const [targetOffer] = await db
+      const [targetOffer] = await tx
         .update(offers)
         .set({ status: "accepted", updatedAt: now })
         .where(and(eq(offers.id, pendingOffer.id), eq(offers.status, "pending")))
         .returning();
-      if (!targetOffer) return blockedCard();
+      if (!targetOffer) return null;
 
       // Withdraw other pending offers specifically for this position
-      const allReqOffers = await db
+      const allReqOffers = await tx
         .select()
         .from(offers)
         .where(eq(offers.requestId, requestId));
@@ -583,7 +617,7 @@ export async function GET(request: NextRequest) {
       for (const off of allReqOffers) {
         const offPos = existingOfferPositions[off.id] || 1;
         if (off.id !== targetOffer.id && offPos === positionIndex && off.status === "pending") {
-          await db
+          await tx
             .update(offers)
             .set({ status: "withdrawn", updatedAt: now })
             .where(eq(offers.id, off.id));
@@ -646,7 +680,7 @@ export async function GET(request: NextRequest) {
       ];
 
       // Update requests record parameter-safely linking the accepted interpreter
-      await db
+      await tx
         .update(requests)
         .set({
           status: newStatus,
@@ -664,6 +698,11 @@ export async function GET(request: NextRequest) {
           updatedAt: now,
         })
         .where(eq(requests.id, requestId));
+
+        return targetOffer;
+      });
+      if (!claimed) return blockedCard();
+      committed = "accepted";
 
       await notifyAgencyAdmins({
         type: "job",
@@ -699,15 +738,17 @@ export async function GET(request: NextRequest) {
       });
     } else {
       // Action is 'decline'
-      const [targetOffer] = await db
+      // One transaction, same as accepting: all of the decline is recorded, or none of it.
+      const declined = await db.transaction(async (tx) => {
+      const [targetOffer] = await tx
         .update(offers)
         .set({ status: "declined", updatedAt: now })
         .where(and(eq(offers.id, pendingOffer.id), eq(offers.status, "pending")))
         .returning();
-      if (!targetOffer) return blockedCard();
+      if (!targetOffer) return null;
 
       // Also mark any other pending offers for this interpreter on this request as declined
-      await db
+      await tx
         .update(offers)
         .set({ status: "declined", updatedAt: now })
         .where(
@@ -719,7 +760,7 @@ export async function GET(request: NextRequest) {
         );
 
       // 2. Fetch all offers to accurately evaluate remaining staffing
-      const allReqOffers = await db
+      const allReqOffers = await tx
         .select()
         .from(offers)
         .where(eq(offers.requestId, requestId));
@@ -801,7 +842,7 @@ export async function GET(request: NextRequest) {
       }
 
       // 4. Update the requests table explicitly clearing assigned interpreter and setting unfilled status
-      await db
+      await tx
         .update(requests)
         .set({
           status: newStatus,
@@ -809,6 +850,11 @@ export async function GET(request: NextRequest) {
           updatedAt: now,
         })
         .where(eq(requests.id, requestId));
+
+        return targetOffer;
+      });
+      if (!declined) return blockedCard();
+      committed = "declined";
 
       await notifyAgencyAdmins({
         type: "job",
@@ -843,11 +889,71 @@ export async function GET(request: NextRequest) {
     }
   } catch (err) {
     console.error("[Offer Response] Error processing offer response:", err);
-    return renderHtmlCard({
-      status: "expired",
-      title: "Offer Expired or Invalid",
-      message:
-        "This link has expired or has already been used. Please reach out to the agency directly.",
-    });
+    // The write already committed: the answer IS recorded, so don't tell the interpreter the link is expired.
+    if (committed) {
+      return renderHtmlCard({
+        status: committed,
+        title: committed === "accepted" ? "Offer Accepted!" : "Offer Declined",
+        message:
+          committed === "accepted"
+            ? "Your acceptance is recorded. Your confirmation email may take a moment to arrive."
+            : "Your response is recorded. Thank you for letting us know.",
+      });
+    }
+    return expiredLinkCard();
   }
+}
+
+function expiredLinkCard(): Response {
+  return renderHtmlCard({
+    status: "expired",
+    title: "Offer Expired or Invalid",
+    message: "This link has expired or has already been used. Please reach out to the agency directly.",
+  });
+}
+
+/**
+ * Opening an Accept / Decline link (a GET) never changes anything. It shows a confirm page with the restricted job
+ * summary, and the button on it POSTs the answer. This keeps mail scanners, link previews and double loads from
+ * booking or declining by accident, and keeps the screen honest: what you see is what is in the database.
+ */
+export async function GET(request: NextRequest) {
+  const { searchParams } = request.nextUrl;
+  const token = searchParams.get("token");
+  const action = searchParams.get("action")?.trim().toLowerCase();
+  if (!token || (action !== "accept" && action !== "decline")) return expiredLinkCard();
+
+  const payload = verifyOfferToken(token);
+  if (!payload) return expiredLinkCard();
+
+  try {
+    const state = await resolveOfferLinkState(payload);
+    if (state.kind === "pending") return renderOfferConfirmPage({ token, action, summary: state.summary });
+    if (state.kind === "already_accepted" && action === "accept") {
+      return renderHtmlCard({
+        status: "accepted",
+        title: "You're already booked",
+        message: "This offer was already accepted, so there is nothing more to do. Your confirmation email has been sent.",
+        jobDetails: { title: state.summary.title, date: state.summary.dateLabel, time: state.summary.timeLabel, position: state.summary.role },
+      });
+    }
+  } catch (err) {
+    console.error("[Offer Response] could not read the offer state:", err);
+  }
+  return expiredLinkCard();
+}
+
+/** The confirm button. This is the only place an answer is recorded. */
+export async function POST(request: NextRequest) {
+  let token: string | null = null;
+  let action: string | undefined;
+  try {
+    const form = await request.formData();
+    const rawToken = form.get("token");
+    token = typeof rawToken === "string" ? rawToken : null;
+    action = String(form.get("action") ?? "").trim().toLowerCase();
+  } catch {
+    return expiredLinkCard();
+  }
+  return processResponse(token, action);
 }
