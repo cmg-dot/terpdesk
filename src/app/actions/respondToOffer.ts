@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
+import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 
 type OfferRecord = typeof offers.$inferSelect;
@@ -205,6 +206,10 @@ export async function respondToOffer(
     title: normResponse === 'accepted' ? "Offer accepted" : "Offer declined",
     message: `${who_name} ${normResponse === 'accepted' ? "accepted the job" : "declined the offer"}.`,
   });
+  // Booked: send the confirmation with the secure full-details link (same email as the magic-link path).
+  if (normResponse === 'accepted') {
+    await sendBookingConfirmation({ requestId: offer.requestId, interpreterId: offer.interpreterId, positionNumber: posIdx });
+  }
 
   revalidatePath('/interpreter-home');
   revalidatePath('/jobs');

@@ -9,6 +9,8 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { escapeHtml } from "@/lib/emailTemplate";
+import { sendBookingConfirmation } from "@/lib/jobEmails";
 
 export const dynamic = "force-dynamic";
 
@@ -110,8 +112,16 @@ function renderHtmlCard({
   title,
   message,
   subNotice,
-  jobDetails,
+  jobDetails: rawJobDetails,
 }: HtmlCardParams): Response {
+  // Job fields come from the database (agency-entered), so they are escaped before going into the HTML.
+  const jobDetails = rawJobDetails && {
+    title: escapeHtml(rawJobDetails.title),
+    date: rawJobDetails.date ? escapeHtml(String(rawJobDetails.date)) : undefined,
+    time: rawJobDetails.time ? escapeHtml(rawJobDetails.time) : undefined,
+    location: rawJobDetails.location ? escapeHtml(rawJobDetails.location) : undefined,
+    position: rawJobDetails.position ? escapeHtml(rawJobDetails.position) : undefined,
+  };
   const isAccepted = status === "accepted";
   const isDeclined = status === "declined";
 
@@ -374,6 +384,8 @@ export async function GET(request: NextRequest) {
           existingData.location ||
           "On-site";
     const roleLabel = positionIndex === 2 ? "Secondary Interpreter (Position 2)" : "Primary Interpreter";
+    // Progressive disclosure: anyone who has not (or will not) accept sees no exact address.
+    const restrictedLocation = jobLocation === "Virtual / Remote" ? "Virtual" : "Shared after you accept";
 
     const totalPositions =
       existingData.slotCount === 2 ||
@@ -548,7 +560,7 @@ export async function GET(request: NextRequest) {
             title: jobTitle,
             date: jobDate,
             time: jobTime,
-            location: jobLocation,
+            location: restrictedLocation,
             position: roleLabel,
           },
         });
@@ -659,6 +671,8 @@ export async function GET(request: NextRequest) {
         title: "Offer accepted",
         message: `${interpreterName || "An interpreter"} accepted the job.`,
       });
+      // Booked: send the confirmation with the secure full-details link.
+      await sendBookingConfirmation({ requestId, interpreterId, positionNumber: positionIndex });
 
       try {
         revalidatePath(`/requests/${requestId}`);
@@ -674,7 +688,7 @@ export async function GET(request: NextRequest) {
         status: "accepted",
         title: "Offer Accepted!",
         message:
-          "You're locked in for this assignment. Job details and prep notes have been logged.",
+          "You're locked in for this assignment. A confirmation email with a private link to the full job details (location, preparation notes and materials) is on its way.",
         jobDetails: {
           title: jobTitle,
           date: jobDate,
@@ -818,11 +832,11 @@ export async function GET(request: NextRequest) {
         title: "Offer Declined",
         message: "Thank you for responding promptly.",
         subNotice: "The agency dispatch dashboard has been notified of the vacancy.",
+        // Declined: no location at all.
         jobDetails: {
           title: jobTitle,
           date: jobDate,
           time: jobTime,
-          location: jobLocation,
           position: roleLabel,
         },
       });
