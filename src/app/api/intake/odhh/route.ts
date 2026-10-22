@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { logActivity } from "@/lib/requestActivity";
+import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
@@ -121,6 +122,10 @@ function to24HourTime(time12: string): string | null {
 }
 
 export async function POST(req: Request): Promise<NextResponse> {
+  // Same x-api-key check as /api/intake, before the body is even read.
+  const denied = rejectUnlessIntakeAuthorized(req, "ODHH Intake");
+  if (denied) return denied;
+
   let body: unknown;
   try {
     body = await req.json();

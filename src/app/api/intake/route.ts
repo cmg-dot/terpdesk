@@ -1,7 +1,7 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { createHash, timingSafeEqual } from "node:crypto";
+import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { logActivity } from "@/lib/requestActivity";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
@@ -55,17 +55,6 @@ interface WebhookErrorResponse {
 
 const REQUIRED_FIELDS: readonly (keyof InboundEmailPayload)[] = ["email", "subject", "rawContent"];
 
-/**
- * Constant-time comparison. Both values are SHA-256 hashed first so the buffers
- * are always equal length (timingSafeEqual throws otherwise) and length isn't leaked.
- */
-function isValidApiKey(provided: string | null, expected: string): boolean {
-  if (!provided) return false;
-  const a = createHash("sha256").update(provided).digest();
-  const b = createHash("sha256").update(expected).digest();
-  return timingSafeEqual(a, b);
-}
-
 function validatePayload(
   body: unknown
 ): { ok: true; data: InboundEmailPayload } | { ok: false; invalidFields: (keyof InboundEmailPayload)[] } {
@@ -94,17 +83,8 @@ export async function POST(
   req: Request
 ): Promise<NextResponse<WebhookSuccessResponse | WebhookErrorResponse>> {
   try {
-    const expectedSecret = process.env.INTAKE_WEBHOOK_SECRET;
-    if (!expectedSecret) {
-      // Fail closed: never accept traffic when the secret isn't configured.
-      console.error("[Intake Webhook] INTAKE_WEBHOOK_SECRET is not set — rejecting request.");
-      return NextResponse.json({ success: false, error: "Webhook is not configured." }, { status: 500 });
-    }
-
-    if (!isValidApiKey(req.headers.get("x-api-key"), expectedSecret)) {
-      console.warn("[Intake Webhook] Unauthorized request (missing or invalid x-api-key).");
-      return NextResponse.json({ success: false, error: "Unauthorized." }, { status: 401 });
-    }
+    const denied = rejectUnlessIntakeAuthorized(req, "Intake Webhook");
+    if (denied) return denied;
 
     let body: unknown;
     try {
