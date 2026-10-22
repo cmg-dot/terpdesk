@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useGlobalState } from "@/context/GlobalContext";
 import type { SelectInterpreter } from "@/db/schema";
 import { AddExternalInterpreterModal } from "@/components/interpreters/AddExternalInterpreterModal";
+import { ImportInterpretersCsvModal } from "@/components/interpreters/ImportInterpretersCsvModal";
 import { ManageAccessModal } from "@/components/interpreters/ManageAccessModal";
 import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
 import { JoinRequestsTab } from "@/components/interpreters/JoinRequestsTab";
@@ -14,7 +15,7 @@ import type { RosterItem } from "@/components/interpreters/RosterTab";
 import { WebsiteProfilesTab } from "@/components/interpreters/WebsiteProfilesTab";
 import type { PendingConnection } from "@/app/actions/approvalActions";
 import type { WebsitePermission, WebsiteProfileRequest } from "@/lib/websiteProfile";
-import { UserPlus, Search, CheckCircle2, X } from "lucide-react";
+import { UserPlus, Upload, Search, CheckCircle2, X } from "lucide-react";
 
 export type InterpretersTab = "roster" | "requests" | "website";
 
@@ -52,6 +53,7 @@ export function InterpretersPageClient({
   const [activeTab, setActiveTab] = useState<InterpretersTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   // Keep local state in sync when server props revalidate
@@ -117,6 +119,15 @@ export function InterpretersPageClient({
     router.refresh();
 
     showToast(`Successfully added ${newInterpreter.name} to the roster.`);
+  };
+
+  const handleCsvImported = (result: { created: number; skippedExisting: number; invalid: unknown[] }) => {
+    // New profiles were created on the server; pull the fresh roster.
+    router.refresh();
+    const parts = [`Imported ${result.created} new ${result.created === 1 ? "interpreter" : "interpreters"}`];
+    if (result.skippedExisting > 0) parts.push(`${result.skippedExisting} already existed and ${result.skippedExisting === 1 ? "was" : "were"} left unchanged`);
+    if (result.invalid.length > 0) parts.push(`${result.invalid.length} invalid ${result.invalid.length === 1 ? "row was" : "rows were"} skipped`);
+    showToast(`${parts.join("; ")}.`);
   };
 
   const handleJoinRequestDecided = (requestId: string, message: string) => {
@@ -185,14 +196,24 @@ export function InterpretersPageClient({
           </p>
         </div>
 
-        <button
-          type="button"
-          onClick={() => setIsAddModalOpen(true)}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#0B3B32] text-white text-sm font-medium hover:bg-[#082a23] transition-all shadow-sm active:scale-95 cursor-pointer self-start sm:self-auto shrink-0"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>Add External Interpreter</span>
-        </button>
+        <div className="flex flex-wrap items-center gap-3 self-start sm:self-auto shrink-0">
+          <button
+            type="button"
+            onClick={() => setIsImportOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-gray-200 bg-white text-[var(--ink)] text-sm font-medium hover:bg-gray-50 transition-all active:scale-95 cursor-pointer"
+          >
+            <Upload className="w-4 h-4" />
+            <span>Import CSV</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setIsAddModalOpen(true)}
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#0B3B32] text-white text-sm font-medium hover:bg-[#082a23] transition-all shadow-sm active:scale-95 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>Add External Interpreter</span>
+          </button>
+        </div>
       </div>
 
       {/* Navigation Tabs */}
@@ -263,6 +284,8 @@ export function InterpretersPageClient({
           )}
         </motion.div>
       </AnimatePresence>
+
+      <ImportInterpretersCsvModal isOpen={isImportOpen} onClose={() => setIsImportOpen(false)} onImported={handleCsvImported} />
 
       {/* Add External Interpreter Modal */}
       <AddExternalInterpreterModal
