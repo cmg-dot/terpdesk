@@ -16,8 +16,8 @@ import {
   type AppointmentFormat,
 } from "@/lib/odhhEmailParser";
 
-/** Appointment note (<= 1000) + client/employee block (<= 1500) + spacing. */
-const MAX_PREP_NOTES_LENGTH = 3000;
+/** Only the appointment note goes into the interpreter-visible preparation notes (the parser already caps it). */
+const MAX_PREP_NOTES_LENGTH = 1000;
 
 /**
  * Webhook receiver for the AWS Lambda email forwarder.
@@ -166,9 +166,10 @@ export async function POST(
 
     const locationLabel = parsed.venue ?? parsed.address ?? "TBD";
     const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
-    // A "Comment:" line inside the client/employee section is already in that block, so it isn't repeated as the note.
+    // A "Comment:" line inside the client/employee section stays in that (private) block and is not copied into the
+    // interpreter-visible preparation notes.
     const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
-    const prepNotes = [noteAlreadyInBlock ? null : parsed.appointmentNote, parsed.clientInfoBlock].filter((part): part is string => Boolean(part)).join("\n\n").slice(0, MAX_PREP_NOTES_LENGTH);
+    const prepNotes = noteAlreadyInBlock ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
     const title = parsed.srn
       ? `ODHH SRN #${parsed.srn}${parsed.venue ? ` — ${parsed.venue}` : ""}`
       : subject.trim().slice(0, 200) || `Inbound email from ${email}`;
@@ -186,13 +187,13 @@ export async function POST(
         ...(parsed.purpose ? { purpose: parsed.purpose } : {}),
         ...(parsed.platform ? { platform: parsed.platform } : {}),
         ...(parsed.meetingLink ? { meetingLink: parsed.meetingLink, virtualLink: parsed.meetingLink } : {}),
-        // Staff-only: stored with the draft, never logged or put in an email.
-        ...(parsed.clientGender ? { clientGender: parsed.clientGender } : {}),
       },
       // The ODHH "Appointment Note" lands in the agency's Preparation notes field, so staff review it before booking.
-      // Preparation notes: the appointment note, then the whole CLIENT/EMPLOYEE INFORMATION section, so nothing in the
-      // email is lost. Staff review this draft before anyone is booked; booked interpreters see these notes.
+      // Preparation notes are shared with booked interpreters, so they hold ONLY the appointment note from the email.
       ...(prepNotes ? { prepNotes } : {}),
+      // The whole CLIENT/EMPLOYEE INFORMATION section (gender, hearing identity, comments, ...) is sensitive: it goes
+      // to "Agency-private notes" (requests.data.privateNotes), which interpreters never receive.
+      ...(parsed.clientInfoBlock ? { privateNotes: parsed.clientInfoBlock } : {}),
       onsite: {
         venue: parsed.venue ?? "",
         address: parsed.address ?? "",

@@ -7,6 +7,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { isTeamRequestData, legacyPosition1Hours } from "@/utils/hoursState";
+import { interpreterSafeData, interpreterSafeDetails } from "@/lib/interpreterJobData";
 import { timesheetToHoursSubmission, type TimesheetForSync } from "@/lib/timesheetSync";
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
@@ -194,7 +195,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       platform,
       virtualInstructions,
       details: {
-        ...details,
+        ...interpreterSafeDetails(details),
         setting,
         format,
         timeZone: details.timeZone || "America/Los_Angeles",
@@ -215,7 +216,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
         contact: onsite.contact || "",
         contactMethod: onsite.contactMethod || "",
       },
-      data: rowData
+      // Staff-only keys (private notes, the raw email, requester, other interpreters' data) never reach the browser.
+      data: interpreterSafeData(rowData)
     };
   });
 }

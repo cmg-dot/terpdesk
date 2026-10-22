@@ -1229,14 +1229,14 @@ export default function EditRequestPage() {
  label="Preparation and logistics notes for interpreters"
  subtext="Visible to interpreters who are offered or assigned this job."
  >
- <LimitedTextarea className="min-h-[160px]" maxLength={3000} value={formData.prepNotes} onChange={(val) => handleChange("prepNotes", val)} />
+ <LimitedTextarea className="min-h-[100px]" maxLength={1000} value={formData.prepNotes} onChange={(val) => handleChange("prepNotes", val)} />
  </Field>
  <div className="mt-6">
  <Field 
  label="Agency-private notes"
  subtext="Visible to your agency staff only. Never shared with interpreters. File attachments are not available yet and are not part of this workflow."
  >
- <LimitedTextarea className="min-h-[100px]" maxLength={1000} value={formData.privateNotes} onChange={(val) => handleChange("privateNotes", val)} />
+ <LimitedTextarea className="min-h-[160px]" maxLength={3000} value={formData.privateNotes} onChange={(val) => handleChange("privateNotes", val)} />
  </Field>
  </div>
  </div>
