@@ -16,6 +16,9 @@ import {
   type AppointmentFormat,
 } from "@/lib/odhhEmailParser";
 
+/** Appointment note (<= 1000) + client/employee block (<= 1500) + spacing. */
+const MAX_PREP_NOTES_LENGTH = 3000;
+
 /**
  * Webhook receiver for the AWS Lambda email forwarder.
  * Lambda POSTs each inbound domain email as JSON: { email, subject, rawContent }.
@@ -43,6 +46,8 @@ interface WebhookSuccessResponse {
     hasMeeting: boolean;
     hasNote: boolean;
     hasClientGender: boolean;
+    hasRequestor: boolean;
+    hasClientInfoBlock: boolean;
   };
   warnings: string[];
 }
@@ -131,6 +136,10 @@ export async function POST(
     else if (parsed.formatInferred) warnings.push("Format inferred as in_person from address");
     if (!parsed.clientName) warnings.push("Client name not found");
     if (!parsed.purpose) warnings.push("Purpose not found");
+    if (!parsed.requestorName) warnings.push("Requestor name not found");
+    if (!parsed.requestorPhone) warnings.push("Requestor phone not found");
+    if (!parsed.requestorEmail) warnings.push("Requestor email not found");
+    if (!parsed.clientInfoBlock) warnings.push("CLIENT/EMPLOYEE INFORMATION section not found");
     if ((parsed.format === "virtual" || parsed.format === "hybrid") && !parsed.platform && !parsed.meetingLink) {
       warnings.push("Virtual meeting platform/link not found");
     }
@@ -156,6 +165,8 @@ export async function POST(
     }
 
     const locationLabel = parsed.venue ?? parsed.address ?? "TBD";
+    const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
+    const prepNotes = [parsed.appointmentNote, parsed.clientInfoBlock].filter((part): part is string => Boolean(part)).join("\n\n").slice(0, MAX_PREP_NOTES_LENGTH);
     const title = parsed.srn
       ? `ODHH SRN #${parsed.srn}${parsed.venue ? ` — ${parsed.venue}` : ""}`
       : subject.trim().slice(0, 200) || `Inbound email from ${email}`;
@@ -177,13 +188,28 @@ export async function POST(
         ...(parsed.clientGender ? { clientGender: parsed.clientGender } : {}),
       },
       // The ODHH "Appointment Note" lands in the agency's Preparation notes field, so staff review it before booking.
-      ...(parsed.appointmentNote ? { prepNotes: parsed.appointmentNote } : {}),
+      // Preparation notes: the appointment note, then the whole CLIENT/EMPLOYEE INFORMATION section, so nothing in the
+      // email is lost. Staff review this draft before anyone is booked; booked interpreters see these notes.
+      ...(prepNotes ? { prepNotes } : {}),
       onsite: {
         venue: parsed.venue ?? "",
         address: parsed.address ?? "",
       },
       overview: { location: locationLabel, status: "Unfilled / draft" },
-      requester: { email, org: "WA ODHH" },
+      // One-time requester for this job: the ODHH requestor from the email. `oneTime` stops the edit page from
+      // swapping in a saved client's default contact (it matches saved clients by organisation name).
+      // Only if the email names no requestor at all is the forwarding address kept as the contact.
+      requester: {
+        org: "WA ODHH",
+        oneTime: true,
+        ...(hasRequestor
+          ? {
+              ...(parsed.requestorName ? { name: parsed.requestorName } : {}),
+              ...(parsed.requestorPhone ? { phone: parsed.requestorPhone } : {}),
+              ...(parsed.requestorEmail ? { email: parsed.requestorEmail } : {}),
+            }
+          : { email }),
+      },
       schedule: {
         date: parsed.date,
         startTime: parsed.startTime,
@@ -244,6 +270,8 @@ export async function POST(
           hasMeeting: parsed.platform !== null || parsed.meetingLink !== null,
           hasNote: parsed.appointmentNote !== null,
           hasClientGender: parsed.clientGender !== null,
+          hasRequestor,
+          hasClientInfoBlock: parsed.clientInfoBlock !== null,
         },
         warnings,
       },

@@ -44,6 +44,15 @@ export interface ParsedIntakeEmail {
   /** Free-text appointment note (may span several lines). */
   appointmentNote: string | null;
   clientGender: string | null;
+  /** The person at ODHH who requested the service. Becomes the draft's one-time requester. */
+  requestorName: string | null;
+  requestorPhone: string | null;
+  requestorEmail: string | null;
+  /**
+   * The whole "CLIENT/EMPLOYEE INFORMATION" section (Gender, Hearing Identity, Preferred Notification, ...) as
+   * formatted text, heading included, so nothing in it is lost. Null when the email has no such section.
+   */
+  clientInfoBlock: string | null;
 }
 
 const TIME_FRAGMENT = String.raw`\d{1,2}(?::\d{2})?\s*[AaPp]\.?\s*[Mm]\.?`;
@@ -111,6 +120,19 @@ const NOTE_START_PATTERN =
 // A new "Label:" line ends a multi-line note. "https://" and times like "8:00" are not labels.
 const NEXT_LABEL_PATTERN = /^[ \t]*[A-Za-z][A-Za-z0-9 \/#()'-]{1,40}:(?:[ \t]|$)/;
 const MAX_NOTE_LENGTH = 1000;
+const MAX_CLIENT_BLOCK_LENGTH = 1500;
+
+// "Requestor" is ODHH's spelling; "Requester" is accepted too.
+const REQUESTOR_NAME_PATTERN = labelPattern(["Requestor[ \t]+Name", "Requester[ \t]+Name"]);
+const REQUESTOR_PHONE_PATTERN = labelPattern([
+  "Requestor[ \t]+(?:Phone|Telephone)(?:[ \t]+(?:Number|No\.?))?",
+  "Requester[ \t]+(?:Phone|Telephone)(?:[ \t]+(?:Number|No\.?))?",
+]);
+const REQUESTOR_EMAIL_PATTERN = labelPattern(["Requestor[ \t]+E-?mail(?:[ \t]+Address)?", "Requester[ \t]+E-?mail(?:[ \t]+Address)?"]);
+const CLIENT_BLOCK_HEADER = /^[ \t]*CLIENT[ \t]*\/[ \t]*EMPLOYEE[ \t]+INFORMATION[ \t]*:?[ \t]*$/im;
+// A section heading is a line of capitals only ("APPOINTMENT INFORMATION"); a rule line ("-----") also ends a section.
+const SECTION_HEADER_PATTERN = /^[ \t]*[A-Z][A-Z0-9 \/&,'()-]{5,}:?[ \t]*$/;
+const RULE_LINE_PATTERN = /^[ \t]*[-=_*]{3,}[ \t]*$/;
 const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i;
 
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
@@ -194,6 +216,65 @@ function extractNote(text: string): string | null {
   return note && !EMPTY_VALUE.test(note) ? note : null;
 }
 
+/** Non-empty lines of the section that starts at `header`, up to the next section heading or rule line. */
+function sectionLines(text: string, header: RegExp): string[] | null {
+  const lines = text.split("\n");
+  const start = lines.findIndex((line) => header.test(line));
+  if (start < 0) return null;
+  const out: string[] = [];
+  for (let i = start + 1; i < lines.length; i += 1) {
+    const line = lines[i];
+    if (SECTION_HEADER_PATTERN.test(line) || RULE_LINE_PATTERN.test(line)) break;
+    const cleaned = line.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").replace(/[ \t]+/g, " ").trim();
+    if (cleaned) out.push(cleaned.slice(0, MAX_FIELD_LENGTH));
+  }
+  return out;
+}
+
+/** The CLIENT/EMPLOYEE INFORMATION section, heading plus every line in it, capped so it can't flood the notes. */
+function extractClientInfoBlock(text: string): string | null {
+  const lines = sectionLines(text, CLIENT_BLOCK_HEADER);
+  if (!lines || lines.length === 0) return null;
+  return ["CLIENT/EMPLOYEE INFORMATION", ...lines].join("\n").slice(0, MAX_CLIENT_BLOCK_LENGTH);
+}
+
+/** First e-mail address in the value (a trailing "mailto:", brackets or punctuation are ignored). */
+function parseEmailAddress(value: string | null): string | null {
+  if (!value) return null;
+  const found = value.match(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/);
+  return found ? found[0].toLowerCase().slice(0, 120) : null;
+}
+
+/** The first phone number in the value, as written (with any extension), when it has at least 7 digits. */
+function parsePhoneNumber(value: string | null): string | null {
+  if (!value) return null;
+  const found = value.match(/\+?\(?\d[\d\s().-]{5,}\d(?:[ \t]*(?:x|ext\.?|#)[ \t]*\d{1,6})?/i)?.[0];
+  const cleaned = found?.replace(/\s+/g, " ").trim().slice(0, 40) ?? null;
+  return cleaned && cleaned.replace(/\D/g, "").length >= 7 ? cleaned : null;
+}
+
+/** Requestor details: "Requestor Name/Phone/Email" lines, else Name/Phone/Email inside a REQUESTOR section. */
+function extractRequestor(text: string): { name: string | null; phone: string | null; email: string | null } {
+  const pick = (v: string | undefined): string | null => {
+    const cleaned = cleanValue(v);
+    return cleaned && !EMPTY_VALUE.test(cleaned) ? cleaned : null;
+  };
+  let name = pick(text.match(REQUESTOR_NAME_PATTERN)?.[1]);
+  let phone = parsePhoneNumber(pick(text.match(REQUESTOR_PHONE_PATTERN)?.[1]));
+  let email = parseEmailAddress(pick(text.match(REQUESTOR_EMAIL_PATTERN)?.[1]));
+  if (!name || !phone || !email) {
+    const section = sectionLines(text, /^[ \t]*REQUES?TOR(?:[ \t]+(?:INFORMATION|INFO|DETAILS))?[ \t]*:?[ \t]*$/im) ?? [];
+    const field = (label: RegExp): string | null => {
+      const line = section.find((l) => label.test(l));
+      return line ? pick(line.replace(label, "")) : null;
+    };
+    name = name ?? field(/^Name[ \t]*:[ \t]*/i);
+    phone = phone ?? parsePhoneNumber(field(/^(?:Phone|Telephone)(?:[ \t]+(?:Number|No\.?))?[ \t]*:[ \t]*/i));
+    email = email ?? parseEmailAddress(field(/^E-?mail(?:[ \t]+Address)?[ \t]*:[ \t]*/i));
+  }
+  return { name, phone, email };
+}
+
 /** Known video platforms by hostname or name; anything else keeps the text the email gave. */
 function platformFrom(value: string): string | null {
   if (/zoom/i.test(value)) return "Zoom";
@@ -254,6 +335,8 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
     formatInferred = true;
   }
 
+  const requestor = extractRequestor(text);
+
   return {
     srn,
     date,
@@ -271,6 +354,10 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
     platform: meeting.platform,
     meetingLink: meeting.meetingLink,
     appointmentNote: extractNote(text),
+    requestorName: requestor.name,
+    requestorPhone: requestor.phone,
+    requestorEmail: requestor.email,
+    clientInfoBlock: extractClientInfoBlock(text),
     clientGender: (() => {
       const gender = cleanValue(text.match(GENDER_PATTERN)?.[1])?.slice(0, 40) ?? null;
       return gender && !EMPTY_VALUE.test(gender) ? gender : null;

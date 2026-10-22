@@ -13,6 +13,7 @@ import { getClientsAction, saveRequesterToClientsAction, type ClientWithStats } 
 import { isInvalidEmail } from "@/utils/validation";
 import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
 import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
+import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
 
 function CustomSelect({ options, value, onChange, disabled = false }: { options: string[], value?: string, onChange?: (val: string) => void, disabled?: boolean }) {
  const [isOpen, setIsOpen] = useState(false);
@@ -196,7 +197,12 @@ export default function EditRequestPage() {
  program: "General",
  odhhSrn: "",
  odhhAccessCode: "",
- providerOneNumber: ""
+ providerOneNumber: "",
+ platform: "Zoom",
+ meetingLink: "",
+ meetingId: "",
+ passcode: "",
+ virtualInstructions: ""
  });
 
  useEffect(() => {
@@ -238,7 +244,12 @@ export default function EditRequestPage() {
        program: existingRequest?.data?.intake?.program || "General",
        odhhSrn: existingRequest?.data?.intake?.odhhSrn || "",
        odhhAccessCode: existingRequest?.data?.intake?.odhhAccessCode || "",
-       providerOneNumber: existingRequest?.data?.intake?.providerOneNumber || ""
+       providerOneNumber: existingRequest?.data?.intake?.providerOneNumber || "",
+       platform: existingRequest?.platform || existingRequest?.details?.platform || "Zoom",
+       meetingLink: existingRequest?.meetingLink || existingRequest?.details?.meetingLink || existingRequest?.virtualLink || existingRequest?.details?.virtualLink || "",
+       meetingId: existingRequest?.meetingId || existingRequest?.details?.meetingId || "",
+       passcode: existingRequest?.passcode || existingRequest?.details?.passcode || existingRequest?.accessCode || existingRequest?.details?.accessCode || "",
+       virtualInstructions: existingRequest?.virtualInstructions || existingRequest?.details?.virtualInstructions || ""
      }));
    }
  }, [existingRequest]);
@@ -347,6 +358,9 @@ export default function EditRequestPage() {
   useEffect(() => {
     if (!existingRequest || dbClients.length === 0 || hasAutoMatchedClientRef.current) return;
     hasAutoMatchedClientRef.current = true;
+    // A one-time requester (e.g. the ODHH requestor from an intake email) keeps its own contact: never replaced by a
+    // saved client's default contact just because the organisation name matches.
+    if (existingRequest?.requester?.oneTime) return;
 
     const reqOrg = (
       existingRequest?.requester?.org ||
@@ -662,6 +676,14 @@ export default function EditRequestPage() {
           positions: formData.positions,
           requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
           slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
+          // Virtual Meeting Details (same fields and keys as Quick Edit).
+          platform: formData.platform,
+          meetingLink: formData.meetingLink,
+          virtualLink: formData.meetingLink,
+          meetingId: formData.meetingId,
+          passcode: formData.passcode,
+          accessCode: formData.passcode,
+          virtualInstructions: formData.virtualInstructions,
         },
         onsite: {
           venue: formData.venue,
@@ -683,7 +705,9 @@ export default function EditRequestPage() {
           billOrg: formData.billOrg,
           billContact: formData.billContact,
           billEmail: formData.billEmail,
-          poNumber: formData.poNumber
+          poNumber: formData.poNumber,
+          // Keep (or drop, once a saved client is chosen) the one-time flag set by the intake.
+          ...(existingRequest?.requester?.oneTime ? { oneTime: isNewRequester } : {})
         },
         prepNotes: formData.prepNotes,
         privateNotes: formData.privateNotes,
@@ -1050,7 +1074,19 @@ export default function EditRequestPage() {
  )}
  </div>
 
- {/* Location details Section */}
+ {/* Virtual Meeting Details (same fields as the Quick Edit modal) */}
+ {isVirtualFormat(formData.modality) && (
+ <div className={cardClass}>
+ <h2 className={sectionTitleClass}>Virtual meeting details</h2>
+ <VirtualMeetingFields
+ values={{ platform: formData.platform, meetingLink: formData.meetingLink, meetingId: formData.meetingId, passcode: formData.passcode, virtualInstructions: formData.virtualInstructions }}
+ onChange={(field, value) => handleChange(field, value)}
+ />
+ </div>
+ )}
+
+ {/* Location details Section (a fully virtual job has no physical location to edit, as in Quick Edit) */}
+ {formData.modality !== "Virtual" && (
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Location details</h2>
  
@@ -1090,6 +1126,7 @@ export default function EditRequestPage() {
  </Field>
  </div>
  </div>
+ )}
 
  {/* Short location label Section */}
  <div className={cardClass}>
@@ -1192,7 +1229,7 @@ export default function EditRequestPage() {
  label="Preparation and logistics notes for interpreters"
  subtext="Visible to interpreters who are offered or assigned this job."
  >
- <LimitedTextarea className="min-h-[100px]" maxLength={1000} value={formData.prepNotes} onChange={(val) => handleChange("prepNotes", val)} />
+ <LimitedTextarea className="min-h-[160px]" maxLength={3000} value={formData.prepNotes} onChange={(val) => handleChange("prepNotes", val)} />
  </Field>
  <div className="mt-6">
  <Field 

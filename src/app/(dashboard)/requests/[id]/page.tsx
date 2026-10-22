@@ -31,6 +31,7 @@ import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
 import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
+import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -2332,70 +2333,17 @@ export default function AssignmentDetailPage() {
             </div>
           </div>
 
-          {editFormat.toLowerCase().includes('virtual') ? (
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200/60 space-y-3.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Virtual Meeting Details</h4>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Platform</label>
-                <select
-                  value={editPlatform}
-                  onChange={(e) => setEditPlatform(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                >
-                  <option value="Zoom">Zoom</option>
-                  <option value="Microsoft Teams">Microsoft Teams</option>
-                  <option value="Google Meet">Google Meet</option>
-                  <option value="Webex">Webex</option>
-                  <option value="Virtual">Other Virtual Platform</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Meeting Link / Join URL</label>
-                <input
-                  type="text"
-                  placeholder="https://zoom.us/j/..."
-                  value={editMeetingLink}
-                  onChange={(e) => setEditMeetingLink(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Meeting ID</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 812 3456 7890"
-                    value={editMeetingId}
-                    onChange={(e) => setEditMeetingId(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Passcode / Access Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. 984210"
-                    value={editPasscode}
-                    onChange={(e) => setEditPasscode(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none font-mono"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Virtual Instructions / Notes</label>
-                <textarea
-                  rows={2}
-                  placeholder="e.g. Waiting room enabled, join 5 mins before start."
-                  value={editVirtualInstructions}
-                  onChange={(e) => setEditVirtualInstructions(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                />
-              </div>
-            </div>
+          {isVirtualFormat(editFormat) ? (
+            <VirtualMeetingFields
+              values={{ platform: editPlatform, meetingLink: editMeetingLink, meetingId: editMeetingId, passcode: editPasscode, virtualInstructions: editVirtualInstructions }}
+              onChange={(field, value) => {
+                if (field === 'platform') setEditPlatform(value);
+                else if (field === 'meetingLink') setEditMeetingLink(value);
+                else if (field === 'meetingId') setEditMeetingId(value);
+                else if (field === 'passcode') setEditPasscode(value);
+                else setEditVirtualInstructions(value);
+              }}
+            />
           ) : (
             <div className="p-4 bg-gray-50 rounded-xl border border-gray-200/60 space-y-3.5">
               <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Physical Location Details</h4>
