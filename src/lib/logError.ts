@@ -2,6 +2,8 @@
  * Logs the real failure (message, stack, and the underlying database error) so a crash can be located.
  * Drizzle puts the bound query parameters in its error message ("Failed query: ... params: ..."), and for
  * sign-ups those are emails and password hashes, so that part is cut off before logging.
+ * HIPAA: Postgres' `detail` ("Key (email)=(...) already exists") quotes row values, so it is never printed either;
+ * the error code identifies the failure without exposing data.
  */
 const stripParams = (message: string): string => message.split(/\nparams:/i)[0];
 
@@ -25,7 +27,7 @@ export function logError(tag: string, err: unknown): void {
   const cause = (err as DbLikeError).cause as DbLikeError | undefined;
   if (cause) {
     console.error(
-      `[${tag}] caused by: code=${cause.code ?? "n/a"} message=${stripParams(cause.message ?? "n/a")}${cause.detail ? ` detail=${cause.detail}` : ""}`,
+      `[${tag}] caused by: code=${cause.code ?? "n/a"} message=${stripParams(cause.message ?? "n/a")}`,
     );
   }
 }

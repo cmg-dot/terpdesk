@@ -53,7 +53,7 @@ export function RequestsProvider({ children }: { children: ReactNode }) {
       try {
         setRequests(JSON.parse(saved));
       } catch (e) {
-        console.error("Failed to parse requests from local storage", e);
+        console.error("Failed to parse requests from local storage");
       }
     }
     setIsLoaded(true);

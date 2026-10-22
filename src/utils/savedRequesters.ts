@@ -34,7 +34,7 @@ export function getSavedAgencyRequesters(): SavedAgencyRequester[] {
     }
     return DEFAULT_SAVED_REQUESTERS;
   } catch (e) {
-    console.error("Failed to read saved agency requesters", e);
+    console.error("Failed to read saved agency requesters");
     return DEFAULT_SAVED_REQUESTERS;
   }
 }
@@ -62,7 +62,7 @@ export function saveAgencyRequester(entry: {
       phone,
       preferredContact
     }).catch(err => {
-      console.error("Failed to sync requester to PostgreSQL:", err);
+      console.error("Failed to sync requester to PostgreSQL:");
     });
   }
 
@@ -111,7 +111,7 @@ export function saveAgencyRequester(entry: {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(list));
   } catch (e) {
-    console.error("Failed to persist saved agency requester", e);
+    console.error("Failed to persist saved agency requester");
   }
 
   return list;

@@ -7,6 +7,7 @@ import { getInterpreterDisplayName } from "@/lib/displayName";
 import { sendOdhhPostJobReminder } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import { resolveRequestTimes } from "@/utils/timezone";
+import { logError } from "@/lib/logError";
 
 export const dynamic = "force-dynamic";
 
@@ -114,7 +115,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ success: true, considered: due.length, sent: sentCount, skipped, failed });
   } catch (err) {
-    console.error("[cron:odhh-reminders] run failed:", err instanceof Error ? err.message : "unknown error");
+    logError("cron:odhh-reminders", err);
     return NextResponse.json({ success: false, error: "Reminder run failed." }, { status: 500 });
   }
 }

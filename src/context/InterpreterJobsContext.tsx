@@ -102,7 +102,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
         }));
         setJobs(mappedJobs);
       } catch (e) {
-        console.error(e);
+        console.error("[context/InterpreterJobsContext] operation failed");
       }
     }
   };

@@ -8,6 +8,7 @@ import { agencyInterpreters, interpreters, type SelectInterpreter } from "@/db/s
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { ilike } from "drizzle-orm";
+import { logError } from "@/lib/logError";
 
 export interface AddExternalInterpreterInput {
   name: string;
@@ -108,10 +109,12 @@ export async function addExternalInterpreter(
       interpreter: newInterpreter,
     };
   } catch (err: any) {
-    console.error("[addExternalInterpreter] Error inserting interpreter:", err);
+    // HIPAA/PII: neither the log nor the response may carry the raw database error (its message holds the bound name,
+    // email and phone).
+    logError("addExternalInterpreter", err);
     return {
       success: false,
-      error: err?.message || "Failed to add external interpreter to the database.",
+      error: "Failed to add external interpreter to the database.",
     };
   }
 }

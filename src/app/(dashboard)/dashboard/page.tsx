@@ -54,7 +54,7 @@ export default function DashboardPage() {
       const records = mergeHoursRecords({ localRecords, requests: rows, timesheets: Array.isArray(submitted) ? submitted : [] });
       setAwaitingReviewCount(records.filter(isAwaitingReview).length);
     } catch (e) {
-      console.error(e);
+      console.error("[dashboard page] operation failed");
     }
   }, []);
 
@@ -67,7 +67,7 @@ export default function DashboardPage() {
         const storedJobs: unknown = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
         setInterpreterJobs(Array.isArray(storedJobs) ? storedJobs.filter((j) => j && typeof j === 'object') : []);
       } catch (e) {
-        console.error(e);
+        console.error("[dashboard page] operation failed");
       }
     };
     loadJobs();

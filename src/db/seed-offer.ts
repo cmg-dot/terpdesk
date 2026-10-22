@@ -26,9 +26,9 @@ async function main() {
       expiresAt: new Date(Date.now() + 86400000), // expires in 24 hours
     }).returning();
     
-    console.log('Successfully seeded offer:', inserted);
+    console.log('Successfully seeded offer.');
   } catch (error) {
-    console.error('Error seeding offer:', error);
+    console.error('Error seeding offer (code: ' + ((error as { code?: string } | null)?.code ?? 'unknown') + ').');
   } finally {
     await client.end();
   }

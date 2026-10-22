@@ -3,6 +3,7 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { logActivity } from "@/lib/requestActivity";
+import { logError } from "@/lib/logError";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
@@ -113,13 +114,8 @@ export async function POST(
 
     const { email, subject, rawContent } = validation.data;
 
-    // Verification log for the live AWS trigger. rawContent is intentionally not logged (may contain PII).
-    console.log("[Intake Webhook] Inbound email received", {
-      email,
-      subject,
-      contentLength: rawContent.length,
-      receivedAt: new Date().toISOString(),
-    });
+    // HIPAA: log only that an email arrived and its size. The sender, subject and body can hold PHI, so none are logged.
+    console.log("[Intake Webhook] Inbound email received", { contentLength: rawContent.length });
 
     const receivedAt = new Date().toISOString();
     const parsed = parseIntakeEmail(rawContent, subject);
@@ -250,11 +246,8 @@ export async function POST(
     revalidatePath("/dashboard");
     revalidatePath("/calendar");
 
-    console.log("[Intake Webhook] Draft request created", {
-      id: inserted.id,
-      srn: parsed.srn,
-      warnings,
-    });
+    // HIPAA: the request id and the parser's fixed warning labels only. No SRN, names, dates or other parsed values.
+    console.log("[Intake Webhook] Draft request created", { id: inserted.id, warnings });
 
     return NextResponse.json(
       {
@@ -281,7 +274,8 @@ export async function POST(
       { status: 200 }
     );
   } catch (error) {
-    console.error("[Intake Webhook] Failed to process inbound email:", error);
+    // logError never prints bound query parameters (which would hold the whole email).
+    logError("Intake Webhook", error);
     return NextResponse.json({ success: false, error: "Internal server error." }, { status: 500 });
   }
 }

@@ -102,7 +102,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
         await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1);
       }
     } catch (e) {
-      console.error(e);
+      console.error("[hours-review page] operation failed");
     }
     setIsApproving(false);
 
@@ -138,7 +138,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     try {
       await requestHoursCorrection(record.appointmentId, correctionText, record.positionIndex || 1);
     } catch (e) {
-      console.error(e);
+      console.error("[hours-review page] operation failed");
     }
 
     const prevHistory = Array.isArray(record.history) ? record.history : [];
@@ -441,7 +441,7 @@ function HoursReviewContent() {
           try {
             localRecords = JSON.parse(stored);
           } catch (e) {
-            console.error('Failed to parse records', e);
+            console.error('Failed to parse records');
           }
         }
       }
@@ -456,7 +456,7 @@ function HoursReviewContent() {
           localStorage.setItem('terpdesk_service_records', JSON.stringify(withoutSignatures(merged)));
         }
       } catch (e) {
-        console.error("Failed to fetch live requests for hours review", e);
+        console.error("Failed to fetch live requests for hours review");
         setRecords(localRecords);
       }
     };

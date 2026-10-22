@@ -36,7 +36,7 @@ async function main() {
       .insert(users)
       .values({ email, passwordHash, name, role, accountStatus: 'approved' })
       .onConflictDoUpdate({ target: users.email, set: { passwordHash, name, role, accountStatus: 'approved', updatedAt: new Date() } });
-    console.log(`Saved ${role} account for ${email}.`);
+    console.log(`Saved ${role} account.`);
   } finally {
     await client.end();
   }

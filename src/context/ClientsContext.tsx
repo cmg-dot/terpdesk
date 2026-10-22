@@ -88,7 +88,7 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
       }));
       setClients(mapped);
     } catch (err) {
-      console.error("Failed to load clients from PostgreSQL:", err);
+      console.error("Failed to load clients from PostgreSQL:");
     } finally {
       setIsLoading(false);
     }

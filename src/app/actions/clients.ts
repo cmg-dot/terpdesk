@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { clients, requests, type ClientContact, type ClientLocation, type ClientData, type SelectClient } from "@/db/schema";
 import { eq, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { logError } from "@/lib/logError";
 
 let clientsTableEnsured = false;
 
@@ -26,7 +27,7 @@ export async function ensureClientsTable() {
     `);
     clientsTableEnsured = true;
   } catch (err) {
-    console.error("Failed to ensure clients table:", err);
+    logError("clients table", err);
   }
 }
 
@@ -123,7 +124,7 @@ export async function getClientsAction(): Promise<ClientWithStats[]> {
       };
     });
   } catch (err) {
-    console.error("Error in getClientsAction:", err);
+    logError("getClientsAction", err);
     return [];
   }
 }
@@ -166,7 +167,7 @@ export async function getClientByIdAction(id: string) {
       }))
     };
   } catch (err) {
-    console.error("Error in getClientByIdAction:", err);
+    logError("getClientByIdAction", err);
     return null;
   }
 }

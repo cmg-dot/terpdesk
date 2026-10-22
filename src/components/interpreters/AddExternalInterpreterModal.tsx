@@ -81,7 +81,7 @@ export function AddExternalInterpreterModal({
       onSuccess(createdInterpreter);
       onClose();
     } catch (err: any) {
-      console.error("Error submitting external interpreter:", err);
+      console.error("Error submitting external interpreter:");
       setErrorMessage(err?.message || "An unexpected error occurred. Please try again.");
       setIsSubmitting(false);
     }

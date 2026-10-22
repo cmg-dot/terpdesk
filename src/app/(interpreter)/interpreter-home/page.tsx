@@ -67,7 +67,7 @@ export default function InterpreterHomePage() {
           try {
             setServiceRecords(JSON.parse(stored));
           } catch (e) {
-            console.error(e);
+            console.error("[interpreter-home page] operation failed");
           }
         }
         const dismissed = localStorage.getItem('terpdesk_dismissed_expired_offers');
@@ -75,7 +75,7 @@ export default function InterpreterHomePage() {
           try {
             setDismissedExpiredOfferIds(JSON.parse(dismissed));
           } catch (e) {
-            console.error(e);
+            console.error("[interpreter-home page] operation failed");
           }
         }
       }
@@ -98,7 +98,7 @@ export default function InterpreterHomePage() {
         if (data.profile?.timeZone) {
           setProfileTimezone(data.profile.timeZone);
         }
-      }).catch(console.error);
+      }).catch(() => console.error("[interpreter-home page] request failed"));
     }
     window.addEventListener('storage', loadTz);
     return () => window.removeEventListener('storage', loadTz);
@@ -108,7 +108,7 @@ export default function InterpreterHomePage() {
     if (currentUser?.email) {
       fetchInterpreterOffers(currentUser.email).then(data => {
         setOffers(data);
-      }).catch(console.error);
+      }).catch(() => console.error("[interpreter-home page] request failed"));
     }
   }, [currentUser?.email]);
 
@@ -133,10 +133,10 @@ export default function InterpreterHomePage() {
         await acceptJobOffer(offer.id);
         setOffers(prev => prev.filter(o => o.id !== offer.id));
       } catch (err: any) {
-        console.error(err);
+        console.error("[interpreter-home page] operation failed");
         setAcceptError(err?.message || "This offer has expired and can no longer be accepted.");
         if (currentUser?.email) {
-          fetchInterpreterOffers(currentUser.email).then(data => setOffers(data)).catch(console.error);
+          fetchInterpreterOffers(currentUser.email).then(data => setOffers(data)).catch(() => console.error("[interpreter-home page] request failed"));
         }
       } finally {
         setActingOfferId(null);

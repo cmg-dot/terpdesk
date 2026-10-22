@@ -396,7 +396,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
             // Only this booking's own cached record (by offer id), never another interpreter's on the same job.
             local = findOwnServiceRecord(records, job) || null;
           } catch (e) {
-            console.error(e);
+            console.error("[jobs/[id] page] operation failed");
           }
         }
       }
@@ -1162,7 +1162,7 @@ export default function JobDetailPage() {
       try {
         await acceptJobOffer(job!.id);
       } catch (err: any) {
-        console.error(err);
+        console.error("[jobs/[id] page] operation failed");
         setActionError(err?.message || "This offer has expired because the scheduled appointment time has already ended.");
       } finally {
         setActingAction(null);
@@ -1177,7 +1177,7 @@ export default function JobDetailPage() {
       try {
         await declineOffer(id);
       } catch (err: any) {
-        console.error(err);
+        console.error("[jobs/[id] page] operation failed");
         setActionError(err?.message || "Failed to decline offer.");
       } finally {
         setActingAction(null);

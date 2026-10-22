@@ -17,12 +17,12 @@ async function main() {
       .returning();
 
     if (updated.length) {
-      console.log('Successfully updated interpreter email:', updated[0].email);
+      console.log('Successfully updated interpreter email.');
     } else {
       console.log('No interpreter found with email interpreter@example.com (may already be updated).');
     }
   } catch (error) {
-    console.error('Error reassigning interpreter:', error);
+    console.error('Error reassigning interpreter (code: ' + ((error as { code?: string } | null)?.code ?? 'unknown') + ').');
   } finally {
     await client.end();
   }

@@ -40,7 +40,7 @@ export default function CalendarPage() {
   }, []);
 
   useEffect(() => {
-    fetchLiveRequests().then(setRequests).catch(console.error);
+    fetchLiveRequests().then(setRequests).catch(() => console.error("[calendar page] request failed"));
   }, []);
 
   const year = currentDate.getFullYear();

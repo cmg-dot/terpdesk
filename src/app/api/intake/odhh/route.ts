@@ -2,6 +2,7 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { logActivity } from "@/lib/requestActivity";
+import { logError } from "@/lib/logError";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
@@ -237,7 +238,8 @@ export async function POST(req: Request): Promise<NextResponse> {
       { status: 200 }
     );
   } catch (err) {
-    console.error("[ODHH intake] Database insert failed:", err);
+    // logError never prints bound query parameters (which would hold the request data).
+    logError("ODHH intake", err);
     return NextResponse.json(
       { success: false, error: "Database insert failed." },
       { status: 500 }

@@ -16,7 +16,8 @@ interface ErrorScreenProps {
  */
 export function ErrorScreen({ error, reset, area }: ErrorScreenProps) {
   useEffect(() => {
-    console.error(`[${area}] page error:`, error);
+    // HIPAA: the error object is not printed (a message can quote data). The digest links it to the server log.
+    console.error(`[${area}] page error`, { name: error.name, digest: error.digest });
   }, [error, area]);
 
   return (

@@ -137,7 +137,7 @@ export default function EditRequestPage() {
          setIsLoading(false);
        })
        .catch(err => {
-         console.error(err);
+         console.error("[requests/[id]/edit page] operation failed");
          setIsLoading(false);
        });
    }
@@ -274,7 +274,7 @@ export default function EditRequestPage() {
           endTime
         }));
       } catch (e) {
-        console.error("Error prefilling dates in timezone:", e);
+        console.error("Error prefilling dates in timezone:");
       }
     }
   }, [existingRequest]);
@@ -304,7 +304,7 @@ export default function EditRequestPage() {
   useEffect(() => {
     getClientsAction().then(data => {
       setDbClients(data.filter(c => !c.isArchived));
-    }).catch(console.error);
+    }).catch(() => console.error("[requests/[id]/edit page] request failed"));
   }, []);
 
   const requesterOptions = React.useMemo(() => {
@@ -577,7 +577,7 @@ export default function EditRequestPage() {
           return;
         }
       } catch (e) {
-        console.error("Error adjusting timezone in edit:", e);
+        console.error("Error adjusting timezone in edit:");
       }
     }
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -786,13 +786,13 @@ export default function EditRequestPage() {
             localStorage.setItem('terpdesk_interpreter_jobs', JSON.stringify(storedJobs));
           }
         } catch (e) {
-          console.error(e);
+          console.error("[requests/[id]/edit page] operation failed");
         }
       }
 
       router.push(`/requests/${requestId}`);
     } catch (err) {
-      console.error("Failed to save request:", err);
+      console.error("Failed to save request:");
       setSaveError("We could not save your changes. Please try again.");
       setIsSaving(false);
     }

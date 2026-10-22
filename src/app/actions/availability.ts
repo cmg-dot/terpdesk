@@ -17,6 +17,7 @@ import { eq, and, sql, lt, gt, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { formatInTimeZone } from "date-fns-tz";
 import { getIanaZone, resolveRequestTimes, wallClockToUtcDate } from "@/utils/timezone";
+import { logError } from "@/lib/logError";
 
 let tablesEnsured = false;
 
@@ -180,10 +181,10 @@ async function runEnsureAvailabilityTables(): Promise<void> {
         }
       }
     } catch (seedErr) {
-      console.warn("Could not seed default availability rules:", seedErr);
+      logError("availability seed", seedErr);
     }
   } catch (err) {
-    console.error("Failed to ensure availability tables:", err);
+    logError("availability tables", err);
   }
 }
 
@@ -757,7 +758,7 @@ export async function td_conflict(params: {
 
     return { hasConflict: false };
   } catch (error) {
-    console.error("Interpreter conflict lookup failed", { interpreterId: params.interpreterId, error });
+    logError("availability conflict lookup", error);
     // Fail closed: do not expose a database error or label an uncertain
     // interpreter as available.
     return { hasConflict: true, reason: "job" };
@@ -934,7 +935,7 @@ export async function getInterpretersFitForJob(params: {
       });
       result[interpreterId] = fit;
     } catch (error) {
-      console.error("Interpreter availability lookup failed", { interpreterId, error });
+      logError("availability lookup", error);
       result[interpreterId] = "unavailable";
     }
   }

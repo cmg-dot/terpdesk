@@ -131,7 +131,7 @@ export default function ClientDetailsPage() {
  if (data?.linkedJobs) {
  setLinkedJobs(data.linkedJobs);
  }
- }).catch(console.error);
+ }).catch(() => console.error("[clients/[id] page] request failed"));
  }
  }, [id]);
 

@@ -43,7 +43,7 @@ export default async function InterpretersPage({ searchParams }: { searchParams:
       .from(interpreterProfiles);
     registeredProfileIds = profiles.map((p) => p.interpreterId);
   } catch (e) {
-    console.error("Error fetching interpreter profiles:", e);
+    console.error("Error fetching interpreter profiles:");
   }
 
   return (

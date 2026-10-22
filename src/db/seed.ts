@@ -16,9 +16,9 @@ async function main() {
       phone: '555-0101',
     }).returning();
     
-    console.log('Successfully seeded interpreter:', inserted);
+    console.log('Successfully seeded interpreter.');
   } catch (error) {
-    console.error('Error seeding data:', error);
+    console.error('Error seeding data (code: ' + ((error as { code?: string } | null)?.code ?? 'unknown') + ').');
   } finally {
     await client.end();
   }

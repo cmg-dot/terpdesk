@@ -67,7 +67,7 @@ export const checkInterpreterAvailability = (
     
     return true;
   } catch (e) {
-    console.error("Availability Check Error:", e);
+    console.error("Availability Check Error:");
     return true; // Fail open
   }
 };

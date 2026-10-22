@@ -149,7 +149,7 @@ function RequestsPageContent() {
   const filterParam = searchParams.get("filter");
 
   useEffect(() => {
-    fetchLiveRequests().then(data => setRequests(data)).catch(console.error);
+    fetchLiveRequests().then(data => setRequests(data)).catch(() => console.error("[requests page] request failed"));
   }, []);
 
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
@@ -181,7 +181,7 @@ function RequestsPageContent() {
       const storedJobs = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
       setInterpreterJobs(storedJobs);
     } catch (e) {
-      console.error(e);
+      console.error("[requests page] operation failed");
     }
   }, []);
 

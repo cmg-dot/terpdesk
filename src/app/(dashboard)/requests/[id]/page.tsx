@@ -267,7 +267,7 @@ export default function AssignmentDetailPage() {
   const [interpreterFitError, setInterpreterFitError] = useState<string | null>(null);
 
   useEffect(() => {
-    getInterpreters().then(setDbInterpreters).catch(console.error);
+    getInterpreters().then(setDbInterpreters).catch(() => console.error("[requests/[id] page] request failed"));
   }, []);
 
   // Real auto-book permission per interpreter (sharing on AND auto-book on), read from the database.
@@ -647,13 +647,13 @@ export default function AssignmentDetailPage() {
             localStorage.setItem('terpdesk_interpreter_jobs', JSON.stringify(storedJobs));
           }
         } catch (e) {
-          console.error(e);
+          console.error("[requests/[id] page] operation failed");
         }
       }
 
       setIsEditAccessOpen(false);
     } catch (err: any) {
-      console.error(err);
+      console.error("[requests/[id] page] operation failed");
       setSaveError(err.message || 'Failed to update details. Please try again.');
     } finally {
       setIsSavingAccess(false);
@@ -700,7 +700,7 @@ export default function AssignmentDetailPage() {
           });
           localStorage.setItem('terpdesk_interpreter_jobs', JSON.stringify(updatedJobs));
         } catch (e) {
-          console.error(e);
+          console.error("[requests/[id] page] operation failed");
         }
       }
 
@@ -711,7 +711,7 @@ export default function AssignmentDetailPage() {
       setFoundRequest(updated);
       router.refresh();
     } catch (err) {
-      console.error(err);
+      console.error("[requests/[id] page] operation failed");
       setRemoveBookingError(err instanceof Error ? err.message : 'Failed to remove the booking. Please try again.');
     } finally {
       setIsRemovingBooking(false);
@@ -728,7 +728,7 @@ export default function AssignmentDetailPage() {
         setFoundRequest(data);
         setIsLoading(false);
       }).catch(err => {
-        console.error(err);
+        console.error("[requests/[id] page] operation failed");
         setIsLoading(false);
       });
     }
@@ -774,7 +774,7 @@ export default function AssignmentDetailPage() {
         }
         if (isCurrent) setInterpreterFitMap(fits);
       } catch (error) {
-        console.error(error);
+        console.error("[requests/[id] page] operation failed");
         if (isCurrent) {
           setInterpreterFitMap({});
           setInterpreterFitError(getErrorMessage(error));
@@ -809,7 +809,7 @@ export default function AssignmentDetailPage() {
      setFoundRequest(updatedRequest);
      setShowCancelModal(false);
    } catch (err) {
-     console.error(err);
+     console.error("[requests/[id] page] operation failed");
    }
  };
 
@@ -832,7 +832,7 @@ export default function AssignmentDetailPage() {
       if (posIdx === 1) setAutoBookRecipient1('');
       if (posIdx === 2) setAutoBookRecipient2('');
     } catch (err) {
-      console.error(err);
+      console.error("[requests/[id] page] operation failed");
     }
 
     if (typeof window !== 'undefined') {
@@ -862,7 +862,7 @@ export default function AssignmentDetailPage() {
         
         localStorage.setItem('terpdesk_interpreter_jobs', JSON.stringify(storedJobs));
       } catch (e) {
-        console.error(e);
+        console.error("[requests/[id] page] operation failed");
       }
     }
     
@@ -945,7 +945,7 @@ export default function AssignmentDetailPage() {
       showToast('Offer emailed successfully');
       setRec('');
     } catch (error) {
-      console.error('[Offer Dispatch] Error creating or sending offer:', error);
+      console.error('[Offer Dispatch] Error creating or sending offer:');
       const errorMsg = error instanceof Error ? error.message : 'Failed to create offer. Please try again.';
       setErr(errorMsg);
     } finally {
@@ -1804,7 +1804,7 @@ export default function AssignmentDetailPage() {
                         const updatedRequest = await fetchLiveRequestById(id);
                         setFoundRequest(updatedRequest);
                       } catch (err) {
-                        console.error(err);
+                        console.error("[requests/[id] page] operation failed");
                       }
                     }}
                     className="bg-white border border-gray-300 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"

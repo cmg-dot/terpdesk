@@ -195,7 +195,7 @@ export default function ConnectedAvailability({
           );
         }
       } catch (err) {
-        console.error("Failed to load availability from PostgreSQL:", err);
+        console.error("Failed to load availability from PostgreSQL:");
       } finally {
         if (!isCancelled) setIsLoading(false);
       }
@@ -228,7 +228,7 @@ export default function ConnectedAvailability({
       };
       localStorage.setItem("terpdesk_availability", JSON.stringify(payload));
     } catch (e) {
-      console.error(e);
+      console.error("[connected/availability] operation failed");
     }
   }, [rules, exceptions, baseTimezone, isLoading]);
 
@@ -251,7 +251,7 @@ export default function ConnectedAvailability({
         setTimeout(() => setSaveSuccessMsg(null), 3500);
         onAvailabilityChanged?.();
       } catch (err) {
-        console.error(err);
+        console.error("[connected/availability] operation failed");
       }
     });
   };
@@ -379,7 +379,7 @@ export default function ConnectedAvailability({
         setTimeout(() => setSaveSuccessMsg(null), 3500);
         onAvailabilityChanged?.();
       } catch (err) {
-        console.error("Failed to save busy block:", err);
+        console.error("Failed to save busy block:");
       }
     });
   };
@@ -399,7 +399,7 @@ export default function ConnectedAvailability({
       setTimeout(() => setSaveSuccessMsg(null), 3500);
       onAvailabilityChanged?.();
     } catch (err) {
-      console.error(err);
+      console.error("[connected/availability] operation failed");
     } finally {
       setIsDeleting(false);
     }
@@ -470,7 +470,7 @@ export default function ConnectedAvailability({
                   });
                   onAvailabilityChanged?.();
                 } catch (err) {
-                  console.error("Failed to auto-save timezone:", err);
+                  console.error("Failed to auto-save timezone:");
                 }
               });
             }}

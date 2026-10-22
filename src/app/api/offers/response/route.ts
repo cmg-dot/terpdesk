@@ -9,6 +9,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { logError } from "@/lib/logError";
 import { isPositionTakenByOther, lockRequestForPosition } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
 import { escapeHtml } from "@/lib/emailTemplate";
@@ -580,7 +581,7 @@ async function processResponse(token: string | null, actionParam: string | undef
             hasScheduleConflict = true;
           }
         } catch (e) {
-          console.error("Conflict check evaluation error:", e);
+          logError("Offer Response conflict check", e);
         }
       }
 
@@ -906,7 +907,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       });
     }
   } catch (err) {
-    console.error("[Offer Response] Error processing offer response:", err);
+    logError("Offer Response", err);
     // The write already committed: the answer IS recorded, so don't tell the interpreter the link is expired.
     if (committed) {
       return renderHtmlCard({
@@ -956,7 +957,7 @@ export async function GET(request: NextRequest) {
       });
     }
   } catch (err) {
-    console.error("[Offer Response] could not read the offer state:", err);
+    logError("Offer Response state", err);
   }
   return expiredLinkCard();
 }

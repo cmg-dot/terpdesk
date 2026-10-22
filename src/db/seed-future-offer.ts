@@ -14,7 +14,7 @@ async function main() {
     const interpreterRows = await db.select().from(interpreters).where(eq(interpreters.email, 'dale.fictional@example.com')).limit(1);
     
     if (!interpreterRows.length) {
-      console.log('Could not find interpreter dale.fictional@example.com.');
+      console.log('Could not find the seed interpreter.');
       return;
     }
 
@@ -38,9 +38,9 @@ async function main() {
       expiresAt: new Date(futureDate.getTime() - 86400000), // expires 1 day before
     }).returning();
     
-    console.log('Successfully seeded future offer:', inserted);
+    console.log('Successfully seeded future offer.');
   } catch (error) {
-    console.error('Error seeding offer:', error);
+    console.error('Error seeding offer (code: ' + ((error as { code?: string } | null)?.code ?? 'unknown') + ').');
   } finally {
     await client.end();
   }

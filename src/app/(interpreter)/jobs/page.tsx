@@ -41,7 +41,7 @@ export default function InterpreterJobsPage() {
         try {
           setServiceRecords(JSON.parse(stored));
         } catch (e) {
-          console.error(e);
+          console.error("[jobs page] operation failed");
         }
       }
     }
@@ -84,7 +84,7 @@ export default function InterpreterJobsPage() {
     if (currentUser?.email) {
       fetchInterpreterOffers(currentUser.email).then(data => {
         setOffers(data);
-      }).catch(console.error);
+      }).catch(() => console.error("[jobs page] request failed"));
     }
     loadServiceRecords();
   };

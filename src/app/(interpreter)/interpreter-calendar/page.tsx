@@ -141,7 +141,7 @@ export default function InterpreterCalendarPage() {
         })));
       }
     } catch (error) {
-      console.error(error);
+      console.error("[interpreter-calendar page] operation failed");
     } finally {
       setIsTimezoneLoading(false);
     }

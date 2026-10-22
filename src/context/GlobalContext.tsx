@@ -90,7 +90,7 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
 
       setIsLoaded(true);
     } catch (e) {
-      console.error(e);
+      console.error("[context/GlobalContext] operation failed");
       setIsLoaded(true);
     }
   }, []);

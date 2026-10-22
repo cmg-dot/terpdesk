@@ -141,7 +141,7 @@ export default function NewRequestPage() {
   useEffect(() => {
     getClientsAction().then(data => {
       setDbClients(data.filter(c => !c.isArchived));
-    }).catch(console.error);
+    }).catch(() => console.error("[requests/new page] request failed"));
   }, []);
 
   const requesterOptions = React.useMemo(() => {
@@ -326,7 +326,7 @@ export default function NewRequestPage() {
  endTime: endLocal.time
  }));
  } catch (e) {
- console.error(e);
+ console.error("[requests/new page] operation failed");
  }
  }, []);
 
@@ -459,7 +459,7 @@ export default function NewRequestPage() {
  return;
  }
  } catch (e) {
- console.error(e);
+ console.error("[requests/new page] operation failed");
  }
  }
  
@@ -508,7 +508,7 @@ export default function NewRequestPage() {
    startsAtIso = times.startsAt;
    endsAtIso = times.endsAt;
  } catch (e) {
-   console.error("Timezone parsing error", e);
+   console.error("Timezone parsing error");
    const now = new Date();
    startsAtIso = now.toISOString();
    endsAtIso = new Date(now.getTime() + 3600000).toISOString();
@@ -580,7 +580,7 @@ export default function NewRequestPage() {
    }
    router.push(`/requests/${dbId}`);
  } catch (err) {
-   console.error("Error creating request:", err);
+   console.error("Error creating request:");
  }
  };
 
