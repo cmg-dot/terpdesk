@@ -140,6 +140,24 @@ const REQUESTOR_SECTION_HEADER = new RegExp(
 // without text inside it ("----------", "===== CONTRACTOR AND INTERPRETER ONLY =====").
 const SECTION_HEADER_PATTERN = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}[A-Z][A-Z0-9 \/&,'()-]{5,}:?[ \t]*$`);
 const RULE_LINE_PATTERN = /^[ \t]*[-=_*]{3,}/;
+
+// Artifacts of a forwarded (MIME) email. The email's own text ends at the first such line, so a section or note is
+// cut off there and none of it is saved.
+//  - a MIME boundary: "--000000000abc", "--_000_x", "--=_Part_1" (not a "-- " signature or a "-----" rule)
+//  - a MIME header: "Content-Type: ...", "Content-Transfer-Encoding: ...", any "Content-...:"
+//  - the quoted-printable "=" at the start of a line ("=", "=3D=3D...")
+const MIME_BOUNDARY_PATTERN = /^[ \t]*--[^\s-]/;
+const MIME_HEADER_PATTERN = /^[ \t]*Content-[A-Za-z-]+[ \t]*:/i;
+const QUOTED_PRINTABLE_LINE_PATTERN = /^[ \t]*=/;
+//  - the standard signature delimiter ("-- " alone on a line): everything after it is the sender's signature
+const SIGNATURE_DELIMITER_PATTERN = /^[ \t]*--[ \t]*$/;
+const isMimeArtifactLine = (line: string): boolean =>
+  MIME_BOUNDARY_PATTERN.test(line) ||
+  MIME_HEADER_PATTERN.test(line) ||
+  QUOTED_PRINTABLE_LINE_PATTERN.test(line) ||
+  SIGNATURE_DELIMITER_PATTERN.test(line);
+/** A quoted-printable soft line break leaves a trailing "=" on the line; it is removed from kept text. */
+const stripSoftLineBreak = (line: string): string => line.replace(/[ \t]*=[ \t]*$/, "");
 const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i;
 
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
@@ -213,11 +231,11 @@ function extractNote(text: string): string | null {
   const lines = text.split("\n");
   const start = lines.findIndex((line) => NOTE_START_PATTERN.test(line));
   if (start < 0) return null;
-  const parts = [(lines[start].match(NOTE_START_PATTERN)?.[1] ?? "").trim()];
+  const parts = [stripSoftLineBreak(lines[start].match(NOTE_START_PATTERN)?.[1] ?? "").trim()];
   for (let i = start + 1; i < lines.length; i += 1) {
     const line = lines[i];
-    if (line.trim() === "" || NEXT_LABEL_PATTERN.test(line) || RULE_LINE_PATTERN.test(line) || SECTION_HEADER_PATTERN.test(line)) break;
-    parts.push(line.trim());
+    if (line.trim() === "" || NEXT_LABEL_PATTERN.test(line) || RULE_LINE_PATTERN.test(line) || SECTION_HEADER_PATTERN.test(line) || isMimeArtifactLine(line)) break;
+    parts.push(stripSoftLineBreak(line).trim());
   }
   const note = parts.join("\n").replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").trim().slice(0, MAX_NOTE_LENGTH);
   return note && !EMPTY_VALUE.test(note) ? note : null;
@@ -231,8 +249,8 @@ function sectionLines(text: string, header: RegExp): string[] | null {
   const out: string[] = [];
   for (let i = start + 1; i < lines.length; i += 1) {
     const line = lines[i];
-    if (SECTION_HEADER_PATTERN.test(line) || RULE_LINE_PATTERN.test(line)) break;
-    const cleaned = line.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").replace(/[ \t]+/g, " ").trim();
+    if (SECTION_HEADER_PATTERN.test(line) || RULE_LINE_PATTERN.test(line) || isMimeArtifactLine(line)) break;
+    const cleaned = stripSoftLineBreak(line.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "")).replace(/[ \t]+/g, " ").trim();
     if (cleaned) out.push(cleaned.slice(0, MAX_FIELD_LENGTH));
   }
   return out;
