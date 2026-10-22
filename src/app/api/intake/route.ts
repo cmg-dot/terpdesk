@@ -6,7 +6,15 @@ import { logActivity } from "@/lib/requestActivity";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
-import { requests, type Program, type RequestData } from "@/db/schema";
+import { requests, type RequestData } from "@/db/schema";
+import {
+  FORMAT_LABELS,
+  ODHH_PROGRAM,
+  ODHH_TIME_ZONE_IANA,
+  ODHH_TIME_ZONE_LABEL,
+  parseIntakeEmail,
+  type AppointmentFormat,
+} from "@/lib/odhhEmailParser";
 
 /**
  * Webhook receiver for the AWS Lambda email forwarder.
@@ -32,6 +40,9 @@ interface WebhookSuccessResponse {
     format: AppointmentFormat | null;
     hasClientName: boolean;
     hasPurpose: boolean;
+    hasMeeting: boolean;
+    hasNote: boolean;
+    hasClientGender: boolean;
   };
   warnings: string[];
 }
@@ -76,212 +87,6 @@ function validatePayload(
       subject: record.subject as string,
       rawContent: record.rawContent as string,
     },
-  };
-}
-
-// ---------------------------------------------------------------------------
-// ODHH email parsing
-// ---------------------------------------------------------------------------
-
-// Must match the schema's Program union (frontend checks program === 'WA ODHH').
-const ODHH_PROGRAM: Program = "WA ODHH";
-// ODHH is a Washington State agency — appointment times are Pacific.
-const ODHH_TIME_ZONE_IANA = "America/Los_Angeles";
-const ODHH_TIME_ZONE_LABEL = "Pacific Time — Seattle, Los Angeles";
-const SRN_ALLOWED = /^[A-Za-z0-9-]{0,40}$/;
-const MAX_FIELD_LENGTH = 300;
-
-type AppointmentFormat = "in_person" | "virtual" | "hybrid";
-
-// Labels must match the frontend's modality options exactly.
-const FORMAT_LABELS: Record<AppointmentFormat, string> = {
-  in_person: "In person",
-  virtual: "Virtual",
-  hybrid: "Hybrid — in person and virtual",
-};
-
-interface ParsedIntakeEmail {
-  srn: string | null;
-  date: string | null; // as written, e.g. 12/15/2021
-  isoDate: string | null; // 2021-12-15
-  startTime: string | null; // as written, e.g. 8:00 AM
-  endTime: string | null;
-  start24: string | null; // 08:00
-  end24: string | null;
-  venue: string | null;
-  address: string | null;
-  format: AppointmentFormat | null;
-  formatInferred: boolean;
-  clientName: string | null;
-  purpose: string | null;
-}
-
-const TIME_FRAGMENT = String.raw`\d{1,2}(?::\d{2})?\s*[AaPp]\.?\s*[Mm]\.?`;
-
-const SRN_PATTERNS: readonly RegExp[] = [
-  /Service\s+Request\s*(?:#|No\.?|Number)\s*:?\s*#?\s*([A-Za-z0-9-]+)/i,
-  /\bSRN\s*[:#]?\s*#?\s*([A-Za-z0-9-]+)/i,
-];
-const DATE_PATTERN = /^[ \t]*(?:Appointment[ \t]+|Service[ \t]+)?Date[ \t]*:[ \t]*(\d{1,2}\/\d{1,2}\/\d{2,4})/im;
-const START_TIME_PATTERN = new RegExp(
-  String.raw`^[ \t]*(?:Appointment[ \t]+)?Start[ \t]+Time[ \t]*:[ \t]*(${TIME_FRAGMENT})`,
-  "im"
-);
-const END_TIME_PATTERN = new RegExp(
-  String.raw`^[ \t]*(?:Appointment[ \t]+)?End[ \t]+Time[ \t]*:[ \t]*(${TIME_FRAGMENT})`,
-  "im"
-);
-// Fallback for a single line such as "Time: 8:00 AM - 9:00 AM".
-const TIME_RANGE_PATTERN = new RegExp(
-  String.raw`^[ \t]*(?:Appointment[ \t]+)?Time[ \t]*:[ \t]*(${TIME_FRAGMENT})[ \t]*(?:-|–|—|to)[ \t]*(${TIME_FRAGMENT})`,
-  "im"
-);
-
-/** Builds a line-anchored "Label: value" matcher. Labels are trusted regex fragments. */
-function labelPattern(labels: readonly string[]): RegExp {
-  return new RegExp(String.raw`^[ \t]*(?:${labels.join("|")})[ \t]*:[ \t]*(.+?)[ \t]*$`, "im");
-}
-
-const VENUE_PATTERN = labelPattern(["Location", "Location[ \\t]+Name", "Venue", "Facility"]);
-const ADDRESS_PATTERN = labelPattern(["Address", "Location[ \\t]+Address", "Street[ \\t]+Address"]);
-const FORMAT_PATTERN = labelPattern([
-  "Format",
-  "Service[ \\t]+Format",
-  "Modality",
-  "Service[ \\t]+Type",
-  "Appointment[ \\t]+Type",
-  "Delivery[ \\t]+Method",
-]);
-const CLIENT_PATTERN = labelPattern([
-  "Patient[ \\t]+Name",
-  "Client[ \\t]+Name",
-  "Consumer[ \\t]+Name",
-  "Deaf[ \\t]+(?:Consumer|Client|Participant)",
-  "Patient",
-  "Client",
-  "Consumer",
-]);
-const PURPOSE_PATTERN = labelPattern([
-  "Purpose[ \\t]+of[ \\t]+(?:Appointment|Visit|Assignment)",
-  "Appointment[ \\t]+Purpose",
-  "Purpose",
-  "Reason[ \\t]+for[ \\t]+(?:Appointment|Visit)",
-]);
-
-/** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
-function normalizeEmailText(raw: string): string {
-  let text = raw.replace(/\r\n?/g, "\n");
-  if (/<[a-z][^>]*>/i.test(text)) {
-    text = text
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/(?:p|div|tr|li|h\d)>/gi, "\n")
-      .replace(/<[^>]+>/g, "")
-      .replace(/&nbsp;/gi, " ")
-      .replace(/&amp;/gi, "&")
-      .replace(/&lt;/gi, "<")
-      .replace(/&gt;/gi, ">")
-      .replace(/&quot;/gi, '"')
-      .replace(/&#39;/gi, "'");
-  }
-  return text;
-}
-
-function cleanValue(value: string | undefined): string | null {
-  if (!value) return null;
-  const cleaned = value.replace(/\s+/g, " ").trim().slice(0, MAX_FIELD_LENGTH);
-  return cleaned.length > 0 ? cleaned : null;
-}
-
-/** Enforces /^[A-Za-z0-9-]{0,40}$/. Anything else is discarded rather than stored. */
-function sanitizeSrn(candidate: string | undefined): string | null {
-  if (!candidate) return null;
-  const trimmed = candidate.trim().replace(/^#/, "");
-  if (trimmed.length === 0 || !SRN_ALLOWED.test(trimmed)) return null;
-  return trimmed;
-}
-
-function normalizeFormat(value: string | null): AppointmentFormat | null {
-  if (!value) return null;
-  const v = value.toLowerCase();
-  if (/hybrid/.test(v)) return "hybrid";
-  if (/virtual|remote|\bvri\b|video|zoom|teams|online|telehealth/.test(v)) return "virtual";
-  if (/in[\s-]?person|on[\s-]?site|face[\s-]to[\s-]face|physical/.test(v)) return "in_person";
-  return null;
-}
-
-/** "12/15/2021" | "12/15/21" -> "2021-12-15" */
-function toIsoDate(usDate: string): string | null {
-  const m = usDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
-  if (!m) return null;
-  const [, mm, dd, yy] = m;
-  const month = Number(mm);
-  const day = Number(dd);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
-  const year = yy.length === 2 ? `20${yy}` : yy;
-  return `${year}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
-}
-
-/** "8:00 AM" | "8 am" | "12:30 p.m." -> "08:00" | "08:00" | "12:30" */
-function to24HourTime(time12: string): string | null {
-  const m = time12.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s*[Mm]\.?$/);
-  if (!m) return null;
-  const [, hh, mi = "00", meridiem] = m;
-  let hours = Number(hh);
-  if (hours < 1 || hours > 12 || Number(mi) > 59) return null;
-  const isPm = meridiem.toUpperCase() === "P";
-  if (hours === 12) hours = isPm ? 12 : 0;
-  else if (isPm) hours += 12;
-  return `${String(hours).padStart(2, "0")}:${mi}`;
-}
-
-function parseIntakeEmail(rawContent: string, subject: string): ParsedIntakeEmail {
-  const text = normalizeEmailText(rawContent);
-
-  // SRN: body first, then subject line as a fallback.
-  let srn: string | null = null;
-  for (const source of [text, subject]) {
-    for (const pattern of SRN_PATTERNS) {
-      srn = sanitizeSrn(source.match(pattern)?.[1]);
-      if (srn) break;
-    }
-    if (srn) break;
-  }
-
-  const date = cleanValue(text.match(DATE_PATTERN)?.[1]);
-
-  let startTime = cleanValue(text.match(START_TIME_PATTERN)?.[1]);
-  let endTime = cleanValue(text.match(END_TIME_PATTERN)?.[1]);
-  if (!startTime) {
-    const range = text.match(TIME_RANGE_PATTERN);
-    startTime = cleanValue(range?.[1]);
-    endTime = endTime ?? cleanValue(range?.[2]);
-  }
-
-  const venue = cleanValue(text.match(VENUE_PATTERN)?.[1]);
-  const address = cleanValue(text.match(ADDRESS_PATTERN)?.[1]);
-
-  let format = normalizeFormat(cleanValue(text.match(FORMAT_PATTERN)?.[1]));
-  let formatInferred = false;
-  if (!format && address) {
-    // A physical street address with no stated format implies an on-site job.
-    format = "in_person";
-    formatInferred = true;
-  }
-
-  return {
-    srn,
-    date,
-    isoDate: date ? toIsoDate(date) : null,
-    startTime,
-    endTime,
-    start24: startTime ? to24HourTime(startTime) : null,
-    end24: endTime ? to24HourTime(endTime) : null,
-    venue,
-    address,
-    format,
-    formatInferred,
-    clientName: cleanValue(text.match(CLIENT_PATTERN)?.[1]),
-    purpose: cleanValue(text.match(PURPOSE_PATTERN)?.[1]),
   };
 }
 
@@ -346,6 +151,9 @@ export async function POST(
     else if (parsed.formatInferred) warnings.push("Format inferred as in_person from address");
     if (!parsed.clientName) warnings.push("Client name not found");
     if (!parsed.purpose) warnings.push("Purpose not found");
+    if ((parsed.format === "virtual" || parsed.format === "hybrid") && !parsed.platform && !parsed.meetingLink) {
+      warnings.push("Virtual meeting platform/link not found");
+    }
 
     // Build UTC timestamps from Pacific wall-clock time.
     let startsAt: Date | null = null;
@@ -383,7 +191,13 @@ export async function POST(
         ...(parsed.format ? { format: FORMAT_LABELS[parsed.format], formatCode: parsed.format } : {}),
         ...(parsed.clientName ? { deafParticipant: parsed.clientName } : {}),
         ...(parsed.purpose ? { purpose: parsed.purpose } : {}),
+        ...(parsed.platform ? { platform: parsed.platform } : {}),
+        ...(parsed.meetingLink ? { meetingLink: parsed.meetingLink, virtualLink: parsed.meetingLink } : {}),
+        // Staff-only: stored with the draft, never logged or put in an email.
+        ...(parsed.clientGender ? { clientGender: parsed.clientGender } : {}),
       },
+      // The ODHH "Appointment Note" lands in the agency's Preparation notes field, so staff review it before booking.
+      ...(parsed.appointmentNote ? { prepNotes: parsed.appointmentNote } : {}),
       onsite: {
         venue: parsed.venue ?? "",
         address: parsed.address ?? "",
@@ -447,6 +261,9 @@ export async function POST(
           format: parsed.format,
           hasClientName: parsed.clientName !== null,
           hasPurpose: parsed.purpose !== null,
+          hasMeeting: parsed.platform !== null || parsed.meetingLink !== null,
+          hasNote: parsed.appointmentNote !== null,
+          hasClientGender: parsed.clientGender !== null,
         },
         warnings,
       },
