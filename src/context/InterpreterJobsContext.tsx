@@ -12,7 +12,7 @@ export interface Job {
   requestStatus?: string;
   title: string;
   dateString: string;
-  status: 'pending' | 'booked' | 'declined' | 'released' | 'expired';
+  status: 'pending' | 'booked' | 'declined' | 'released' | 'expired' | 'cancelled';
   location: string;
   isVirtual: boolean;
   hasAutoFill?: boolean;
@@ -55,6 +55,9 @@ interface InterpreterJobsContextType {
 }
 
 const InterpreterJobsContext = createContext<InterpreterJobsContextType | undefined>(undefined);
+
+/** How often an open, visible page re-reads the interpreter's jobs. */
+const POLL_INTERVAL_MS = 60_000;
 
 export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -115,7 +118,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser?.email]);
 
-  // Hours can be submitted outside this tab (e.g. via the emailed secure link), so re-sync when the app regains focus.
+  // Hours can be submitted outside this tab (e.g. via the emailed secure link) and the agency can change or cancel a job,
+  // so re-sync when the app regains focus and once a minute while it is visible.
   const lastSyncRef = useRef(0);
   useEffect(() => {
     if (!currentUser?.email) return;
@@ -126,9 +130,12 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
     };
     window.addEventListener('focus', resync);
     document.addEventListener('visibilitychange', resync);
+    // Changes made by the agency while this page stays open (a cancellation, an edit) show up within a minute.
+    const poll = window.setInterval(resync, POLL_INTERVAL_MS);
     return () => {
       window.removeEventListener('focus', resync);
       document.removeEventListener('visibilitychange', resync);
+      window.clearInterval(poll);
     };
   }, [currentUser?.email]);
 

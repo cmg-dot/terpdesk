@@ -1240,6 +1240,21 @@ export default function JobDetailPage() {
     );
   }
 
+  if (job.status === 'cancelled') {
+    return (
+      <div className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased flex flex-col items-center justify-center pt-32">
+        <div role="status" className="bg-white rounded-2xl border border-gray-200 p-8 text-center max-w-md w-full">
+          <h2 className="text-xl font-semibold text-[var(--ink)] mb-4">Appointment Cancelled</h2>
+          <p className="text-[var(--sage)] mb-8">The agency cancelled this appointment. It has been removed from your upcoming jobs, and the job details are no longer available to you.</p>
+          <Link href="/interpreter-home" className="inline-flex items-center justify-center gap-2 text-[14px] font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-6 py-2.5 rounded-full transition-colors">
+            <ArrowLeft className="w-4 h-4" />
+            Back to dashboard
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   if (job.status === 'released') {
     return (
       <div className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased flex flex-col items-center justify-center pt-32">

@@ -144,7 +144,7 @@ export default function InterpreterHomePage() {
     });
   };
 
-  const visibleAppointments = jobs.filter((job) => job.status !== "declined" && job.status !== "released").length;
+  const visibleAppointments = jobs.filter((job) => job.status !== "declined" && job.status !== "released" && job.status !== "cancelled").length;
   const upcomingBookedJobs = jobs.filter((job) => job.status === "booked" && isAppointmentUpcoming(job, currentTime));
   const sortedUpcomingBookings = sortUpcomingWithHappeningNow(upcomingBookedJobs, currentTime);
   const upcomingBookings = sortedUpcomingBookings.length;

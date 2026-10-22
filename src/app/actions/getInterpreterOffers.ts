@@ -128,6 +128,13 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
         : (onsite.venue ? (onsite.address ? `${onsite.venue} · ${onsite.address}` : onsite.venue) : (onsite.address || "Location pending"))
     );
 
+    // A cancelled appointment closes its offers (see cancelRequest). This also covers older cancellations that left the
+    // offer 'accepted', so a cancelled job is never shown to the interpreter as Booked or Happening now.
+    const requestCancelled = Boolean(row.request.canceledAt) || /^cancel+ed$/i.test(row.request.status);
+    const effectiveOfferStatus =
+      requestCancelled && row.offer.status === 'accepted' ? 'cancelled'
+      : requestCancelled && row.offer.status === 'pending' ? 'withdrawn'
+      : row.offer.status;
     const isTeamJob = isTeamRequestData(rowData);
     const knownPosition = rowData.offerPositions?.[row.offer.id];
     const posIdx = (knownPosition || 1) as 1 | 2;
@@ -166,7 +173,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       title: row.request.title,
       startsAt,
       endsAt,
-      status: row.offer.status,
+      status: effectiveOfferStatus,
       expiredAt: row.offer.status === 'expired' ? (row.offer.updatedAt ? row.offer.updatedAt.toISOString() : endsAt) : null,
       requestStatus: row.request.status,
       // Team jobs: request-wide status/travel describe both positions, so the UI must not use them for this

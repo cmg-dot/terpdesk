@@ -99,7 +99,8 @@ export default function InterpreterJobsPage() {
   const upcomingBooked = jobs.filter(job => job.status === 'booked' && isAppointmentUpcoming(job, currentTime));
   const upcomingOffers = offers.filter(o => o.status === 'pending');
   const upcomingJobs = sortUpcomingWithHappeningNow([...upcomingOffers, ...upcomingBooked], currentTime);
-  const declinedReleasedJobs = jobs.filter(job => job.status === 'declined' || job.status === 'released');
+  // Closed assignments: declined, given back, or cancelled by the agency.
+  const declinedReleasedJobs = jobs.filter(job => job.status === 'declined' || job.status === 'released' || job.status === 'cancelled');
   
   const upcomingCount = upcomingJobs.length;
   
@@ -462,7 +463,7 @@ export default function InterpreterJobsPage() {
           <div>
             
             {declinedReleasedJobs.length === 0 ? (
-               <p className="text-sm text-[var(--sage)]">No released or declined assignments.</p>
+               <p className="text-sm text-[var(--sage)]">No released, declined or cancelled assignments.</p>
             ) : (
                <AnimatedPaginatedList
                  items={declinedReleasedJobs}
@@ -481,7 +482,7 @@ export default function InterpreterJobsPage() {
                      })()} · {job.location}
                    </p>
                    <p className="text-[14px] text-gray-800 mb-2">
-                     {job.status === 'declined' ? 'You declined this offer.' : 'You gave this assignment back.'}
+                     {job.status === 'declined' ? 'You declined this offer.' : job.status === 'cancelled' ? 'The agency cancelled this appointment.' : 'You gave this assignment back.'}
                    </p>
                    <p className="text-xs text-gray-400">Job details and prep materials are no longer available to you.</p>
                  </div>

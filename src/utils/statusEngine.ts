@@ -13,7 +13,7 @@ export interface Offer {
   interpreterId: string;
   state: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired';
   /** Offers loaded straight from the database carry `status` (same values as `state`); older UI data uses `state`. */
-  status?: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired' | 'declined' | 'returned';
+  status?: 'pending' | 'accepted' | 'rejected' | 'withdrawn' | 'expired' | 'declined' | 'returned' | 'cancelled';
   expiresAt: number | string;
 }
 
