@@ -166,7 +166,9 @@ export async function POST(
 
     const locationLabel = parsed.venue ?? parsed.address ?? "TBD";
     const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
-    const prepNotes = [parsed.appointmentNote, parsed.clientInfoBlock].filter((part): part is string => Boolean(part)).join("\n\n").slice(0, MAX_PREP_NOTES_LENGTH);
+    // A "Comment:" line inside the client/employee section is already in that block, so it isn't repeated as the note.
+    const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
+    const prepNotes = [noteAlreadyInBlock ? null : parsed.appointmentNote, parsed.clientInfoBlock].filter((part): part is string => Boolean(part)).join("\n\n").slice(0, MAX_PREP_NOTES_LENGTH);
     const title = parsed.srn
       ? `ODHH SRN #${parsed.srn}${parsed.venue ? ` — ${parsed.venue}` : ""}`
       : subject.trim().slice(0, 200) || `Inbound email from ${email}`;

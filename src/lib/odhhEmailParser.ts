@@ -129,10 +129,17 @@ const REQUESTOR_PHONE_PATTERN = labelPattern([
   "Requester[ \t]+(?:Phone|Telephone)(?:[ \t]+(?:Number|No\.?))?",
 ]);
 const REQUESTOR_EMAIL_PATTERN = labelPattern(["Requestor[ \t]+E-?mail(?:[ \t]+Address)?", "Requester[ \t]+E-?mail(?:[ \t]+Address)?"]);
-const CLIENT_BLOCK_HEADER = /^[ \t]*CLIENT[ \t]*\/[ \t]*EMPLOYEE[ \t]+INFORMATION[ \t]*:?[ \t]*$/im;
-// A section heading is a line of capitals only ("APPOINTMENT INFORMATION"); a rule line ("-----") also ends a section.
-const SECTION_HEADER_PATTERN = /^[ \t]*[A-Z][A-Z0-9 \/&,'()-]{5,}:?[ \t]*$/;
-const RULE_LINE_PATTERN = /^[ \t]*[-=_*]{3,}[ \t]*$/;
+// Section headings may be numbered ("5. CLIENT/EMPLOYEE INFORMATION", "5) ...").
+const SECTION_NUMBER = String.raw`(?:\d{1,2}[.)][ \t]*)?`;
+const CLIENT_BLOCK_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}CLIENT[ \t]*\/[ \t]*EMPLOYEE[ \t]+INFORMATION[ \t]*:?[ \t]*$`, "im");
+const REQUESTOR_SECTION_HEADER = new RegExp(
+  String.raw`^[ \t]*${SECTION_NUMBER}REQUES?TOR(?:[ \t]+(?:INFORMATION|INFO|DETAILS))?[ \t]*:?[ \t]*$`,
+  "im",
+);
+// A section heading is a line of capitals only ("5. APPOINTMENT INFORMATION"). A rule line ends a section too, with or
+// without text inside it ("----------", "===== CONTRACTOR AND INTERPRETER ONLY =====").
+const SECTION_HEADER_PATTERN = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}[A-Z][A-Z0-9 \/&,'()-]{5,}:?[ \t]*$`);
+const RULE_LINE_PATTERN = /^[ \t]*[-=_*]{3,}/;
 const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i;
 
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
@@ -209,7 +216,7 @@ function extractNote(text: string): string | null {
   const parts = [(lines[start].match(NOTE_START_PATTERN)?.[1] ?? "").trim()];
   for (let i = start + 1; i < lines.length; i += 1) {
     const line = lines[i];
-    if (line.trim() === "" || NEXT_LABEL_PATTERN.test(line)) break;
+    if (line.trim() === "" || NEXT_LABEL_PATTERN.test(line) || RULE_LINE_PATTERN.test(line) || SECTION_HEADER_PATTERN.test(line)) break;
     parts.push(line.trim());
   }
   const note = parts.join("\n").replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").trim().slice(0, MAX_NOTE_LENGTH);
@@ -263,7 +270,7 @@ function extractRequestor(text: string): { name: string | null; phone: string | 
   let phone = parsePhoneNumber(pick(text.match(REQUESTOR_PHONE_PATTERN)?.[1]));
   let email = parseEmailAddress(pick(text.match(REQUESTOR_EMAIL_PATTERN)?.[1]));
   if (!name || !phone || !email) {
-    const section = sectionLines(text, /^[ \t]*REQUES?TOR(?:[ \t]+(?:INFORMATION|INFO|DETAILS))?[ \t]*:?[ \t]*$/im) ?? [];
+    const section = sectionLines(text, REQUESTOR_SECTION_HEADER) ?? [];
     const field = (label: RegExp): string | null => {
       const line = section.find((l) => label.test(l));
       return line ? pick(line.replace(label, "")) : null;
