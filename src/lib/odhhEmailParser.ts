@@ -55,9 +55,9 @@ export interface ParsedIntakeEmail {
   clientInfoBlock: string | null;
 }
 
-const TIME_FRAGMENT = String.raw`\d{1,2}(?::\d{2})?\s*[AaPp]\.?\s*[Mm]\.?`;
+export const TIME_FRAGMENT = String.raw`\d{1,2}(?::\d{2})?\s*[AaPp]\.?\s*[Mm]\.?`;
 
-const SRN_PATTERNS: readonly RegExp[] = [
+export const SRN_PATTERNS: readonly RegExp[] = [
   /Service\s+Request\s*(?:#|No\.?|Number)\s*:?\s*#?\s*([A-Za-z0-9-]+)/i,
   /\bSRN\s*[:#]?\s*#?\s*([A-Za-z0-9-]+)/i,
 ];
@@ -77,7 +77,7 @@ const TIME_RANGE_PATTERN = new RegExp(
 );
 
 /** Builds a line-anchored "Label: value" matcher. Labels are trusted regex fragments. */
-function labelPattern(labels: readonly string[]): RegExp {
+export function labelPattern(labels: readonly string[]): RegExp {
   return new RegExp(String.raw`^[ \t]*(?:${labels.join("|")})[ \t]*:[ \t]*(.+?)[ \t]*$`, "im");
 }
 
@@ -158,10 +158,10 @@ const isMimeArtifactLine = (line: string): boolean =>
   SIGNATURE_DELIMITER_PATTERN.test(line);
 /** A quoted-printable soft line break leaves a trailing "=" on the line; it is removed from kept text. */
 const stripSoftLineBreak = (line: string): string => line.replace(/[ \t]*=[ \t]*$/, "");
-const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i;
+export const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i;
 
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
-function normalizeEmailText(raw: string): string {
+export function normalizeEmailText(raw: string): string {
   let text = raw.replace(/\r\n?/g, "\n");
   if (/<[a-z][^>]*>/i.test(text)) {
     text = text
@@ -178,14 +178,14 @@ function normalizeEmailText(raw: string): string {
   return text;
 }
 
-function cleanValue(value: string | undefined): string | null {
+export function cleanValue(value: string | undefined): string | null {
   if (!value) return null;
   const cleaned = value.replace(/\s+/g, " ").trim().slice(0, MAX_FIELD_LENGTH);
   return cleaned.length > 0 ? cleaned : null;
 }
 
 /** Enforces /^[A-Za-z0-9-]{0,40}$/. Anything else is discarded rather than stored. */
-function sanitizeSrn(candidate: string | undefined): string | null {
+export function sanitizeSrn(candidate: string | undefined): string | null {
   if (!candidate) return null;
   const trimmed = candidate.trim().replace(/^#/, "");
   if (trimmed.length === 0 || !SRN_ALLOWED.test(trimmed)) return null;
@@ -202,7 +202,7 @@ function normalizeFormat(value: string | null): AppointmentFormat | null {
 }
 
 /** "12/15/2021" | "12/15/21" -> "2021-12-15" */
-function toIsoDate(usDate: string): string | null {
+export function toIsoDate(usDate: string): string | null {
   const m = usDate.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
   if (!m) return null;
   const [, mm, dd, yy] = m;
@@ -214,7 +214,7 @@ function toIsoDate(usDate: string): string | null {
 }
 
 /** "8:00 AM" | "8 am" | "12:30 p.m." -> "08:00" | "08:00" | "12:30" */
-function to24HourTime(time12: string): string | null {
+export function to24HourTime(time12: string): string | null {
   const m = time12.trim().match(/^(\d{1,2})(?::(\d{2}))?\s*([AaPp])\.?\s*[Mm]\.?$/);
   if (!m) return null;
   const [, hh, mi = "00", meridiem] = m;

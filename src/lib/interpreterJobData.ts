@@ -26,6 +26,7 @@ const STAFF_ONLY_KEYS = [
   "position2InterpreterId",
   "position2InterpreterName",
   "detailsUpdate",
+  "serviceVerification", // the state's receipt (times, miles, fees)
 ] as const;
 
 /** `intake` keys that staff must never share (the ODHH access code is "never shown to interpreters"). */

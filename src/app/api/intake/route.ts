@@ -4,6 +4,9 @@ import { NextResponse } from "next/server";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
+import { respondToServiceVerification } from "@/lib/serviceVerification";
+import type { TimesheetIntakeResponse } from "@/lib/serviceVerification";
+import { resolveIntakeType } from "@/lib/odhhVerificationParser";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
@@ -22,13 +25,17 @@ const MAX_PREP_NOTES_LENGTH = 1000;
 
 /**
  * Webhook receiver for the AWS Lambda email forwarder.
- * Lambda POSTs each inbound domain email as JSON: { email, subject, rawContent }.
+ * Lambda POSTs each inbound domain email as JSON: { email, subject, rawContent, type?, verification? }.
+ *  - type "job_offer" (default): parsed into a new draft request.
+ *  - type "timesheet": an ODHH SERVICE VERIFICATION. It updates the existing request with the same SRN and never
+ *    creates a draft (see lib/serviceVerification.ts). When `type` is missing it is inferred from the email text.
  */
 interface InboundEmailPayload {
   email: string;
   subject: string;
   rawContent: string;
 }
+
 
 interface WebhookSuccessResponse {
   success: true;
@@ -57,6 +64,8 @@ interface WebhookErrorResponse {
   success: false;
   error: string;
   invalidFields?: (keyof InboundEmailPayload)[];
+  /** Service verification: the required fields that could not be read. */
+  missingFields?: string[];
 }
 
 const REQUIRED_FIELDS: readonly (keyof InboundEmailPayload)[] = ["email", "subject", "rawContent"];
@@ -87,7 +96,7 @@ function validatePayload(
 
 export async function POST(
   req: Request
-): Promise<NextResponse<WebhookSuccessResponse | WebhookErrorResponse>> {
+): Promise<NextResponse<WebhookSuccessResponse | TimesheetIntakeResponse | WebhookErrorResponse>> {
   try {
     const denied = rejectUnlessIntakeAuthorized(req, "Intake Webhook");
     if (denied) return denied;
@@ -113,6 +122,14 @@ export async function POST(
     }
 
     const { email, subject, rawContent } = validation.data;
+
+    const declaredType = (body as Record<string, unknown>).type;
+    if (declaredType !== undefined && declaredType !== "job_offer" && declaredType !== "timesheet") {
+      return NextResponse.json({ success: false, error: 'type must be "job_offer" or "timesheet".' }, { status: 400 });
+    }
+    const intakeType = resolveIntakeType(declaredType, rawContent);
+
+    if (intakeType === "timesheet") return respondToServiceVerification(rawContent, (body as Record<string, unknown>).verification);
 
     // HIPAA: log only that an email arrived and its size. The sender, subject and body can hold PHI, so none are logged.
     console.log("[Intake Webhook] Inbound email received", { contentLength: rawContent.length });

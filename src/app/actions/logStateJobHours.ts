@@ -1,15 +1,14 @@
 "use server";
 
-import { randomBytes } from "crypto";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { offers, requests, timesheets } from "@/db/schema";
+import { offers, requests } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { NOT_ALLOWED_MESSAGE, requireRole } from "@/lib/auth/guards";
 import { isStateJobRequest } from "@/lib/stateJob";
-import { hashToken } from "@/lib/timesheetToken";
+import { recordStateJobHours } from "@/lib/stateJobHours";
 import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezone";
 
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
@@ -74,41 +73,15 @@ export async function logStateJobHours(input: LogStateJobHoursInput): Promise<Lo
     if (!(elapsedHours > 0)) return fail("End time must be after start time.");
     if (serviceHours > elapsedHours + 1 / 60) return fail("Service hours cannot be longer than the time between start and end.");
 
-    const now = new Date();
-    const created = await db.transaction(async (tx) => {
-      const [existing] = await tx
-        .select({ id: timesheets.id })
-        .from(timesheets)
-        .where(and(eq(timesheets.requestId, requestId), eq(timesheets.interpreterId, interpreterId)))
-        .limit(1);
-      if (existing) return null;
-
-      // The token columns are required, but no link exists for this row: the hash is of a value nobody
-      // holds and it is already expired, so it can never be used.
-      const [row] = await tx
-        .insert(timesheets)
-        .values({
-          requestId,
-          interpreterId,
-          tokenHash: hashToken(randomBytes(32).toString("hex")),
-          tokenExpiresAt: now,
-          actualStartTime: start,
-          actualEndTime: end,
-          billableHours: serviceHours.toFixed(2),
-          // Miles come from the verified state receipt, so they are both reported and approved.
-          mileage: totalMiles.toFixed(1),
-          approvedMileage: totalMiles.toFixed(1),
-          travelLegs: [],
-          // timesheets has no fees column, so extra fees are recorded in the note.
-          serviceNote: otherFees > 0 ? `Logged by agency from state receipt. Additional fees: $${otherFees.toFixed(2)}` : "Logged by agency from state receipt.",
-          status: "approved",
-          submittedAt: now,
-        })
-        .returning({ id: timesheets.id });
-
-      // Same closing step the normal approval performs, so the job moves straight to done.
-      await tx.update(requests).set({ status: "completed", updatedAt: now }).where(eq(requests.id, requestId));
-      return row;
+    const created = await recordStateJobHours({
+      requestId,
+      interpreterId,
+      start,
+      end,
+      serviceHours,
+      totalMiles,
+      // timesheets has no fees column, so extra fees are recorded in the note.
+      note: otherFees > 0 ? `Logged by agency from state receipt. Additional fees: $${otherFees.toFixed(2)}` : "Logged by agency from state receipt.",
     });
     if (!created) return fail("A timesheet already exists for this interpreter on this job.");
 
