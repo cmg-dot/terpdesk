@@ -73,7 +73,7 @@ export default function SettingsPage() {
  <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 border border-gray-200">
  <h2 className="text-lg font-semibold text-[var(--ink)]">Notifications</h2>
  <p className="text-[14px] text-gray-600 mb-6 mt-1">
- Choose how terpDESK tells you about each kind of activity. In-app notices appear in your workspace. Email is optional and off until you turn it on. terpDESK does not send text messages or phone alerts.
+ How terpDESK tells you about activity. In-app notices appear in your workspace. Booking and timesheet events (offers accepted, declined or given back, and hours submitted) are always emailed to agency staff as well. terpDESK does not send text messages or phone alerts.
  </p>
 
  <div className="space-y-0">
@@ -98,7 +98,7 @@ export default function SettingsPage() {
  </div>
 
  <p className="text-[12px] text-gray-400 mt-6 leading-relaxed">
- Emails keep details out of the message itself; they tell you something happened and ask you to sign in. Account invitations, password recovery and security emails are separate from these choices and are always sent. terpDESK reports an email as sent once it is handed to the mail service; that is not a guarantee it reached your inbox.
+ Emails carry only the booking reference, date, time, format and generic setting; the SRN, location and notes stay in terpDESK, so sign in for those. Account invitations, password recovery and security emails are always sent. terpDESK reports an email as sent once it is handed to the mail service; that is not a guarantee it reached your inbox.
  </p>
  </div>
 

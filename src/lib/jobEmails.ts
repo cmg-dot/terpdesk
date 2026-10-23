@@ -19,7 +19,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
  * SERVER ONLY.
  */
 
-const summaryRows = (s: JobSummary) => [
+export const summaryRows = (s: JobSummary) => [
   { label: "Reference", value: s.reference },
   { label: "Assignment", value: s.title },
   { label: "Date", value: s.dateLabel },
@@ -30,7 +30,7 @@ const summaryRows = (s: JobSummary) => [
   { label: "Program", value: s.program },
 ];
 
-const summaryText = (s: JobSummary) => summaryRows(s).map((r) => `${r.label}: ${r.value}`).join("\n");
+export const summaryText = (s: JobSummary) => summaryRows(s).map((r) => `${r.label}: ${r.value}`).join("\n");
 
 /** The offer email: restricted details plus Accept / Decline links. */
 export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string): { subject: string; html: string; text: string } {

@@ -9,9 +9,8 @@ import { isPositionTakenByOther, lockRequestForPosition, positionOfOffer } from 
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
-import { getInterpreterDisplayName } from "@/lib/displayName";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
-import { notifyAgencyAdmins } from "@/lib/notifications";
+import { alertAgency } from "@/lib/lifecycleAlerts";
 import { logActivity } from "@/lib/requestActivity";
 
 type OfferRecord = typeof offers.$inferSelect;
@@ -222,12 +221,12 @@ export async function respondToOffer(
   }
   const { offer: updatedOffer, posIdx } = outcome;
 
-  const who_name = (await getInterpreterDisplayName(offer.interpreterId)) ?? "An interpreter";
-  await notifyAgencyAdmins({
-    type: "job",
-    href: `/requests/${offer.requestId}`,
-    title: normResponse === 'accepted' ? "Offer accepted" : "Offer declined",
-    message: `${who_name} ${normResponse === 'accepted' ? "accepted the job" : "declined the offer"}.`,
+  // Agency: in-app notification + email, with the job's reference, date and location.
+  await alertAgency({
+    event: normResponse === 'accepted' ? 'offer_accepted' : 'offer_declined',
+    requestId: offer.requestId,
+    interpreterId: offer.interpreterId,
+    positionNumber: posIdx,
   });
   await logActivity({
     requestId: offer.requestId,

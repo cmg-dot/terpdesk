@@ -9,6 +9,7 @@ import { z } from "zod";
 import { logActivity } from "@/lib/requestActivity";
 import { notifyInterpreter } from "@/lib/notifications";
 import { lockRequestForPosition } from "@/lib/positionClaim";
+import { alertInterpreter } from "@/lib/lifecycleAlerts";
 
 const cancelSchema = z.object({
   id: z.string().uuid(),
@@ -84,20 +85,23 @@ export async function cancelRequest(id: string, reason?: string, clientRequested
     });
   }
 
-  // Tell each affected interpreter once. No job details in the text: only that an appointment was cancelled.
+  // Tell each affected interpreter once. Booked interpreters: in-app + email with the reference, date and location.
+  // Interpreters who only had an open offer: an in-app notice that it was withdrawn.
   const notified = new Set<string>();
   for (const offer of live) {
     if (notified.has(offer.interpreterId)) continue;
     notified.add(offer.interpreterId);
-    const booked = live.some((o) => o.interpreterId === offer.interpreterId && o.status === "accepted");
-    await notifyInterpreter(offer.interpreterId, {
-      type: "job",
-      href: booked ? `/jobs/${offer.id}` : "/jobs",
-      title: booked ? "Appointment cancelled" : "Offer withdrawn",
-      message: booked
-        ? "The agency cancelled an appointment you were booked on. It has been removed from your upcoming jobs."
-        : "An offer you received was withdrawn because the appointment was cancelled.",
-    });
+    const booking = live.find((o) => o.interpreterId === offer.interpreterId && o.status === "accepted");
+    if (booking) {
+      await alertInterpreter({ event: "booking_cancelled", requestId: parsed.id, interpreterId: offer.interpreterId, offerId: booking.id });
+    } else {
+      await notifyInterpreter(offer.interpreterId, {
+        type: "job",
+        href: "/jobs",
+        title: "Offer withdrawn",
+        message: "An offer you received was withdrawn because the appointment was cancelled.",
+      });
+    }
   }
 
   // Agency side.

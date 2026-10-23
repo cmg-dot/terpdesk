@@ -167,7 +167,7 @@ export default function AgenciesPage() {
             </ul>
 
             <p className="text-[14px] text-[var(--sage)] max-w-4xl leading-relaxed mt-2">
-              Qualifications, travel time and rates are <span className="font-semibold">not</span> checked. Bookings and other activity do create notices for you; they always appear in your notifications here, and an email is sent only for the categories you have switched on yourself under Settings → Notifications, where email is off by default.
+              Qualifications, travel time and rates are <span className="font-semibold">not</span> checked. Bookings and other activity do create notices for you; they always appear in your notifications here. Booking emails (offers, confirmations, changes, cancellations and hours corrections) are always sent too, without location or client details.
             </p>
           </div>
 

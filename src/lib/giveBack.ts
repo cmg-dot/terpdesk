@@ -2,11 +2,9 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
-import { getInterpreterDisplayName } from "@/lib/displayName";
-import { notifyAgencyAdmins } from "@/lib/notifications";
+import { alertAgency } from "@/lib/lifecycleAlerts";
 import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
-import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
 
 /**
@@ -99,13 +97,8 @@ export async function giveBackBooking(params: {
 
   if (!outcome.ok) return { success: false, error: outcome.error };
 
-  const name = (await getInterpreterDisplayName(params.interpreterId).catch(() => null)) || "An interpreter";
-  await notifyAgencyAdmins({
-    type: "job",
-    href: `/requests/${outcome.requestId}`,
-    title: "Assignment given back",
-    message: `${name} gave back Position ${outcome.position} of booking ${formatReference(outcome.requestId)}. It needs a replacement.`,
-  });
+  // Agency: in-app notification + email (the reason stays in the staff-only log below, never in an alert).
+  await alertAgency({ event: "assignment_given_back", requestId: outcome.requestId, interpreterId: params.interpreterId, positionNumber: outcome.position });
   // The reason can be personal, so it stays in the staff-only log (never in a notification or email).
   await logActivity({
     requestId: outcome.requestId,

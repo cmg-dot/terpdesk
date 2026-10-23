@@ -13,6 +13,7 @@ import { isStateJobRequest } from "@/lib/stateJob";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
 import type { TravelLeg } from "@/lib/timesheetSchemas";
+import { alertAgency } from "@/lib/lifecycleAlerts";
 
 const signatureSchema = z
   .string()
@@ -197,6 +198,8 @@ export async function submitInterpreterHours(
   });
 
   await logActivity({ requestId, interpreterId: sessionInterpreterId, audience: "shared", kind: "hours_submitted", message: (extra?.version ?? 1) > 1 ? "Corrected hours submitted (in app)" : "Hours submitted (in app)", actorLabel: "Interpreter" });
+  // Agency: in-app notification + email that hours are waiting for review.
+  await alertAgency({ event: "timesheet_submitted", requestId, interpreterId: sessionInterpreterId, href: "/hours-review" });
 
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");

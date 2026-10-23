@@ -7,6 +7,7 @@ import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/requestActivity";
 import { legacyPosition1Hours } from "@/utils/hoursState";
+import { alertInterpreter } from "@/lib/lifecycleAlerts";
 
 export async function approveHours(
   requestId: string,
@@ -106,7 +107,7 @@ export async function requestHoursCorrection(
   positionIndex: 1 | 2 = 1
 ): Promise<{ success: boolean }> {
   await requireRole("agency");
-  await db.transaction(async (tx) => {
+  const reportedBy = await db.transaction(async (tx) => {
     const [existing] = await tx
       .select({ data: requests.data })
       .from(requests)
@@ -159,7 +160,32 @@ export async function requestHoursCorrection(
         updatedAt: new Date(),
       })
       .where(eq(requests.id, requestId));
+    // Who reported these hours, and which offer is theirs (for the alert's link).
+    return {
+      interpreterId: typeof existingHours.interpreterId === "string" ? (existingHours.interpreterId as string) : null,
+      offerPositions: (existingData.offerPositions || {}) as Record<string, number>,
+    };
   });
+
+  // Interpreter: in-app notification + email (the agency's note itself stays in the app).
+  const correctionPosition = positionIndex || 1;
+  const accepted = await db
+    .select({ id: offers.id, interpreterId: offers.interpreterId })
+    .from(offers)
+    .where(and(eq(offers.requestId, requestId), eq(offers.status, "accepted")));
+  const booking =
+    accepted.find((o) => o.interpreterId === reportedBy.interpreterId) ??
+    accepted.find((o) => (reportedBy.offerPositions[o.id] === 2 ? 2 : 1) === correctionPosition);
+  const correctionInterpreterId = reportedBy.interpreterId ?? booking?.interpreterId ?? null;
+  if (correctionInterpreterId) {
+    await alertInterpreter({
+      event: "timesheet_correction_requested",
+      requestId,
+      interpreterId: correctionInterpreterId,
+      positionNumber: correctionPosition,
+      offerId: booking?.id,
+    });
+  }
 
   await logActivity({ requestId, kind: "hours_correction_requested", message: `Hours correction requested (Position ${positionIndex || 1})`, actorLabel: "Agency staff" });
   revalidatePath("/jobs");

@@ -11,6 +11,7 @@ import { wallClockToUtc } from "@/utils/timezone";
 import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
 import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
 import { logActivity } from "@/lib/requestActivity";
+import { alertAgency } from "@/lib/lifecycleAlerts";
 
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -144,6 +145,8 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
 
   if (!submitted) return { success: false, error: INVALID_LINK };
   await logActivity({ requestId: submitted.requestId, interpreterId: submitted.interpreterId, audience: "shared", kind: "hours_submitted", message: "Hours submitted (secure link)", actorLabel: "Interpreter" });
+  // Agency: in-app notification + email that hours are waiting for review.
+  await alertAgency({ event: "timesheet_submitted", requestId: submitted.requestId, interpreterId: submitted.interpreterId, href: "/hours-review" });
 
   revalidatePath(`/requests/${appointment.requestId}`);
   revalidatePath("/hours-review");

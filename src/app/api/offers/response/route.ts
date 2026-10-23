@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "@/app/actions/availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
-import { notifyAgencyAdmins } from "@/lib/notifications";
+import { alertAgency } from "@/lib/lifecycleAlerts";
 import { logError } from "@/lib/logError";
 import { isPositionTakenByOther, lockRequestForPosition } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
@@ -715,12 +715,8 @@ async function processResponse(token: string | null, actionParam: string | undef
       committed = "accepted";
       await logActivity({ requestId, interpreterId, audience: "shared", kind: "offer_accepted", message: `Offer accepted · booked for Position ${positionIndex}`, actorLabel: "Interpreter (email link)" });
 
-      await notifyAgencyAdmins({
-        type: "job",
-        href: `/requests/${requestId}`,
-        title: "Offer accepted",
-        message: `${interpreterName || "An interpreter"} accepted the job.`,
-      });
+      // Agency: in-app notification + email, with the job's reference, date and location.
+      await alertAgency({ event: "offer_accepted", requestId, interpreterId, positionNumber: positionIndex });
       // Booked: send the confirmation with the secure full-details link.
       await sendBookingConfirmation({ requestId, interpreterId, positionNumber: positionIndex });
 
@@ -875,12 +871,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       committed = "declined";
       await logActivity({ requestId, interpreterId, kind: "offer_declined", message: `Offer declined (Position ${positionIndex})`, actorLabel: "Interpreter (email link)" });
 
-      await notifyAgencyAdmins({
-        type: "job",
-        href: `/requests/${requestId}`,
-        title: "Offer declined",
-        message: `${interpreterName || "An interpreter"} declined the offer.`,
-      });
+      await alertAgency({ event: "offer_declined", requestId, interpreterId, positionNumber: positionIndex });
 
       try {
         revalidatePath(`/requests/${requestId}`);
