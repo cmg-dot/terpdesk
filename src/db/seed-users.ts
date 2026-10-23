@@ -4,6 +4,7 @@ import postgres from 'postgres';
 import bcrypt from 'bcryptjs';
 import { z } from 'zod';
 import { users, userRoleValues } from './schema';
+import { databaseSslOptions } from './ssl';
 
 /**
  * Creates (or updates the password of) one login account. Credentials come from the environment so no
@@ -28,7 +29,7 @@ async function main() {
   }
   const { SEED_USER_EMAIL: email, SEED_USER_PASSWORD: password, SEED_USER_NAME: name, SEED_USER_ROLE: role } = parsed.data;
 
-  const client = postgres(connectionString, { prepare: false });
+  const client = postgres(connectionString, { prepare: false, ssl: databaseSslOptions() });
   const db = drizzle(client);
   try {
     const passwordHash = await bcrypt.hash(password, 12);

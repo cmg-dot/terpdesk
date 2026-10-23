@@ -1,6 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import * as schema from './schema';
+import { databaseSslOptions } from './ssl';
 
 const LOCAL_FALLBACK = 'postgres://localhost:5432/terpdesk';
 
@@ -34,6 +35,7 @@ function resolveConnectionString(): string {
   }
 }
 
-// Disable prefetch as it is not supported for "Transaction" pool mode
-const client = postgres(resolveConnectionString(), { prepare: false });
+// Disable prefetch as it is not supported for "Transaction" pool mode.
+// TLS is enforced with full certificate verification (see ./ssl.ts); it overrides any sslmode in the URL.
+const client = postgres(resolveConnectionString(), { prepare: false, ssl: databaseSslOptions() });
 export const db = drizzle(client, { schema });

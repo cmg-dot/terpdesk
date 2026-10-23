@@ -1,12 +1,13 @@
 import { drizzle } from 'drizzle-orm/postgres-js';
 import postgres from 'postgres';
 import { interpreters } from './schema';
+import { databaseSslOptions } from './ssl';
 
 const connectionString = process.env.DATABASE_URL || 'postgres://localhost:5432/terpdesk';
 
 async function main() {
   console.log('Seeding database...');
-  const client = postgres(connectionString, { prepare: false });
+  const client = postgres(connectionString, { prepare: false, ssl: databaseSslOptions() });
   const db = drizzle(client);
 
   try {
