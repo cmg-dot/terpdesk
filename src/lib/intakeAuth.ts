@@ -2,8 +2,8 @@ import { createHash, timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
 /**
- * Shared x-api-key check for the inbound-email intake webhooks (/api/intake and /api/intake/odhh).
- * The key is the INTAKE_WEBHOOK_SECRET environment variable.
+ * Shared x-api-key check for the intake endpoints: the inbound-email webhooks (/api/intake, /api/intake/odhh; key in
+ * INTAKE_WEBHOOK_SECRET) and the public intake form (/api/intake/public; key in INTAKE_API_KEY).
  *
  * SERVER ONLY.
  */
@@ -22,11 +22,17 @@ export function isValidApiKey(provided: string | null, expected: string): boolea
 /**
  * Returns an error response when the request must be rejected, or null when it is authorized.
  * Fails closed: if the secret isn't configured, nothing is accepted. Runs before the body is read or parsed.
+ * `secretEnv` names the environment variable holding the key: INTAKE_WEBHOOK_SECRET for the email webhooks (the AWS
+ * Lambda), INTAKE_API_KEY for the public intake form's server. Each caller has its own key.
  */
-export function rejectUnlessIntakeAuthorized(req: Request, tag: string): NextResponse<{ success: false; error: string }> | null {
-  const expectedSecret = process.env.INTAKE_WEBHOOK_SECRET;
+export function rejectUnlessIntakeAuthorized(
+  req: Request,
+  tag: string,
+  secretEnv: "INTAKE_WEBHOOK_SECRET" | "INTAKE_API_KEY" = "INTAKE_WEBHOOK_SECRET",
+): NextResponse<{ success: false; error: string }> | null {
+  const expectedSecret = process.env[secretEnv];
   if (!expectedSecret) {
-    console.error(`[${tag}] INTAKE_WEBHOOK_SECRET is not set — rejecting request.`);
+    console.error(`[${tag}] ${secretEnv} is not set — rejecting request.`);
     return NextResponse.json({ success: false, error: "Webhook is not configured." }, { status: 500 });
   }
   if (!isValidApiKey(req.headers.get("x-api-key"), expectedSecret)) {

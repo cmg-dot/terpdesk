@@ -6,6 +6,7 @@ import { db } from "@/db";
 import { requests, RequestData } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { isStateProgram } from "@/lib/stateJob";
+import { normalizeRequestData } from "@/lib/requestData";
 
 interface CreateRequestPayload {
   title: string;
@@ -25,56 +26,7 @@ export async function createRequest(payload: CreateRequestPayload) {
     throw new Error("The end time must be after the start time.");
   }
 
-  const isRepeats = Boolean(payload.data?.repeats ?? payload.data?.details?.repeats ?? false);
-  const recurrenceNoteStr = String(payload.data?.recurrenceNote ?? payload.data?.details?.recurrenceNote ?? '').trim();
-
-  const rawPositions = String(payload.data?.positions ?? payload.data?.details?.positions ?? 'One interpreter');
-  const slotCount = (payload.data?.slotCount === 2 || payload.data?.details?.slotCount === 2 || payload.data?.requiredPositions === 2 || rawPositions === "Team — two independent positions") ? 2 : 1;
-  const positionsStr = slotCount === 2 ? "Team — two independent positions" : "One interpreter";
-
-  const requestData: RequestData = {
-    ...payload.data,
-    repeats: isRepeats,
-    recurrenceNote: recurrenceNoteStr,
-    startsAt: startsAtIso,
-    endsAt: endsAtIso,
-    customStartsAt: startsAtIso,
-    customEndsAt: endsAtIso,
-    positions: positionsStr,
-    requiredPositions: slotCount,
-    slotCount: slotCount,
-    details: {
-      ...(payload.data?.details || {}),
-      startsAt: startsAtIso,
-      endsAt: endsAtIso,
-      customStartsAt: startsAtIso,
-      customEndsAt: endsAtIso,
-      startDate: payload.data?.details?.startDate,
-      startTime: payload.data?.details?.startTime,
-      endDate: payload.data?.details?.endDate,
-      endTime: payload.data?.details?.endTime,
-      timeZone: payload.data?.details?.timeZone,
-      timezone: payload.data?.details?.timeZone,
-      repeats: isRepeats,
-      recurrenceNote: recurrenceNoteStr,
-      positions: positionsStr,
-      requiredPositions: slotCount,
-      slotCount: slotCount,
-    },
-    overview: {
-      ...(payload.data?.overview || {}),
-      startsAt: startsAtIso,
-      endsAt: endsAtIso,
-    },
-    intake: {
-      ...((payload.data as any)?.intake || {}),
-      repeats: isRepeats,
-      recurrenceNote: recurrenceNoteStr,
-      positions: positionsStr,
-      requiredPositions: slotCount,
-      slotCount: slotCount,
-    }
-  };
+  const requestData = normalizeRequestData(payload.data, startsAtIso, endsAtIso);
 
   const [newRequest] = await db.insert(requests).values({
     title: payload.title,
