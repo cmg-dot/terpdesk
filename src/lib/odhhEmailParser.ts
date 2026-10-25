@@ -1,3 +1,4 @@
+import { fromZonedTime } from "date-fns-tz";
 import { type Program } from "@/db/schema";
 
 /**
@@ -388,4 +389,55 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
       return gender && !EMPTY_VALUE.test(gender) ? gender : null;
     })(),
   };
+}
+
+/**
+ * Fixed warning labels for fields the parser could not read. Labels only: never a value from the email, so they are
+ * safe to log and to return to the Lambda.
+ */
+export function parseWarnings(parsed: ParsedIntakeEmail): string[] {
+  const warnings: string[] = [];
+  if (!parsed.srn) warnings.push("SRN not found or failed sanitisation");
+  if (!parsed.date) warnings.push("Appointment date not found");
+  else if (!parsed.isoDate) warnings.push("Appointment date malformed");
+  if (!parsed.startTime) warnings.push("Start time not found");
+  else if (!parsed.start24) warnings.push("Start time malformed");
+  if (parsed.endTime && !parsed.end24) warnings.push("End time malformed");
+  if (!parsed.venue && !parsed.address) warnings.push("Location not found");
+  if (!parsed.format) warnings.push("Format not found");
+  else if (parsed.formatInferred) warnings.push("Format inferred as in_person from address");
+  if (!parsed.clientName) warnings.push("Client name not found");
+  if (!parsed.purpose) warnings.push("Purpose not found");
+  if (!parsed.requestorName) warnings.push("Requestor name not found");
+  if (!parsed.requestorPhone) warnings.push("Requestor phone not found");
+  if (!parsed.requestorEmail) warnings.push("Requestor email not found");
+  if (!parsed.clientInfoBlock) warnings.push("CLIENT/EMPLOYEE INFORMATION section not found");
+  if ((parsed.format === "virtual" || parsed.format === "hybrid") && !parsed.platform && !parsed.meetingLink) {
+    warnings.push("Virtual meeting platform/link not found");
+  }
+  return warnings;
+}
+
+/**
+ * Appointment start/end as UTC from the email's Pacific wall-clock times. A missing or unusable end defaults to one
+ * hour after the start. Both are null when the start cannot be computed. Adds to `warnings` when it has to guess.
+ */
+export function appointmentTimes(parsed: ParsedIntakeEmail, warnings: string[]): { startsAt: Date | null; endsAt: Date | null } {
+  let startsAt: Date | null = null;
+  let endsAt: Date | null = null;
+  if (parsed.isoDate && parsed.start24) {
+    startsAt = fromZonedTime(`${parsed.isoDate}T${parsed.start24}:00`, ODHH_TIME_ZONE_IANA);
+    if (Number.isNaN(startsAt.getTime())) {
+      startsAt = null;
+      warnings.push("Could not compute start timestamp");
+    }
+  }
+  if (startsAt) {
+    if (parsed.end24) endsAt = fromZonedTime(`${parsed.isoDate}T${parsed.end24}:00`, ODHH_TIME_ZONE_IANA);
+    if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
+      if (parsed.end24) warnings.push("End time not after start; defaulted to 1 hour");
+      endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
+    }
+  }
+  return { startsAt, endsAt };
 }

@@ -3,11 +3,11 @@ export const dynamic = "force-dynamic";
 import { NextResponse } from "next/server";
 import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
+import { contentFingerprint, insertOdhhRequestOnce } from "@/lib/odhhDedupe";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
-import { db } from "@/db";
-import { requests, type RequestData } from "@/db/schema";
+import type { RequestData } from "@/db/schema";
 
 // ODHH is a Washington State agency — all appointment times are Pacific.
 const ODHH_TIME_ZONE_IANA = "America/Los_Angeles";
@@ -196,6 +196,7 @@ export async function POST(req: Request): Promise<NextResponse> {
       channel: "odhh_email",
       receivedAt: new Date().toISOString(),
       rawEmailText: body.rawEmailText,
+      contentHash: contentFingerprint(body.rawEmailText),
     },
     overview: { location: data.locationName, status: "Unfilled / draft" },
     details: { format: "On-site", timeZone: ODHH_TIME_ZONE_LABEL },
@@ -207,17 +208,24 @@ export async function POST(req: Request): Promise<NextResponse> {
   };
 
   try {
-    const [inserted] = await db
-      .insert(requests)
-      .values({
+    // Saved at most once per SRN: a retried or repeated email must not create a second job.
+    const inserted = await insertOdhhRequestOnce(
+      {
         title: `ODHH SRN #${data.srn} — ${data.locationName}`,
         status: "draft",
         isStateJob: true,
         // Matches createRequest: createdAt is used as the appointment start across the app.
         createdAt: startsAt,
         data: requestData,
-      })
-      .returning({ id: requests.id });
+      },
+      { srn: data.srn, contentHash: contentFingerprint(body.rawEmailText) },
+    );
+
+    if (inserted.duplicate) {
+      // 200 on purpose: the job is already saved, and a non-2xx would make the sender retry.
+      await logActivity({ requestId: inserted.id, kind: "duplicate_email_ignored", audience: "agency", message: "A repeat of this request's email was received and ignored", actorLabel: "ODHH intake" });
+      return NextResponse.json({ success: true, duplicate: true, outcome: "duplicate", id: inserted.id }, { status: 200 });
+    }
 
     await logActivity({ requestId: inserted.id, kind: "created", audience: "shared", message: "Request created", actorLabel: "ODHH intake" });
 

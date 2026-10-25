@@ -4,19 +4,23 @@ import { NextResponse } from "next/server";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
 import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
+import { contentFingerprint, insertOdhhRequestOnce } from "@/lib/odhhDedupe";
 import { respondToServiceVerification } from "@/lib/serviceVerification";
 import type { TimesheetIntakeResponse } from "@/lib/serviceVerification";
 import { resolveIntakeType } from "@/lib/odhhVerificationParser";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
-import { requests, type RequestData } from "@/db/schema";
+import type { RequestData } from "@/db/schema";
 import {
   FORMAT_LABELS,
   ODHH_PROGRAM,
   ODHH_TIME_ZONE_IANA,
   ODHH_TIME_ZONE_LABEL,
+  appointmentTimes,
   parseIntakeEmail,
+  parseWarnings,
+  sanitizeSrn,
   type AppointmentFormat,
 } from "@/lib/odhhEmailParser";
 
@@ -60,6 +64,14 @@ interface WebhookSuccessResponse {
   warnings: string[];
 }
 
+/** A repeat of an email whose job is already saved: nothing was inserted. */
+interface DuplicateIntakeResponse {
+  success: true;
+  duplicate: true;
+  outcome: "duplicate";
+  id: string;
+}
+
 interface WebhookErrorResponse {
   success: false;
   error: string;
@@ -96,7 +108,7 @@ function validatePayload(
 
 export async function POST(
   req: Request
-): Promise<NextResponse<WebhookSuccessResponse | TimesheetIntakeResponse | WebhookErrorResponse>> {
+): Promise<NextResponse<WebhookSuccessResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | WebhookErrorResponse>> {
   try {
     const denied = rejectUnlessIntakeAuthorized(req, "Intake Webhook");
     if (denied) return denied;
@@ -136,46 +148,18 @@ export async function POST(
 
     const receivedAt = new Date().toISOString();
     const parsed = parseIntakeEmail(rawContent, subject);
-    const warnings: string[] = [];
+    // The SRN that identifies this job: read from the email, else the Lambda's own extraction if it sent one.
+    const verificationHint = (body as Record<string, unknown>).verification;
+    const hintedSrn =
+      verificationHint && typeof verificationHint === "object" && !Array.isArray(verificationHint)
+        ? sanitizeSrn(String((verificationHint as { srn?: unknown }).srn ?? "").trim() || undefined)
+        : null;
+    const srn = parsed.srn ?? hintedSrn;
+    const contentHash = contentFingerprint(rawContent);
+    const warnings = parseWarnings(parsed);
 
-    if (!parsed.srn) warnings.push("SRN not found or failed sanitisation");
-    if (!parsed.date) warnings.push("Appointment date not found");
-    else if (!parsed.isoDate) warnings.push("Appointment date malformed");
-    if (!parsed.startTime) warnings.push("Start time not found");
-    else if (!parsed.start24) warnings.push("Start time malformed");
-    if (parsed.endTime && !parsed.end24) warnings.push("End time malformed");
-    if (!parsed.venue && !parsed.address) warnings.push("Location not found");
-    if (!parsed.format) warnings.push("Format not found");
-    else if (parsed.formatInferred) warnings.push("Format inferred as in_person from address");
-    if (!parsed.clientName) warnings.push("Client name not found");
-    if (!parsed.purpose) warnings.push("Purpose not found");
-    if (!parsed.requestorName) warnings.push("Requestor name not found");
-    if (!parsed.requestorPhone) warnings.push("Requestor phone not found");
-    if (!parsed.requestorEmail) warnings.push("Requestor email not found");
-    if (!parsed.clientInfoBlock) warnings.push("CLIENT/EMPLOYEE INFORMATION section not found");
-    if ((parsed.format === "virtual" || parsed.format === "hybrid") && !parsed.platform && !parsed.meetingLink) {
-      warnings.push("Virtual meeting platform/link not found");
-    }
-
-    // Build UTC timestamps from Pacific wall-clock time.
-    let startsAt: Date | null = null;
-    let endsAt: Date | null = null;
-    if (parsed.isoDate && parsed.start24) {
-      startsAt = fromZonedTime(`${parsed.isoDate}T${parsed.start24}:00`, ODHH_TIME_ZONE_IANA);
-      if (Number.isNaN(startsAt.getTime())) {
-        startsAt = null;
-        warnings.push("Could not compute start timestamp");
-      }
-    }
-    if (startsAt) {
-      if (parsed.end24) {
-        endsAt = fromZonedTime(`${parsed.isoDate}T${parsed.end24}:00`, ODHH_TIME_ZONE_IANA);
-      }
-      if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
-        if (parsed.end24) warnings.push("End time not after start; defaulted to 1 hour");
-        endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
-      }
-    }
+    // Appointment start/end in UTC from the email's Pacific wall-clock times.
+    const { startsAt, endsAt } = appointmentTimes(parsed, warnings);
 
     const locationLabel = parsed.venue ?? parsed.address ?? "TBD";
     const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
@@ -183,15 +167,15 @@ export async function POST(
     // interpreter-visible preparation notes.
     const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
     const prepNotes = noteAlreadyInBlock ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
-    const title = parsed.srn
-      ? `ODHH SRN #${parsed.srn}${parsed.venue ? ` — ${parsed.venue}` : ""}`
+    const title = srn
+      ? `ODHH SRN #${srn}${parsed.venue ? ` — ${parsed.venue}` : ""}`
       : subject.trim().slice(0, 200) || `Inbound email from ${email}`;
 
     const requestData: RequestData = {
       brief: {},
       intake: {
         program: ODHH_PROGRAM,
-        ...(parsed.srn ? { odhhSrn: parsed.srn } : {}),
+        ...(srn ? { odhhSrn: srn } : {}),
       },
       details: {
         timeZone: ODHH_TIME_ZONE_LABEL,
@@ -238,15 +222,17 @@ export async function POST(
         fromEmail: email,
         subject,
         rawContent,
+        // Fingerprint of the email text (not the text): lets a repeat of an email with no readable SRN be recognised.
+        contentHash,
         receivedAt,
         parseWarnings: warnings,
       },
     };
 
-    // Runs inside the outer try: any connection/constraint failure falls through to the 500 handler.
-    const [inserted] = await db
-      .insert(requests)
-      .values({
+    // Saved at most once per SRN: AWS retries and repeat emails must not create a second job. Runs inside the outer
+    // try: any connection/constraint failure falls through to the 500 handler.
+    const inserted = await insertOdhhRequestOnce(
+      {
         title,
         status: "draft",
         // This parser only handles ODHH emails (program is always WA ODHH), so these are always state jobs.
@@ -254,8 +240,16 @@ export async function POST(
         data: requestData,
         // The app reads createdAt as the appointment start (see createRequest); default now() if unparsed.
         ...(startsAt ? { createdAt: startsAt } : {}),
-      })
-      .returning({ id: requests.id });
+      },
+      { srn, contentHash },
+    );
+
+    if (inserted.duplicate) {
+      // 200 on purpose: the job is already saved, and a non-2xx would make AWS retry the delivery again.
+      await logActivity({ requestId: inserted.id, kind: "duplicate_email_ignored", audience: "agency", message: "A repeat of this request's email was received and ignored", actorLabel: "Email intake" });
+      console.log("[Intake Webhook] Duplicate email ignored", { id: inserted.id });
+      return NextResponse.json({ success: true, duplicate: true, outcome: "duplicate", id: inserted.id }, { status: 200 });
+    }
 
     await logActivity({ requestId: inserted.id, kind: "created", audience: "shared", message: "Request created", actorLabel: "Email intake" });
 
