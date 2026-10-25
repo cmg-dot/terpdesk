@@ -8,13 +8,9 @@ import {
   Home,
   Briefcase,
   Calendar,
-  Users,
-  CircleDollarSign,
   Navigation,
-  GraduationCap,
   FileText,
   Building,
-  Network,
   User,
   Settings,
   Menu,
@@ -76,30 +72,9 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
             <Calendar strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
             Calendar
           </Link>
-          <Link href="#" className="flex items-center justify-between rounded-xl px-4 py-[9px] text-[14px] font-medium text-[#8BA49E] hover:bg-white/5 hover:text-white transition-colors">
-            <div className="flex items-center gap-3">
-              <Users strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-              People
-            </div>
-            <span className="text-[10px] uppercase text-[#8BA49E]">Later</span>
-          </Link>
-          <Link href="#" className="flex items-center justify-between rounded-xl px-4 py-[9px] text-[14px] font-medium text-[#8BA49E] hover:bg-white/5 hover:text-white transition-colors">
-            <div className="flex items-center gap-3">
-              <CircleDollarSign strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-              Money
-            </div>
-            <span className="text-[10px] uppercase text-[#8BA49E]">Later</span>
-          </Link>
           <Link href="/mileage" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/mileage') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
             <Navigation strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
             Mileage
-          </Link>
-          <Link href="#" className="flex items-center justify-between rounded-xl px-4 py-[9px] text-[14px] font-medium text-[#8BA49E] hover:bg-white/5 hover:text-white transition-colors">
-            <div className="flex items-center gap-3">
-              <GraduationCap strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-              CEUs
-            </div>
-            <span className="text-[10px] uppercase text-[#8BA49E]">Later</span>
           </Link>
           <Link href="/prep" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/prep') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
             <FileText strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
@@ -108,13 +83,6 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
           <Link href="/agencies" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/agencies') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
             <Building strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
             Agencies
-          </Link>
-          <Link href="#" className="flex items-center justify-between rounded-xl px-4 py-[9px] text-[14px] font-medium text-[#8BA49E] hover:bg-white/5 hover:text-white transition-colors">
-            <div className="flex items-center gap-3">
-              <Network strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-              Connections
-            </div>
-            <span className="text-[10px] uppercase text-[#8BA49E]">Later</span>
           </Link>
           <Link href="/profile" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/profile') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
             <User strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
@@ -207,30 +175,9 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
                 <Calendar strokeWidth={1.5} className="h-5 w-5" />
                 Calendar
               </Link>
-              <Link href="#" onClick={() => setIsMenuOpen(false)} className={`flex items-center justify-between rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/people') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <div className="flex items-center gap-4">
-                  <Users strokeWidth={1.5} className="h-5 w-5" />
-                  People
-                </div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400">Later</span>
-              </Link>
-              <Link href="#" onClick={() => setIsMenuOpen(false)} className={`flex items-center justify-between rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/money') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <div className="flex items-center gap-4">
-                  <CircleDollarSign strokeWidth={1.5} className="h-5 w-5" />
-                  Money
-                </div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400">Later</span>
-              </Link>
               <Link href="/mileage" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/mileage') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                 <Navigation strokeWidth={1.5} className="h-5 w-5" />
                 Mileage
-              </Link>
-              <Link href="#" onClick={() => setIsMenuOpen(false)} className={`flex items-center justify-between rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/ceus') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <div className="flex items-center gap-4">
-                  <GraduationCap strokeWidth={1.5} className="h-5 w-5" />
-                  CEUs
-                </div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400">Later</span>
               </Link>
               <Link href="/prep" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/prep') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                 <FileText strokeWidth={1.5} className="h-5 w-5" />
@@ -239,13 +186,6 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
               <Link href="/agencies" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/agencies') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                 <Building strokeWidth={1.5} className="h-5 w-5" />
                 Agencies
-              </Link>
-              <Link href="#" onClick={() => setIsMenuOpen(false)} className={`flex items-center justify-between rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/connections') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <div className="flex items-center gap-4">
-                  <Network strokeWidth={1.5} className="h-5 w-5" />
-                  Connections
-                </div>
-                <span className="text-[11px] uppercase tracking-wider text-slate-400">Later</span>
               </Link>
               <Link href="/profile" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/profile') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                 <User strokeWidth={1.5} className="h-5 w-5" />
