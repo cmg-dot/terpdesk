@@ -32,6 +32,7 @@ import { legacyPosition1Hours } from "@/utils/hoursState";
 import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
 import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
 import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
+import { IconInput } from "@/components/ui/IconInput";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
@@ -145,12 +146,27 @@ function getMockInterpreterDetails(id: string) {
   return { name: `Interpreter ${id}` };
 }
 
+// Label above value on phones (full width for the value, so long text wraps cleanly); side by side from 640px up
+// with a real gap and the value right-aligned, wrapping inside its own column instead of against the label.
 function DataRow({ label, value }: { label: string; value: React.ReactNode }) {
  return (
- <div className="flex justify-between items-center border-b border-gray-50 py-3 last:border-b-0">
- <span className="text-[var(--sage)] text-sm">{label}</span>
- <span className="text-[var(--ink)] text-sm font-medium">{value}</span>
+ <div className="flex flex-col gap-1 border-b border-gray-50 py-3.5 last:border-b-0 sm:flex-row sm:items-start sm:justify-between sm:gap-8">
+ <span className="shrink-0 text-sm text-[var(--sage)] sm:pt-px">{label}</span>
+ <span className="min-w-0 break-words text-sm font-medium leading-relaxed text-[var(--ink)] sm:max-w-[65%] sm:text-right">{value}</span>
  </div>
+ );
+}
+
+/** "Venue · Street address" (how the location is stored) as separate lines, so the address does not run into the name. */
+function LocationLines({ text }: { text: string }) {
+ const lines = String(text ?? "").split(" · ").map((l) => l.trim()).filter(Boolean);
+ if (lines.length <= 1) return <>{text}</>;
+ return (
+ <>
+ {lines.map((line, i) => (
+ <span key={i} className={i === 0 ? "block" : "block font-normal text-gray-600"}>{line}</span>
+ ))}
+ </>
  );
 }
 
@@ -1185,7 +1201,7 @@ export default function AssignmentDetailPage() {
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Overview</h2>
  <div className="flex flex-col">
  <DataRow label="Request source" value={programLabel} />
- <DataRow label="Location" value={assignment.overview.location} />
+ <DataRow label="Location" value={<LocationLines text={assignment.overview.location} />} />
  <DataRow label="Reference" value={assignment.overview.reference} />
  <DataRow label="Status" value={assignment.overview.status} />
  {assignment.overview.repeats && <DataRow label="Repeats" value={String(assignment.overview.repeats)} />}
@@ -1876,8 +1892,7 @@ export default function AssignmentDetailPage() {
                       <label className="block text-sm text-[var(--sage)] mb-2">Offer expiry</label>
                       <div className="flex flex-col sm:flex-row gap-4 w-full">
                         <div className="flex-1 relative w-full">
-                          <input 
-                            type="date" 
+                          <IconInput kind="date" 
                             className="w-full bg-[#F5F4F0] border-none rounded-full px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow" 
                             value={expDate}
                             onChange={(e) => {
@@ -1890,8 +1905,7 @@ export default function AssignmentDetailPage() {
                           />
                         </div>
                         <div className="flex-1 relative w-full">
-                          <input 
-                            type="time" 
+                          <IconInput kind="time" 
                             className="w-full bg-[#F5F4F0] border-none rounded-full px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow" 
                             value={expTime}
                             onChange={(e) => {
@@ -2256,8 +2270,7 @@ export default function AssignmentDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-                  <input
-                    type="date"
+                  <IconInput kind="date"
                     value={editStartDate}
                     onChange={(e) => setEditStartDate(e.target.value)}
                     className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
@@ -2265,8 +2278,7 @@ export default function AssignmentDetailPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
-                  <input
-                    type="time"
+                  <IconInput kind="time"
                     value={editStartTime}
                     onChange={(e) => setEditStartTime(e.target.value)}
                     className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
@@ -2277,8 +2289,7 @@ export default function AssignmentDetailPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
-                  <input
-                    type="date"
+                  <IconInput kind="date"
                     value={editEndDate}
                     onChange={(e) => setEditEndDate(e.target.value)}
                     className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
@@ -2286,8 +2297,7 @@ export default function AssignmentDetailPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">End Time</label>
-                  <input
-                    type="time"
+                  <IconInput kind="time"
                     value={editEndTime}
                     onChange={(e) => setEditEndTime(e.target.value)}
                     className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"

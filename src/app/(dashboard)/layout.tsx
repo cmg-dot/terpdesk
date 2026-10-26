@@ -199,7 +199,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                     <span className="text-sm text-[var(--sage)]">{userEmail}</span>
                   </div>
                   <div className="flex flex-col gap-4">
-                    <Link href="/interpreter" onClick={() => setIsMenuOpen(false)} className="text-slate-600 text-[15px] font-medium hover:text-[var(--forest)]">Switch to Interpreter</Link>
                     <SignOutButton className="text-red-600 text-[15px] font-medium hover:text-red-700 text-left" />
                   </div>
                 </div>

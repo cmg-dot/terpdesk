@@ -53,7 +53,8 @@ async function resolveDisplayName(token: JWT): Promise<string | undefined> {
 export const authOptions: NextAuthOptions = {
   secret: getAuthSecret(),
   session: { strategy: "jwt", maxAge: 60 * 60 * 12 },
-  pages: { signIn: "/login" },
+  // signOut: NextAuth's own sign-out confirmation is unstyled, so its URL is served by our page instead.
+  pages: { signIn: "/login", signOut: "/signout" },
   providers: [
     CredentialsProvider({
       name: "Email and password",

@@ -12,6 +12,7 @@ import { getIanaZone, buildAppointmentUtcTimes } from "@/utils/timezone";
 import { AlertTriangle } from "lucide-react";
 import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, type SavedAgencyRequester } from "@/utils/savedRequesters";
 import { isInvalidEmail } from "@/utils/validation";
+import { IconInput } from "@/components/ui/IconInput";
 import type { RequestData, Program } from "@/db/schema";
 
 function CustomSelect({ options, value, onChange }: { options: string[], value?: string, onChange?: (val: string) => void }) {
@@ -763,14 +764,14 @@ export default function NewRequestPage() {
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-6">
  <Field label="Starts" subtext={getHelperText(formData.startDate, formData.startTime, formData.timeZone)}>
  <div className="flex flex-col sm:flex-row gap-2">
- <input type="date" className={inputClass} value={formData.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
- <input type="time" className={inputClass} value={formData.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
+ <IconInput kind="date" className={inputClass} value={formData.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
+ <IconInput kind="time" className={inputClass} value={formData.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
  </div>
  </Field>
  <Field label="Ends" subtext={getHelperText(formData.endDate, formData.endTime, formData.timeZone)}>
  <div className="flex flex-col sm:flex-row gap-2">
- <input type="date" className={inputClass} value={formData.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
- <input type="time" className={inputClass} value={formData.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
+ <IconInput kind="date" className={inputClass} value={formData.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
+ <IconInput kind="time" className={inputClass} value={formData.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
  </div>
  </Field>
  </div>

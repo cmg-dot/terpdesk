@@ -81,7 +81,10 @@ export function NotificationBell() {
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 mt-2 w-80 bg-white border border-gray-200 shadow-lg rounded-2xl z-50 overflow-hidden flex flex-col max-h-[400px]">
+        // Phones: a panel pinned 12px from both screen edges, just below the header, so it can never run off-screen (the
+        // bell sits ~64px in from the right, so a fixed 320px box anchored to it was cut off on the left).
+        // 640px and up: the bell-anchored dropdown, capped to the viewport.
+        <div className="fixed inset-x-3 top-[4.5rem] z-50 flex max-h-[min(400px,calc(100dvh-6rem))] origin-top-right flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[calc(100vw-2rem)] sm:max-h-[400px]">
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <h3 className="font-semibold text-[15px] text-gray-800 tracking-tight">Notifications</h3>
             {unreadCount > 0 && (
@@ -105,7 +108,7 @@ export function NotificationBell() {
                   >
                     <div className="flex items-start gap-3">
                       {!notif.isRead && <div className="mt-1.5 w-2 h-2 rounded-full bg-[#0B3B32] shrink-0" />}
-                      <div className={`flex flex-col gap-1 ${notif.isRead ? "ml-5" : ""}`}>
+                      <div className={`flex min-w-0 flex-col gap-1 break-words ${notif.isRead ? "ml-5" : ""}`}>
                         <span className={`text-sm ${notif.isRead ? "font-medium text-gray-700" : "font-semibold text-gray-900"}`}>
                           {notif.title}
                         </span>
