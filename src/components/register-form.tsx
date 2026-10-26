@@ -6,6 +6,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useRouter } from "next/navigation";
 import { registerInterpreter } from "@/app/actions/registerInterpreter";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { AgreementNotice } from "@/components/legal/LegalLinks";
 import { PasswordRequirements } from "@/components/ui/PasswordRequirements";
 import { registerInterpreterSchema } from "@/lib/validation/registerInterpreter";
 import type { RegisterInterpreterInput } from "@/lib/validation/registerInterpreter";
@@ -94,6 +95,7 @@ export function RegisterForm() {
         >
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>
+        <AgreementNotice className="mt-3" />
       </div>
     </form>
   );

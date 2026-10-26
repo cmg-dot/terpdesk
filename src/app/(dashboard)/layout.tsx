@@ -21,6 +21,7 @@ import { RequestsProvider } from "@/context/RequestsContext";
 import { ClientsProvider } from "@/context/ClientsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -98,6 +99,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 <span className="text-xs text-[#8BA49E]">{userEmail}</span>
               </div>
               <SignOutButton className="text-sm font-medium text-white hover:underline underline-offset-4 decoration-white/30" />
+              <NavLegalLinks tone="dark" className="mt-5" />
             </div>
           </aside>
 
@@ -201,6 +203,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <div className="flex flex-col gap-4">
                     <SignOutButton className="text-red-600 text-[15px] font-medium hover:text-red-700 text-left" />
                   </div>
+                  <NavLegalLinks tone="light" className="mt-5" onNavigate={() => setIsMenuOpen(false)} />
                 </div>
               </motion.div>
             )}

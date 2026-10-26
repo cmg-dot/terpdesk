@@ -20,6 +20,7 @@ import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { motion, AnimatePresence } from "framer-motion";
 import { SignOutButton } from "@/components/auth/SignOutButton";
+import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useSession } from "next-auth/react";
 import { InterpreterNameProvider, useInterpreterName } from "@/context/InterpreterNameContext";
 
@@ -100,6 +101,7 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
             <span className="text-xs text-[#8BA49E]">{displayEmail}</span>
           </div>
           <SignOutButton className="text-[13px] font-medium text-[#8BA49E] hover:text-white transition-colors" />
+          <NavLegalLinks tone="dark" className="mt-4" />
         </div>
       </aside>
 
@@ -207,6 +209,7 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
                 <Link href="/dashboard" onClick={() => setIsMenuOpen(false)} className="text-slate-600 text-[15px] font-medium hover:text-[var(--forest)]">Switch to Agency</Link>
                 <SignOutButton className="text-red-600 text-[15px] font-medium hover:text-red-700 text-left" />
               </div>
+              <NavLegalLinks tone="light" className="mt-5" onNavigate={() => setIsMenuOpen(false)} />
             </div>
           </motion.div>
         )}

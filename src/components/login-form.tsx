@@ -10,6 +10,7 @@ import { useRouter } from "next/navigation";
 import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 import type { AppRole } from "@/lib/auth/routes";
 import { PasswordInput } from "@/components/ui/PasswordInput";
+import { AgreementNotice } from "@/components/legal/LegalLinks";
 import { DISPLAYABLE_AUTH_MESSAGES, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 
 const loginSchema = z.object({
@@ -154,6 +155,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  >
  {isSubmitting ? "Signing in..." : "Sign in"}
  </button>
+ <AgreementNotice className="mt-3" />
  </div>
  </form>
  );
