@@ -35,27 +35,50 @@ type PublicIntakeResponse =
 const fail = (error: string, status: number, fields?: FieldProblem[]) =>
   NextResponse.json<PublicIntakeResponse>({ success: false, error, ...(fields ? { fields } : {}) }, { status });
 
+/**
+ * The payload's SHAPE for the logs: each field's name, type and length, never its value. Enough to spot a missing
+ * field, a wrong type or an oversized value without writing a client's name, contact details or medical purpose to the
+ * log (HIPAA, security.md).
+ */
+function describePayload(body: unknown): string {
+  if (!body || typeof body !== "object" || Array.isArray(body)) return Array.isArray(body) ? "array" : typeof body;
+  return Object.entries(body)
+    .map(([key, v]) => `${key}:${typeof v === "string" ? `string(${v.length})` : v === null ? "null" : typeof v}`)
+    .join(", ");
+}
+
 export async function POST(req: Request): Promise<NextResponse<PublicIntakeResponse | { success: false; error: string }>> {
+  let stage = "auth";
+  let body: unknown;
   try {
     const denied = rejectUnlessIntakeAuthorized(req, "Public Intake", "INTAKE_API_KEY");
     if (denied) return denied;
 
+    stage = "read body";
     if (Number(req.headers.get("content-length") ?? 0) > MAX_BODY_BYTES) return fail("Request body is too large.", 413);
     const raw = await req.text();
     if (raw.length > MAX_BODY_BYTES) return fail("Request body is too large.", 413);
 
-    let body: unknown;
     try {
       body = JSON.parse(raw);
     } catch {
+      console.warn("[Public Intake] 400: body is not valid JSON", { bytes: raw.length });
       return fail("Request body must be valid JSON.", 400);
     }
 
+    stage = "validate";
     const parsed = parsePublicIntake(body);
-    if (!parsed.ok) return fail("Some fields are missing or not valid.", 422, parsed.fields);
+    if (!parsed.ok) {
+      // Field names and our own messages only: the messages never repeat a submitted value.
+      console.warn("[Public Intake] 422: rejected fields", { fields: parsed.fields, payload: describePayload(body) });
+      return fail("Some fields are missing or not valid.", 422, parsed.fields);
+    }
 
+    stage = "build draft";
     const draft = buildPublicRequest(parsed.data);
     const submissionId = parsed.data.submissionId;
+
+    stage = "insert draft";
 
     // One transaction. With a submissionId, a retry of the same submission (a timeout, a double click) returns the
     // first request instead of creating a second; the advisory lock makes two retries at the same moment safe too.
@@ -92,6 +115,7 @@ export async function POST(req: Request): Promise<NextResponse<PublicIntakeRespo
       return NextResponse.json<PublicIntakeResponse>({ success: true, id: saved.id, reference, duplicate: true, ignoredFields }, { status: 200 });
     }
 
+    stage = "after insert";
     await logActivity({ requestId: saved.id, kind: "created", audience: "shared", message: "Request created", actorLabel: "Public intake form" });
 
     // Tell staff there is something to review. Reference, date and generic setting only: nothing about the client.
@@ -109,7 +133,9 @@ export async function POST(req: Request): Promise<NextResponse<PublicIntakeRespo
     console.log("[Public Intake] Draft request created", { id: saved.id });
     return NextResponse.json<PublicIntakeResponse>({ success: true, id: saved.id, reference, duplicate: false, ignoredFields }, { status: 201 });
   } catch (error) {
-    // logError never prints bound query parameters (which would hold the submission).
+    // Message, stack and the Postgres error code. logError never prints bound query parameters (which would hold the
+    // submission), and the payload is logged by shape only.
+    console.error(`[Public Intake] 500 during "${stage}"`, { payload: describePayload(body) });
     logError("Public Intake", error);
     return fail("Internal server error.", 500);
   }
