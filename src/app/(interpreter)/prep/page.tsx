@@ -19,7 +19,7 @@ export default async function PrepPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1000px] space-y-6 p-6 pb-24 antialiased">
+    <div className="mx-auto w-full max-w-[1000px] space-y-6 p-4 pb-24 antialiased sm:p-6">
       <div className="space-y-2">
         <h1 className="text-[28px] font-semibold tracking-tight text-[var(--ink)]">Prep</h1>
         <p className="text-[15px] text-[var(--sage)]">Materials agencies have shared for your booked jobs.</p>

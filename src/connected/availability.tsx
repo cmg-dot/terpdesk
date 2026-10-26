@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
+import { IconInput } from "@/components/ui/IconInput";
 import { useGlobalState } from "@/context/GlobalContext";
 import { getIanaZone } from "@/utils/timezone";
 import {
@@ -436,7 +437,7 @@ export default function ConnectedAvailability({
   return (
     <div className="space-y-8">
       {/* Timezone Preference */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-2">
           <div>
             <h3 className="font-semibold text-[var(--ink)] text-base">
@@ -486,7 +487,7 @@ export default function ConnectedAvailability({
       </div>
 
       {/* Card 1: Usual weekly hours */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="font-semibold text-[var(--ink)] text-base">
@@ -516,60 +517,57 @@ export default function ConnectedAvailability({
         <div className="flex flex-col divide-y divide-gray-100">
           {DAYS_OF_WEEK.map((day, idx) => {
             const rule = rules.find((r) => r.weekday === idx);
+            const timeInput =
+              "w-full rounded-lg border border-gray-200 bg-white py-1 pr-2 text-xs outline-none focus:ring-1 focus:ring-[#1B433C]";
             return (
-              <div
-                key={day}
-                className="flex flex-col sm:flex-row sm:items-center py-3.5 first:pt-0 last:pb-0 gap-3"
-              >
-                <div className="w-32 font-medium text-sm text-[var(--ink)]">
-                  {day}
+              // One line per day on phones (the day name is abbreviated, with the full name kept for screen readers);
+              // it only wraps when the width really runs out.
+              <div key={day} className="flex flex-wrap items-center gap-x-3 gap-y-1.5 py-2.5 first:pt-0 last:pb-0">
+                <div className="w-10 shrink-0 text-sm font-medium text-[var(--ink)] sm:w-32">
+                  <span aria-hidden="true" className="sm:hidden">{day.slice(0, 3)}</span>
+                  <span className="sr-only sm:not-sr-only">{day}</span>
                 </div>
-                <div className="flex-1">
+                <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2">
                   {!rule ? (
-                    <div className="text-xs text-gray-400">Not provided</div>
+                    <span className="text-xs text-gray-400">Not provided</span>
                   ) : (
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="time"
+                    <>
+                      <IconInput
+                        kind="time"
+                        compact
+                        aria-label={`${day} start time`}
+                        wrapperClassName="relative min-w-0 flex-1 sm:w-32 sm:flex-none"
+                        className={timeInput}
                         value={minutesToTimeString(rule.startMinute)}
-                        onChange={(e) =>
-                          handleUpdateRule(
-                            idx,
-                            "startMinute",
-                            timeStringToMinutes(e.target.value)
-                          )
-                        }
-                        className="border border-gray-200 rounded-lg px-3 py-1 text-xs outline-none focus:ring-1 focus:ring-[#1B433C]"
+                        onChange={(e) => handleUpdateRule(idx, "startMinute", timeStringToMinutes(e.target.value))}
                       />
-                      <span className="text-gray-400 text-xs">–</span>
-                      <input
-                        type="time"
+                      <span className="text-xs text-gray-400" aria-hidden="true">–</span>
+                      <IconInput
+                        kind="time"
+                        compact
+                        aria-label={`${day} end time`}
+                        wrapperClassName="relative min-w-0 flex-1 sm:w-32 sm:flex-none"
+                        className={timeInput}
                         value={minutesToTimeString(rule.endMinute)}
-                        onChange={(e) =>
-                          handleUpdateRule(
-                            idx,
-                            "endMinute",
-                            timeStringToMinutes(e.target.value)
-                          )
-                        }
-                        className="border border-gray-200 rounded-lg px-3 py-1 text-xs outline-none focus:ring-1 focus:ring-[#1B433C]"
+                        onChange={(e) => handleUpdateRule(idx, "endMinute", timeStringToMinutes(e.target.value))}
                       />
                       <button
                         type="button"
                         onClick={() => handleRemoveRule(idx)}
-                        className="text-gray-400 hover:text-red-500 p-1 rounded transition-colors cursor-pointer"
+                        className="shrink-0 cursor-pointer rounded p-1 text-gray-400 transition-colors hover:text-red-500"
                         title="Remove hours"
+                        aria-label={`Remove ${day} hours`}
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <X className="h-3.5 w-3.5" />
                       </button>
-                    </div>
+                    </>
                   )}
                 </div>
                 {!rule && (
                   <button
                     type="button"
                     onClick={() => handleAddRule(idx)}
-                    className="px-3.5 py-1 rounded-full border border-gray-200 text-gray-700 text-xs font-medium hover:bg-gray-50 transition-colors shrink-0 self-start sm:self-auto cursor-pointer"
+                    className="shrink-0 cursor-pointer rounded-full border border-gray-200 px-3.5 py-1 text-xs font-medium text-gray-700 transition-colors hover:bg-gray-50"
                   >
                     Add hours
                   </button>
@@ -581,7 +579,7 @@ export default function ConnectedAvailability({
       </div>
 
       {/* Card 2: Dates that are different */}
-      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+      <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
         <h3 className="font-semibold text-[var(--ink)] mb-1 text-base">
           Dates that are different
         </h3>
@@ -598,11 +596,14 @@ export default function ConnectedAvailability({
                 key={idx}
                 className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 bg-gray-50/70 rounded-xl border border-gray-200/60"
               >
-                <input
-                  type="date"
+                <IconInput
+                  kind="date"
+                  compact
+                  aria-label="Date"
+                  wrapperClassName="relative w-full sm:w-auto"
                   value={ex.date}
                   onChange={(e) => handleUpdateException(idx, { date: e.target.value })}
-                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white outline-none"
+                  className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pr-3 text-xs outline-none"
                 />
                 <select
                   value={ex.available ? "available" : "unavailable"}
@@ -622,26 +623,30 @@ export default function ConnectedAvailability({
 
                 {ex.available && (
                   <div className="flex items-center gap-2">
-                    <input
-                      type="time"
+                    <IconInput
+                      kind="time"
+                      compact
+                      wrapperClassName="relative w-28"
                       value={minutesToTimeString(ex.startMinute)}
                       onChange={(e) =>
                         handleUpdateException(idx, {
                           startMinute: timeStringToMinutes(e.target.value),
                         })
                       }
-                      className="border border-gray-200 rounded-lg px-3 py-1 text-xs bg-white outline-none"
+                      className="w-full rounded-lg border border-gray-200 bg-white py-1 pr-2 text-xs outline-none"
                     />
                     <span className="text-gray-400 text-xs">–</span>
-                    <input
-                      type="time"
+                    <IconInput
+                      kind="time"
+                      compact
+                      wrapperClassName="relative w-28"
                       value={minutesToTimeString(ex.endMinute)}
                       onChange={(e) =>
                         handleUpdateException(idx, {
                           endMinute: timeStringToMinutes(e.target.value),
                         })
                       }
-                      className="border border-gray-200 rounded-lg px-3 py-1 text-xs bg-white outline-none"
+                      className="w-full rounded-lg border border-gray-200 bg-white py-1 pr-2 text-xs outline-none"
                     />
                   </div>
                 )}
@@ -668,7 +673,7 @@ export default function ConnectedAvailability({
       </div>
 
       {/* Private Busy Time Section */}
-      <div id="private-busy-time" className="bg-white rounded-2xl border border-gray-200 p-6">
+      <div id="private-busy-time" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
             <Lock className="w-4 h-4 text-[#1B433C]" />
@@ -721,8 +726,9 @@ export default function ConnectedAvailability({
               Busy start {busyAllDay && <span className="text-[11px] font-normal text-gray-400">(All day)</span>}
             </label>
             <div className="flex items-center gap-3">
-              <input
-                type="date"
+              <IconInput
+                kind="date"
+                wrapperClassName="relative min-w-0 flex-1"
                 value={busyStartDate}
                 onChange={(e) => {
                   const val = e.target.value;
@@ -731,14 +737,15 @@ export default function ConnectedAvailability({
                     setBusyEndDate(val);
                   }
                 }}
-                className="bg-[#F5F4F0] border-none rounded-xl p-2.5 flex-1 text-xs outline-none"
+                className="w-full rounded-xl border-none bg-[#F5F4F0] p-2.5 text-xs outline-none"
               />
               {!busyAllDay && (
-                <input
-                  type="time"
+                <IconInput
+                  kind="time"
+                  wrapperClassName="relative min-w-0 flex-1"
                   value={busyStartTime}
                   onChange={(e) => setBusyStartTime(e.target.value)}
-                  className="bg-[#F5F4F0] border-none rounded-xl p-2.5 flex-1 text-xs outline-none"
+                  className="w-full rounded-xl border-none bg-[#F5F4F0] p-2.5 text-xs outline-none"
                 />
               )}
             </div>
@@ -750,19 +757,21 @@ export default function ConnectedAvailability({
               Busy end {busyAllDay && <span className="text-[11px] font-normal text-gray-400">(All day)</span>}
             </label>
             <div className="flex items-center gap-3">
-              <input
-                type="date"
+              <IconInput
+                kind="date"
+                wrapperClassName="relative min-w-0 flex-1"
                 value={busyEndDate}
                 min={busyStartDate}
                 onChange={(e) => setBusyEndDate(e.target.value)}
-                className="bg-[#F5F4F0] border-none rounded-xl p-2.5 flex-1 text-xs outline-none"
+                className="w-full rounded-xl border-none bg-[#F5F4F0] p-2.5 text-xs outline-none"
               />
               {!busyAllDay && (
-                <input
-                  type="time"
+                <IconInput
+                  kind="time"
+                  wrapperClassName="relative min-w-0 flex-1"
                   value={busyEndTime}
                   onChange={(e) => setBusyEndTime(e.target.value)}
-                  className="bg-[#F5F4F0] border-none rounded-xl p-2.5 flex-1 text-xs outline-none"
+                  className="w-full rounded-xl border-none bg-[#F5F4F0] p-2.5 text-xs outline-none"
                 />
               )}
             </div>

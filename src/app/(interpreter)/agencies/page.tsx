@@ -45,7 +45,7 @@ export default function AgenciesPage() {
     .map(c => ({ id: c.id, agency_id: c.agencyId, state: c.status === 'rejected' ? 'declined' : 'pending' }));
 
   return (
-    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2 pb-24">
+    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto w-full max-w-[1200px] space-y-6 p-4 pb-24 sm:space-y-10 md:p-8">
       
       {/* Header */}
       <div className="space-y-2">
@@ -58,7 +58,7 @@ export default function AgenciesPage() {
       <div className="space-y-6">
         
         {/* Connect with an agency */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
           <h2 className="text-[19px] font-semibold text-[var(--ink)] mb-6">Connect with an agency</h2>
           
           <div className="space-y-2 mb-6">
@@ -93,7 +93,7 @@ export default function AgenciesPage() {
         </div>
 
         {/* Connected */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
           <h2 className="text-[19px] font-semibold text-[var(--ink)] mb-6">Connected</h2>
           
           <div className="space-y-0">
@@ -114,7 +114,7 @@ export default function AgenciesPage() {
         </div>
 
         {/* Share my availability */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
           <h2 className="text-[19px] font-semibold text-[var(--ink)] mb-4">Share my availability</h2>
           <p className="text-[14px] text-[var(--sage)] mb-8 max-w-4xl leading-relaxed">
             Off for every agency until you switch it on. When it is on, that agency's staff can see which hours you are open and which are taken — start and end times only. They never see your private titles, your address, or anything about another agency. Sharing does not let anyone book you or fill jobs for you; you still accept every offer yourself.
@@ -151,7 +151,7 @@ export default function AgenciesPage() {
         </div>
 
         {/* Allow an agency to auto-book */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
           <h2 className="text-[19px] font-semibold text-[var(--ink)] mb-4">Allow an agency to auto-book</h2>
           
           <div className="space-y-4 mb-8">
@@ -209,7 +209,7 @@ export default function AgenciesPage() {
         </div>
 
         {/* Requests you have sent */}
-        <div className="rounded-2xl border border-gray-200 bg-white p-8">
+        <div className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-6 md:p-8">
           <h2 className="text-[19px] font-semibold text-[var(--ink)] mb-6">Requests you have sent</h2>
           
           <div className="space-y-0">

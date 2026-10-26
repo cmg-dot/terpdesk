@@ -16,6 +16,8 @@ export function NotificationBell() {
   const [items, setItems] = useState<MyNotification[]>([]);
   const router = useRouter();
   const menuRef = useRef<HTMLDivElement>(null);
+  // Phones: where the panel starts (just under the header, whatever its height). null = the 4.5rem fallback.
+  const [panelTop, setPanelTop] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     try {
@@ -67,7 +69,11 @@ export function NotificationBell() {
       <button
         className="relative text-slate-500 hover:text-slate-700 mt-1"
         onClick={() => {
-          if (!isOpen) refresh();
+          if (!isOpen) {
+            refresh();
+            const header = menuRef.current?.closest("header");
+            if (header) setPanelTop(Math.round(header.getBoundingClientRect().bottom) + 8);
+          }
           setIsOpen(!isOpen);
         }}
         aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
@@ -81,10 +87,13 @@ export function NotificationBell() {
       </button>
 
       {isOpen && (
-        // Phones: a panel pinned 12px from both screen edges, just below the header, so it can never run off-screen (the
-        // bell sits ~64px in from the right, so a fixed 320px box anchored to it was cut off on the left).
-        // 640px and up: the bell-anchored dropdown, capped to the viewport.
-        <div className="fixed inset-x-3 top-[4.5rem] z-50 flex max-h-[min(400px,calc(100dvh-6rem))] origin-top-right flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-80 sm:max-w-[calc(100vw-2rem)] sm:max-h-[400px]">
+        // Phones: a panel pinned 12px from both screen edges, starting 8px under the header (measured when it opens), so
+        // it can never run off-screen and always lines up with the header. 640px and up: the bell-anchored dropdown,
+        // roomier (384px) and capped to the viewport.
+        <div
+          style={panelTop === null ? undefined : ({ "--bell-top": `${panelTop}px` } as React.CSSProperties)}
+          className="fixed inset-x-3 top-[var(--bell-top,4.5rem)] z-50 flex max-h-[min(26rem,calc(100dvh-var(--bell-top,4.5rem)-5rem))] origin-top-right flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-lg sm:absolute sm:inset-x-auto sm:right-0 sm:top-auto sm:mt-2 sm:w-96 sm:max-w-[calc(100vw-2rem)] sm:max-h-[26rem]"
+        >
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <h3 className="font-semibold text-[15px] text-gray-800 tracking-tight">Notifications</h3>
             {unreadCount > 0 && (

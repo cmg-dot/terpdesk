@@ -21,10 +21,10 @@ export const PrepMaterialsTab = ({ files }: { files: InterpreterPrepFile[] }) =>
 
   if (files.length === 0) {
     return (
-      <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
+      <div className="rounded-2xl border border-gray-200 bg-white p-6 text-center sm:p-10">
         <FolderOpen className="mx-auto mb-3 h-8 w-8 text-gray-300" aria-hidden="true" />
-        <h2 className="text-lg font-semibold text-[var(--ink)]">No prep materials yet</h2>
-        <p className="mx-auto mt-1 max-w-md text-sm text-[var(--sage)]">
+        <h2 className="text-balance break-words text-lg font-semibold text-[var(--ink)]">No prep materials yet</h2>
+        <p className="mx-auto mt-1 max-w-md break-words text-sm text-[var(--sage)]">
           Nothing has been shared with you. When an agency shares files for a job you are booked on, they appear here.
         </p>
       </div>
