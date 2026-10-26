@@ -1,64 +1,56 @@
-import { Logo } from "@/components/logo";
-import { LoginForm } from "@/components/login-form";
+import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { Building2, UserRound } from "lucide-react";
+import { LoginShell } from "@/components/auth/LoginShell";
+import { loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 
-export default function LoginPage() {
- return (
- <div className="min-h-[100dvh] w-full bg-[var(--canvas)] flex flex-col items-center justify-center p-4 font-sans text-[var(--ink)]">
- {/* Header Section */}
- <div className="mb-4 flex flex-col items-center text-center">
- <Logo className="mb-2" />
- <p className="text-lg lg:text-xl text-slate-700">
- Your interpreting business. One place.
- </p>
- </div>
+export const metadata: Metadata = { title: "Sign in | terpDESK" };
 
- {/* Main Card */}
- <div className="w-full max-w-[90vw] lg:max-w-md rounded-2xl border border-neutral-100 bg-white p-6 lg:p-8 ">
- <p className="mb-6 text-xs lg:text-sm leading-relaxed text-[var(--sage)]">
- Approved accounts and fictional records only. Scheduling,
- offers, private busy time and prep materials are saved. Billing,
- integrations and notifications are unavailable.
- </p>
+type SearchParams = Record<string, string | string[] | undefined>;
 
- <LoginForm />
+const first = (v: string | string[] | undefined): string | undefined => (Array.isArray(v) ? v[0] : v);
 
- {/* Links inside card */}
- <div className="mt-6 space-y-4 text-xs lg:text-sm leading-relaxed text-[var(--sage)]">
- <p>
- New interpreter?{" "}
- <Link
- href="/register"
- className="text-[var(--sage)] underline decoration-slate-300 underline-offset-4 hover:text-slate-800"
- >
- Create an interpreter account
- </Link>{" "}
- — in preview testing only, and it gives you a profile, not agency access.
- </p>
- <p>
- <Link
- href="/reset-password"
- className="text-[var(--sage)] underline decoration-slate-300 underline-offset-4 hover:text-slate-800"
- >
- Email me a password reset link
- </Link>
- </p>
- </div>
- </div>
+/**
+ * /login only picks a portal. Links that already say where they lead go straight to the right one: a callbackUrl to
+ * an agency or interpreter page, and the "account created" notice after interpreter sign-up.
+ */
+export default function LoginChooserPage({ searchParams }: { searchParams: SearchParams }) {
+  const query = new URLSearchParams();
+  for (const [key, value] of Object.entries(searchParams)) {
+    const v = first(value);
+    if (v !== undefined) query.set(key, v);
+  }
+  const qs = query.toString() ? `?${query.toString()}` : "";
 
- {/* Footer Link */}
- <div className="mt-6 text-center text-xs lg:text-sm text-slate-700">
- <p>
- Curious about terpDESK?{" "}
- <Link
- href="/demo"
- className="font-medium text-slate-700 underline decoration-slate-400 underline-offset-4 hover:text-[var(--ink)]"
- >
- Explore the demo
- </Link>{" "}
- — fictional sample data, nothing saved.
- </p>
- </div>
- </div>
- );
+  const callback = first(searchParams.callbackUrl);
+  const callbackRole = callback?.startsWith("/") && !callback.startsWith("//") ? requiredRoleForPath(callback.split("?")[0]) : null;
+  if (callbackRole) redirect(`${loginPathForRole(callbackRole)}${qs}`);
+  if (first(searchParams.registered) === "true") redirect(`${loginPathForRole("interpreter")}${qs}`);
+
+  const option = "flex items-center gap-4 rounded-2xl border border-neutral-200 p-4 transition-colors hover:border-[var(--forest)] hover:bg-neutral-50";
+  return (
+    <LoginShell title="Sign in" subtitle="Choose how you use terpDESK.">
+      <nav aria-label="Sign-in portals" className="space-y-3">
+        <Link href={loginPathForRole("agency")} className={option}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E6EFEA] text-[var(--forest)]">
+            <Building2 className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-[var(--ink)]">Agency</span>
+            <span className="block text-xs text-[var(--sage)]">Agency owners and staff</span>
+          </span>
+        </Link>
+        <Link href={loginPathForRole("interpreter")} className={option}>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E6EFEA] text-[var(--forest)]">
+            <UserRound className="h-5 w-5" aria-hidden="true" />
+          </span>
+          <span>
+            <span className="block text-sm font-semibold text-[var(--ink)]">Interpreter</span>
+            <span className="block text-xs text-[var(--sage)]">Independent and agency interpreters</span>
+          </span>
+        </Link>
+      </nav>
+    </LoginShell>
+  );
 }

@@ -200,7 +200,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </div>
                   <div className="flex flex-col gap-4">
                     <Link href="/interpreter" onClick={() => setIsMenuOpen(false)} className="text-slate-600 text-[15px] font-medium hover:text-[var(--forest)]">Switch to Interpreter</Link>
-                    <Link href="/login" onClick={() => setIsMenuOpen(false)} className="text-red-600 text-[15px] font-medium hover:text-red-700">Sign out</Link>
+                    <SignOutButton className="text-red-600 text-[15px] font-medium hover:text-red-700 text-left" />
                   </div>
                 </div>
               </motion.div>

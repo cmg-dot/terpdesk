@@ -79,7 +79,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
         {!access.ok ? (
           <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
             {MESSAGES[access.reason]}{" "}
-            <Link href="/login" className="font-medium underline underline-offset-4">Sign in</Link>
+            <Link href="/login/interpreter" className="font-medium underline underline-offset-4">Sign in</Link>
           </div>
         ) : (
           <>

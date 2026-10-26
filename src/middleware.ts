@@ -2,10 +2,10 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getAuthSecret } from "@/lib/auth/secret";
-import { homePathForRole, isAppRole, requiredRoleForPath } from "@/lib/auth/routes";
+import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 
-/** Public entry pages a signed-in user has no reason to see. */
-const ENTRY_PATHS = ["/", "/login"];
+/** Public entry pages a signed-in user has no reason to see (the portal chooser and both sign-in portals). */
+const ENTRY_PATHS = ["/", "/login", "/login/agency", "/login/interpreter"];
 
 export async function middleware(req: NextRequest) {
   const { pathname, search } = req.nextUrl;
@@ -27,16 +27,17 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(target, req.url));
   }
 
-  if (role === requiredRole) return NextResponse.next();
+  if (!requiredRole || role === requiredRole) return NextResponse.next();
 
-  const loginUrl = new URL("/login", req.url);
-  if (!role) {
-    // Not signed in: remember where they were headed.
-    loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
-  } else {
-    // Signed in with the wrong role: never send them back to the area they are not allowed in.
-    loginUrl.searchParams.set("error", "forbidden");
+  if (role) {
+    // Signed in, but this is the other role's area (e.g. an interpreter typing /dashboard): no access. They are sent
+    // to their own workspace, never into the other one.
+    return NextResponse.redirect(new URL(homePathForRole(role), req.url));
   }
+
+  // Not signed in: the sign-in portal for the area they were headed to, remembering where that was.
+  const loginUrl = new URL(loginPathForRole(requiredRole), req.url);
+  loginUrl.searchParams.set("callbackUrl", `${pathname}${search}`);
   return NextResponse.redirect(loginUrl);
 }
 
@@ -45,6 +46,8 @@ export const config = {
   matcher: [
     "/",
     "/login",
+    "/login/agency",
+    "/login/interpreter",
     "/dashboard/:path*",
     "/requests/:path*",
     "/calendar/:path*",

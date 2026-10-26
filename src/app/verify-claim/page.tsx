@@ -56,7 +56,7 @@ export default async function VerifyClaimPage({ searchParams }: { searchParams: 
             <p role="alert" className="mb-6 rounded-xl bg-red-50 px-4 py-3 text-sm text-red-700">
               {error}
             </p>
-            <Link href="/login" className="text-sm text-[var(--sage)] underline underline-offset-4 hover:text-slate-800">
+            <Link href="/login/interpreter" className="text-sm text-[var(--sage)] underline underline-offset-4 hover:text-slate-800">
               Go to sign in
             </Link>
           </>

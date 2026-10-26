@@ -4,11 +4,13 @@ import * as React from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { getSession, signIn } from "next-auth/react";
+import Link from "next/link";
+import { getSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { homePathForRole, isAppRole } from "@/lib/auth/routes";
+import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
+import type { AppRole } from "@/lib/auth/routes";
 import { PasswordInput } from "@/components/ui/PasswordInput";
-import { DISPLAYABLE_AUTH_MESSAGES } from "@/lib/auth/messages";
+import { DISPLAYABLE_AUTH_MESSAGES, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 
 const loginSchema = z.object({
  email: z.string().email({ message: "Please enter a valid email address" }),
@@ -17,7 +19,9 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-export function LoginForm() {
+/** The sign-in form of one portal. The server refuses accounts of the other role (see authorize() in auth options). */
+export function LoginForm({ portal }: { portal: AppRole }) {
+ const otherPortal: AppRole = portal === "agency" ? "interpreter" : "agency";
  const router = useRouter();
  const [justRegistered, setJustRegistered] = React.useState(false);
  const [verifySent, setVerifySent] = React.useState(false);
@@ -47,7 +51,7 @@ export function LoginForm() {
 
  const onSubmit = async (data: LoginFormValues) => {
  setFormError(null);
- const result = await signIn("credentials", { email: data.email, password: data.password, redirect: false });
+ const result = await signIn("credentials", { email: data.email, password: data.password, portal, redirect: false });
  if (!result || result.error) {
  // Only the lockout notice is shown verbatim; every other failure is one generic message
  // so the form never reveals whether an email exists.
@@ -65,10 +69,21 @@ export function LoginForm() {
  setFormError("Your account has no role assigned. Contact your administrator.");
  return;
  }
+ if (role !== portal) {
+ // The server already refuses this; never keep a session that came through the wrong portal.
+ await signOut({ redirect: false });
+ setFormError(WRONG_PORTAL_MESSAGES[portal]);
+ return;
+ }
 
- // Only follow same-site, role-appropriate callbacks.
+ // Only follow same-site callbacks this role may open (a public page, or one of its own pages).
  const callback = new URLSearchParams(window.location.search).get("callbackUrl");
- const safeCallback = callback && callback.startsWith("/") && !callback.startsWith("//") ? callback : null;
+ const callbackPath = callback?.split("?")[0] ?? "";
+ const callbackRole = requiredRoleForPath(callbackPath);
+ const safeCallback =
+ callback && callback.startsWith("/") && !callback.startsWith("//") && !callbackPath.startsWith("/login") && (callbackRole === null || callbackRole === role)
+ ? callback
+ : null;
  router.push(safeCallback ?? homePathForRole(role));
  router.refresh();
  };
@@ -121,9 +136,14 @@ export function LoginForm() {
  </div>
 
  {formError && (
- <p role="alert" className="rounded-xl bg-red-50 px-4 py-2.5 text-xs text-red-700">
- {formError}
- </p>
+ <div role="alert" className="rounded-xl bg-red-50 px-4 py-2.5 text-xs text-red-700">
+ <p>{formError}</p>
+ {formError === WRONG_PORTAL_MESSAGES[portal] && (
+ <Link href={loginPathForRole(otherPortal)} className="mt-1.5 inline-block font-semibold underline underline-offset-2">
+ Go to the {otherPortal} sign-in
+ </Link>
+ )}
+ </div>
  )}
 
  <div className="pt-2">

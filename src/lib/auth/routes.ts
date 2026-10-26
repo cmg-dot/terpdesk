@@ -39,3 +39,6 @@ export const requiredRoleForPath = (path: string): AppRole | null => {
 export const homePathForRole = (role: AppRole): string => (role === "agency" ? "/dashboard" : "/interpreter-home");
 
 export const isAppRole = (value: unknown): value is AppRole => value === "agency" || value === "interpreter";
+
+/** Each role has its own sign-in portal; /login itself only lets people pick one. */
+export const loginPathForRole = (role: AppRole): string => (role === "agency" ? "/login/agency" : "/login/interpreter");

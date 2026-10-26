@@ -9,7 +9,7 @@ import { auditLogs, interpreters, users } from "@/db/schema";
 import { interpreterDisplayName } from "@/lib/displayNameSql";
 import { getAuthSecret } from "@/lib/auth/secret";
 import { ensureValidAuthUrl } from "@/lib/baseUrl";
-import { LOCKED_MESSAGE } from "@/lib/auth/messages";
+import { LOCKED_MESSAGE, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
 
@@ -19,6 +19,8 @@ ensureValidAuthUrl();
 const credentialsSchema = z.object({
   email: z.string().trim().toLowerCase().email().max(255),
   password: z.string().min(1).max(200),
+  // Which sign-in portal was used. Required: every sign-in goes through the agency or the interpreter portal.
+  portal: z.enum(["agency", "interpreter"]),
 });
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -58,11 +60,12 @@ export const authOptions: NextAuthOptions = {
       credentials: {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
+        portal: { label: "Portal", type: "text" },
       },
       async authorize(credentials) {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
-        const { email, password } = parsed.data;
+        const { email, password, portal } = parsed.data;
 
         // Brute-force protection: checked before any password work, and by submitted email, so an
         // unknown address is locked exactly like a real one (no way to tell them apart).
@@ -83,6 +86,14 @@ export const authOptions: NextAuthOptions = {
         if (!user || !passwordOk || !isAppRole(user.role)) {
           await writeAuditLog({ userId: user?.id ?? null, userEmail: email, action: "login_failed", details: "invalid credentials" });
           return null;
+        }
+
+        // Right password, wrong portal: refused here, before a session exists, so nobody is ever signed in through
+        // the other role's portal. Not counted as a failed attempt (the password was right). The message names the
+        // right portal; it is only reachable with the correct password, so it reveals nothing about other accounts.
+        if (user.role !== portal) {
+          await writeAuditLog({ userId: user.id, userEmail: email, action: "login_wrong_portal", details: `role=${user.role}; portal=${portal}` });
+          throw new Error(WRONG_PORTAL_MESSAGES[portal]);
         }
 
         // Link an interpreter login to its interpreters row (matched by email) so actions can scope data to it.
