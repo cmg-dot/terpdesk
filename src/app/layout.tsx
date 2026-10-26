@@ -15,6 +15,10 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: "terpDESK",
   description: "Your interpreting business. One place.",
+  icons: {
+    icon: { url: "/terpdesk-mark.png", type: "image/png" },
+    apple: "/terpdesk-mark.png",
+  },
 };
 
 export default async function RootLayout({
