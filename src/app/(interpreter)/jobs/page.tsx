@@ -13,7 +13,7 @@ import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappe
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
-import { getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord } from "@/utils/hoursState";
+import { getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord, showsStatePortal } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 
 type Tab = "upcoming" | "past";
@@ -348,12 +348,13 @@ export default function InterpreterJobsPage() {
                 const locSecondary = locationParts[1]?.trim() || job.agencyName || "North Fictional Interpreting";
                 const hoursState = getJobHoursState(job, serviceRecords);
                 const isCorrection = hoursState === 'correction_requested';
+                const usesStatePortal = showsStatePortal(job, hoursState);
                 const record = findOwnServiceRecord(serviceRecords, job);
                 const reviewMsg = record?.reviewMessage || (job.hoursSubmission as any)?.reviewMessage;
-                
+
                 return (
-                  <div 
-                    key={job.id} 
+                  <div
+                    key={job.id}
                     className={`bg-white rounded-2xl border p-4 flex flex-col justify-between hover:shadow-md transition-shadow ${
                       isCorrection 
                         ? 'border-amber-300 ring-1 ring-amber-300/30' 
@@ -375,7 +376,7 @@ export default function InterpreterJobsPage() {
                           <div className="inline-flex h-6 items-center bg-[#DCEAE3] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                             Booked
                           </div>
-                          {job.isStateJob ? (
+                          {usesStatePortal ? (
                             <div className="inline-flex h-6 items-center bg-gray-100 text-gray-600 border border-gray-200 text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                               Hours via ODHH portal
                             </div>
@@ -432,7 +433,7 @@ export default function InterpreterJobsPage() {
                     </div>
 
                     {/* Bottom Action Button */}
-                    {job.isStateJob ? (
+                    {usesStatePortal ? (
                       <a
                         href={buildOdhhPortalUrl()}
                         target="_blank"

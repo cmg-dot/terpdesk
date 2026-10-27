@@ -16,7 +16,7 @@ import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadg
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { formatReference } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
-import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus } from "@/utils/hoursState";
+import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
@@ -720,7 +720,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
   }, [serviceRecord, job, isOdhh]);
 
   // State jobs: the whole TerpDesk hours form is replaced by a pointer to the state portal.
-  if (job.isStateJob === true) {
+  if (showsStatePortal(job, currentState)) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
         <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Actual service time</h2>

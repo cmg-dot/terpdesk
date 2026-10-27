@@ -68,6 +68,14 @@ export function getJobHoursState(job: any, serviceRecords: any[] = []): HoursWor
   return 'not_submitted';
 }
 
+/**
+ * State jobs (ODHH/HCA) send the interpreter to the state portal to report hours. Once TerpDesk holds hours for the job
+ * (for example from the state's service-verification email) they are shown like any other job's hours instead; only a
+ * job with no hours yet, a draft, or a correction request still points to the portal.
+ */
+export const showsStatePortal = (job: { isStateJob?: boolean } | null | undefined, state: HoursWorkflowState): boolean =>
+  job?.isStateJob === true && state !== 'awaiting_review' && state !== 'approved';
+
 export function isJobNeedingHours(job: any, serviceRecords: any[] = [], nowMs: number = Date.now()): boolean {
   if (!job) return false;
   // State jobs: hours are submitted in the state portal, not in TerpDesk.
