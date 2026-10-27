@@ -38,6 +38,10 @@ export interface VerificationHints {
   actualEndTime?: unknown;
   totalMiles?: unknown;
   otherFees?: unknown;
+  serviceComplete?: unknown;
+  cancellation?: unknown;
+  cancelledBy?: unknown;
+  comments?: unknown;
 }
 
 export interface ParsedServiceVerification {
@@ -53,6 +57,13 @@ export interface ParsedServiceVerification {
   /** Other fees as written (for the record), and the dollar amount when one is given. */
   otherFeesText: string | null;
   otherFeesAmount: number | null;
+  /** "Service Complete - No" -> false. Null when the email does not say. */
+  serviceComplete: boolean | null;
+  /** The cancellation line as written ("Cancellation By State Employee"), and who cancelled ("State Employee"). */
+  cancellation: string | null;
+  cancelledBy: string | null;
+  /** The state's free-text comment (single line). Staff-only: it is never put in a notification or email. */
+  comments: string | null;
 }
 
 const ACTUAL_START = labelPattern(["Actual[ \\t]+Start(?:[ \\t]+Time)?", "Actual[ \\t]+Time[ \\t]+In"]);
@@ -64,6 +75,16 @@ const MILEAGE = labelPattern([
   "Mile(?:s|age)",
 ]);
 const OTHER_FEES = labelPattern(["Other[ \\t]+Fee(?:s|\\(s\\))", "Additional[ \\t]+Fee(?:s|\\(s\\))"]);
+
+// "Service Complete - No" | "Service Complete: Yes" | "Service Completed? no"
+const SERVICE_COMPLETE = /^[ \t]*Service[ \t]+Complete(?:d)?[ \t]*[-:?–—]+[ \t]*(yes|no|y|n|true|false)\b/im;
+// "Cancellation By State Employee": group 1 is the whole line, group 2 who cancelled.
+const CANCELLED_BY = /^[ \t]*(Cancell?ation[ \t]+by\b[ \t]*[-:–—]?[ \t]*(.*?))[ \t]*$/im;
+// "Cancellation: Late" | "Cancellation Status: Cancelled"
+const CANCELLATION_FIELD = labelPattern(["Cancell?ation(?:[ \\t]+(?:Status|Type))?"]);
+// "Comments:cancelled 10/8 8 am" (no space after the colon is fine)
+const COMMENTS = labelPattern(["Comments?"]);
+const MAX_COMMENTS_LENGTH = 1000;
 
 const MAX_MILES = 2000;
 const MAX_FEES = 10000;
@@ -97,6 +118,21 @@ function parseFees(value: string | null): { text: string | null; amount: number 
   return { text: value.slice(0, 100), amount: amount !== null && Number.isFinite(amount) && amount >= 0 && amount <= MAX_FEES ? amount : null };
 }
 
+/** true/false from "Yes"/"No"-style text or a real boolean; null for anything else. */
+function toYesNo(value: unknown): boolean | null {
+  if (typeof value === "boolean") return value;
+  const answer = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (["yes", "y", "true"].includes(answer)) return true;
+  if (["no", "n", "false"].includes(answer)) return false;
+  return null;
+}
+
+/** Free text from the email, whitespace flattened and capped. Control characters never survive. */
+const longText = (value: string | null | undefined): string | null => {
+  const cleaned = (value ?? "").replace(/[\u0000-\u001F\u007F]+/g, " ").replace(/\s+/g, " ").trim().slice(0, MAX_COMMENTS_LENGTH);
+  return cleaned.length > 0 ? cleaned : null;
+};
+
 export function parseServiceVerification(rawContent: string, hints: VerificationHints = {}): ParsedServiceVerification {
   const text = normalizeEmailText(rawContent);
   const pick = (pattern: RegExp, hint: unknown): string | null => cleanValue(text.match(pattern)?.[1]) ?? cleanValue(asText(hint));
@@ -112,6 +148,10 @@ export function parseServiceVerification(rawContent: string, hints: Verification
   const end = parseDateTimeValue(pick(ACTUAL_END, hints.actualEndTime));
   const fees = parseFees(pick(OTHER_FEES, hints.otherFees));
 
+  const cancelledLine = text.match(CANCELLED_BY);
+  const cancellation = cleanValue(cancelledLine?.[1]) ?? cleanValue(text.match(CANCELLATION_FIELD)?.[1]) ?? cleanValue(asText(hints.cancellation));
+  const cancelledBy = cleanValue(cancelledLine?.[2]) ?? cleanValue(asText(hints.cancelledBy));
+
   return {
     srn,
     startDate: start.date,
@@ -121,13 +161,24 @@ export function parseServiceVerification(rawContent: string, hints: Verification
     totalMiles: parseMiles(pick(MILEAGE, hints.totalMiles)),
     otherFeesText: fees.text,
     otherFeesAmount: fees.amount,
+    serviceComplete: toYesNo(text.match(SERVICE_COMPLETE)?.[1]) ?? toYesNo(hints.serviceComplete),
+    cancellation,
+    cancelledBy,
+    comments: longText(text.match(COMMENTS)?.[1]) ?? longText(asText(hints.comments)),
   };
 }
 
-/** Names of the required fields that could not be read (SRN, start and end time). Empty when usable. */
+/** The state reports the service did not happen (not completed, or cancelled): actual times may legitimately be empty. */
+export const reportsNoService = (parsed: ParsedServiceVerification): boolean => parsed.serviceComplete === false || parsed.cancellation !== null;
+
+/**
+ * Names of the required fields that could not be read (SRN, start and end time). Empty when usable. A receipt that
+ * reports no service (cancelled / not completed) only needs the SRN: nothing was worked, so there may be no times.
+ */
 export function missingVerificationFields(parsed: ParsedServiceVerification): string[] {
   const missing: string[] = [];
   if (!parsed.srn) missing.push("srn");
+  if (reportsNoService(parsed)) return missing;
   if (!parsed.startTime) missing.push("actualStartTime");
   if (!parsed.endTime) missing.push("actualEndTime");
   return missing;

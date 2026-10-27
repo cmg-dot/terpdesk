@@ -33,6 +33,8 @@ const MAX_PREP_NOTES_LENGTH = 1000;
  *  - type "job_offer" (default): parsed into a new draft request.
  *  - type "timesheet": an ODHH SERVICE VERIFICATION. It updates the existing request with the same SRN and never
  *    creates a draft (see lib/serviceVerification.ts). When `type` is missing it is inferred from the email text.
+ *    `attachments` (base64 PDF / image files) may come with it: the first real, non-inline one is the state's signature.
+ *    The hours land under Hours review > "Awaiting review" for staff to approve.
  */
 interface InboundEmailPayload {
   email: string;
@@ -141,7 +143,10 @@ export async function POST(
     }
     const intakeType = resolveIntakeType(declaredType, rawContent);
 
-    if (intakeType === "timesheet") return respondToServiceVerification(rawContent, (body as Record<string, unknown>).verification);
+    if (intakeType === "timesheet") {
+      const { verification, attachments } = body as Record<string, unknown>;
+      return respondToServiceVerification(rawContent, verification, attachments);
+    }
 
     // HIPAA: log only that an email arrived and its size. The sender, subject and body can hold PHI, so none are logged.
     console.log("[Intake Webhook] Inbound email received", { contentLength: rawContent.length });

@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { NextResponse } from "next/server";
@@ -6,10 +7,14 @@ import { db } from "@/db";
 import { offers, requests, timesheets } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { notifyAgencyAdmins } from "@/lib/notifications";
-import { missingVerificationFields, parseServiceVerification } from "@/lib/odhhVerificationParser";
+import { logError } from "@/lib/logError";
+import { missingVerificationFields, parseServiceVerification, reportsNoService } from "@/lib/odhhVerificationParser";
 import type { ParsedServiceVerification, VerificationHints } from "@/lib/odhhVerificationParser";
 import { logActivity } from "@/lib/requestActivity";
+import { removeObjectsQuietly } from "@/lib/s3";
 import { recordStateJobHours } from "@/lib/stateJobHours";
+import { pickSignature, signatureUrlFor, storeSignature } from "@/lib/verificationSignature";
+import type { StoredSignature } from "@/lib/verificationSignature";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezone";
 
@@ -25,7 +30,7 @@ import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezo
  */
 
 export type VerificationOutcome =
-  | "recorded" // hours written to a new approved timesheet
+  | "pending_review" // saved as a submitted timesheet: waiting under Hours review > "Awaiting review"
   | "unchanged" // already recorded with these same values
   | "conflict" // already recorded with different values: left as is, staff notified
   | "no_matching_request"
@@ -48,9 +53,18 @@ const MAX_SHIFT_HOURS = 24;
 const FUTURE_TOLERANCE_MS = 10 * 60_000;
 
 /** What staff see when a receipt could not be applied automatically. Never includes names or times. */
-async function flagForStaff(title: string, message: string, requestId?: string): Promise<void> {
-  await notifyAgencyAdmins({ type: "job", href: requestId ? `/requests/${requestId}` : "/requests", title, message });
+async function flagForStaff(title: string, message: string, requestId?: string, href?: string): Promise<void> {
+  await notifyAgencyAdmins({ type: "job", href: href ?? (requestId ? `/requests/${requestId}` : "/requests"), title, message });
 }
+
+/** The service-note line for what the state wrote: the comment is the state's own words, kept on the timesheet only. */
+const verificationNote = (parsed: ParsedServiceVerification): string => {
+  const parts = ["Recorded from the ODHH service verification."];
+  if (parsed.otherFeesText) parts.push(`Other fee(s): ${parsed.otherFeesText}`);
+  if (parsed.cancellation) parts.push(`${parsed.cancellation}.`);
+  if (parsed.comments) parts.push(`ODHH comments: ${parsed.comments}`);
+  return parts.join(" ");
+};
 
 function computeTimes(parsed: ParsedServiceVerification, appointmentStartsAt: string, zone: string): { start: Date; end: Date } | string {
   const appointmentDate = formatInTimeZone(new Date(appointmentStartsAt), zone, "yyyy-MM-dd");
@@ -72,17 +86,17 @@ export type TimesheetIntakeResponse =
   | { success: false; error: string; missingFields?: string[] };
 
 /** The webhook's HTTP answer for a service verification. 422 = the email will never parse, so the Lambda must not retry it. */
-export async function respondToServiceVerification(rawContent: string, hintsRaw: unknown): Promise<NextResponse<TimesheetIntakeResponse>> {
+export async function respondToServiceVerification(rawContent: string, hintsRaw: unknown, attachmentsRaw?: unknown): Promise<NextResponse<TimesheetIntakeResponse>> {
   // HIPAA: only the size and the outcome are logged, never the email or any value read from it.
-  console.log("[Intake Webhook] Service verification received", { contentLength: rawContent.length });
+  console.log("[Intake Webhook] Service verification received", { contentLength: rawContent.length, attachments: Array.isArray(attachmentsRaw) ? attachmentsRaw.length : 0 });
   const hints = hintsRaw && typeof hintsRaw === "object" && !Array.isArray(hintsRaw) ? (hintsRaw as VerificationHints) : undefined;
-  const result = await processServiceVerification(rawContent, hints);
+  const result = await processServiceVerification(rawContent, hints, attachmentsRaw);
   if (!result.ok) return NextResponse.json({ success: false, error: result.error, missingFields: result.missingFields }, { status: 422 });
   console.log("[Intake Webhook] Service verification processed", { outcome: result.outcome });
   return NextResponse.json({ success: true, type: "timesheet", outcome: result.outcome, id: result.requestId }, { status: 200 });
 }
 
-export async function processServiceVerification(rawContent: string, hints?: VerificationHints): Promise<ServiceVerificationResult> {
+export async function processServiceVerification(rawContent: string, hints?: VerificationHints, attachmentsRaw?: unknown): Promise<ServiceVerificationResult> {
   const parsed = parseServiceVerification(rawContent, hints);
   const missing = missingVerificationFields(parsed);
   if (missing.length > 0) {
@@ -118,20 +132,26 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
   const data = (request.data ?? {}) as unknown as LooseData;
   const zone = getIanaZone(data.details?.timeZone ?? data.details?.timezone ?? data.timeZone ?? data.timezone);
   const { startsAt } = resolveRequestTimes({ createdAt: request.createdAt, data: request.data });
-  const times = computeTimes(parsed, startsAt, zone);
-  if (typeof times === "string") return { ok: false, error: times };
+  // A receipt that reports no service (cancelled / not completed) may carry no times at all; it is still recorded.
+  const computed = parsed.startTime && parsed.endTime ? computeTimes(parsed, startsAt, zone) : null;
+  if (typeof computed === "string" && !reportsNoService(parsed)) return { ok: false, error: computed };
+  const times = computed !== null && typeof computed !== "string" ? computed : null;
 
-  const serviceHours = Math.round(((times.end.getTime() - times.start.getTime()) / 3_600_000) * 100) / 100;
+  const serviceHours = times ? Math.round(((times.end.getTime() - times.start.getTime()) / 3_600_000) * 100) / 100 : 0;
   const totalMiles = parsed.totalMiles ?? 0;
 
   // Keep the receipt on the request (staff-only) whatever happens next, as a record and for manual follow-up.
   const record = {
     receivedAt: new Date().toISOString(),
-    actualStart: times.start.toISOString(),
-    actualEnd: times.end.toISOString(),
+    actualStart: times?.start.toISOString() ?? null,
+    actualEnd: times?.end.toISOString() ?? null,
     totalMiles,
     otherFeesText: parsed.otherFeesText,
     otherFeesAmount: parsed.otherFeesAmount,
+    serviceComplete: parsed.serviceComplete,
+    cancellation: parsed.cancellation,
+    cancelledBy: parsed.cancelledBy,
+    comments: parsed.comments,
   };
   await db.execute(sql`
     UPDATE requests
@@ -157,18 +177,39 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
   }
   const interpreterId = interpreterIds[0];
 
-  const feesNote = parsed.otherFeesText ? ` Other fee(s): ${parsed.otherFeesText}` : "";
+  // The signature (first real PDF / image attachment, never an inline logo) goes to the private bucket first. If the
+  // storage is unavailable the hours are still recorded and staff are told the signature is missing.
+  const signatureFile = pickSignature(attachmentsRaw);
+  let stored: StoredSignature | null = null;
+  if (signatureFile) {
+    try {
+      stored = await storeSignature(requestId, signatureFile);
+    } catch (err) {
+      logError("Service verification signature upload", err);
+    }
+  }
+  const signatureLost = Boolean(signatureFile) && !stored;
+
+  const timesheetId = randomUUID();
   const created = await recordStateJobHours({
     requestId,
     interpreterId,
-    start: times.start,
-    end: times.end,
+    start: times?.start ?? null,
+    end: times?.end ?? null,
     serviceHours,
     totalMiles,
-    note: `Recorded from the ODHH service verification.${feesNote}`,
+    note: verificationNote(parsed),
+    review: {
+      timesheetId,
+      serviceCompleted: parsed.serviceComplete,
+      // Shown on the review card next to "Not completed": who cancelled, and what the state wrote.
+      cancellationReason: reportsNoService(parsed) ? [parsed.cancellation, parsed.comments].filter(Boolean).join(" - ") || null : null,
+      signature: stored ? { stored, url: signatureUrlFor(timesheetId) } : null,
+    },
   });
 
   if (!created) {
+    if (stored) await removeObjectsQuietly([stored.storageKey]); // a repeat of an email already recorded: no second copy
     // A timesheet already exists. The same figures are a no-op (a re-sent email); different figures are never
     // overwritten automatically, because the earlier ones may already be paid. Staff decide.
     const [existing] = await db
@@ -177,8 +218,8 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
       .where(and(eq(timesheets.requestId, requestId), eq(timesheets.interpreterId, interpreterId)))
       .limit(1);
     const same =
-      existing?.start?.getTime() === times.start.getTime() &&
-      existing?.end?.getTime() === times.end.getTime() &&
+      (existing?.start?.getTime() ?? null) === (times?.start.getTime() ?? null) &&
+      (existing?.end?.getTime() ?? null) === (times?.end.getTime() ?? null) &&
       Number(existing?.mileage ?? 0) === Number(totalMiles.toFixed(1));
     if (!same) {
       await flagForStaff("Service verification differs from recorded hours", "A new service verification has different hours or mileage than what is already recorded. Review the request.", requestId);
@@ -192,13 +233,19 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
     interpreterId,
     audience: "shared",
     kind: "hours_verified",
-    message: "Hours recorded from the ODHH service verification",
+    message: "Hours received from the ODHH service verification (waiting for staff review)",
     actorLabel: "ODHH service verification",
   });
-  await flagForStaff("Hours recorded from ODHH", "A service verification was applied and the hours were recorded as approved.", requestId);
+  // Generic wording only: no names, dates, comments or cancellation details in notifications (security.md).
+  await flagForStaff(
+    "ODHH hours to review",
+    `A service verification was received and is waiting in Hours review.${reportsNoService(parsed) ? " It reports the service was not completed or was cancelled." : ""}${signatureLost ? " Its signature could not be saved; check the original email." : ""}`,
+    requestId,
+    "/hours-review",
+  );
   await writeAuditLog({
     action: "service_verification_received",
-    details: `outcome=recorded; requestId=${requestId}; timesheetId=${created.id}; serviceHours=${serviceHours.toFixed(2)}`,
+    details: `outcome=pending_review; requestId=${requestId}; timesheetId=${created.id}; serviceHours=${serviceHours.toFixed(2)}; signature=${stored ? "stored" : signatureLost ? "failed" : "none"}`,
   });
 
   revalidatePath("/hours-review");
@@ -206,5 +253,5 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
   revalidatePath("/requests");
   revalidatePath(`/requests/${requestId}`);
   revalidatePath("/jobs");
-  return { ok: true, outcome: "recorded", requestId };
+  return { ok: true, outcome: "pending_review", requestId };
 }

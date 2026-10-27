@@ -70,6 +70,14 @@ export async function presignUpload(key: string, contentType: string, sizeBytes:
   );
 }
 
+/** Server-side upload for a file the server already holds (the intake webhook), so no presigned PUT is needed. */
+export async function uploadObject(key: string, body: Buffer, contentType: string): Promise<void> {
+  const { client, config } = storage();
+  await client.send(
+    new PutObjectCommand({ Bucket: config.bucket, Key: key, Body: body, ContentType: contentType, ContentLength: body.length }),
+  );
+}
+
 /** A short-lived GET URL. `fileName` is offered to the browser as the download name. */
 export async function presignDownload(key: string, fileName: string): Promise<string> {
   const { client, config } = storage();

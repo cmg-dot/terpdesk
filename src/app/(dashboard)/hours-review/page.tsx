@@ -13,6 +13,7 @@ import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords"
 import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone } from "@/utils/timezone";
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
 import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
+import { SignatureImage } from "@/components/features/SignatureImage";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -337,12 +338,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
       {record.signatureDataUrl ? (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mb-6">
           <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Service-verification signature</h4>
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={record.signatureDataUrl}
-            alt="Interpreter Signature"
-            className="max-h-32 max-w-full w-auto rounded-lg border border-gray-200 bg-white object-contain"
-          />
+          <SignatureImage src={record.signatureDataUrl} alt="Service-verification signature" />
         </div>
       ) : (record.state === 'submitted' || record.state === 'awaiting_review') ? (
         <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mb-6">
