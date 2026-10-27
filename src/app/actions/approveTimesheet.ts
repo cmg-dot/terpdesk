@@ -12,14 +12,17 @@ import { writeAuditLog } from "@/lib/audit";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 import { allBookedPositionsApproved, mirrorTimesheetApproval } from "@/lib/timesheetSync";
+import { MILEAGE_REASON_REQUIRED, mileageAdjustmentReasonSchema, mileageDiffers } from "@/lib/timesheetSchemas";
 import { logActivity } from "@/lib/requestActivity";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
 const REQUEST_COMPLETED_STATUS = "completed";
 
-const approveSchema =z.object({
+const approveSchema = z.object({
   timesheetId: z.string().uuid(),
   approvedMileage: z.coerce.number().finite().min(0).max(2000),
+  // Required (checked below) when the approved mileage differs from what was reported.
+  mileageAdjustmentReason: mileageAdjustmentReasonSchema.optional(),
 });
 
 export type ApproveTimesheetResult =
@@ -47,13 +50,25 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
   const { timesheetId, approvedMileage } = parsed.data;
 
   try {
+    // A submitted timesheet's mileage is fixed (its link is used up), so this read cannot go stale before the guarded
+    // update below. `mileage` is the server-computed sum of the legs' counted miles.
+    const [current] = await db
+      .select({ mileage: timesheets.mileage })
+      .from(timesheets)
+      .where(and(eq(timesheets.id, timesheetId), eq(timesheets.status, "submitted")))
+      .limit(1);
+    if (!current) return fail("This timesheet is not awaiting review.");
+    const adjusted = mileageDiffers(approvedMileage, Number(current.mileage ?? 0));
+    const reason = adjusted ? parsed.data.mileageAdjustmentReason || null : null;
+    if (adjusted && !reason) return fail(MILEAGE_REASON_REQUIRED);
+
     // Guarded update: only a 'submitted' timesheet can be approved, and only once.
     // The parent request's status is updated in the same transaction so the two cannot diverge.
     const approved = await db.transaction(async (tx) => {
       const now = new Date();
       const [row] = await tx
         .update(timesheets)
-        .set({ status: "approved", approvedMileage: approvedMileage.toFixed(1), updatedAt: now })
+        .set({ status: "approved", approvedMileage: approvedMileage.toFixed(1), mileageAdjustmentReason: reason, updatedAt: now })
         .where(and(eq(timesheets.id, timesheetId), eq(timesheets.status, "submitted")))
         .returning({
           requestId: timesheets.requestId,
@@ -63,7 +78,7 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
         });
       if (!row) return null;
       // Keep the interpreter app's copy of these hours (requests.data.hoursSubmissions) in step.
-      await mirrorTimesheetApproval(tx, row.requestId, timesheetId, approvedMileage);
+      await mirrorTimesheetApproval(tx, row.requestId, timesheetId, approvedMileage, reason);
       // Team jobs: the request is 'completed' only once every booked position is approved; until then it stays in
       // review, so the other interpreter's job never shows as approved because of this approval.
       const everyoneApproved = await allBookedPositionsApproved(tx, row.requestId);
@@ -90,6 +105,7 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
     revalidatePath(`/requests/${approved.requestId}`);
     revalidatePath("/jobs");
     revalidatePath("/interpreter-home");
+    revalidatePath("/mileage");
 
     await ensureDisplayNameColumns();
     const [row] = await db

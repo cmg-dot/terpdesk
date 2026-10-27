@@ -31,6 +31,8 @@ export interface SubmittedTimesheet {
   travelEnd: string | null;
   serviceCompleted: boolean | null;
   mileageNote: string;
+  /** Why the approved mileage differs from the reported mileage (set at approval). */
+  mileageAdjustmentReason: string | null;
   cancellationReason: string | null;
   travelLegs: TimesheetTravelLeg[];
 }
@@ -61,6 +63,7 @@ export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
       travelEndTime: timesheets.travelEndTime,
       serviceCompleted: timesheets.serviceCompleted,
       mileageNote: timesheets.mileageNote,
+      mileageAdjustmentReason: timesheets.mileageAdjustmentReason,
       cancellationReason: timesheets.cancellationReason,
       serviceNote: timesheets.serviceNote,
       travelLegs: timesheets.travelLegs,
@@ -103,6 +106,7 @@ export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
       travelEnd: r.travelEndTime ? r.travelEndTime.toISOString() : null,
       serviceCompleted: r.serviceCompleted,
       mileageNote: r.mileageNote ?? "",
+      mileageAdjustmentReason: r.mileageAdjustmentReason,
       cancellationReason: r.cancellationReason,
       travelLegs: Array.isArray(r.travelLegs) ? r.travelLegs : [],
     };

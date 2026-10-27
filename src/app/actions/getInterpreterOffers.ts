@@ -2,13 +2,12 @@
 
 import { requireInterpreter } from "@/lib/auth/guards";
 import { db } from "@/db";
-import { requests, offers, interpreters, timesheets } from "@/db/schema";
-import { and, eq, inArray } from "drizzle-orm";
+import { requests, offers, interpreters } from "@/db/schema";
+import { eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
-import { isTeamRequestData, legacyPosition1Hours } from "@/utils/hoursState";
 import { interpreterSafeData, interpreterSafeDetails } from "@/lib/interpreterJobData";
-import { timesheetToHoursSubmission, type TimesheetForSync } from "@/lib/timesheetSync";
+import { latestSheetsByRequest, resolveOwnHours } from "@/lib/ownHours";
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
 export async function fetchInterpreterOffers(_interpreterEmail?: string) {
@@ -74,34 +73,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
     }
   }
 
-  // Magic-link timesheets this interpreter submitted. Newer submissions are mirrored into the request already;
-  // this also covers ones sent before that mirror existed, so the app never shows "Submit actual hours" for them.
-  const sheetRows: (TimesheetForSync & { requestId: string })[] = await db
-    .select({
-      id: timesheets.id,
-      requestId: timesheets.requestId,
-      status: timesheets.status,
-      actualStartTime: timesheets.actualStartTime,
-      actualEndTime: timesheets.actualEndTime,
-      breakMinutes: timesheets.breakMinutes,
-      travelStartTime: timesheets.travelStartTime,
-      travelEndTime: timesheets.travelEndTime,
-      mileage: timesheets.mileage,
-      approvedMileage: timesheets.approvedMileage,
-      travelLegs: timesheets.travelLegs,
-      mileageNote: timesheets.mileageNote,
-      serviceNote: timesheets.serviceNote,
-      serviceCompleted: timesheets.serviceCompleted,
-      cancellationReason: timesheets.cancellationReason,
-      submittedAt: timesheets.submittedAt,
-    })
-    .from(timesheets)
-    .where(and(eq(timesheets.interpreterId, interpreter.id), inArray(timesheets.status, ["submitted", "approved"])));
-  const sheetByRequest = new Map<string, TimesheetForSync>();
-  for (const ts of sheetRows) {
-    const prev = sheetByRequest.get(ts.requestId);
-    if (!prev || (ts.submittedAt?.getTime() ?? 0) > (prev.submittedAt?.getTime() ?? 0)) sheetByRequest.set(ts.requestId, ts);
-  }
+  // Magic-link timesheets this interpreter submitted (also covers ones sent before they were mirrored into the request).
+  const sheetByRequest = await latestSheetsByRequest(interpreter.id);
 
   return offersData.map(row => {
     const rowData = (row.request.data as any) || {};
@@ -135,28 +108,9 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       requestCancelled && row.offer.status === 'accepted' ? 'cancelled'
       : requestCancelled && row.offer.status === 'pending' ? 'withdrawn'
       : row.offer.status;
-    const isTeamJob = isTeamRequestData(rowData);
-    const knownPosition = rowData.offerPositions?.[row.offer.id];
-    const posIdx = (knownPosition || 1) as 1 | 2;
-    const slotHours = rowData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(rowData) : null);
-    // Only the viewer's OWN hours: an entry recorded for another interpreter is never returned. On a team job an
-    // entry without an owner is trusted only when this offer's position is known for certain.
-    const ownerId = slotHours && typeof slotHours.interpreterId === 'string' ? slotHours.interpreterId : null;
-    const storedHours = !slotHours
-      ? null
-      : ownerId
-        ? (ownerId === interpreter.id ? slotHours : null)
-        : (!isTeamJob || knownPosition ? slotHours : null);
+    // Only the viewer's OWN hours (see resolveOwnHours), with their magic-link timesheet layered on.
     const sheet = row.offer.status === 'accepted' ? sheetByRequest.get(row.request.id) : undefined;
-    // Used when the request holds no submitted in-app hours, or holds this timesheet's own mirror. A mirror keeps
-    // its stored review state (e.g. a correction request); only the timesheet's approval is layered on top.
-    const isMirror = Boolean(sheet && storedHours?.timesheetId === sheet.id);
-    const fromSheet = sheet && (isMirror || !storedHours?.submittedAt) ? timesheetToHoursSubmission(sheet, posIdx) : null;
-    const hoursSub = !fromSheet
-      ? storedHours
-      : isMirror
-        ? { ...fromSheet, ...storedHours, ...(sheet?.status === 'approved' ? { status: 'approved', approvedMileage: fromSheet.approvedMileage } : {}) }
-        : { ...(storedHours || {}), ...fromSheet, isDraft: false };
+    const { posIdx, isTeamJob, hoursSub } = resolveOwnHours({ rowData, offerId: row.offer.id, interpreterId: interpreter.id, sheet });
 
     // Set by a post-booking edit for the offers that were booked at the time (see jobUpdateNotice.ts).
     const update = rowData.detailsUpdate as { at?: unknown; fields?: unknown; offerIds?: unknown } | undefined;

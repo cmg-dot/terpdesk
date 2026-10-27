@@ -64,5 +64,6 @@ export const config = {
     "/agencies/:path*",
     "/profile/:path*",
     "/prep/:path*",
+    "/mileage/:path*",
   ],
 };

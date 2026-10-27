@@ -11,8 +11,9 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { z } from "zod";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { legacyPosition1Hours } from "@/utils/hoursState";
-import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
+import { MAX_TOTAL_MILES, countLegs, sumCountedMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
 import type { TravelLeg } from "@/lib/timesheetSchemas";
+import { replaceMileageLegs } from "@/lib/mileageLegs";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 
 const signatureSchema = z
@@ -69,8 +70,11 @@ export async function submitInterpreterHours(
     ? undefined
     : z.string().trim().max(1000).parse(extra.cancellationReason);
 
-  const legs = travelLegsSchema.parse(extra?.legs ?? []);
-  const totalMiles = legs.length > 0 ? sumLegMiles(legs) : miles;
+  // Empty and 0-mile legs are dropped and each leg's counted miles (doubled on a round trip) are worked out here.
+  // The total comes from the legs whenever legs were sent, even if every one was empty; the `miles` argument is only
+  // used by a caller that sends no legs at all.
+  const legs = countLegs(travelLegsSchema.parse(extra?.legs ?? []));
+  const totalMiles = extra?.legs !== undefined ? sumCountedMiles(legs) : miles;
   if (!Number.isFinite(totalMiles) || totalMiles < 0 || totalMiles > MAX_TOTAL_MILES) {
     throw new Error("Mileage is out of range.");
   }
@@ -195,6 +199,7 @@ export async function submitInterpreterHours(
         updatedAt: new Date(),
       })
       .where(eq(requests.id, requestId));
+    await replaceMileageLegs(tx, { requestId, interpreterId: sessionInterpreterId }, legs);
   });
 
   await logActivity({ requestId, interpreterId: sessionInterpreterId, audience: "shared", kind: "hours_submitted", message: (extra?.version ?? 1) > 1 ? "Corrected hours submitted (in app)" : "Hours submitted (in app)", actorLabel: "Interpreter" });
@@ -203,6 +208,7 @@ export async function submitInterpreterHours(
 
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
+  revalidatePath("/mileage");
   revalidatePath("/dashboard");
   revalidatePath("/hours-review");
   revalidatePath(`/requests/${requestId}`);

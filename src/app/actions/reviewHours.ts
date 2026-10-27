@@ -8,14 +8,29 @@ import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/requestActivity";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { alertInterpreter } from "@/lib/lifecycleAlerts";
+import { z } from "zod";
+import { MAX_TOTAL_MILES, MILEAGE_REASON_REQUIRED, mileageAdjustmentReasonSchema, mileageDiffers } from "@/lib/timesheetSchemas";
+
+const approveHoursSchema = z.object({
+  requestId: z.string().uuid(),
+  approvedMileage: z.number().finite().min(0).max(MAX_TOTAL_MILES),
+  positionIndex: z.union([z.literal(1), z.literal(2)]),
+  mileageAdjustmentReason: mileageAdjustmentReasonSchema.optional(),
+});
+
+export type ApproveHoursResult = { success: true } | { success: false; error: string };
 
 export async function approveHours(
   requestId: string,
   approvedMileage: number,
-  positionIndex: 1 | 2 = 1
-): Promise<{ success: boolean }> {
+  positionIndex: 1 | 2 = 1,
+  mileageAdjustmentReason?: string,
+): Promise<ApproveHoursResult> {
   await requireRole("agency");
-  await db.transaction(async (tx) => {
+  const parsed = approveHoursSchema.safeParse({ requestId, approvedMileage, positionIndex: positionIndex || 1, mileageAdjustmentReason });
+  if (!parsed.success) return { success: false, error: "Enter a valid, non-negative mileage." };
+
+  const failure = await db.transaction(async (tx): Promise<string | null> => {
     const [existing] = await tx
       .select({ data: requests.data })
       .from(requests)
@@ -30,6 +45,11 @@ export async function approveHours(
     const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(existingData) : null) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
 
+    // `miles` on the stored hours is the server-computed sum of the legs' counted miles.
+    const adjusted = mileageDiffers(approvedMileage, Number(existingHours.miles ?? 0));
+    const adjustmentReason = adjusted ? parsed.data.mileageAdjustmentReason || null : null;
+    if (adjusted && !adjustmentReason) return MILEAGE_REASON_REQUIRED;
+
     const approveHistoryEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'approved',
@@ -40,6 +60,7 @@ export async function approveHours(
       positionIndex: posIdx,
       details: {
         approvedMileage,
+        ...(adjustmentReason ? { mileageAdjustmentReason: adjustmentReason } : {}),
       }
     };
 
@@ -48,6 +69,7 @@ export async function approveHours(
       positionIndex: posIdx,
       status: 'approved',
       approvedMileage,
+      mileageAdjustmentReason: adjustmentReason,
       approvedAt: new Date().toISOString(),
       reviewMessage: null,
       history: [...existingHistory, approveHistoryEntry],
@@ -89,7 +111,9 @@ export async function approveHours(
         updatedAt: new Date(),
       })
       .where(eq(requests.id, requestId));
+    return null;
   });
+  if (failure) return { success: false, error: failure };
 
   await logActivity({ requestId, kind: "hours_approved", message: `Hours approved (Position ${positionIndex || 1})`, actorLabel: "Agency staff" });
   revalidatePath("/jobs");
@@ -97,6 +121,7 @@ export async function approveHours(
   revalidatePath("/dashboard");
   revalidatePath("/hours-review");
   revalidatePath(`/requests/${requestId}`);
+  revalidatePath("/mileage");
 
   return { success: true };
 }

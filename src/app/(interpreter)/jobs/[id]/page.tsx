@@ -429,6 +429,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
           serviceCompleted: hs.serviceCompleted ?? (isPos1 ? (job as any).serviceCompleted : null) ?? "yes",
           isOdhh: isOdhh,
           approvedMileage: hs.approvedMileage ?? null,
+          mileageAdjustmentReason: hs.mileageAdjustmentReason ?? null,
           reviewMessage: hs.reviewMessage ?? null,
           version: hs.version || 1,
           history: hs.history || []
@@ -1020,6 +1021,9 @@ function ServiceTimeBlock({ job }: { job: any }) {
                     ? `${serviceRecord.approvedMileage.toFixed(1)} mi approved`
                     : "Not approved yet"}
                 </div>
+                {serviceRecord?.mileageAdjustmentReason && (
+                  <div className="mt-1 text-xs text-[var(--sage)]">Adjusted by the agency: {serviceRecord.mileageAdjustmentReason}</div>
+                )}
               </div>
             </div>
           </div>

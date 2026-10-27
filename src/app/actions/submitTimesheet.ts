@@ -8,7 +8,8 @@ import { timesheets } from "@/db/schema";
 import { getPendingTimesheetByToken } from "@/lib/timesheets";
 import { hashToken, TOKEN_PATTERN } from "@/lib/timesheetToken";
 import { wallClockToUtc } from "@/utils/timezone";
-import { MAX_TOTAL_MILES, sumLegMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
+import { MAX_TOTAL_MILES, countLegs, sumCountedMiles, travelLegsSchema } from "@/lib/timesheetSchemas";
+import { replaceMileageLegs } from "@/lib/mileageLegs";
 import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
 import { logActivity } from "@/lib/requestActivity";
 import { alertAgency } from "@/lib/lifecycleAlerts";
@@ -50,7 +51,9 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
   if (!parsed.success) {
     return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid submission." };
   }
-  const { token, actualStartTime, actualEndTime, legs, mileageNote, serviceNote, signatureDataUrl } = parsed.data;
+  const { token, actualStartTime, actualEndTime, mileageNote, serviceNote, signatureDataUrl } = parsed.data;
+  // Empty and 0-mile legs are dropped; what each leg counts for (doubled on a round trip) is worked out here.
+  const legs = countLegs(parsed.data.legs);
 
   // Re-verify the token server-side; also gives us the appointment's time zone and job type.
   const appointment = await getPendingTimesheetByToken(token);
@@ -95,7 +98,7 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
 
   const hours = (shiftMinutes - (breakMinutes ?? 0)) / 60;
 
-  const mileage = sumLegMiles(legs);
+  const mileage = sumCountedMiles(legs);
   if (mileage > MAX_TOTAL_MILES) {
     return { success: false, error: "Total mileage looks too high. Please check the legs." };
   }
@@ -139,6 +142,7 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
       )
       .returning();
     if (!row) return null;
+    await replaceMileageLegs(tx, { requestId: row.requestId, interpreterId: row.interpreterId }, legs);
     await mirrorTimesheetSubmission(tx, row.requestId, row.interpreterId, row);
     return row;
   });
@@ -153,6 +157,7 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
   revalidatePath("/dashboard");
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
+  revalidatePath("/mileage");
 
   return { success: true };
 }

@@ -14,6 +14,8 @@ import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone } from "@/util
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
 import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
 import { SignatureImage } from "@/components/features/SignatureImage";
+import { MileageApprovalField, needsMileageReason } from "@/components/features/MileageApprovalField";
+import { MileageLegsList } from "@/components/features/MileageLegsList";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 function CopyButton({ text, label }: { text: string; label?: string }) {
@@ -56,7 +58,9 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
   
   const [mileageToApprove, setMileageToApprove] = useState(record.reportedMileage.toString());
   const [showMileageError, setShowMileageError] = useState(false);
-  
+  const [adjustmentReason, setAdjustmentReason] = useState("");
+  const [showReasonError, setShowReasonError] = useState(false);
+
   // React 18: an async startTransition does not stay pending across the await, so track it explicitly.
   const [isApproving, setIsApproving] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
@@ -86,21 +90,26 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
       setShowMileageError(true);
       return;
     }
+    // A different mileage than reported needs a reason (the server enforces this too).
+    const reason = needsMileageReason(record.reportedMileage ?? 0, mileageToApprove) ? adjustmentReason.trim() : "";
+    if (needsMileageReason(record.reportedMileage ?? 0, mileageToApprove) && !reason) {
+      setShowReasonError(true);
+      return;
+    }
     setShowSignatureError(false);
     setShowMileageError(false);
+    setShowReasonError(false);
     setApproveError(null);
     setIsApproving(true);
 
     try {
-      if (record.timesheetId) {
-        const result = await approveTimesheet({ timesheetId: record.timesheetId, approvedMileage: mileageNum });
-        if (!result.success) {
-          setApproveError(result.error);
-          setIsApproving(false);
-          return;
-        }
-      } else {
-        await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1);
+      const result = record.timesheetId
+        ? await approveTimesheet({ timesheetId: record.timesheetId, approvedMileage: mileageNum, mileageAdjustmentReason: reason })
+        : await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1, reason);
+      if (!result.success) {
+        setApproveError(result.error);
+        setIsApproving(false);
+        return;
       }
     } catch (e) {
       console.error("[hours-review page] operation failed");
@@ -124,6 +133,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
       ...record,
       state: 'approved',
       approvedMileage: mileageNum,
+      mileageAdjustmentReason: reason || null,
       reviewMessage: null,
       history: [...prevHistory, approveEntry]
     });
@@ -295,14 +305,16 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
       {Array.isArray(record.travelLegs) && record.travelLegs.length > 0 && (
         <div className="text-sm mb-6 border-t border-gray-100 pt-4">
           <div className="text-[var(--sage)] text-xs mb-2">Mileage legs</div>
-          <ul className="space-y-1.5">
-            {record.travelLegs.map((leg, i) => (
-              <li key={i} className="text-xs text-[var(--ink)] bg-gray-50 p-2.5 rounded-lg border border-gray-100">
-                {leg.fromLabel || "—"} → {leg.toLabel || "—"} · {(leg.miles ?? 0).toFixed(1)} mi
-                {leg.roundTrip ? ` (round trip, ${((leg.miles ?? 0) * 2).toFixed(1)} mi)` : ""}
-              </li>
-            ))}
-          </ul>
+          <MileageLegsList legs={record.travelLegs} />
+        </div>
+      )}
+
+      {record.mileageAdjustmentReason && (
+        <div className="text-sm mb-6 border-t border-gray-100 pt-4">
+          <div className="text-[var(--sage)] text-xs mb-1">Mileage adjusted by the agency — reason</div>
+          <div className="text-[var(--ink)] text-xs bg-gray-50 p-2.5 rounded-lg border border-gray-100">
+            {record.mileageAdjustmentReason}
+          </div>
         </div>
       )}
 
@@ -368,16 +380,15 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
             <span className="text-sm text-gray-700">Record a signature exception (demo bypass)</span>
           </label>
           )}
-          <div className="mb-5">
-            <label className="block text-xs text-gray-600 mb-2">Mileage to approve (reported: {(record.reportedMileage ?? 0).toFixed(1)} mi)</label>
-            <input 
-              type="text" 
-              value={mileageToApprove} 
-              onChange={(e) => setMileageToApprove(e.target.value)} 
-              className="w-full sm:w-[200px] bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow" 
-            />
-            {showMileageError && <p className="text-[#C23B22] text-xs mt-1">Please enter a valid non-negative number.</p>}
-          </div>
+          <MileageApprovalField
+            reported={record.reportedMileage ?? 0}
+            value={mileageToApprove}
+            onChange={(v) => { setMileageToApprove(v); setShowReasonError(false); }}
+            reason={adjustmentReason}
+            onReasonChange={(v) => { setAdjustmentReason(v); setShowReasonError(false); }}
+            showValueError={showMileageError}
+            showReasonError={showReasonError}
+          />
           <div className="mb-5">
             <label className="block text-xs text-gray-600 mb-2">Message to the interpreter (required to request a correction)</label>
             <textarea 

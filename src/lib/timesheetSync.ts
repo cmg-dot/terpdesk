@@ -27,6 +27,7 @@ export type TimesheetForSync = Pick<
   | "travelEndTime"
   | "mileage"
   | "approvedMileage"
+  | "mileageAdjustmentReason"
   | "travelLegs"
   | "mileageNote"
   | "serviceNote"
@@ -63,6 +64,7 @@ export function timesheetToHoursSubmission(ts: TimesheetForSync, positionIndex: 
     submittedAt: iso(ts.submittedAt),
     reviewMessage: null,
     approvedMileage: approved ? num(ts.approvedMileage) : null,
+    mileageAdjustmentReason: approved ? ts.mileageAdjustmentReason : null,
     status: approved ? "approved" : "awaiting_review",
     timesheetId: ts.id,
     source: "magic_link",
@@ -142,7 +144,13 @@ export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, int
 }
 
 /** Marks the mirrored hours record approved when the agency approves its timesheet. No-op for unmirrored rows. */
-export async function mirrorTimesheetApproval(tx: DbTx, requestId: string, timesheetId: string, approvedMileage: number): Promise<void> {
+export async function mirrorTimesheetApproval(
+  tx: DbTx,
+  requestId: string,
+  timesheetId: string,
+  approvedMileage: number,
+  mileageAdjustmentReason: string | null = null,
+): Promise<void> {
   const [req] = await tx.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).for("update");
   if (!req) return;
   const data = requestData(req.data);
@@ -156,6 +164,7 @@ export async function mirrorTimesheetApproval(tx: DbTx, requestId: string, times
     ...current,
     status: "approved",
     approvedMileage,
+    mileageAdjustmentReason,
     reviewMessage: null,
     history: [
       ...history,
@@ -166,7 +175,7 @@ export async function mirrorTimesheetApproval(tx: DbTx, requestId: string, times
         actor: "Agency Staff",
         timestamp: new Date().toISOString(),
         version: Number(current.version ?? 1),
-        details: { approvedMileage },
+        details: { approvedMileage, ...(mileageAdjustmentReason ? { mileageAdjustmentReason } : {}) },
       },
     ],
   };

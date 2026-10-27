@@ -21,6 +21,8 @@ export interface ServiceRecord {
   travelEnd?: string;
   serviceCompleted?: string | boolean;
   mileageNote?: string;
+  /** Why the agency approved a different mileage than was reported (required by the approval when they differ). */
+  mileageAdjustmentReason?: string | null;
   serviceNote?: string;
   history?: any[];
   positionIndex?: 1 | 2;
@@ -30,7 +32,7 @@ export interface ServiceRecord {
   cancellationReason?: string | null;
   /** IANA zone of the job. Times are always shown in it, never in the viewer's local zone. */
   timeZone?: string;
-  travelLegs?: { fromLabel: string; toLabel: string; miles: number; roundTrip: boolean }[];
+  travelLegs?: { fromLabel: string; toLabel: string; miles: number; roundTrip: boolean; countedMiles?: number }[];
 }
 
 /** The single definition of "awaiting review", shared by the dashboard metric and the review panel. */
@@ -104,6 +106,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             travelEnd: hoursSub?.travelEndTime || (pos === 1 ? req.travelEndTime : null) || req.endsAt,
             serviceCompleted: hoursSub?.serviceCompleted ?? (pos === 1 ? req.serviceCompleted : null) ?? true,
             mileageNote: hoursSub?.mileageNote || "",
+            mileageAdjustmentReason: hoursSub?.mileageAdjustmentReason ?? null,
             serviceNote: hoursSub?.note || "",
             history: hoursSub?.history || [],
             signatureDataUrl: hoursSub?.signatureDataUrl ?? null,
@@ -155,6 +158,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
           isOdhh: ts.isOdhh,
           serviceNote: ts.notes,
           mileageNote: ts.mileageNote,
+          mileageAdjustmentReason: ts.mileageAdjustmentReason,
           travelStart: ts.travelStart ?? undefined,
           travelEnd: ts.travelEnd ?? undefined,
           serviceCompleted: ts.serviceCompleted ?? undefined,

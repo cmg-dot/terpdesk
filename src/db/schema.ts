@@ -1,3 +1,4 @@
+import { relations } from 'drizzle-orm';
 import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index, date } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
@@ -204,6 +205,8 @@ export interface TimesheetTravelLeg {
   toLabel: string;
   miles: number;
   roundTrip: boolean;
+  /** miles, doubled for a round trip; computed on the server (see lib/timesheetSchemas.ts). Absent on older records. */
+  countedMiles?: number;
 }
 
 export const timesheets = pgTable('timesheets', {
@@ -224,6 +227,8 @@ export const timesheets = pgTable('timesheets', {
   approvedMileage: numeric('approved_mileage', { precision: 7, scale: 1 }),
   notes: text('notes'),
   mileageNote: text('mileage_note'),
+  // Why the agency approved a different mileage than the interpreter reported; required whenever the two differ.
+  mileageAdjustmentReason: text('mileage_adjustment_reason'),
   // Itemised mileage legs as entered by the interpreter; `mileage` holds the server-computed total.
   travelLegs: jsonb('travel_legs').$type<TimesheetTravelLeg[]>(),
   // ODHH only: whether the service was completed (the "verification" question).
@@ -241,6 +246,38 @@ export const timesheets = pgTable('timesheets', {
 
 export type SelectTimesheet = typeof timesheets.$inferSelect;
 export type InsertTimesheet = typeof timesheets.$inferInsert;
+
+/**
+ * One itemised mileage leg of an interpreter's submitted hours. A job is a `requests` row and the interpreter owns
+ * their own legs on it, so (request, interpreter) identifies the set; `position` is the leg's order in that set.
+ * Written by the submit actions in the same transaction as the hours, replacing the previous set on a resubmission.
+ */
+export const mileageLegs = pgTable('mileage_legs', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  requestId: uuid('request_id').notNull().references(() => requests.id, { onDelete: 'cascade' }),
+  interpreterId: uuid('interpreter_id').notNull().references(() => interpreters.id, { onDelete: 'cascade' }),
+  position: integer('position').notNull(),
+  fromLabel: text('from_label').notNull().default(''),
+  toLabel: text('to_label').notNull().default(''),
+  miles: numeric('miles', { precision: 7, scale: 1 }).notNull(),
+  roundTrip: boolean('round_trip').notNull().default(false),
+  // miles * 2 for a round trip, else miles; always computed on the server.
+  countedMiles: numeric('counted_miles', { precision: 7, scale: 1 }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  ownerPositionIdx: uniqueIndex('mileage_legs_owner_position_idx').on(t.requestId, t.interpreterId, t.position),
+  interpreterIdx: index('mileage_legs_interpreter_idx').on(t.interpreterId),
+}));
+
+export type SelectMileageLeg = typeof mileageLegs.$inferSelect;
+
+export const requestsRelations = relations(requests, ({ many }) => ({
+  mileageLegs: many(mileageLegs),
+}));
+
+export const mileageLegsRelations = relations(mileageLegs, ({ one }) => ({
+  request: one(requests, { fields: [mileageLegs.requestId], references: [requests.id] }),
+}));
 
 export interface ClientContact {
   id: string;
