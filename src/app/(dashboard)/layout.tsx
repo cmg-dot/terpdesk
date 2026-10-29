@@ -43,7 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* The page scrolls with the browser's own scrollbar (no inner scroll container); the sidebar stays put. */}
         <div className="flex min-h-screen bg-[#F9F8F4] font-sans text-slate-900">
           {/* Sidebar */}
-          <aside className="hidden md:flex sticky top-0 h-screen self-start overflow-y-auto w-64 flex-col bg-[#0B3B32] text-white shrink-0">
+          <aside className="hidden md:flex sticky top-0 h-screen self-start overflow-y-auto sidebar-scroll w-64 flex-col bg-[#0B3B32] text-white shrink-0">
             <div className="flex flex-col p-6">
               <div className="flex items-center gap-3 mb-1">
                 <Image
