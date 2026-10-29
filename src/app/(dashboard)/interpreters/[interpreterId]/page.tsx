@@ -4,7 +4,9 @@ import { notFound } from "next/navigation";
 import { ArrowLeft, Lock, Mail, MapPin, Phone } from "lucide-react";
 import { AvailabilitySection } from "@/components/interpreters/detail/AvailabilitySection";
 import { SharedCredentialsSection } from "@/components/interpreters/detail/SharedCredentialsSection";
+import { InsuranceExpiry } from "@/components/profile/InsuranceExpiry";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ServiceAreaChips } from "@/components/profile/ServiceAreaChips";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { loadAgencyInterpreterView } from "@/lib/agencyInterpreterView";
 import { requireRole } from "@/lib/auth/guards";
@@ -56,9 +58,10 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
       <section className="rounded-2xl border border-gray-200 bg-white p-6">
         <h2 className="mb-2 text-lg font-semibold text-[var(--ink)]">How they work</h2>
         <dl>
-          <Row label="Service area">{view.serviceArea || NOT_SET}</Row>
+          <Row label="Service areas"><ServiceAreaChips areas={view.serviceAreas} /></Row>
           <Row label="Time zone">{zoneLabel}</Row>
           <Row label="Formats">{formats || "Not taking work right now"}</Row>
+          <Row label="Liability insurance expires"><InsuranceExpiry date={view.liabilityInsuranceExpiration} timeZone={view.timeZone} /></Row>
         </dl>
       </section>
 

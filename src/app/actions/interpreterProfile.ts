@@ -10,6 +10,7 @@ import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 import { deletePhotoFile } from "@/lib/profilePhoto";
+import { areasFromLegacy, cleanAreas, summarizeAreas } from "@/lib/serviceAreas";
 import { announceWebsiteReReview, sendApprovedWebsiteProfilesBackToReview } from "@/lib/websiteReview";
 import { publicFieldsChanged } from "@/lib/websiteProfile";
 import { interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
@@ -50,7 +51,9 @@ const loadProfile = async (userId: string, interpreterId: string): Promise<MyPro
     shortBio: row?.shortBio ?? "",
     city: row?.city ?? "",
     stateOrRegion: row?.stateOrRegion ?? "",
-    serviceArea: row?.serviceArea ?? "",
+    // A profile saved before tags existed only has the free-text area: its parts show up as tags until it is next saved.
+    serviceAreas: row && row.serviceAreas.length > 0 ? row.serviceAreas : areasFromLegacy(row?.serviceArea),
+    liabilityInsuranceExpiration: row?.liabilityInsuranceExpiration ?? "",
     timeZone: row?.timeZone ?? "America/Los_Angeles",
     takesInPerson: row?.takesInPerson ?? true,
     takesVirtual: row?.takesVirtual ?? true,
@@ -113,6 +116,8 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
     logError("updateMyProfile.accountName", err);
   }
 
+  const serviceAreas = cleanAreas(d.serviceAreas);
+
   // Only validated, picked fields reach the database. Empty strings are stored as "not set".
   const values = {
     preferredName: d.preferredName || null,
@@ -120,7 +125,10 @@ export async function updateMyProfile(input: InterpreterProfileInput): Promise<U
     shortBio: d.shortBio || null,
     city: d.city || null,
     stateOrRegion: d.stateOrRegion || null,
-    serviceArea: d.serviceArea || null,
+    // The tags, plus their one-line text for the website profile (which reads service_area) and its re-review check.
+    serviceAreas,
+    serviceArea: summarizeAreas(serviceAreas) || null,
+    liabilityInsuranceExpiration: d.liabilityInsuranceExpiration || null,
     timeZone: d.timeZone,
     takesInPerson: d.takesInPerson,
     takesVirtual: d.takesVirtual,

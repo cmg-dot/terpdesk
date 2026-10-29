@@ -5,6 +5,7 @@ import { setWebsiteSharing } from "@/app/actions/websiteSharing";
 import { PublicProfileCard } from "@/components/profile/PublicProfileCard";
 import { useGlobalState } from "@/context/GlobalContext";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
+import { summarizeAreas } from "@/lib/serviceAreas";
 import { toPublicProfile } from "@/lib/websiteProfile";
 import type { MyWebsiteSharing, WebsitePermission } from "@/lib/websiteProfile";
 
@@ -28,7 +29,8 @@ export const VisibilitySharingTab = ({ profile, sharing, onSharingChange }: Visi
 
   // Agencies are not stored in the database yet, so names come from the app's agency list.
   const nameOf = (id: string) => knownAgencies.find((a) => a.id === id)?.name ?? "Agency";
-  const publicProfile = useMemo(() => toPublicProfile(profile), [profile]);
+  // The website shows the one-line summary of the service areas (what saving the profile stores in service_area).
+  const publicProfile = useMemo(() => toPublicProfile({ ...profile, serviceArea: summarizeAreas(profile.serviceAreas) }), [profile]);
 
   const toggle = async (agencyId: string, allow: boolean) => {
     if (busyAgencyId) return;

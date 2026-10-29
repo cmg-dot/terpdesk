@@ -16,6 +16,7 @@ import { ensureAvailabilityTables, resolveInterpreterIds } from "@/app/actions/a
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { readPermission } from "@/lib/agencyPermissions";
 import { filesFor } from "@/lib/credentials";
+import { areasFromLegacy } from "@/lib/serviceAreas";
 import type { CredentialFile } from "@/lib/validation/file";
 import { summarizeAvailability } from "@/lib/availabilitySummary";
 import type { DayAvailability } from "@/lib/availabilitySummary";
@@ -42,7 +43,9 @@ export interface AgencyInterpreterView {
   photoUrl: string;
   city: string;
   stateOrRegion: string;
-  serviceArea: string;
+  serviceAreas: string[];
+  /** yyyy-MM-dd, or "" when the interpreter has not recorded it. */
+  liabilityInsuranceExpiration: string;
   timeZone: string;
   takesInPerson: boolean;
   takesVirtual: boolean;
@@ -150,7 +153,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     photoUrl: profile?.photoUrl ?? "",
     city: profile?.city ?? "",
     stateOrRegion: profile?.stateOrRegion ?? "",
-    serviceArea: profile?.serviceArea ?? "",
+    serviceAreas: profile && profile.serviceAreas.length > 0 ? profile.serviceAreas : areasFromLegacy(profile?.serviceArea),
+    liabilityInsuranceExpiration: profile?.liabilityInsuranceExpiration ?? "",
     timeZone,
     takesInPerson: profile?.takesInPerson ?? true,
     takesVirtual: profile?.takesVirtual ?? true,

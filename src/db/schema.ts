@@ -1,4 +1,4 @@
-import { relations } from 'drizzle-orm';
+import { relations, sql } from 'drizzle-orm';
 import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index, date } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
@@ -380,7 +380,13 @@ export const interpreterProfiles = pgTable('interpreter_profiles', {
   shortBio: text('short_bio'),
   city: varchar('city', { length: 100 }),
   stateOrRegion: varchar('state_or_region', { length: 100 }),
+  // One-line summary of service_areas ("Seattle, Tacoma"), kept in step by the profile form. The agency website profile
+  // and its re-review check read this text, so anything that writes service_areas must write this too.
   serviceArea: varchar('service_area', { length: 200 }),
+  // The areas an interpreter works in, one tag each. The single tag "Virtual Only" means no in-person areas.
+  serviceAreas: text('service_areas').array().notNull().default(sql`'{}'::text[]`),
+  // Calendar date (yyyy-MM-dd) their liability insurance expires; NULL = not recorded.
+  liabilityInsuranceExpiration: date('liability_insurance_expiration', { mode: 'string' }),
   takesInPerson: boolean('takes_in_person').notNull().default(true),
   takesVirtual: boolean('takes_virtual').notNull().default(true),
   workEmail: varchar('work_email', { length: 255 }),

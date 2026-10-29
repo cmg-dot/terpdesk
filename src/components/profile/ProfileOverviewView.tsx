@@ -1,6 +1,8 @@
 import type { ReactNode } from "react";
 import { Lock } from "lucide-react";
+import { InsuranceExpiry } from "@/components/profile/InsuranceExpiry";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
+import { ServiceAreaChips } from "@/components/profile/ServiceAreaChips";
 import { CONTACT_VISIBILITY_OPTIONS, PROFILE_TIME_ZONES } from "@/lib/validation/interpreterProfile";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
 
@@ -64,9 +66,13 @@ export const ProfileOverviewView = ({ profile }: { profile: MyProfile }) => {
       <Section title="Where and how you work">
         <Row label="City">{profile.city || NOT_SET}</Row>
         <Row label="State or region">{profile.stateOrRegion || NOT_SET}</Row>
-        <Row label="Service area">{profile.serviceArea || NOT_SET}</Row>
+        <Row label="Service areas"><ServiceAreaChips areas={profile.serviceAreas} /></Row>
         <Row label="Time zone">{zoneLabel(profile.timeZone)}</Row>
         <Row label="Takes work">{workModes(profile)}</Row>
+      </Section>
+
+      <Section title="Liability insurance">
+        <Row label="Expiration date"><InsuranceExpiry date={profile.liabilityInsuranceExpiration} timeZone={profile.timeZone} /></Row>
       </Section>
 
       <Section title="Contact details">

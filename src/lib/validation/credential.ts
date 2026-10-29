@@ -8,7 +8,7 @@ const optionalText = (max: number, label: string) =>
   z.string().trim().max(max, `${label} must be ${max} characters or fewer.`);
 
 /** A real calendar date written yyyy-mm-dd, or "" for none. */
-const optionalDate = (label: string) =>
+export const optionalDate = (label: string) =>
   z.string().refine((v) => {
     if (v === "") return true;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;

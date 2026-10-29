@@ -1,5 +1,14 @@
 import { z } from "zod";
+import { optionalDate } from "@/lib/validation/credential";
 import { PHOTO_PATH_PATTERN } from "@/lib/validation/file";
+import {
+  MAX_SERVICE_AREAS,
+  MAX_SERVICE_AREA_LENGTH,
+  SERVICE_AREA_SUMMARY_MAX,
+  VIRTUAL_ONLY_AREA,
+  cleanAreas,
+  summarizeAreas,
+} from "@/lib/serviceAreas";
 
 /** Time zones offered on the profile form (the ones the calendar understands). */
 export const PROFILE_TIME_ZONES = [
@@ -36,7 +45,22 @@ export const interpreterProfileSchema = z.object({
   shortBio: text(600, "Short bio"),
   city: text(100, "City"),
   stateOrRegion: text(100, "State or region"),
-  serviceArea: text(200, "Service area"),
+  serviceAreas: z
+    .array(
+      z.string().trim().min(1, "A service area can't be blank.").max(MAX_SERVICE_AREA_LENGTH, `Each service area must be ${MAX_SERVICE_AREA_LENGTH} characters or fewer.`),
+    )
+    .max(MAX_SERVICE_AREAS, `Add up to ${MAX_SERVICE_AREAS} service areas.`)
+    .superRefine((areas, ctx) => {
+      const cleaned = cleanAreas(areas);
+      if (cleaned.includes(VIRTUAL_ONLY_AREA) && cleaned.length > 1) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: `"${VIRTUAL_ONLY_AREA}" can't be combined with other areas.` });
+      }
+      // The list is also saved as one line of text (service_area), which holds 200 characters.
+      if (summarizeAreas(cleaned).length > SERVICE_AREA_SUMMARY_MAX) {
+        ctx.addIssue({ code: z.ZodIssueCode.custom, message: "That list is too long. Remove an area or shorten the names." });
+      }
+    }),
+  liabilityInsuranceExpiration: optionalDate("liability insurance expiration date"),
   timeZone: z.string().max(64).refine(isKnownZone, "Choose a time zone from the list."),
   takesInPerson: z.boolean(),
   takesVirtual: z.boolean(),

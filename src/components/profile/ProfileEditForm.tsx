@@ -5,11 +5,12 @@ import type { ChangeEvent, FormEvent } from "react";
 import { updateMyProfile } from "@/app/actions/interpreterProfile";
 import { Field, FormCard as Card, inputClass } from "@/components/profile/formParts";
 import { ProfilePhotoPicker } from "@/components/profile/ProfilePhotoPicker";
+import { ServiceAreasInput } from "@/components/profile/ServiceAreasInput";
 import { CONTACT_VISIBILITY_OPTIONS, PROFILE_TIME_ZONES, interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
 
 type FieldErrors = Partial<Record<InterpreterProfileField, string>>;
-type TextField = Exclude<InterpreterProfileField, "takesInPerson" | "takesVirtual">;
+type TextField = Exclude<InterpreterProfileField, "takesInPerson" | "takesVirtual" | "serviceAreas">;
 
 interface ProfileEditFormProps {
   profile: MyProfile;
@@ -27,7 +28,8 @@ const toInput = (p: MyProfile): InterpreterProfileInput => ({
   shortBio: p.shortBio,
   city: p.city,
   stateOrRegion: p.stateOrRegion,
-  serviceArea: p.serviceArea,
+  serviceAreas: p.serviceAreas,
+  liabilityInsuranceExpiration: p.liabilityInsuranceExpiration,
   timeZone: p.timeZone,
   takesInPerson: p.takesInPerson,
   takesVirtual: p.takesVirtual,
@@ -137,12 +139,18 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
         <Field id="profile-stateOrRegion" label="State or region" error={errors.stateOrRegion}>
           <input type="text" autoComplete="address-level1" className={inputClass} {...text("stateOrRegion")} />
         </Field>
-        <Field id="profile-serviceArea" label="Service area" error={errors.serviceArea}>
-          <input
-            type="text"
-            placeholder="For example: Seattle metro, up to 40 miles"
-            className={inputClass}
-            {...text("serviceArea")}
+        <Field
+          id="profile-serviceAreas"
+          label="Service areas"
+          hint="Add each area you work in, for example Seattle or Pierce County. Choose Virtual Only if you don't work in person."
+          error={errors.serviceAreas}
+          className="md:col-span-2"
+        >
+          <ServiceAreasInput
+            id="profile-serviceAreas"
+            value={values.serviceAreas}
+            onChange={(serviceAreas) => setValues((v) => ({ ...v, serviceAreas }))}
+            error={errors.serviceAreas}
           />
         </Field>
         <Field id="profile-timeZone" label="Time zone" hint="Also used by your calendar." error={errors.timeZone}>
@@ -166,6 +174,17 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
             </label>
           ))}
         </div>
+      </Card>
+
+      <Card title="Liability insurance">
+        <Field
+          id="profile-liabilityInsuranceExpiration"
+          label="Expiration date"
+          hint="The date your liability insurance expires. Agencies you are connected to can see it."
+          error={errors.liabilityInsuranceExpiration}
+        >
+          <input type="date" className={inputClass} {...text("liabilityInsuranceExpiration")} />
+        </Field>
       </Card>
 
       <Card title="Contact details">
