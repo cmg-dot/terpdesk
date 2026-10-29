@@ -57,6 +57,7 @@ export const config = {
     "/settings/:path*",
     "/hours-review/:path*",
     "/website-requests/:path*",
+    "/inbox/:path*",
     "/jobs/:path*",
     "/interpreter-home/:path*",
     "/interpreter-calendar/:path*",

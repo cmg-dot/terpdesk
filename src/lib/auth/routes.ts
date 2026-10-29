@@ -15,6 +15,7 @@ export const AGENCY_PREFIXES = [
   "/settings",
   "/hours-review",
   "/website-requests",
+  "/inbox",
 ] as const;
 
 export const INTERPRETER_PREFIXES = [

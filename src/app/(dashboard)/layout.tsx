@@ -11,6 +11,7 @@ import {
   Users,
   Building,
   Globe,
+  Inbox,
   CreditCard,
   Settings,
   Bell,
@@ -79,6 +80,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link href="/website-requests" className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/website-requests') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
                 <Globe className="h-4 w-4" />
                 Website requests
+              </Link>
+              <Link href="/inbox" className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/inbox') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
+                <Inbox className="h-4 w-4" />
+                Inbox
               </Link>
               <Link href="/billing" className={`flex items-center justify-between rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/billing') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
                 <div className="flex items-center gap-3">
@@ -180,6 +185,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link href="/website-requests" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/website-requests') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Globe className="h-5 w-5" />
                     Website requests
+                  </Link>
+                  <Link href="/inbox" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/inbox') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
+                    <Inbox className="h-5 w-5" />
+                    Inbox
                   </Link>
                   <Link href="/billing" onClick={() => setIsMenuOpen(false)} className={`flex items-center justify-between rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/billing') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <div className="flex items-center gap-4">
