@@ -26,6 +26,8 @@ import { RequestTimesheetButton } from "@/components/features/RequestTimesheetBu
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
 import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
+import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
+import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { legacyPosition1Hours } from "@/utils/hoursState";
@@ -883,6 +885,29 @@ export default function AssignmentDetailPage() {
     }
     
     updateRequest(id, { status: totalPositions === 2 && staffedCount === 0 ? 'Partially staffed' : 'booked' });
+  };
+
+  // Agency override: the server already booked the interpreter and closed the pending offers; just reflect it here.
+  const handleDirectlyAssigned = async (posIdx: 1 | 2, result: DirectAssignSuccess) => {
+    if (posIdx === 1) {
+      setRecipient1('');
+      setAutoBookRecipient1('');
+    } else {
+      setRecipient2('');
+      setAutoBookRecipient2('');
+    }
+    setAutoBookErrors(prev => ({ ...prev, [posIdx]: '' }));
+    try {
+      setFoundRequest(await fetchLiveRequestById(id));
+    } catch {
+      console.error("[requests/[id] page] request failed");
+    }
+    updateRequest(id, { status: result.status });
+    showToast(
+      result.emailed
+        ? `${result.interpreterName} is assigned and was emailed the booking details.`
+        : `${result.interpreterName} is assigned, but the email could not be sent. Use "Resend details".`
+    );
   };
 
   const handleCreateOffer = async (posIdx: 1 | 2 = 1) => {
@@ -2030,6 +2055,19 @@ export default function AssignmentDetailPage() {
                     </div>
                   </div>
                 </>
+              )}
+
+              {/* Works even while an offer is out: assigning withdraws it. Not offered once the job has started. */}
+              {isFutureAppointment && (
+                <DirectAssignPanel
+                  jobId={id}
+                  positionIndex={posIdx}
+                  showPosition={totalPositions === 2}
+                  roster={roster}
+                  fits={interpreterFitMap}
+                  offers={realOffers}
+                  onAssigned={(result) => handleDirectlyAssigned(posIdx, result)}
+                />
               )}
             </>
           ) : (

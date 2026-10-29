@@ -65,23 +65,38 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
   return { subject: `Job offer ${s.reference} - terpDESK`, html, text };
 }
 
-function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: string | null): { subject: string; html: string; text: string } {
+/** "accepted": the interpreter said yes. "assigned": agency staff booked them directly, so there is nothing to answer. */
+export type ConfirmationKind = "accepted" | "assigned";
+
+const CONFIRMATION_COPY: Record<ConfirmationKind, { title: string; heading: string; intro: string; subject: string }> = {
+  accepted: { title: "Booking confirmed", heading: "You're booked", intro: "Thanks for accepting. Here is your booking.", subject: "Booking confirmed" },
+  assigned: {
+    title: "Job assigned",
+    heading: "You've been assigned to a job",
+    intro: "Your agency has booked you for this job, so there is nothing to accept. Here is your booking.",
+    subject: "Job assigned",
+  },
+};
+
+export function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: string | null, kind: ConfirmationKind = "accepted"): { subject: string; html: string; text: string } {
+  const copy = CONFIRMATION_COPY[kind];
   const detailsBlock = detailsUrl
     ? `<p style="margin:20px 0 8px;">${emailButton("View full job details", detailsUrl)}</p>
        <p style="margin:0;font-size:13px;color:#6B7280;">The exact location or meeting link, program, preparation notes and prep materials are on this private page (no password needed). Prep materials are also in the terpDESK app.</p>`
     : `<p style="margin:16px 0 0;font-size:13px;color:#6B7280;">Sign in to terpDESK to see the location, preparation notes and prep materials.</p>`;
   const html = buildTerpDeskEmail({
-    title: `Booking confirmed ${s.reference}`,
+    title: `${copy.title} ${s.reference}`,
     preheader: `You're booked for ${s.dateLabel}.`,
     bodyContent: `
-      <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">You're booked${name ? `, ${escapeHtml(name)}` : ""}</h1>
-      <p style="margin:0 0 4px;">Thanks for accepting. Here is your booking.</p>
+      <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${copy.heading}${name ? `, ${escapeHtml(name)}` : ""}</h1>
+      <p style="margin:0 0 4px;">${copy.intro}</p>
       ${emailActionCard(`${emailDetailsTable(summaryRows(s))}${detailsBlock}`)}
       <p style="margin:0;font-size:13px;color:#6B7280;">For your clients' privacy, location and preparation details are never sent by email. Please don't forward this message.</p>`,
   });
   const text = [
-    `You're booked${name ? `, ${name}` : ""}.`,
+    `${copy.heading}${name ? `, ${name}` : ""}.`,
     "",
+    ...(kind === "assigned" ? [copy.intro, ""] : []),
     summaryText(s),
     "",
     detailsUrl
@@ -90,7 +105,7 @@ function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: string 
     "",
     "For your clients' privacy, location and preparation details are never sent by email.",
   ].join("\n");
-  return { subject: `Booking confirmed ${s.reference} - terpDESK`, html, text };
+  return { subject: `${copy.subject} ${s.reference} - terpDESK`, html, text };
 }
 
 /** The external portal where ODHH interpreters report the assignment (kept exactly as the state publishes it). */
@@ -134,7 +149,7 @@ export async function sendOdhhPostJobReminder(params: { to: string; name: string
  * directly, or when staff choose "Resend details". Never throws: a failed email must not undo or block the booking.
  * Returns whether the email went out.
  */
-export async function sendBookingConfirmation(params: { requestId: string; interpreterId: string; positionNumber?: number }): Promise<boolean> {
+export async function sendBookingConfirmation(params: { requestId: string; interpreterId: string; positionNumber?: number; kind?: ConfirmationKind }): Promise<boolean> {
   try {
     const [request] = await db
       .select({ id: requests.id, title: requests.title, createdAt: requests.createdAt, data: requests.data })
@@ -159,7 +174,7 @@ export async function sendBookingConfirmation(params: { requestId: string; inter
     const detailsUrl = token ? `${getBaseUrl()}/job-details?token=${encodeURIComponent(token)}` : null;
     const name = (await getInterpreterDisplayName(params.interpreterId).catch(() => null)) ?? "";
 
-    const email = buildConfirmationEmail(summary, name, detailsUrl);
+    const email = buildConfirmationEmail(summary, name, detailsUrl, params.kind);
     await sendEmail(interpreter.email, email.subject, email.html, email.text);
     await writeAuditLog({
       action: "booking_confirmation_sent",
