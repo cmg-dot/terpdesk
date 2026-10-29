@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useMe
 import { useSession } from "next-auth/react";
 import { getMyRosterAgencyIds } from "@/app/actions/getMyAgencies";
 import { requestAgencyConnection } from "@/app/actions/agencyConnections";
+import { DEFAULT_AGENCY_ID, DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 export interface DevUser {
   id: string;
@@ -76,10 +77,12 @@ export function GlobalProvider({ children }: { children: ReactNode }) {
     try {
       const storedAgencies = localStorage.getItem('terpdesk_agencies');
       if (storedAgencies) {
-        setAgencies(JSON.parse(storedAgencies));
+        // A list saved by an earlier version still carries the old name for the workspace agency.
+        const saved: Agency[] = JSON.parse(storedAgencies);
+        setAgencies(saved.map((a) => (a.id === DEFAULT_AGENCY_ID ? { ...a, name: DEFAULT_AGENCY_NAME } : a)));
       } else {
         const defaultAgencies: Agency[] = [
-          { id: 'agency-1', name: 'North Fictional Interpreting', join_code: 'north123', accepts_join_requests: true }
+          { id: DEFAULT_AGENCY_ID, name: DEFAULT_AGENCY_NAME, join_code: 'north123', accepts_join_requests: true }
         ];
         setAgencies(defaultAgencies);
         localStorage.setItem('terpdesk_agencies', JSON.stringify(defaultAgencies));

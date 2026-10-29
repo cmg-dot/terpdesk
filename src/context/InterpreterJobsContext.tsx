@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, ReactNode, useEffect, useRe
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { useGlobalState } from "@/context/GlobalContext";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 export interface Job {
   id: string;
@@ -98,7 +99,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           accessCode: o.passcode || o.accessCode || null,
           platform: o.platform || null,
           virtualInstructions: o.virtualInstructions || null,
-          agencyName: o.agencyName || "North Fictional Interpreting",
+          agencyName: o.agencyName || DEFAULT_AGENCY_NAME,
           details: o.details || {},
           onsite: o.onsite || {},
           data: o.data || {}

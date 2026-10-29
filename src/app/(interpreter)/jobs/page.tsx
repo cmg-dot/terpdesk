@@ -15,6 +15,7 @@ import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord, showsStatePortal } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 type Tab = "upcoming" | "past";
 
@@ -232,7 +233,7 @@ export default function InterpreterJobsPage() {
               const isOffer = job.status === 'pending';
               const locationText = isOffer ? (job.location || job.agencyName) : job.location;
               const locPrimary = (locationText?.split('·')[0]?.trim() || locationText) || (job.isVirtual ? "Virtual" : "Location pending");
-              const locSecondary = locationText?.split('·')[1]?.trim() || (job.isVirtual ? "Remote / Video" : (job.agencyName || "North Fictional Interpreting"));
+              const locSecondary = locationText?.split('·')[1]?.trim() || (job.isVirtual ? "Remote / Video" : (job.agencyName || DEFAULT_AGENCY_NAME));
               const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
               const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
               const tz = (job as any).details?.timeZone || job.timeZone;
@@ -345,7 +346,7 @@ export default function InterpreterJobsPage() {
               renderItem={(job) => {
                 const locationParts = (job.location || '').split('·');
                 const locPrimary = locationParts[0]?.trim() || "Location pending";
-                const locSecondary = locationParts[1]?.trim() || job.agencyName || "North Fictional Interpreting";
+                const locSecondary = locationParts[1]?.trim() || job.agencyName || DEFAULT_AGENCY_NAME;
                 const hoursState = getJobHoursState(job, serviceRecords);
                 const isCorrection = hoursState === 'correction_requested';
                 const usesStatePortal = showsStatePortal(job, hoursState);

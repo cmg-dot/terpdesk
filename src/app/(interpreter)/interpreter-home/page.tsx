@@ -19,6 +19,7 @@ import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord } from "@/utils/hoursState";
 import { td_availability_view } from "@/app/actions/availability";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
@@ -532,7 +533,7 @@ export default function InterpreterHomePage() {
  const isHappening = isAppointmentHappeningNow(job, currentTime);
  const locationParts = (job.location || '').split("·");
  const locPrimary = (locationParts[0]?.trim() || (job.isVirtual ? "Virtual" : "Location pending"));
- const locSecondary = (locationParts[1]?.trim() || (job.isVirtual ? "Remote / Video" : (job.agencyName || "North Fictional Interpreting")));
+ const locSecondary = (locationParts[1]?.trim() || (job.isVirtual ? "Remote / Video" : (job.agencyName || DEFAULT_AGENCY_NAME)));
 
  return (
  <Link

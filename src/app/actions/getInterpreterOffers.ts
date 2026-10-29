@@ -8,6 +8,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { interpreterSafeData, interpreterSafeDetails } from "@/lib/interpreterJobData";
 import { latestSheetsByRequest, resolveOwnHours } from "@/lib/ownHours";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
 export async function fetchInterpreterOffers(_interpreterEmail?: string) {
@@ -133,7 +134,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       // Team jobs: request-wide status/travel describe both positions, so the UI must not use them for this
       // interpreter's hours (see scopedRequestStatus).
       isTeamJob,
-      agencyName: "North Fictional Interpreting",
+      agencyName: DEFAULT_AGENCY_NAME,
       interpreterId: row.offer.interpreterId,
       program: rowData?.intake?.program || "General",
       isStateJob: isStateJobRequest(row.request),
