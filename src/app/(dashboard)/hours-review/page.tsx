@@ -13,6 +13,7 @@ import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords"
 import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone } from "@/utils/timezone";
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
 import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
+import { BillableTimeRow } from "@/components/features/BillableTimeRow";
 import { SignatureImage } from "@/components/features/SignatureImage";
 import { MileageApprovalField, needsMileageReason } from "@/components/features/MileageApprovalField";
 import { MileageLegsList } from "@/components/features/MileageLegsList";
@@ -259,6 +260,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
             </div>
             <div className="text-[var(--ink)]">{serviceHours} hr</div>
           </div>
+          <BillableTimeRow workedMinutes={serviceMinutes} isOdhh={Boolean(record.isOdhh)} />
           <div>
             <div className="text-[var(--sage)] mb-1">Mileage approved by the agency</div>
             <div className="text-[var(--ink)]">{record.state === 'approved' && record.approvedMileage != null ? `${(record.approvedMileage ?? 0).toFixed(1)} mi` : 'Not approved yet'}</div>

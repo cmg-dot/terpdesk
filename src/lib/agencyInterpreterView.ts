@@ -17,6 +17,8 @@ import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { readPermission } from "@/lib/agencyPermissions";
 import { filesFor } from "@/lib/credentials";
 import { areasFromLegacy } from "@/lib/serviceAreas";
+import { rateToText } from "@/lib/validation/interpreterRates";
+import type { InterpreterRatesInput } from "@/lib/validation/interpreterRates";
 import type { CredentialFile } from "@/lib/validation/file";
 import { summarizeAvailability } from "@/lib/availabilitySummary";
 import type { DayAvailability } from "@/lib/availabilitySummary";
@@ -46,6 +48,8 @@ export interface AgencyInterpreterView {
   serviceAreas: string[];
   /** yyyy-MM-dd, or "" when the interpreter has not recorded it. */
   liabilityInsuranceExpiration: string;
+  /** The hourly rates this agency has set, as text ("" = not set). Agency-only: this view is never sent to an interpreter. */
+  rates: InterpreterRatesInput;
   timeZone: string;
   takesInPerson: boolean;
   takesVirtual: boolean;
@@ -155,6 +159,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     stateOrRegion: profile?.stateOrRegion ?? "",
     serviceAreas: profile && profile.serviceAreas.length > 0 ? profile.serviceAreas : areasFromLegacy(profile?.serviceArea),
     liabilityInsuranceExpiration: profile?.liabilityInsuranceExpiration ?? "",
+    rates: { stateRate: rateToText(profile?.stateRate), nonStateRate: rateToText(profile?.nonStateRate) },
     timeZone,
     takesInPerson: profile?.takesInPerson ?? true,
     takesVirtual: profile?.takesVirtual ?? true,

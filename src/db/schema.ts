@@ -387,6 +387,10 @@ export const interpreterProfiles = pgTable('interpreter_profiles', {
   serviceAreas: text('service_areas').array().notNull().default(sql`'{}'::text[]`),
   // Calendar date (yyyy-MM-dd) their liability insurance expires; NULL = not recorded.
   liabilityInsuranceExpiration: date('liability_insurance_expiration', { mode: 'string' }),
+  // Hourly rates (US dollars) an agency has set for this interpreter on State and Non-state jobs; NULL = not set.
+  // AGENCY-ONLY: never select these into anything an interpreter's browser receives (see td_availability_view).
+  stateRate: numeric('state_rate', { precision: 8, scale: 2 }),
+  nonStateRate: numeric('non_state_rate', { precision: 8, scale: 2 }),
   takesInPerson: boolean('takes_in_person').notNull().default(true),
   takesVirtual: boolean('takes_virtual').notNull().default(true),
   workEmail: varchar('work_email', { length: 255 }),

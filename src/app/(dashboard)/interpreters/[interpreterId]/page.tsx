@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Lock, Mail, MapPin, Phone } from "lucide-react";
 import { AvailabilitySection } from "@/components/interpreters/detail/AvailabilitySection";
+import { InterpreterRatesCard } from "@/components/interpreters/detail/InterpreterRatesCard";
 import { SharedCredentialsSection } from "@/components/interpreters/detail/SharedCredentialsSection";
 import { InsuranceExpiry } from "@/components/profile/InsuranceExpiry";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -64,6 +65,8 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
           <Row label="Liability insurance expires"><InsuranceExpiry date={view.liabilityInsuranceExpiration} timeZone={view.timeZone} /></Row>
         </dl>
       </section>
+
+      <InterpreterRatesCard interpreterId={view.id} initial={view.rates} />
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6">
         <h2 className="mb-2 text-lg font-semibold text-[var(--ink)]">Contact</h2>

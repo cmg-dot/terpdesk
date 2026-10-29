@@ -12,7 +12,10 @@ interface StateJobSource {
 export const isStateProgram = (program: string | null | undefined): boolean =>
   program === "WA ODHH" || program === "wa_odhh" || program === "WA Apple Health" || program === "wa_apple_health";
 
-export const isStateJobRequest = (row: StateJobSource): boolean => {
+/** The ODHH funding program alone (not Apple Health / HCA, which `isStateProgram` also counts as a state job). */
+export const isOdhhProgram = (program: string | null | undefined): boolean => program === "WA ODHH" || program === "wa_odhh";
+
+export const isStateJobRequest =(row: StateJobSource): boolean => {
   if (row.isStateJob === true) return true;
   return isStateProgram((row.data as { intake?: { program?: string } } | null | undefined)?.intake?.program);
 };

@@ -104,6 +104,8 @@ async function runEnsureAvailabilityTables(): Promise<void> {
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS service_area VARCHAR(200);
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS service_areas TEXT[] NOT NULL DEFAULT '{}'::text[];
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS liability_insurance_expiration DATE;
+      ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS state_rate NUMERIC(8,2);
+      ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS non_state_rate NUMERIC(8,2);
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS takes_in_person BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS takes_virtual BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS work_email VARCHAR(255);
@@ -611,13 +613,13 @@ export async function td_availability_view(interpreterId: string) {
     .from(availabilityShares)
     .where(inArray(availabilityShares.interpreterId, targetIds));
 
+  // This goes to the interpreter's browser, so only the fields its callers use are returned. Never the whole row:
+  // interpreter_profiles also holds agency-only data (the State / Non-state rates an agency sets).
+  const row = profiles[0];
   return {
-    profile: profiles[0] || {
-      id: "default",
-      interpreterId,
-      timeZone: "America/Los_Angeles",
-      updatedAt: new Date(),
-    },
+    profile: row
+      ? { id: row.id, interpreterId: row.interpreterId, timeZone: row.timeZone, updatedAt: row.updatedAt }
+      : { id: "default", interpreterId, timeZone: "America/Los_Angeles", updatedAt: new Date() },
     rules,
     exceptions: exceptions.map((e) => ({
       id: e.id,
