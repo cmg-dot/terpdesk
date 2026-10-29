@@ -271,6 +271,31 @@ export const mileageLegs = pgTable('mileage_legs', {
 
 export type SelectMileageLeg = typeof mileageLegs.$inferSelect;
 
+/**
+ * Mail received at the agency's intake address (AWS SES -> SNS -> /api/webhooks/ses), shown in the in-app inbox.
+ * Bodies can hold client details: never log them, and render `body_html` only sanitised or sandboxed.
+ */
+export const agencyInbox = pgTable('agency_inbox', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  // The agency workspace that owns the mailbox (plain text, like agency_interpreters.agency_id).
+  agencyId: text('agency_id').notNull(),
+  senderEmail: text('sender_email').notNull(),
+  senderName: text('sender_name'),
+  subject: text('subject').notNull(),
+  bodyText: text('body_text').notNull(),
+  bodyHtml: text('body_html'),
+  // The email's Message-ID header; unique so a forwarded or retried copy is ignored (insert with onConflictDoNothing).
+  messageId: text('message_id').notNull().unique(),
+  isRead: boolean('is_read').notNull().default(false),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+}, (t) => ({
+  // Serves the inbox list: one agency's mail, newest first.
+  agencyReceivedIdx: index('agency_inbox_agency_received_idx').on(t.agencyId, t.receivedAt),
+}));
+
+export type SelectAgencyInbox = typeof agencyInbox.$inferSelect;
+export type InsertAgencyInbox = typeof agencyInbox.$inferInsert;
+
 export const requestsRelations = relations(requests, ({ many }) => ({
   mileageLegs: many(mileageLegs),
 }));
