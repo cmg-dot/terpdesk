@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import React, { useState } from "react";
 import { useSession } from "next-auth/react";
 import { ChangePasswordDialog } from "@/components/features/ChangePasswordDialog";
@@ -45,7 +46,7 @@ export default function SettingsPage() {
 
  <div className="flex justify-between items-center py-3 border-b border-gray-200 mb-4">
  <span className="text-[14px] text-[var(--sage)]">Agency</span>
- <span className="text-[14px] text-[var(--ink)] font-medium">North Fictional Interpreting</span>
+ <span className="text-[14px] text-[var(--ink)] font-medium">{DEFAULT_AGENCY_NAME}</span>
  </div>
 
  {/* Agency Join Code Box */}

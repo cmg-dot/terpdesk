@@ -21,6 +21,9 @@ import {
 import { RequestsProvider } from "@/context/RequestsContext";
 import { ClientsProvider } from "@/context/ClientsContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { CountBadge } from "@/components/ui/CountBadge";
+import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useSession } from "next-auth/react";
@@ -32,6 +35,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { data: session } = useSession();
   const userName = session?.user?.name ?? "";
   const userEmail = session?.user?.email ?? "";
+  const unreadInbox = useInboxUnreadCount();
 
   return (
     <ClientsProvider>
@@ -52,7 +56,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 />
                 <span className="text-white font-semibold text-[22px]">terpDESK</span>
               </div>
-              <span className="text-[13px] text-[#8BA49E]">North Fictional Interpreting</span>
+              <span className="text-[13px] text-[#8BA49E]">{DEFAULT_AGENCY_NAME}</span>
               <span className="mt-6 text-[15px] font-medium text-white">Agency workspace</span>
             </div>
 
@@ -84,6 +88,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               <Link href="/inbox" className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/inbox') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
                 <Inbox className="h-4 w-4" />
                 Inbox
+                <CountBadge count={unreadInbox} label="unread emails" />
               </Link>
               <Link href="/billing" className={`flex items-center justify-between rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/billing') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
                 <div className="flex items-center gap-3">
@@ -189,6 +194,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link href="/inbox" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/inbox') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Inbox className="h-5 w-5" />
                     Inbox
+                    <CountBadge count={unreadInbox} label="unread emails" />
                   </Link>
                   <Link href="/billing" onClick={() => setIsMenuOpen(false)} className={`flex items-center justify-between rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/billing') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <div className="flex items-center gap-4">

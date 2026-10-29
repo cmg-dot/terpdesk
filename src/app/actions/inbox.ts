@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -18,6 +18,16 @@ const FAILED = "Something went wrong. Please try again.";
 
 /** Every write is scoped to the agency's own mailbox, never to the id alone. */
 const inMailbox = (id: string) => and(eq(agencyInbox.id, id), eq(agencyInbox.agencyId, DEFAULT_AGENCY_ID));
+
+/** How many of the agency's emails are unread (for the sidebar badge). 0 for anyone who is not an agency user. */
+export async function getInboxUnreadCount(): Promise<number> {
+  if (!(await hasRole("agency"))) return 0;
+  const [row] = await db
+    .select({ value: count() })
+    .from(agencyInbox)
+    .where(and(eq(agencyInbox.agencyId, DEFAULT_AGENCY_ID), eq(agencyInbox.isRead, false)));
+  return row?.value ?? 0;
+}
 
 /** Opens an email: returns its full content and marks it read, in one round trip. */
 export async function openInboxEmail(id: string): Promise<OpenInboxEmailResult> {

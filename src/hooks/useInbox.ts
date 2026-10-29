@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState } from "react";
 import { openInboxEmail, setInboxEmailRead } from "@/app/actions/inbox";
+import { notifyInboxChanged } from "@/hooks/useInboxUnreadCount";
 import type { InboxEmail, InboxListItem } from "@/types/inbox";
 
 const LOAD_FAILED = "We couldn't open that email. Please try again.";
@@ -38,6 +39,7 @@ export function useInbox(serverEmails: InboxListItem[]) {
       setRead(id, true);
       try {
         const result = await openInboxEmail(id);
+        notifyInboxChanged();
         if (latestRequest.current !== id) return;
         if (result.success) {
           setOpenEmail(result.email);
@@ -62,6 +64,7 @@ export function useInbox(serverEmails: InboxListItem[]) {
     setRead(id, false);
     try {
       const result = await setInboxEmailRead(id, false);
+      notifyInboxChanged();
       if (!result.success) {
         setRead(id, true);
         setError(result.error);

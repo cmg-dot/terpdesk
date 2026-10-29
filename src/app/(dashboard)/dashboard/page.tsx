@@ -1,5 +1,6 @@
 "use client";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import React from "react";
 import Link from "next/link";
 import { useRequests } from "@/context/RequestsContext";
@@ -262,7 +263,7 @@ export default function DashboardPage() {
         <div className="space-y-1.5 w-full">
           <label className="pl-5 text-[13px] font-medium text-[var(--sage)]">Agency</label>
           <div className="rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-600 border border-neutral-200/50">
-            North Fictional Interpreting
+            {DEFAULT_AGENCY_NAME}
           </div>
         </div>
       </div>
