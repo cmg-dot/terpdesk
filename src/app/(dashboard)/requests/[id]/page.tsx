@@ -9,7 +9,6 @@ import { ChevronDown, Copy, Check, ExternalLink, Video, MapPin, Edit2, X, Lock, 
 import { fetchLiveRequestById } from "@/app/actions/getRequests";
 import { updateRequestDetails } from "@/app/actions/updateRequestDetails";
 import { removeBooking } from "@/app/actions/removeBooking";
-import { assignInterpreter } from "@/app/actions/assignInterpreter";
 import { getInterpreters } from "@/app/actions/getInterpreters";
 import { createOffer } from "@/app/actions/createOffer";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
@@ -38,7 +37,6 @@ import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSe
 import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
 import { IconInput } from "@/components/ui/IconInput";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
-import { getAutoBookEligibility } from "@/app/actions/getAutoBookEligibility";
 import { getClientsAction } from "@/app/actions/clients";
 import type { ClientWithStats } from "@/app/actions/clients";
 import { ClientAssignmentBanner } from "@/components/features/ClientAssignmentBanner";
@@ -290,38 +288,25 @@ export default function AssignmentDetailPage() {
     getInterpreters().then(setDbInterpreters).catch(() => console.error("[requests/[id] page] request failed"));
   }, []);
 
-  // Real auto-book permission per interpreter (sharing on AND auto-book on), read from the database.
-  const [autoBookAllowed, setAutoBookAllowed] = useState<Record<string, boolean>>({});
-  const [autoBookErrors, setAutoBookErrors] = useState<Record<number, string>>({});
-  useEffect(() => {
-    if (dbInterpreters.length === 0) return;
-    getAutoBookEligibility(dbInterpreters.map((m: any) => String(m.id))).then(setAutoBookAllowed).catch(() => setAutoBookAllowed({}));
-  }, [dbInterpreters]);
-
   const activeRoster = dbInterpreters.map(m => ({
     id: m.id,
     name: m.name,
     email: m.email,
-    isAutoFillEligible: interpreterFitMap[m.id] === 'available' || interpreterFitMap[m.id] === 'outside_hours' || interpreterFitMap[m.id] === undefined
   }));
 
   const [recipient1, setRecipient1] = useState('');
-  const [autoBookRecipient1, setAutoBookRecipient1] = useState('');
   const [expiryDate1, setExpiryDate1] = useState('');
   const [expiryTime1, setExpiryTime1] = useState('');
   const [errorMessage1, setErrorMessage1] = useState('');
   const [successMessage1, setSuccessMessage1] = useState('');
   const [isSendingOffer1, setIsSendingOffer1] = useState(false);
-  const [isEligible1, setIsEligible1] = useState<boolean | null>(null);
 
   const [recipient2, setRecipient2] = useState('');
-  const [autoBookRecipient2, setAutoBookRecipient2] = useState('');
   const [expiryDate2, setExpiryDate2] = useState('');
   const [expiryTime2, setExpiryTime2] = useState('');
   const [errorMessage2, setErrorMessage2] = useState('');
   const [successMessage2, setSuccessMessage2] = useState('');
   const [isSendingOffer2, setIsSendingOffer2] = useState(false);
-  const [isEligible2, setIsEligible2] = useState<boolean | null>(null);
 
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
@@ -416,7 +401,6 @@ export default function AssignmentDetailPage() {
   const isOccupiedInSlot1 = (interpId: string, interpName?: string) => {
     // Currently selected in Position 1
     if (recipient1 && recipient1 === interpId) return true;
-    if (autoBookRecipient1 && autoBookRecipient1 === interpId) return true;
 
     // Currently assigned or offered in Position 1
     if (slot1Accepted) {
@@ -435,7 +419,6 @@ export default function AssignmentDetailPage() {
   const isOccupiedInSlot2 = (interpId: string, interpName?: string) => {
     // Currently selected in Position 2
     if (recipient2 && recipient2 === interpId) return true;
-    if (autoBookRecipient2 && autoBookRecipient2 === interpId) return true;
 
     // Currently assigned or offered in Position 2
     if (slot2Accepted) {
@@ -827,13 +810,6 @@ export default function AssignmentDetailPage() {
     applyDefaultExpiry(2);
   }, [applyDefaultExpiry]);
 
- const getPayloadLocation = () => {
- if (foundRequest?.location && foundRequest.location.includes('·')) {
- return foundRequest.location;
- }
- return `${foundRequest?.location || 'Virtual'} · No location provided`;
- };
-
  const handleCancelAppointment = () => {
  setShowCancelModal(true);
  };
@@ -849,72 +825,9 @@ export default function AssignmentDetailPage() {
    }
  };
 
-  const handleAutoBook = async (posIdx: 1 | 2 = 1) => {
-    const selectedId = posIdx === 1 ? autoBookRecipient1 : autoBookRecipient2;
-    const currentRoster = posIdx === 1 ? rosterSlot1 : rosterSlot2;
-    const selectedName = currentRoster.find(i => i.id === selectedId)?.name || 'Unknown Interpreter';
-
-    try {
-      const result = await assignInterpreter(id, selectedId, selectedName, posIdx);
-      if (typeof result.error === 'string') {
-        const blockedMessage = result.error;
-        // Blocked on the server (interpreter has not opted in): nothing was booked, so stop here.
-        setAutoBookErrors(prev => ({ ...prev, [posIdx]: blockedMessage }));
-        return;
-      }
-      setAutoBookErrors(prev => ({ ...prev, [posIdx]: '' }));
-      const updatedRequest = await fetchLiveRequestById(id);
-      setFoundRequest(updatedRequest);
-      if (posIdx === 1) setAutoBookRecipient1('');
-      if (posIdx === 2) setAutoBookRecipient2('');
-    } catch (err) {
-      console.error("[requests/[id] page] operation failed");
-    }
-
-    if (typeof window !== 'undefined') {
-      try {
-        const storedJobs = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
-        const jobIndex = storedJobs.findIndex((job: any) => 
-          (String(job.id) === String(id) || String(job.requestId) === String(id)) && 
-          (job.positionIndex === posIdx || (!job.positionIndex && posIdx === 1))
-        );
-        
-        const payload = {
-          ...(foundRequest || {}),
-          id: `${id}-pos-${posIdx}`,
-          requestId: id,
-          status: 'booked',
-          interpreterName: selectedName,
-          positionIndex: posIdx,
-          location: getPayloadLocation(),
-          serviceRecordState: 'not_started'
-        };
-
-        if (jobIndex > -1) {
-          storedJobs[jobIndex] = { ...storedJobs[jobIndex], ...payload };
-        } else {
-          storedJobs.push(payload);
-        }
-        
-        localStorage.setItem('terpdesk_interpreter_jobs', JSON.stringify(storedJobs));
-      } catch (e) {
-        console.error("[requests/[id] page] operation failed");
-      }
-    }
-    
-    updateRequest(id, { status: totalPositions === 2 && staffedCount === 0 ? 'Partially staffed' : 'booked' });
-  };
-
   // Agency override: the server already booked the interpreter and closed the pending offers; just reflect it here.
   const handleDirectlyAssigned = async (posIdx: 1 | 2, result: DirectAssignSuccess) => {
-    if (posIdx === 1) {
-      setRecipient1('');
-      setAutoBookRecipient1('');
-    } else {
-      setRecipient2('');
-      setAutoBookRecipient2('');
-    }
-    setAutoBookErrors(prev => ({ ...prev, [posIdx]: '' }));
+    (posIdx === 1 ? setRecipient1 : setRecipient2)('');
     try {
       setFoundRequest(await fetchLiveRequestById(id));
     } catch {
@@ -1753,26 +1666,12 @@ export default function AssignmentDetailPage() {
         if (isSlot1) {
           setRecipient1(val);
           if (val && recipient2 === val) setRecipient2('');
-          if (val && autoBookRecipient2 === val) setAutoBookRecipient2('');
         } else {
           setRecipient2(val);
           if (val && recipient1 === val) setRecipient1('');
-          if (val && autoBookRecipient1 === val) setAutoBookRecipient1('');
         }
       };
 
-      const autoBookRec = isSlot1 ? autoBookRecipient1 : autoBookRecipient2;
-      const setAutoBookRec = (val: string) => {
-        if (isSlot1) {
-          setAutoBookRecipient1(val);
-          if (val && autoBookRecipient2 === val) setAutoBookRecipient2('');
-          if (val && recipient2 === val) setRecipient2('');
-        } else {
-          setAutoBookRecipient2(val);
-          if (val && autoBookRecipient1 === val) setAutoBookRecipient1('');
-          if (val && recipient1 === val) setRecipient1('');
-        }
-      };
       const expDate = isSlot1 ? expiryDate1 : expiryDate2;
       const setExpDate = isSlot1 ? setExpiryDate1 : setExpiryDate2;
       const expTime = isSlot1 ? expiryTime1 : expiryTime2;
@@ -1781,10 +1680,6 @@ export default function AssignmentDetailPage() {
       const setErrMsg = isSlot1 ? setErrorMessage1 : setErrorMessage2;
       const successMsg = isSlot1 ? successMessage1 : successMessage2;
       const isSending = isSlot1 ? isSendingOffer1 : isSendingOffer2;
-      const isElig = isSlot1 ? isEligible1 : isEligible2;
-      // Not granted (or still loading) means no auto-book; sending an offer is always still possible.
-      const autoBookDenied = Boolean(autoBookRec) && autoBookAllowed[autoBookRec] !== true;
-      const setIsElig = isSlot1 ? setIsEligible1 : setIsEligible2;
 
       let slotBadgeColor = 'bg-[#FEF3C7] text-[#92400E]';
       let slotBadgeText = 'Booking: Unfilled';
@@ -2000,85 +1895,6 @@ export default function AssignmentDetailPage() {
                         'Create offer'
                       )}
                     </button>
-                  </div>
-
-                  {/* Auto-book Section */}
-                  <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl mt-6">
-                    <h4 className="font-semibold text-sm text-[var(--ink)] mb-1">Auto-book with the interpreter&apos;s permission</h4>
-                    <p className="text-xs text-gray-600 mb-4 leading-relaxed">
-                      Books without waiting for an acceptance, and only for interpreters who have given your agency that permission. Virtual appointments only for now — travel time is not checked. Qualifications and rates are not checked either.
-                    </p>
-                    
-                    <div className="space-y-4">
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="block text-sm text-[var(--sage)]">Interpreter</label>
-                          {autoBookRec && (
-                            <InterpreterFitBadge fit={interpreterFitMap[autoBookRec]} />
-                          )}
-                        </div>
-                        <select 
-                          className="w-full bg-white border border-gray-200 rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow appearance-none"
-                          value={autoBookRec}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setAutoBookRec(val);
-                            if (val) {
-                              const interpreter = roster.find(i => i.id === val);
-                              setIsElig(interpreter?.isAutoFillEligible ?? null);
-                            } else {
-                              setIsElig(null);
-                            }
-                          }}
-                        >
-                          <option value="">Choose an interpreter</option>
-                          {roster.map((interpreter) => (
-                            <option key={interpreter.id} value={interpreter.id}>
-                              {getInterpreterOptionLabel(
-                                interpreter.name,
-                                interpreter.email,
-                                interpreterFitMap[interpreter.id],
-                                isInterpreterFitLoading,
-                                Boolean(interpreterFitError),
-                                pastOfferNote(pastOffers, interpreter.id, isAppointmentFinished, currentTime)
-                              )}
-                            </option>
-                          ))}
-                        </select>
-                        {autoBookRec && (
-                          <div className="mt-2 flex items-center gap-2 text-xs text-[var(--sage)]" aria-live="polite">
-                            <span>{roster.find((interpreter) => interpreter.id === autoBookRec)?.name}</span>
-                            <InterpreterFitBadge fit={interpreterFitMap[autoBookRec]} />
-                          </div>
-                        )}
-                        {autoBookRec && (
-                          <FitWarningNotice fit={interpreterFitMap[autoBookRec]} />
-                        )}
-                        {interpreterFitError && (
-                          <p className="mt-2 text-xs text-red-700" role="alert">
-                            Unable to load interpreter availability: {interpreterFitError}
-                          </p>
-                        )}
-                      </div>
-                      {autoBookDenied ? (
-                        <p className="text-[var(--sage)] text-sm mb-4">Not eligible for Auto Fill: This interpreter has not granted auto-book permission. You can still send an offer.</p>
-                      ) : (
-                        isElig === false && <p className="text-[var(--sage)] text-sm mb-4">Not eligible for Auto Fill: This interpreter is not sharing availability with your agency. You can still send an offer.</p>
-                      )}
-                      {autoBookErrors[posIdx] && <p role="alert" className="text-sm font-medium text-red-700 mb-4">{autoBookErrors[posIdx]}</p>}
-                      <button 
-                        type="button"
-                        onClick={() => handleAutoBook(posIdx)}
-                        disabled={!autoBookRec || isElig === false || autoBookDenied}
-                        className={`rounded-full px-6 py-2 text-sm font-medium transition-colors w-full sm:w-auto ${
-                          !autoBookRec || isElig === false || autoBookDenied
-                            ? 'bg-[#8BA49E] text-white opacity-50 cursor-not-allowed'
-                            : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
-                        }`}
-                      >
-                        Auto-book this interpreter
-                      </button>
-                    </div>
                   </div>
                 </>
               )}
