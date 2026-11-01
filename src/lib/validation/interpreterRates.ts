@@ -7,7 +7,7 @@ const rate = z
   .refine((v) => v === "" || /^\d{1,5}(\.\d{1,2})?$/.test(v), "Enter an amount like 55 or 55.50.");
 
 /** Shared by the rates form (instant feedback) and the server action (the real check). */
-export const interpreterRatesFieldsSchema = z.object({ stateRate: rate, nonStateRate: rate });
+export const interpreterRatesFieldsSchema = z.object({ stateRate: rate, kingCountyRate: rate, nonStateRate: rate });
 
 export const updateInterpreterRatesSchema = interpreterRatesFieldsSchema.extend({ interpreterId: z.string().uuid() });
 

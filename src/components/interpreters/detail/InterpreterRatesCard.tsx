@@ -41,7 +41,7 @@ const RateInput = ({ field, label, hint, value, error, onChange }: RateInputProp
   </Field>
 );
 
-/** Agency-only: set the State and Non-state hourly rates for an interpreter. Interpreters never see this card. */
+/** Agency-only: set the State (Standard), King County and Non-state hourly rates for an interpreter. Interpreters never see this card. */
 export const InterpreterRatesCard = ({ interpreterId, initial }: { interpreterId: string; initial: InterpreterRatesInput }) => {
   const [values, setValues] = useState<InterpreterRatesInput>(initial);
   const [errors, setErrors] = useState<FieldErrors>({});
@@ -87,14 +87,22 @@ export const InterpreterRatesCard = ({ interpreterId, initial }: { interpreterId
       <h2 className="mb-1 text-lg font-semibold text-[var(--ink)]">Rates</h2>
       <p className="mb-4 text-[13px] text-gray-500">Only agency staff can see and change these. Interpreters never see them.</p>
       <form onSubmit={onSubmit} noValidate className="space-y-4">
-        <div className="grid gap-4 md:grid-cols-2">
+        <div className="grid gap-4 md:grid-cols-3">
           <RateInput
             field="stateRate"
-            label="State rate"
-            hint={`For State jobs (ODHH). Billed for at least ${formatHours(STATE_MINIMUM_HOURS)} hours.`}
+            label="State rate (Standard)"
+            hint={`For State jobs (ODHH) outside King County. Billed for at least ${formatHours(STATE_MINIMUM_HOURS)} hours.`}
             value={values.stateRate}
             error={errors.stateRate}
             onChange={(stateRate) => setValues((v) => ({ ...v, stateRate }))}
+          />
+          <RateInput
+            field="kingCountyRate"
+            label="King County rate"
+            hint="The state roster's second state rate, for King County jobs."
+            value={values.kingCountyRate}
+            error={errors.kingCountyRate}
+            onChange={(kingCountyRate) => setValues((v) => ({ ...v, kingCountyRate }))}
           />
           <RateInput
             field="nonStateRate"

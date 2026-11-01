@@ -159,7 +159,11 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     stateOrRegion: profile?.stateOrRegion ?? "",
     serviceAreas: profile && profile.serviceAreas.length > 0 ? profile.serviceAreas : areasFromLegacy(profile?.serviceArea),
     liabilityInsuranceExpiration: profile?.liabilityInsuranceExpiration ?? "",
-    rates: { stateRate: rateToText(profile?.stateRate), nonStateRate: rateToText(profile?.nonStateRate) },
+    rates: {
+      stateRate: rateToText(profile?.stateRate),
+      kingCountyRate: rateToText(profile?.kingCountyRate),
+      nonStateRate: rateToText(profile?.nonStateRate),
+    },
     timeZone,
     takesInPerson: profile?.takesInPerson ?? true,
     takesVirtual: profile?.takesVirtual ?? true,

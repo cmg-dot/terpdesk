@@ -20,13 +20,14 @@ export type UpdateInterpreterRatesResult =
 const toStored = (value: string): string | null => (value === "" ? null : Number(value).toFixed(2));
 
 /**
- * Sets the State and Non-state hourly rates for an interpreter on this agency's roster. Agency staff only; rates are
- * never part of anything an interpreter receives. Only the two rate columns change: the profile's updated_at is left
+ * Sets the State, King County and Non-state hourly rates for an interpreter on this agency's roster. Agency staff only;
+ * rates are never part of anything an interpreter receives. Only the rate columns change: the profile's updated_at is left
  * alone, so the interpreter's profile does not look edited and the newest-row ordering is unaffected.
  */
 export async function updateInterpreterRates(input: {
   interpreterId: string;
   stateRate: string;
+  kingCountyRate: string;
   nonStateRate: string;
 }): Promise<UpdateInterpreterRatesResult> {
   let session;
@@ -47,6 +48,7 @@ export async function updateInterpreterRates(input: {
   }
   const { interpreterId } = parsed.data;
   const stateRate = toStored(parsed.data.stateRate);
+  const kingCountyRate = toStored(parsed.data.kingCountyRate);
   const nonStateRate = toStored(parsed.data.nonStateRate);
 
   try {
@@ -73,20 +75,23 @@ export async function updateInterpreterRates(input: {
       .orderBy(desc(interpreterProfiles.updatedAt))
       .limit(1);
     if (existing) {
-      await db.update(interpreterProfiles).set({ stateRate, nonStateRate }).where(eq(interpreterProfiles.id, existing.id));
+      await db.update(interpreterProfiles).set({ stateRate, kingCountyRate, nonStateRate }).where(eq(interpreterProfiles.id, existing.id));
     } else {
       // An interpreter who has never saved a profile has no row yet (shadow profiles): create it with defaults.
-      await db.insert(interpreterProfiles).values({ id: randomUUID(), interpreterId, stateRate, nonStateRate });
+      await db.insert(interpreterProfiles).values({ id: randomUUID(), interpreterId, stateRate, kingCountyRate, nonStateRate });
     }
 
     await writeAuditLog({
       userId: session.user.id,
       userEmail: session.user.email ?? null,
       action: "interpreter_rates_updated",
-      details: `interpreterId=${interpreterId}; stateRate=${stateRate ?? "none"}; nonStateRate=${nonStateRate ?? "none"}`,
+      details: `interpreterId=${interpreterId}; stateRate=${stateRate ?? "none"}; kingCountyRate=${kingCountyRate ?? "none"}; nonStateRate=${nonStateRate ?? "none"}`,
     });
     revalidatePath(`/interpreters/${interpreterId}`);
-    return { success: true, rates: { stateRate: rateToText(stateRate), nonStateRate: rateToText(nonStateRate) } };
+    return {
+      success: true,
+      rates: { stateRate: rateToText(stateRate), kingCountyRate: rateToText(kingCountyRate), nonStateRate: rateToText(nonStateRate) },
+    };
   } catch (err) {
     logError("updateInterpreterRates", err);
     return { success: false, error: "We could not save the rates. Please try again." };
