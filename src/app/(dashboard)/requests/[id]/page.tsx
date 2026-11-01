@@ -27,6 +27,8 @@ import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection
 import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
+import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
+import { defaultOfferExpiry } from "@/lib/offerExpiry";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
@@ -809,6 +811,22 @@ export default function AssignmentDetailPage() {
   }, [foundRequest, dbInterpreters, currentUser?.agency_id]);
 
 
+  // Offer deadline pre-fill: 24 hours from now in the job's zone. Staff's own edits are never overwritten; it is
+  // refreshed when a recipient is picked, so a form left open for hours doesn't offer a stale "24 hours".
+  const expiryEditedRef = React.useRef<Record<number, boolean>>({});
+  const applyDefaultExpiry = React.useCallback((posIdx: 1 | 2) => {
+    if (!foundRequest || expiryEditedRef.current[posIdx]) return;
+    const fields = defaultOfferExpiry(new Date(), mapSafeZone(foundRequest.details?.timeZone), parseSafeDate(foundRequest.startsAt));
+    const [setDate, setTime] = posIdx === 1 ? [setExpiryDate1, setExpiryTime1] : [setExpiryDate2, setExpiryTime2];
+    // Appointment closer than 24 hours: no ready-made value (it would be refused), so staff choose one.
+    setDate(fields?.date ?? '');
+    setTime(fields?.time ?? '');
+  }, [foundRequest]);
+  useEffect(() => {
+    applyDefaultExpiry(1);
+    applyDefaultExpiry(2);
+  }, [applyDefaultExpiry]);
+
  const getPayloadLocation = () => {
  if (foundRequest?.location && foundRequest.location.includes('·')) {
  return foundRequest.location;
@@ -985,6 +1003,8 @@ export default function AssignmentDetailPage() {
       setSuccess('Offer emailed successfully');
       showToast('Offer emailed successfully');
       setRec('');
+      // The next offer for this position starts from a fresh 24-hour default again.
+      expiryEditedRef.current[posIdx] = false;
     } catch (error) {
       console.error('[Offer Dispatch] Error creating or sending offer:');
       const errorMsg = error instanceof Error ? error.message : 'Failed to create offer. Please try again.';
@@ -1196,6 +1216,9 @@ export default function AssignmentDetailPage() {
  <button type="button" onClick={() => setEditNotice(null)} className="text-emerald-700 hover:text-emerald-900" aria-label="Dismiss"><X className="w-4 h-4" /></button>
  </div>
  )}
+
+ {/* ODHH keeps its own record: once someone is booked, staff mirror the booking on the state portal. */}
+ {isOdhhRequest && hasAcceptedBooking && !isCancelled && <OdhhPortalReminder />}
 
  {/* Questions from interpreters: first, so staff see them immediately. */}
  <ClarificationsCard clarifications={foundRequest?.data?.clarifications} />
@@ -1726,6 +1749,7 @@ export default function AssignmentDetailPage() {
       const roster = isSlot1 ? rosterSlot1 : rosterSlot2;
       const rec = isSlot1 ? recipient1 : recipient2;
       const setRec = (val: string) => {
+        if (val) applyDefaultExpiry(posIdx);
         if (isSlot1) {
           setRecipient1(val);
           if (val && recipient2 === val) setRecipient2('');
@@ -1922,6 +1946,7 @@ export default function AssignmentDetailPage() {
                             value={expDate}
                             onChange={(e) => {
                               setExpDate(e.target.value);
+                              expiryEditedRef.current[posIdx] = true;
                               setErrMsg('');
                               if (!expTime) {
                                 setExpTime('09:00');
@@ -1935,12 +1960,13 @@ export default function AssignmentDetailPage() {
                             value={expTime}
                             onChange={(e) => {
                               setExpTime(e.target.value);
+                              expiryEditedRef.current[posIdx] = true;
                               setErrMsg('');
                             }}
                           />
                         </div>
                       </div>
-                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Choose a future expiration before the appointment starts. An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
+                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Pre-filled to 24 hours from now; change it if needed (it must be before the appointment starts). An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
                       {errMsg && <p className="text-[#C23B22] text-sm mb-4">{errMsg}</p>}
                       {successMsg && (
                         <p className="text-[#059669] text-sm mb-4 font-medium flex items-center gap-1.5">
