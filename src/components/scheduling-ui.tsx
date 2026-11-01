@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { CheckCircle2, Clock, Ban, HelpCircle, AlertTriangle, AlertCircle } from "lucide-react";
+import { CheckCircle2, Clock, Ban, HelpCircle, AlertCircle } from "lucide-react";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 
 export interface InterpreterFitBadgeProps {
@@ -84,33 +84,11 @@ export function InterpreterFitBadge({
 }
 
 /**
- * Soft warning notice displayed when dispatcher picks an interpreter with warning status.
- * Dispatcher can still send offers, but gets complete visibility.
+ * Informational notice for the statuses that do not stop a standard offer: the interpreter's availability simply is
+ * not known. "Unavailable" and "Outside usual hours" block the offer instead (see lib/offerAvailability.ts).
  */
 export function FitWarningNotice({ fit }: { fit?: InterpreterFitStatus | string | null }) {
   if (!fit || fit === "available") return null;
-
-  if (fit === "unavailable") {
-    return (
-      <div className="flex items-start gap-2.5 p-3.5 bg-amber-50/90 border border-amber-200/90 rounded-xl text-amber-900 text-xs mt-3">
-        <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <strong className="font-semibold text-amber-950">Notice · Unavailable:</strong> This interpreter has an existing commitment during this scheduled time. You can still send an offer, but they will not be able to accept it unless their conflicting schedule is cleared.
-        </div>
-      </div>
-    );
-  }
-
-  if (fit === "outside_hours") {
-    return (
-      <div className="flex items-start gap-2.5 p-3.5 bg-amber-50/70 border border-amber-200/70 rounded-xl text-amber-900 text-xs mt-3">
-        <Clock className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-        <div className="leading-relaxed">
-          <strong className="font-semibold text-amber-950">Notice · Outside usual hours:</strong> This appointment falls outside this interpreter&apos;s regular working hours. You can still send an offer.
-        </div>
-      </div>
-    );
-  }
 
   if (fit === "not_shared") {
     return (

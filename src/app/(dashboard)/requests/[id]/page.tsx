@@ -27,6 +27,9 @@ import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/Expired
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
 import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
+import { OfferBlockedNotice } from "@/components/requests/OfferBlockedNotice";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { offerBlock } from "@/lib/offerAvailability";
 import { defaultOfferExpiry } from "@/lib/offerExpiry";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
@@ -44,29 +47,11 @@ import { normalizeClientType } from "@/lib/validation/client";
 import { isStateJobRequest } from "@/lib/stateJob";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 
-const fitOptionLabels: Record<InterpreterFitStatus, string> = {
-  available: "Available",
-  unavailable: "Unavailable",
-  outside_hours: "Outside usual hours",
-  not_provided: "Hours not provided",
-  not_shared: "Not shared",
-};
-
-function getInterpreterOptionLabel(
-  name: string,
-  email: string | undefined,
-  fit: InterpreterFitStatus | undefined,
-  isLoading: boolean,
-  hasError: boolean,
-  pastNote?: string | null
-): string {
-  const identifier = email ? `${name} (${email})` : name;
-  let label: string;
-  if (fit) label = `${identifier} — ${fitOptionLabels[fit]}`;
-  else if (hasError) label = `${identifier} — Availability check failed`;
-  else label = isLoading ? `${identifier} — Checking availability…` : `${identifier} — Availability status unavailable`;
-  // An interpreter who already had an offer on this slot stays in the list, flagged (e.g. "Offer expired").
-  return pastNote ? `${label} · ${pastNote}` : label;
+/** End-of-row status in the recipient list: the same badge the Directly assign list shows, or why there is none yet. */
+function FitTrailing({ fit, loading, failed }: { fit: InterpreterFitStatus | undefined; loading: boolean; failed: boolean }) {
+  if (fit) return <InterpreterFitBadge fit={fit} showIcon={false} />;
+  if (loading) return <span className="text-xs text-gray-400">Checking…</span>;
+  return failed ? <span className="text-xs text-gray-400">Check failed</span> : null;
 }
 
 function getErrorMessage(error: unknown): string {
@@ -876,6 +861,13 @@ export default function AssignmentDetailPage() {
       return;
     }
 
+    // Same rule as the disabled button (and the server): no standard offer to someone unavailable / outside hours.
+    const block = offerBlock(interpreterFitMap[rec], selectedInterpreter?.name ?? 'This interpreter');
+    if (block) {
+      setErr(block.message);
+      return;
+    }
+
     setIsSending(true);
 
     try {
@@ -1680,6 +1672,11 @@ export default function AssignmentDetailPage() {
       const setErrMsg = isSlot1 ? setErrorMessage1 : setErrorMessage2;
       const successMsg = isSlot1 ? successMessage1 : successMessage2;
       const isSending = isSlot1 ? isSendingOffer1 : isSendingOffer2;
+      // A standard offer needs an interpreter who isn't unavailable / outside usual hours (the server checks too).
+      const recFit = rec ? interpreterFitMap[rec] : undefined;
+      const recBlock = rec ? offerBlock(recFit, roster.find((i) => i.id === rec)?.name ?? 'This interpreter') : null;
+      const recChecking = Boolean(rec) && !recFit && isInterpreterFitLoading;
+      const offerDisabled = !rec || isSending || Boolean(recBlock) || recChecking;
 
       let slotBadgeColor = 'bg-[#FEF3C7] text-[#92400E]';
       let slotBadgeText = 'Booking: Unfilled';
@@ -1793,37 +1790,25 @@ export default function AssignmentDetailPage() {
 
                   <div className="space-y-4">
                     <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="block text-sm text-[var(--sage)]">Select one recipient</label>
-                        {rec && <InterpreterFitBadge fit={interpreterFitMap[rec]} />}
-                      </div>
-                      <select 
-                        className="w-full bg-[#F5F4F0] border-none rounded-full px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow appearance-none"
+                      <SearchableSelect
+                        label="Select one recipient"
+                        placeholder="Search by name or email"
+                        emptyText="No interpreters match your search."
                         value={rec}
-                        onChange={(e) => setRec(e.target.value)}
-                      >
-                        <option value="">Choose an interpreter</option>
-                        {roster.map((interpreter) => (
-                          <option key={interpreter.id} value={interpreter.id}>
-                            {getInterpreterOptionLabel(
-                              interpreter.name,
-                              interpreter.email,
-                              interpreterFitMap[interpreter.id],
-                              isInterpreterFitLoading,
-                              Boolean(interpreterFitError),
-                              pastOfferNote(pastOffers, interpreter.id, isAppointmentFinished, currentTime)
-                            )}
-                          </option>
-                        ))}
-                      </select>
-                      {rec && (
-                        <div className="mt-2 flex items-center gap-2 text-xs text-[var(--sage)]" aria-live="polite">
-                          <span>{roster.find((interpreter) => interpreter.id === rec)?.name}</span>
-                          <InterpreterFitBadge fit={interpreterFitMap[rec]} />
-                        </div>
-                      )}
-                      {rec && (
-                        <FitWarningNotice fit={interpreterFitMap[rec]} />
+                        onChange={setRec}
+                        options={roster.map((interpreter) => ({
+                          id: interpreter.id,
+                          label: interpreter.name,
+                          description: [interpreter.email, pastOfferNote(pastOffers, interpreter.id, isAppointmentFinished, currentTime)].filter(Boolean).join(' · ') || undefined,
+                          trailing: <FitTrailing fit={interpreterFitMap[interpreter.id]} loading={isInterpreterFitLoading} failed={Boolean(interpreterFitError)} />,
+                        }))}
+                      />
+                      {/* Unavailable / outside usual hours stop the offer; the Directly assign panel below ignores this. */}
+                      {recBlock && <OfferBlockedNotice block={recBlock} />}
+                      {rec && !recBlock && (
+                        recChecking
+                          ? <p role="status" className="mt-2 text-xs text-gray-500">Checking availability…</p>
+                          : <FitWarningNotice fit={recFit} />
                       )}
                       {interpreterFitError && (
                         <p className="mt-2 text-xs text-red-700" role="alert">
@@ -1876,9 +1861,10 @@ export default function AssignmentDetailPage() {
                     <button 
                       type="button"
                       onClick={() => handleCreateOffer(posIdx)}
-                      disabled={!rec || isSending}
+                      disabled={offerDisabled}
+                      title={recBlock?.message}
                       className={`rounded-full px-6 py-2 text-sm font-medium transition-colors mt-2 w-auto flex items-center gap-2 ${
-                        !rec || isSending
+                        offerDisabled
                           ? 'bg-[#8BA49E] text-white opacity-50 cursor-not-allowed' 
                           : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
                       }`}

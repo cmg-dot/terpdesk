@@ -8,6 +8,10 @@ import { eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { notifyInterpreter } from "@/lib/notifications";
 import { logActivity } from "@/lib/requestActivity";
+import { logError } from "@/lib/logError";
+import { offerBlock } from "@/lib/offerAvailability";
+import { checkInterpreterFit } from "./availability";
+import type { InterpreterFitStatus } from "./availability";
 
 interface CreateOfferPayload {
   requestId: string;
@@ -20,6 +24,13 @@ type OfferRecord = typeof offers.$inferSelect;
 
 /** Problems are returned, not thrown: in production a thrown message is hidden from the browser. */
 export type CreateOfferResult = { success: true; offer: OfferRecord & { positionIndex: 1 | 2 } } | { success: false; error: string };
+
+/** The appointment's own time zone, used only when the interpreter has no profile zone of their own. */
+const jobTimeZoneOf = (data: unknown): string | undefined => {
+  const d = data as { details?: { timeZone?: unknown }; timeZone?: unknown } | null;
+  const zone = d?.details?.timeZone ?? d?.timeZone;
+  return typeof zone === "string" ? zone : undefined;
+};
 
 // Not exported: a "use server" file may only export async functions (types are fine).
 const PAST_APPOINTMENT_MESSAGE =
@@ -48,6 +59,23 @@ export async function createOffer(payload: CreateOfferPayload): Promise<CreateOf
   if (!isNaN(apptStart.getTime()) && payload.expiresAt >= apptStart) {
     return { success: false, error: "The response deadline must be before the appointment starts." };
   }
+
+  // Standard offers respect availability (the Directly assign override does not). Checked here, not just in the form,
+  // so a stale page or a hand-made request can't send one. If the check itself fails, nothing is sent.
+  let fit: InterpreterFitStatus;
+  try {
+    ({ fit } = await checkInterpreterFit({
+      interpreterId: payload.interpreterId,
+      jobStartsAtUtc: apptStart,
+      jobEndsAtUtc: apptEnd,
+      jobTimeZone: jobTimeZoneOf(request.data),
+    }));
+  } catch (err) {
+    logError("createOffer availability check", err);
+    return { success: false, error: "We couldn't check this interpreter's availability, so the offer wasn't sent. Please try again." };
+  }
+  const block = offerBlock(fit, "This interpreter");
+  if (block) return { success: false, error: block.message };
 
   const [newOffer] = await db.insert(offers).values({
     requestId: payload.requestId,
