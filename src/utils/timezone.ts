@@ -79,11 +79,13 @@ export function buildAppointmentUtcTimes(params: {
 
 const HAS_ZONE = /(Z|[+-]\d{2}:?\d{2})$/i;
 const NAIVE_DATETIME = /^\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/;
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
  * Normalises a timestamp to an absolute UTC ISO string.
  * A string that already carries a zone (Z or an offset) is trusted as-is. A "naive" wall-clock string
- * such as "2026-03-04T09:00" is read in the job's own IANA zone, never the host's local zone.
+ * such as "2026-03-04T09:00" is read in the job's own IANA zone, never the host's local zone. A bare date
+ * ("2026-11-01") is that day's midnight in the job's zone (JS would read it as UTC midnight, the day before in the US).
  */
 export function toUtcIso(value: string | Date | null | undefined, ianaZone: string): string | null {
   if (!value) return null;
@@ -91,6 +93,10 @@ export function toUtcIso(value: string | Date | null | undefined, ianaZone: stri
   const text = String(value).trim();
   if (!text) return null;
   try {
+    if (DATE_ONLY.test(text)) {
+      const d = fromZonedTime(`${text}T00:00:00`, ianaZone);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    }
     if (NAIVE_DATETIME.test(text) && !HAS_ZONE.test(text)) {
       const d = fromZonedTime(text.replace(" ", "T"), ianaZone);
       return isNaN(d.getTime()) ? null : d.toISOString();
@@ -226,15 +232,40 @@ export function wallClockToUtcDate(params: {
 
 
 /**
+ * The zone text saved on a job (an IANA id or a label such as "Pacific Time — Seattle, Los Angeles"), wherever the
+ * record keeps it. Undefined when the job has none. Pass the request, its `data`, or its `details`.
+ */
+export function rawJobZone(source: unknown): string | undefined {
+  const s = source as { details?: Record<string, unknown>; data?: { details?: Record<string, unknown>; timeZone?: unknown; timezone?: unknown }; timeZone?: unknown; timezone?: unknown } | null | undefined;
+  const candidates = [
+    s?.details?.timeZone, s?.details?.timezone,
+    s?.data?.details?.timeZone, s?.data?.details?.timezone,
+    s?.timeZone, s?.timezone, s?.data?.timeZone, s?.data?.timezone,
+  ];
+  return candidates.find((c): c is string => typeof c === "string" && c.trim() !== "");
+}
+
+/** The job's IANA zone: every date shown for a job is formatted in this, never in the viewer's zone. */
+export function resolveJobZone(source: unknown): string {
+  return getIanaZone(rawJobZone(source));
+}
+
+/** A stored timestamp as an absolute Date. Zone-less values are read in the job's zone, never the browser's. */
+export function parseInstantInZone(value: string | Date | null | undefined, ianaZone: string): Date | null {
+  const iso = toUtcIso(value, ianaZone);
+  return iso ? new Date(iso) : null;
+}
+
+/**
  * "Tue, Sep 22 · 10:53 AM – 12:53 PM PDT", always in the given IANA zone and never the browser's.
  * Returns an em dash when either instant is missing or invalid.
  */
 export function formatDateTimeRangeInZone(start: string | Date | null | undefined, end: string | Date | null | undefined, ianaZone: string): string {
   try {
     if (!start || !end) return "—";
-    const s = new Date(start);
-    const e = new Date(end);
-    if (isNaN(s.getTime()) || isNaN(e.getTime())) return "—";
+    const s = parseInstantInZone(start, ianaZone);
+    const e = parseInstantInZone(end, ianaZone);
+    if (!s || !e) return "—";
     return `${formatInTimeZone(s, ianaZone, "EEE, MMM d")} · ${formatInTimeZone(s, ianaZone, "h:mm a")} – ${formatInTimeZone(e, ianaZone, "h:mm a zzz")}`;
   } catch {
     return "—";
@@ -245,8 +276,8 @@ export function formatDateTimeRangeInZone(start: string | Date | null | undefine
 export function formatDateInZone(value: string | Date | null | undefined, ianaZone: string, pattern: string = "MMM d, yyyy"): string {
   try {
     if (!value) return "—";
-    const d = new Date(value);
-    return isNaN(d.getTime()) ? "—" : formatInTimeZone(d, ianaZone, pattern);
+    const d = parseInstantInZone(value, ianaZone);
+    return d ? formatInTimeZone(d, ianaZone, pattern) : "—";
   } catch {
     return "—";
   }

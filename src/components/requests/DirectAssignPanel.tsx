@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { assignInterpreterDirectly } from "@/app/actions/assignInterpreterDirectly";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { InterpreterFitBadge } from "@/components/scheduling-ui";
@@ -37,6 +37,10 @@ interface DirectAssignPanelProps {
   fits: Record<string, InterpreterFitStatus>;
   offers: ReadonlyArray<DirectAssignOfferRef>;
   onAssigned: (result: DirectAssignSuccess) => void | Promise<void>;
+  /** Told whenever an interpreter is picked (true) or the choice is cleared (false), so the page can lock the offer form. */
+  onEngagedChange?: (engaged: boolean) => void;
+  /** Faded and disabled while the offer form is in use for this position. */
+  lockedReason?: string;
 }
 
 /** Only the fits worth a warning; "not provided" / "not shared" just mean the agency can't tell. */
@@ -53,12 +57,13 @@ const pendingFor = (offers: ReadonlyArray<DirectAssignOfferRef>, position: JobPo
  * acceptance and their auto-book permission. Asks for one confirmation because it withdraws the pending offers
  * and emails the interpreter.
  */
-export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, fits, offers, onAssigned }: DirectAssignPanelProps) => {
+export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, fits, offers, onAssigned, onEngagedChange, lockedReason }: DirectAssignPanelProps) => {
   const [selectedId, setSelectedId] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [assigning, setAssigning] = useState(false);
   const [error, setError] = useState("");
 
+  const locked = Boolean(lockedReason);
   const person = roster.find((r) => r.id === selectedId);
   const fitWarning = person ? FIT_WARNINGS[fits[person.id]] : undefined;
   const pending = pendingFor(offers, positionIndex);
@@ -68,7 +73,19 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
     setSelectedId(id);
     setConfirming(false);
     setError("");
+    onEngagedChange?.(Boolean(id));
   };
+
+  // The offer form took over: drop any half-made choice here so the two can never both hold a recipient.
+  const engagedCallback = useRef(onEngagedChange);
+  engagedCallback.current = onEngagedChange;
+  useEffect(() => {
+    if (!locked) return;
+    setSelectedId("");
+    setConfirming(false);
+    setError("");
+    engagedCallback.current?.(false);
+  }, [locked]);
 
   const assign = async () => {
     if (!person || assigning) return;
@@ -83,6 +100,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
       }
       setSelectedId("");
       setConfirming(false);
+      onEngagedChange?.(false);
       await onAssigned(result);
     } catch {
       setError("Something went wrong. Please try again.");
@@ -92,8 +110,14 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
   };
 
   return (
-    <section className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-4 md:p-5" aria-label="Directly assign interpreter">
+    <section
+      className={`mt-6 rounded-xl border border-dashed border-gray-300 bg-white p-4 transition-opacity md:p-5 ${locked ? "opacity-50" : ""}`}
+      aria-label="Directly assign interpreter"
+      aria-disabled={locked}
+    >
+      <fieldset disabled={locked} className="m-0 min-w-0 border-0 p-0">
       <h4 className="mb-1 text-sm font-semibold text-[var(--ink)]">Directly assign interpreter</h4>
+      {lockedReason && <p role="status" className="mb-3 text-xs font-medium text-gray-700">{lockedReason}</p>}
       <p className="mb-4 text-xs leading-relaxed text-gray-600">
         Agency override. Books the interpreter right now: no offer, no waiting for them to accept, and no auto-book permission needed.
         Availability is not enforced. Any pending offers for {showPosition ? `Position ${positionIndex}` : "this job"} are withdrawn.
@@ -105,6 +129,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
         emptyText="No interpreters match your search."
         value={selectedId}
         onChange={choose}
+        disabled={locked}
         options={roster.map((r) => ({ id: r.id, label: r.name, description: r.email, trailing: <InterpreterFitBadge fit={fits[r.id]} showIcon={false} /> }))}
       />
       {person && fitWarning && (
@@ -141,6 +166,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
           Assign directly
         </button>
       )}
+      </fieldset>
     </section>
   );
 };

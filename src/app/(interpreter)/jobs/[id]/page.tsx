@@ -15,40 +15,30 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { formatReference } from "@/utils/statusEngine";
-import { resolveRequestTimes } from "@/utils/timezone";
+import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 
-const mapSafeZone = (tz: any) => {
-  if (!tz || typeof tz !== 'string') return 'America/Los_Angeles';
-  const lower = tz.toLowerCase();
-  if (lower.includes('hawaii')) return 'Pacific/Honolulu';
-  if (lower.includes('alaska')) return 'America/Anchorage';
-  if (lower.includes('pacific')) return 'America/Los_Angeles';
-  if (lower.includes('arizona')) return 'America/Phoenix';
-  if (lower.includes('mountain')) return 'America/Denver';
-  if (lower.includes('central')) return 'America/Chicago';
-  if (lower.includes('eastern')) return 'America/New_York';
-  return 'America/Los_Angeles';
-};
+// One zone mapper for the whole app (the old local copy sent every IANA id such as America/New_York to Los Angeles).
+const mapSafeZone = (tz?: string) => getIanaZone(tz);
 
 const formatDetailsDate = (startStr?: string | Date | null, endStr?: string | Date | null, timeZone?: string) => {
   try {
     if (!startStr) return "Date TBD";
-    const start = new Date(startStr);
-    if (isNaN(start.getTime())) return "Date TBD";
     const safeZone = mapSafeZone(timeZone);
-    
+    const start = parseInstantInZone(startStr, safeZone);
+    if (!start) return "Date TBD";
+
     const dateStart = formatInTimeZone(start, safeZone, "EEE, MMM d");
     const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
-    
+
     let timeEnd = "";
     if (endStr) {
-      const end = new Date(endStr);
-      if (!isNaN(end.getTime())) {
+      const end = parseInstantInZone(endStr, safeZone);
+      if (end) {
         timeEnd = formatInTimeZone(end, safeZone, "h:mm a zzz");
       }
     }
@@ -65,14 +55,15 @@ const formatDetailsDate = (startStr?: string | Date | null, endStr?: string | Da
 const formatJobDate = (startStr?: string | Date | null, endStr?: string | Date | null, timeZone?: string) => {
   try {
     if (!startStr) return "Date TBD";
-    const start = new Date(startStr);
-    if (isNaN(start.getTime())) return "Date TBD";
     const safeZone = mapSafeZone(timeZone);
-    
-    const end = endStr ? new Date(endStr) : null;
+    const start = parseInstantInZone(startStr, safeZone);
+    if (!start) return "Date TBD";
+
+    const end = endStr ? parseInstantInZone(endStr, safeZone) : null;
     const dateStr = formatInTimeZone(start, safeZone, "EEE, MMM d").toUpperCase();
     const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
-    const timeEnd = end && !isNaN(end.getTime()) 
+    const timeEnd = end
+
       ? formatInTimeZone(end, safeZone, "h:mm a") 
       : formatInTimeZone(start, safeZone, "h:mm a");
     
@@ -665,8 +656,10 @@ function ServiceTimeBlock({ job }: { job: any }) {
 
   let serviceTimeHours = "-";
   if (actualStart && actualEnd) {
-    const start = new Date(actualStart).getTime();
-    const end = new Date(actualEnd).getTime();
+    // The inputs are wall-clock times in the job's zone: read them there, so the length is right across a DST change.
+    const jobZone = mapSafeZone((job as any).details?.timeZone || job.timeZone);
+    const start = parseInstantInZone(actualStart, jobZone)?.getTime() ?? NaN;
+    const end = parseInstantInZone(actualEnd, jobZone)?.getTime() ?? NaN;
     if (!isNaN(start) && !isNaN(end)) {
       const diffMs = end - start;
       const mins = Math.max(0, (diffMs / 60000) - (effectiveBreakMinutes));

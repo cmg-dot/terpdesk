@@ -10,15 +10,11 @@ import { notifyInterpreter } from "@/lib/notifications";
 import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
 import { offerBlock } from "@/lib/offerAvailability";
+import { offerExpiresAt } from "@/lib/offerExpiry";
+import { createOfferSchema } from "@/lib/validation/createOffer";
+import type { CreateOfferInput } from "@/lib/validation/createOffer";
 import { checkInterpreterFit } from "./availability";
 import type { InterpreterFitStatus } from "./availability";
-
-interface CreateOfferPayload {
-  requestId: string;
-  interpreterId: string;
-  expiresAt: Date;
-  positionIndex?: 1 | 2;
-}
 
 type OfferRecord = typeof offers.$inferSelect;
 
@@ -36,8 +32,17 @@ const jobTimeZoneOf = (data: unknown): string | undefined => {
 const PAST_APPOINTMENT_MESSAGE =
   "This appointment's scheduled time has already started or passed, so new offers can't be sent. Edit the time to a future date to offer it again.";
 
-export async function createOffer(payload: CreateOfferPayload): Promise<CreateOfferResult> {
-  await requireRole("agency");
+export async function createOffer(input: CreateOfferInput): Promise<CreateOfferResult> {
+  try {
+    await requireRole("agency");
+  } catch {
+    return { success: false, error: "You don't have permission to send offers." };
+  }
+  const parsed = createOfferSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: "That offer isn't valid. Check the interpreter and the response time, then try again." };
+  const { requestId, interpreterId, expiresInMinutes } = parsed.data;
+  const payload = { requestId, interpreterId, positionIndex: parsed.data.positionIndex };
+
   const [request] = await db.select().from(requests).where(eq(requests.id, payload.requestId));
   if (!request) return { success: false, error: "This request no longer exists." };
 
@@ -53,10 +58,10 @@ export async function createOffer(payload: CreateOfferPayload): Promise<CreateOf
     return { success: false, error: PAST_APPOINTMENT_MESSAGE };
   }
 
-  if (payload.expiresAt <= now) {
-    return { success: false, error: "The response deadline must be in the future." };
-  }
-  if (!isNaN(apptStart.getTime()) && payload.expiresAt >= apptStart) {
+  // The absolute deadline is worked out here, from the server's clock, so it is the same instant whatever the browser's
+  // clock or time zone say.
+  const expiresAt = offerExpiresAt(now, expiresInMinutes);
+  if (!isNaN(apptStart.getTime()) && expiresAt >= apptStart) {
     return { success: false, error: "The response deadline must be before the appointment starts." };
   }
 
@@ -80,7 +85,7 @@ export async function createOffer(payload: CreateOfferPayload): Promise<CreateOf
   const [newOffer] = await db.insert(offers).values({
     requestId: payload.requestId,
     interpreterId: payload.interpreterId,
-    expiresAt: payload.expiresAt,
+    expiresAt,
     status: 'pending'
   }).returning();
 

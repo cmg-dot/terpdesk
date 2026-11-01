@@ -5,7 +5,7 @@ import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { formatReference, isNeedsReplacementStatus } from "@/utils/statusEngine";
-import { resolveRequestTimes } from "@/utils/timezone";
+import { rawJobZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 function mapRequestRow(row: any, requestOffers: any[]) {
@@ -166,7 +166,8 @@ function mapRequestRow(row: any, requestOffers: any[]) {
       ...details,
       setting,
       format,
-      timeZone: details.timeZone || "America/Los_Angeles",
+      // Keep the saved zone text (the edit form reads it); fall back to wherever else the job stored one.
+      timeZone: rawJobZone(row) || "America/Los_Angeles",
       meetingLink,
       virtualLink: meetingLink,
       meetingId,

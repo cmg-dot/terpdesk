@@ -13,7 +13,7 @@ import { getInterpreters } from "@/app/actions/getInterpreters";
 import { createOffer } from "@/app/actions/createOffer";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { cancelRequest } from "@/app/actions/cancelRequest";
-import { wallClockToUtc, wallClockToUtcDate, getIanaZone, resolveRequestTimes } from "@/utils/timezone";
+import { wallClockToUtc, wallClockToUtcDate, getIanaZone, parseInstantInZone, resolveJobZone, resolveRequestTimes } from "@/utils/timezone";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import { isAppointmentHappeningNow, isUnfilledPastDue } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
@@ -30,7 +30,8 @@ import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
 import { OfferBlockedNotice } from "@/components/requests/OfferBlockedNotice";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { offerBlock } from "@/lib/offerAvailability";
-import { defaultOfferExpiry } from "@/lib/offerExpiry";
+import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from "@/lib/offerExpiry";
+import { OfferExpiryInput } from "@/components/requests/OfferExpiryInput";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
@@ -103,16 +104,16 @@ const mapSafeZone = (tz?: string) => getIanaZone(tz);
 const formatDetailsDate = (startStr?: string | Date | null, endStr?: string | Date | null, timeZone?: string) => {
   try {
     if (!startStr) return "Date TBD";
-    const start = parseSafeDate(startStr);
-    if (!start) return "Date TBD";
     const safeZone = getIanaZone(timeZone);
-    
+    const start = parseInstantInZone(startStr, safeZone);
+    if (!start) return "Date TBD";
+
     const dateStart = formatInTimeZone(start, safeZone, "EEE, MMM d");
     const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
     
     let timeEnd = "";
     if (endStr) {
-      const end = parseSafeDate(endStr);
+      const end = parseInstantInZone(endStr, safeZone);
       if (end) {
         timeEnd = formatInTimeZone(end, safeZone, "h:mm a zzz");
       }
@@ -280,15 +281,18 @@ export default function AssignmentDetailPage() {
   }));
 
   const [recipient1, setRecipient1] = useState('');
-  const [expiryDate1, setExpiryDate1] = useState('');
-  const [expiryTime1, setExpiryTime1] = useState('');
+  // Offer response window: hours + minutes from the moment the offer is sent (24 h unless the job starts sooner).
+  const [expiryHours1, setExpiryHours1] = useState(String(DEFAULT_OFFER_EXPIRY_HOURS));
+  const [expiryMinutes1, setExpiryMinutes1] = useState('0');
   const [errorMessage1, setErrorMessage1] = useState('');
   const [successMessage1, setSuccessMessage1] = useState('');
   const [isSendingOffer1, setIsSendingOffer1] = useState(false);
 
   const [recipient2, setRecipient2] = useState('');
-  const [expiryDate2, setExpiryDate2] = useState('');
-  const [expiryTime2, setExpiryTime2] = useState('');
+  const [expiryHours2, setExpiryHours2] = useState(String(DEFAULT_OFFER_EXPIRY_HOURS));
+  const [expiryMinutes2, setExpiryMinutes2] = useState('0');
+  // Which positions have an interpreter picked in "Directly assign": while one has, that position's offer form is locked.
+  const [assignEngaged, setAssignEngaged] = useState<Record<1 | 2, boolean>>({ 1: false, 2: false });
   const [errorMessage2, setErrorMessage2] = useState('');
   const [successMessage2, setSuccessMessage2] = useState('');
   const [isSendingOffer2, setIsSendingOffer2] = useState(false);
@@ -779,16 +783,16 @@ export default function AssignmentDetailPage() {
   }, [foundRequest, dbInterpreters, currentUser?.agency_id]);
 
 
-  // Offer deadline pre-fill: 24 hours from now in the job's zone. Staff's own edits are never overwritten; it is
-  // refreshed when a recipient is picked, so a form left open for hours doesn't offer a stale "24 hours".
+  // Offer response window pre-fill: 24 hours. Staff's own edits are never overwritten; it is refreshed when a
+  // recipient is picked, because whether 24 hours still fits before the appointment depends on the time of day.
   const expiryEditedRef = React.useRef<Record<number, boolean>>({});
   const applyDefaultExpiry = React.useCallback((posIdx: 1 | 2) => {
     if (!foundRequest || expiryEditedRef.current[posIdx]) return;
-    const fields = defaultOfferExpiry(new Date(), mapSafeZone(foundRequest.details?.timeZone), parseSafeDate(foundRequest.startsAt));
-    const [setDate, setTime] = posIdx === 1 ? [setExpiryDate1, setExpiryTime1] : [setExpiryDate2, setExpiryTime2];
-    // Appointment closer than 24 hours: no ready-made value (it would be refused), so staff choose one.
-    setDate(fields?.date ?? '');
-    setTime(fields?.time ?? '');
+    const fields = defaultOfferExpiry(new Date(), parseSafeDate(foundRequest.startsAt));
+    const [setHours, setMinutes] = posIdx === 1 ? [setExpiryHours1, setExpiryMinutes1] : [setExpiryHours2, setExpiryMinutes2];
+    // Appointment closer than 24 hours: no ready-made value (it would be refused), so staff type a shorter window.
+    setHours(fields?.hours ?? '');
+    setMinutes(fields?.minutes ?? '');
   }, [foundRequest]);
   useEffect(() => {
     applyDefaultExpiry(1);
@@ -828,8 +832,8 @@ export default function AssignmentDetailPage() {
 
   const handleCreateOffer = async (posIdx: 1 | 2 = 1) => {
     const rec = posIdx === 1 ? recipient1 : recipient2;
-    const expDate = posIdx === 1 ? expiryDate1 : expiryDate2;
-    const expTime = posIdx === 1 ? expiryTime1 : expiryTime2;
+    const expHours = posIdx === 1 ? expiryHours1 : expiryHours2;
+    const expMinutes = posIdx === 1 ? expiryMinutes1 : expiryMinutes2;
     const setErr = posIdx === 1 ? setErrorMessage1 : setErrorMessage2;
     const setSuccess = posIdx === 1 ? setSuccessMessage1 : setSuccessMessage2;
     const setRec = posIdx === 1 ? setRecipient1 : setRecipient2;
@@ -838,18 +842,21 @@ export default function AssignmentDetailPage() {
     setErr('');
     setSuccess('');
 
-    if (!rec || !expDate || !expTime) {
-      setErr('Please select an interpreter and set a valid future expiry date/time before the appointment starts.');
+    if (!rec) {
+      setErr('Please select an interpreter to send the offer to.');
       return;
     }
-    
-    const jobTimeZone = mapSafeZone(foundRequest?.details?.timeZone);
-    const inputValue = `${expDate}T${expTime}`;
-    const expiryUtc = new Date(fromZonedTime(inputValue, jobTimeZone).toISOString());
-    const startUtc = parseSafeDate(foundRequest?.startsAt) || new Date();
 
-    if (expiryUtc <= new Date() || expiryUtc >= startUtc) {
-      setErr('Expiry must be in the future and before appointment start.');
+    // The window is sent as minutes; the server turns it into the absolute deadline (this check just fails fast).
+    const expiry = checkOfferExpiry({
+      hours: expHours,
+      minutes: expMinutes,
+      now: new Date(),
+      timeZone: resolveJobZone(foundRequest),
+      startsAt: parseSafeDate(foundRequest?.startsAt),
+    });
+    if (!expiry.ok) {
+      setErr(expiry.message);
       return;
     }
 
@@ -875,7 +882,7 @@ export default function AssignmentDetailPage() {
       const created = await createOffer({
         requestId: id,
         interpreterId: rec,
-        expiresAt: expiryUtc,
+        expiresInMinutes: expiry.totalMinutes,
         positionIndex: posIdx
       });
       if (!created.success) throw new Error(created.error);
@@ -910,6 +917,8 @@ export default function AssignmentDetailPage() {
       setRec('');
       // The next offer for this position starts from a fresh 24-hour default again.
       expiryEditedRef.current[posIdx] = false;
+      (posIdx === 1 ? setExpiryHours1 : setExpiryHours2)(String(DEFAULT_OFFER_EXPIRY_HOURS));
+      (posIdx === 1 ? setExpiryMinutes1 : setExpiryMinutes2)('0');
     } catch (error) {
       console.error('[Offer Dispatch] Error creating or sending offer:');
       const errorMsg = error instanceof Error ? error.message : 'Failed to create offer. Please try again.';
@@ -1135,7 +1144,7 @@ export default function AssignmentDetailPage() {
    try {
      const d = parseSafeDate(cancelDate);
      if (!d) return '';
-     return formatInTimeZone(d, mapSafeZone(assignment.details?.timeZone), "MMM d, yyyy h:mm a zzz");
+     return formatInTimeZone(d, resolveJobZone(foundRequest), "MMM d, yyyy h:mm a zzz");
    } catch (e) {
      return '';
    }
@@ -1434,14 +1443,15 @@ export default function AssignmentDetailPage() {
 
    if (positionsWithHours.length === 0) return null;
 
-   const tz = mapSafeZone(assignment.details?.timeZone);
+   // Every date and time on this card is read and shown in the job's own saved zone, never the browser's.
+   const tz = resolveJobZone(foundRequest);
 
    const formatRange = (startIso?: string | null, endIso?: string | null) => {
      try {
        if (!startIso) return 'Not reported';
-       const s = parseSafeDate(startIso);
+       const s = parseInstantInZone(startIso, tz);
        if (!s) return 'Not reported';
-       const e = endIso ? parseSafeDate(endIso) : null;
+       const e = endIso ? parseInstantInZone(endIso, tz) : null;
        const dStr = formatInTimeZone(s, tz, 'EEE, MMM d');
        const stStr = formatInTimeZone(s, tz, 'h:mm a');
        const etStr = e ? formatInTimeZone(e, tz, 'h:mm a zzz') : 'TBD';
@@ -1490,8 +1500,8 @@ export default function AssignmentDetailPage() {
 
            let serviceTimeStr = "-";
            if (actualStart && actualEnd) {
-             const s = parseSafeDate(actualStart);
-             const e = parseSafeDate(actualEnd);
+             const s = parseInstantInZone(actualStart, tz);
+             const e = parseInstantInZone(actualEnd, tz);
              if (s && e) {
                const mins = Math.max(0, ((e.getTime() - s.getTime()) / 60000) - (hoursSub?.breakMinutes || 0));
                serviceTimeStr = `${(mins / 60).toFixed(1)} hr`;
@@ -1653,7 +1663,11 @@ export default function AssignmentDetailPage() {
       const needsReplacement = isSlot1 ? slot1NeedsReplacement : slot2NeedsReplacement;
       const roster = isSlot1 ? rosterSlot1 : rosterSlot2;
       const rec = isSlot1 ? recipient1 : recipient2;
+      // One way to book at a time: while an interpreter is picked in "Directly assign" the offer form is faded and disabled
+      // (clear that choice to use it). The same goes the other way round, via the Direct assign panel's lockedReason.
+      const offerLocked = assignEngaged[posIdx];
       const setRec = (val: string) => {
+        if (val && offerLocked) return;
         if (val) applyDefaultExpiry(posIdx);
         if (isSlot1) {
           setRecipient1(val);
@@ -1664,10 +1678,8 @@ export default function AssignmentDetailPage() {
         }
       };
 
-      const expDate = isSlot1 ? expiryDate1 : expiryDate2;
-      const setExpDate = isSlot1 ? setExpiryDate1 : setExpiryDate2;
-      const expTime = isSlot1 ? expiryTime1 : expiryTime2;
-      const setExpTime = isSlot1 ? setExpiryTime1 : setExpiryTime2;
+      const expHours = isSlot1 ? expiryHours1 : expiryHours2;
+      const expMinutes = isSlot1 ? expiryMinutes1 : expiryMinutes2;
       const errMsg = isSlot1 ? errorMessage1 : errorMessage2;
       const setErrMsg = isSlot1 ? setErrorMessage1 : setErrorMessage2;
       const successMsg = isSlot1 ? successMessage1 : successMessage2;
@@ -1782,7 +1794,16 @@ export default function AssignmentDetailPage() {
                   </p>
                 </div>
               ) : (
-                <>
+                <fieldset
+                  disabled={offerLocked}
+                  aria-disabled={offerLocked}
+                  className={`m-0 min-w-0 border-0 p-0 transition-opacity ${offerLocked ? 'opacity-50' : ''}`}
+                >
+                  {offerLocked && (
+                    <p role="status" className="mb-3 text-xs font-medium text-gray-700">
+                      Offers are paused while an interpreter is selected in &ldquo;Directly assign&rdquo; below. Clear that selection to send an offer instead.
+                    </p>
+                  )}
                   <label className="flex items-start gap-3 cursor-pointer mb-6">
                     <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" />
                     <span className="text-sm text-gray-700">Deliberately offer this slot to multiple interpreters</span>
@@ -1818,35 +1839,21 @@ export default function AssignmentDetailPage() {
                     </div>
                     
                     <div>
-                      <label className="block text-sm text-[var(--sage)] mb-2">Offer expiry</label>
-                      <div className="flex flex-col sm:flex-row gap-4 w-full">
-                        <div className="flex-1 relative w-full">
-                          <IconInput kind="date" 
-                            className="w-full bg-[#F5F4F0] border-none rounded-full px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow" 
-                            value={expDate}
-                            onChange={(e) => {
-                              setExpDate(e.target.value);
-                              expiryEditedRef.current[posIdx] = true;
-                              setErrMsg('');
-                              if (!expTime) {
-                                setExpTime('09:00');
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="flex-1 relative w-full">
-                          <IconInput kind="time" 
-                            className="w-full bg-[#F5F4F0] border-none rounded-full px-4 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow" 
-                            value={expTime}
-                            onChange={(e) => {
-                              setExpTime(e.target.value);
-                              expiryEditedRef.current[posIdx] = true;
-                              setErrMsg('');
-                            }}
-                          />
-                        </div>
-                      </div>
-                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Pre-filled to 24 hours from now; change it if needed (it must be before the appointment starts). An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
+                      <OfferExpiryInput
+                        hours={expHours}
+                        minutes={expMinutes}
+                        nowMs={currentTime}
+                        timeZone={resolveJobZone(foundRequest)}
+                        startsAt={parseSafeDate(foundRequest?.startsAt)}
+                        disabled={offerLocked}
+                        onChange={(next) => {
+                          (isSlot1 ? setExpiryHours1 : setExpiryHours2)(next.hours);
+                          (isSlot1 ? setExpiryMinutes1 : setExpiryMinutes2)(next.minutes);
+                          expiryEditedRef.current[posIdx] = true;
+                          setErrMsg('');
+                        }}
+                      />
+                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Defaults to 24 hours; it must end before the appointment starts. An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
                       {errMsg && <p className="text-[#C23B22] text-sm mb-4">{errMsg}</p>}
                       {successMsg && (
                         <p className="text-[#059669] text-sm mb-4 font-medium flex items-center gap-1.5">
@@ -1882,7 +1889,7 @@ export default function AssignmentDetailPage() {
                       )}
                     </button>
                   </div>
-                </>
+                </fieldset>
               )}
 
               {/* Works even while an offer is out: assigning withdraws it. Not offered once the job has started. */}
@@ -1895,6 +1902,8 @@ export default function AssignmentDetailPage() {
                   fits={interpreterFitMap}
                   offers={realOffers}
                   onAssigned={(result) => handleDirectlyAssigned(posIdx, result)}
+                  onEngagedChange={(engaged) => setAssignEngaged((prev) => (prev[posIdx] === engaged ? prev : { ...prev, [posIdx]: engaged }))}
+                  lockedReason={rec && !activeOffer ? 'Direct assignment is paused while a recipient is selected for an offer above. Clear that selection to assign directly instead.' : undefined}
                 />
               )}
             </>
