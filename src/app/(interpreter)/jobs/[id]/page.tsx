@@ -19,6 +19,7 @@ import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/ti
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
+import { formatHoursMinutes } from "@/lib/durationFormat";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 
@@ -663,7 +664,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
     if (!isNaN(start) && !isNaN(end)) {
       const diffMs = end - start;
       const mins = Math.max(0, (diffMs / 60000) - (effectiveBreakMinutes));
-      serviceTimeHours = (mins / 60).toFixed(1) + " hr";
+      serviceTimeHours = formatHoursMinutes(mins);
     }
   }
 

@@ -32,6 +32,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { offerBlock } from "@/lib/offerAvailability";
 import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from "@/lib/offerExpiry";
 import { OfferExpiryInput } from "@/components/requests/OfferExpiryInput";
+import { formatHoursMinutes } from "@/lib/durationFormat";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
@@ -1504,7 +1505,7 @@ export default function AssignmentDetailPage() {
              const e = parseInstantInZone(actualEnd, tz);
              if (s && e) {
                const mins = Math.max(0, ((e.getTime() - s.getTime()) / 60000) - (hoursSub?.breakMinutes || 0));
-               serviceTimeStr = `${(mins / 60).toFixed(1)} hr`;
+               serviceTimeStr = formatHoursMinutes(mins);
              }
            }
 

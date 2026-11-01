@@ -2,6 +2,7 @@
 
 import { SignaturePad } from "@/components/ui/SignaturePad";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
+import { sanitizeDecimal } from "@/lib/numericInput";
 
 export interface MileageLeg {
   id: number;
@@ -178,9 +179,10 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
           return (
             <div key={leg.id} className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
               <div className={legRow}>
-                <input type="text" disabled={locked} placeholder="From" value={leg.from} onChange={(e) => p.onUpdateLeg(leg.id, "from", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
-                <input type="text" disabled={locked} placeholder="To" value={leg.to} onChange={(e) => p.onUpdateLeg(leg.id, "to", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
-                <input type="number" disabled={locked} placeholder="Distance" value={leg.distance} onChange={(e) => p.onUpdateLeg(leg.id, "distance", e.target.value)} className={`${legInput} w-full ${m("md:w-24 md:flex-none")}`} />
+                <input type="text" disabled={locked} placeholder="From (Location)" aria-label="From (location)" value={leg.from} onChange={(e) => p.onUpdateLeg(leg.id, "from", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
+                <input type="text" disabled={locked} placeholder="To (Location)" aria-label="To (location)" value={leg.to} onChange={(e) => p.onUpdateLeg(leg.id, "to", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
+                {/* Text + decimal keypad, filtered as typed: digits and one "." only (type="number" lets letters / "e" through in some browsers). */}
+                <input type="text" inputMode="decimal" autoComplete="off" disabled={locked} placeholder="Distance (mi)" aria-label="Distance (miles)" value={leg.distance} onChange={(e) => p.onUpdateLeg(leg.id, "distance", sanitizeDecimal(e.target.value))} className={`${legInput} w-full ${m("md:w-32 md:flex-none")}`} />
                 <select disabled={locked} value={leg.type} onChange={(e) => p.onUpdateLeg(leg.id, "type", e.target.value)} className={`${legInput} w-full ${m("md:flex-[1.5]")} truncate`}>
                   <option value="total">Total distance already travelled</option>
                   <option value="round_trip">One-way distance + return on same route</option>

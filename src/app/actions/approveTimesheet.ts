@@ -14,6 +14,7 @@ import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayN
 import { allBookedPositionsApproved, mirrorTimesheetApproval } from "@/lib/timesheetSync";
 import { MILEAGE_REASON_REQUIRED, mileageAdjustmentReasonSchema, mileageDiffers } from "@/lib/timesheetSchemas";
 import { logActivity } from "@/lib/requestActivity";
+import { formatHoursMinutes } from "@/lib/durationFormat";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
 const REQUEST_COMPLETED_STATUS = "completed";
@@ -131,7 +132,8 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
         to: row.email,
         interpreterName: row.name,
         dateLabel: formatInTimeZone(startsAt, zone, "MMMM d, yyyy"),
-        approvedHours: `${approved.billableHours ?? "0.00"} hr`,
+        // Stored as decimal hours (two places); shown as hours and minutes so 0.75 never reads as "75".
+        approvedHours: formatHoursMinutes(Number(approved.billableHours ?? 0) * 60),
         approvedMileage: approvedMileage.toFixed(1),
         isOdhh: program === "WA ODHH" || program === "wa_odhh",
         travelLegCount: Array.isArray(approved.travelLegs) ? approved.travelLegs.length : 0,

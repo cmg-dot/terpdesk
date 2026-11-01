@@ -6,6 +6,7 @@ import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitFo
 import type { MileageLeg } from "@/components/features/InterpreterSubmitForm";
 import { submitTimesheet } from "@/app/actions/submitTimesheet";
 import { TimesheetSubmitted } from "@/components/features/TimesheetSubmitted";
+import { formatHoursMinutes } from "@/lib/durationFormat";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 
@@ -22,7 +23,7 @@ const formatServiceTime = (start: string, end: string, breakMinutes: number): st
   // Both values are naive wall-clock strings, so their difference is the elapsed wall-clock time.
   const minutes = (new Date(end).getTime() - new Date(start).getTime()) / 60_000 - breakMinutes;
   if (!Number.isFinite(minutes) || minutes <= 0) return "-";
-  return `${(minutes / 60).toFixed(1)} hr`;
+  return formatHoursMinutes(minutes);
 };
 
 /**

@@ -10,7 +10,8 @@ import { approveTimesheet } from "@/app/actions/approveTimesheet";
 import { getSubmittedTimesheets } from "@/app/actions/getSubmittedTimesheets";
 import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords";
-import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone } from "@/utils/timezone";
+import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone, parseInstantInZone } from "@/utils/timezone";
+import { formatHoursMinutes } from "@/lib/durationFormat";
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
 import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
 import { BillableTimeRow } from "@/components/features/BillableTimeRow";
@@ -68,8 +69,8 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
 
   // Every time on this card is shown in the job's own zone, never the browser's.
   const zone = getIanaZone(record.timeZone);
-  const actualStartDt = new Date(record.actualStart);
-  const actualEndDt = new Date(record.actualEnd);
+  const actualStartDt = parseInstantInZone(record.actualStart, zone) ?? new Date(NaN);
+  const actualEndDt = parseInstantInZone(record.actualEnd, zone) ?? new Date(NaN);
   const formattedActual = formatDateTimeRangeInZone(record.actualStart, record.actualEnd, zone);
   const formattedScheduled = formatDateTimeRangeInZone(record.scheduledStart, record.scheduledEnd, zone);
   const formattedTravel = record.travelStart && record.travelEnd
@@ -78,7 +79,7 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
 
   const diffMs = actualEndDt.getTime() - actualStartDt.getTime();
   const serviceMinutes = Math.max(0, (diffMs / 60000) - (record.breakMinutes || 0));
-  const serviceHours = (serviceMinutes / 60).toFixed(1);
+  const serviceTime = formatHoursMinutes(serviceMinutes);
 
   const handleApprove = async () => {
     if (isApproving) return;
@@ -256,9 +257,9 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
           <div>
             <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
               <span>Service time</span>
-              <CopyButton text={`${serviceHours} hr`} label="service time" />
+              <CopyButton text={serviceTime} label="service time" />
             </div>
-            <div className="text-[var(--ink)]">{serviceHours} hr</div>
+            <div className="text-[var(--ink)]">{serviceTime}</div>
           </div>
           <BillableTimeRow workedMinutes={serviceMinutes} isOdhh={Boolean(record.isOdhh)} />
           <div>
