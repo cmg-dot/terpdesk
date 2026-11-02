@@ -22,7 +22,6 @@ export type InterpretersTab = "roster" | "requests" | "website";
 
 interface InterpretersPageClientProps {
   initialInterpreters: RosterItem[];
-  registeredProfileIds: string[];
   /** Pending join requests for this agency, loaded on the server from agency_interpreters. */
   initialJoinRequests: PendingConnection[];
   /** Website opt-ins (pending) and approved website profiles for this agency. */
@@ -39,7 +38,6 @@ const tabButtonClass = (active: boolean): string =>
 
 export function InterpretersPageClient({
   initialInterpreters,
-  registeredProfileIds,
   initialJoinRequests,
   initialWebsiteProfiles,
   initialTab = "roster",
@@ -279,7 +277,6 @@ export function InterpretersPageClient({
             <RosterTab
               items={filteredRoster}
               searchQuery={searchQuery}
-              registeredProfileIds={registeredProfileIds}
               onManage={setManageTarget}
               onAddExternal={() => setIsAddModalOpen(true)}
             />

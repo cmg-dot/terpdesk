@@ -1,5 +1,3 @@
-import { db } from "@/db";
-import { interpreterProfiles } from "@/db/schema";
 import { getPendingConnectionRequests } from "@/app/actions/approvalActions";
 import type { PendingConnection } from "@/app/actions/approvalActions";
 import { getWebsiteProfileRequests } from "@/app/actions/websiteProfiles";
@@ -35,21 +33,9 @@ export default async function InterpretersPage({ searchParams }: { searchParams:
     logError("InterpretersPage.websiteProfiles", err);
   }
 
-  // Fetch interpreter profile IDs to identify registered app users
-  let registeredProfileIds: string[] = [];
-  try {
-    const profiles = await db
-      .select({ interpreterId: interpreterProfiles.interpreterId })
-      .from(interpreterProfiles);
-    registeredProfileIds = profiles.map((p) => p.interpreterId);
-  } catch (e) {
-    console.error("Error fetching interpreter profiles:");
-  }
-
   return (
     <InterpretersPageClient
       initialInterpreters={dbInterpreters}
-      registeredProfileIds={registeredProfileIds}
       initialJoinRequests={joinRequests}
       initialWebsiteProfiles={websiteProfiles}
       initialTab={parseTab(searchParams.tab)}

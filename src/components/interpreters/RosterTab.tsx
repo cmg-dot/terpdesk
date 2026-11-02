@@ -1,6 +1,5 @@
 "use client";
 
-import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { Mail, Phone, Send, ShieldCheck, UserPlus } from "lucide-react";
@@ -8,6 +7,7 @@ import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import type { SelectInterpreter } from "@/db/schema";
+import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
 
 /**
  * A roster row. `rosterActive` is false for archived interpreters (missing = active, e.g. just added);
@@ -19,17 +19,9 @@ interface RosterTabProps {
   /** Rows to show (already filtered by the page's search box). */
   items: RosterItem[];
   searchQuery: string;
-  registeredProfileIds: string[];
   onManage: (target: ManageAccessTarget) => void;
   onAddExternal: () => void;
 }
-
-// Known emails that have registered dev/app user accounts
-const KNOWN_REGISTERED_EMAILS = new Set([
-  "dale.fictional@example.com",
-  "new.terp@example.com",
-  "terp.declined@fictional.test",
-]);
 
 function getInterpreterInitials(name: string): string {
   if (!name) return "IN";
@@ -56,18 +48,7 @@ function getAvatarBgColor(name: string, isRegistered: boolean): string {
 }
 
 /** Interpreters page "Roster" tab: approved connections, with the Manage access action per row. */
-export const RosterTab = ({ items, searchQuery, registeredProfileIds, onManage, onAddExternal }: RosterTabProps) => {
-  const registeredIdSet = useMemo(() => new Set(registeredProfileIds), [registeredProfileIds]);
-
-  const checkIsRegistered = (interpreter: SelectInterpreter): boolean => {
-    // A linked login (set when an interpreter registers or claims a shadow profile) is the source of truth.
-    if (interpreter.userId) return true;
-    const email = interpreter.email.toLowerCase();
-    if (KNOWN_REGISTERED_EMAILS.has(email)) return true;
-    if (registeredIdSet.has(interpreter.id)) return true;
-    if (registeredIdSet.has(interpreter.email)) return true;
-    return false;
-  };
+export const RosterTab = ({ items, searchQuery, onManage, onAddExternal }: RosterTabProps) => {
 
   if (items.length === 0) {
     return (
@@ -95,7 +76,7 @@ export const RosterTab = ({ items, searchQuery, registeredProfileIds, onManage, 
       className="space-y-4"
       getKey={(interpreter) => interpreter.id}
       renderItem={(interpreter) => {
-        const isRegistered = checkIsRegistered(interpreter);
+        const isRegistered = isRegisteredInterpreter(interpreter);
         const initials = getInterpreterInitials(interpreter.name);
         const avatarBg = getAvatarBgColor(interpreter.name, isRegistered);
 

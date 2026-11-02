@@ -14,6 +14,7 @@ import {
 } from "@/db/schema";
 import { ensureAvailabilityTables, resolveInterpreterIds } from "@/app/actions/availability";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
+import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
 import { readPermission } from "@/lib/agencyPermissions";
 import { filesFor } from "@/lib/credentials";
 import { areasFromLegacy } from "@/lib/serviceAreas";
@@ -155,7 +156,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
   return {
     id: row.id,
     name: profile?.preferredName || row.name,
-    isRegistered: row.userId !== null,
+    isRegistered: isRegisteredInterpreter(row),
     photoUrl: profile?.photoUrl ?? "",
     city: profile?.city ?? "",
     stateOrRegion: profile?.stateOrRegion ?? "",
