@@ -78,26 +78,6 @@ const clamp = (text: string | null, max: number, label: string, where: string, n
   return text;
 };
 
-/**
- * Drops repeated names. Identical repeats collapse to one row; repeats that disagree are ambiguous (we cannot know
- * which is right), so none of them is imported and the name is reported.
- */
-const resolveDuplicates = <R extends { key: string; line: number; name: string }>(rows: R[], sheet: string, notes: ImportNote[]): R[] => {
-  const groups = new Map<string, R[]>();
-  for (const row of rows) groups.set(row.key, [...(groups.get(row.key) ?? []), row]);
-  const kept: R[] = [];
-  for (const group of Array.from(groups.values())) {
-    const sameContent = (a: R, b: R) => JSON.stringify({ ...a, line: 0 }) === JSON.stringify({ ...b, line: 0 });
-    if (group.every((row) => sameContent(row, group[0]))) {
-      kept.push(group[0]);
-      if (group.length > 1) notes.push({ where: `${sheet}, rows ${group.map((r) => r.line).join(", ")}`, message: `"${group[0].name}" is listed ${group.length} times with the same details; imported once.` });
-    } else {
-      notes.push({ where: `${sheet}, rows ${group.map((r) => r.line).join(", ")}`, message: `"${group[0].name}" is listed ${group.length} times with different details; none of them were imported. Fix the sheet and upload again.` });
-    }
-  }
-  return kept.sort((a, b) => a.line - b.line);
-};
-
 const extract = <K extends string, R extends { key: string; line: number; name: string }>(
   grid: SheetGrid,
   sheet: string,
@@ -114,6 +94,9 @@ const extract = <K extends string, R extends { key: string; line: number; name: 
 
   const notes: ImportNote[] = [];
   const rows: R[] = [];
+  // The same name (ignoring capitals and extra spaces) can appear many times with slightly different details. The first
+  // row read wins; later ones are dropped without a word, and their cells are never read, so they cannot raise notes.
+  const seen = new Set<string>();
   data.forEach((row, offset) => {
     const line = header.index + 2 + offset;
     const where = `${sheet}, row ${line}`;
@@ -128,9 +111,12 @@ const extract = <K extends string, R extends { key: string; line: number; name: 
       notes.push({ where, message: `Name is longer than ${MAX_NAME} characters; row skipped.` });
       return;
     }
-    rows.push(build((column) => at(row, header.columns[column]), { line, key: nameKey(name), name }, where, notes));
+    const key = nameKey(name);
+    if (seen.has(key)) return;
+    seen.add(key);
+    rows.push(build((column) => at(row, header.columns[column]), { line, key, name }, where, notes));
   });
-  return { ok: true, value: { rows: resolveDuplicates(rows, sheet, notes), notes } };
+  return { ok: true, value: { rows, notes } };
 };
 
 export const extractStateRows = (grid: SheetGrid): ExtractResult<StateRow> =>
