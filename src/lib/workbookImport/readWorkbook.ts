@@ -50,3 +50,29 @@ export async function readWorkbookSheets(buffer: Buffer): Promise<WorkbookSheets
   }
   return { ok: true, state, nonState };
 }
+
+export type SingleSheet = { ok: true; data: SheetGrid } | { ok: false; error: string };
+
+/**
+ * Reads ONE sheet by name (the exact name first, so nothing else in a big workbook is parsed; otherwise a name that
+ * differs in capitals or punctuation is found by reading every sheet). Used by the historical-jobs import.
+ */
+export async function readSingleSheet(buffer: Buffer, wanted: string): Promise<SingleSheet> {
+  try {
+    try {
+      return { ok: true, data: await readSheet<string>(buffer, wanted, READ_OPTIONS) };
+    } catch (err) {
+      if (!(err instanceof SheetNotFoundError)) throw err;
+    }
+    const sheets = await readXlsxFile<string>(buffer, READ_OPTIONS);
+    const found = sheets.find((s) => sheetKey(s.sheet) === sheetKey(wanted));
+    if (found) return { ok: true, data: found.data };
+    const have = sheets.map((s) => `"${s.sheet}"`).join(", ");
+    return { ok: false, error: `The workbook has no sheet named "${wanted}". Sheets found: ${have || "none"}.` };
+  } catch (err) {
+    if (err instanceof InvalidInputError || err instanceof InvalidSpreadsheetError) {
+      return { ok: false, error: "That file isn't a readable .xlsx workbook. If it is an older .xls file, open it in Excel and save it as .xlsx." };
+    }
+    throw err;
+  }
+}
