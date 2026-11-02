@@ -38,6 +38,8 @@ const NON_STATE_COLUMNS = {
   qualifications: ["qualifications", "qualification"],
   insuranceExpiration: ["dateofinsuranceexpiration", "insuranceexpiration", "insuranceexpirationdate"],
   email: ["interpreteremails", "interpreteremail", "emailaddress", "emails", "email"],
+  // "Non State Rate 2 hr Min" is an HOURLY rate that is billed for at least 2 hours. It is stored exactly as written and
+  // never divided or multiplied by the minimum.
   nonStateRate: ["nonstaterate2hrmin", "nonstaterate", "nonstatehourlyrate"],
 } as const;
 

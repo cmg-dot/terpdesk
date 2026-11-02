@@ -107,6 +107,7 @@ async function runEnsureAvailabilityTables(): Promise<void> {
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS state_rate NUMERIC(8,2);
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS non_state_rate NUMERIC(8,2);
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS king_county_rate NUMERIC(8,2);
+      ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS certification TEXT;
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS takes_in_person BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS takes_virtual BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE interpreter_profiles ADD COLUMN IF NOT EXISTS work_email VARCHAR(255);

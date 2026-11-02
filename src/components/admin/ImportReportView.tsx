@@ -48,10 +48,10 @@ export const ImportReportView = ({ report, done }: { report: ImportReport; done:
       {outcome.skippedNotOnRoster > 0 && (
         <p className="text-gray-600">Anyone already in terpDESK is never overwritten: only empty fields are filled, and only for people on your roster.</p>
       )}
-      {(report.withCertification > 0 || report.withQualifications > 0) && (
+      {report.withCertification > 0 && (
         <p className="text-gray-600">
-          {report.withCertification} certification and {report.withQualifications} qualification entries were read but are not saved: interpreter profiles have
-          no field for them yet.
+          {plural(report.withCertification, "person has", "people have")} certifications: the State sheet's Certification and the non-state sheet's
+          Qualifications are saved together.
         </p>
       )}
 
@@ -79,7 +79,7 @@ export const ImportReportView = ({ report, done }: { report: ImportReport; done:
             <table className="w-full text-left text-[13px]">
               <thead className="bg-gray-50 text-gray-600">
                 <tr>
-                  {["Name", "City", "Email", "State", "King County", "Non-state"].map((heading) => (
+                  {["Name", "City", "Certification", "Email", "State", "King County", "Non-state"].map((heading) => (
                     <th key={heading} scope="col" className="px-3 py-2 font-medium">{heading}</th>
                   ))}
                 </tr>
@@ -89,6 +89,7 @@ export const ImportReportView = ({ report, done }: { report: ImportReport; done:
                   <tr key={person.name} className="border-t border-gray-100">
                     <td className="px-3 py-2">{person.name}</td>
                     <td className="px-3 py-2">{person.city ?? "—"}</td>
+                    <td className="px-3 py-2">{person.certification ?? "—"}</td>
                     <td className="px-3 py-2">{person.email ?? "none"}</td>
                     <td className="px-3 py-2">{money(person.stateRate)}</td>
                     <td className="px-3 py-2">{money(person.kingCountyRate)}</td>

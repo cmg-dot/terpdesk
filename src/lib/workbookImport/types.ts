@@ -3,7 +3,9 @@
 export const STATE_SHEET = "Interpreter State Rate";
 export const NON_STATE_SHEET = "Interpreter non state + emails";
 
-export const MAX_WORKBOOK_BYTES = 700_000;
+/** 5 MB. The hosting platform may refuse request bodies larger than about 4.5 MB before they reach the app. */
+export const MAX_WORKBOOK_BYTES = 5_000_000;
+export const MAX_CERTIFICATION_CHARS = 500;
 export const MAX_SHEET_ROWS = 2_000;
 
 /** A row from "Interpreter State Rate". Rates are numeric text ("58.00") or null. */
@@ -34,8 +36,8 @@ export interface MergedInterpreter {
   name: string;
   email: string | null;
   city: string | null;
+  /** The State sheet's Certification and the non-state sheet's Qualifications, combined (see mergeSheets). */
   certification: string | null;
-  qualifications: string | null;
   insuranceExpiration: string | null;
   stateRate: string | null;
   kingCountyRate: string | null;
@@ -63,6 +65,7 @@ export interface SamplePerson {
   name: string;
   city: string | null;
   email: string | null;
+  certification: string | null;
   stateRate: string | null;
   kingCountyRate: string | null;
   nonStateRate: string | null;
@@ -76,9 +79,7 @@ export interface ImportReport {
   onlyInNonState: number;
   people: number;
   withoutEmail: number;
-  /** Read from the sheets but not stored: interpreter profiles have no field for them. */
   withCertification: number;
-  withQualifications: number;
   outcome: PersistOutcome;
   unmatchedState: string[];
   unmatchedNonState: string[];

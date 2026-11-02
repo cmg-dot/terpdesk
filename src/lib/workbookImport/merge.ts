@@ -1,3 +1,4 @@
+import { MAX_CERTIFICATION_CHARS } from "@/lib/workbookImport/types";
 import type { ImportNote, MergedInterpreter, NonStateRow, StateRow } from "@/lib/workbookImport/types";
 
 export interface MergeResult {
@@ -8,6 +9,16 @@ export interface MergeResult {
   unmatchedNonState: string[];
   notes: ImportNote[];
 }
+
+/**
+ * The State sheet's Certification and the non-state sheet's Qualifications as one text: whichever exists, or both joined
+ * with "; " when they differ (identical text, ignoring capitals, is kept once).
+ */
+export const combineCertification = (certification: string | null, qualifications: string | null): string | null => {
+  if (certification === null) return qualifications;
+  if (qualifications === null || qualifications.toLowerCase() === certification.toLowerCase()) return certification;
+  return `${certification}; ${qualifications}`;
+};
 
 /**
  * Joins the two sheets on the case-insensitive interpreter name (an inner match for people on both sheets; people on
@@ -31,8 +42,7 @@ export const mergeSheets = (stateRows: readonly StateRow[], nonStateRows: readon
       name: state.name,
       email: other?.email ?? null,
       city: state.city,
-      certification: state.certification,
-      qualifications: other?.qualifications ?? null,
+      certification: combineCertification(state.certification, other?.qualifications ?? null),
       insuranceExpiration: other?.insuranceExpiration ?? null,
       stateRate: state.stateRate,
       kingCountyRate: state.kingCountyRate,
@@ -46,8 +56,7 @@ export const mergeSheets = (stateRows: readonly StateRow[], nonStateRows: readon
       name: other.name,
       email: other.email,
       city: null,
-      certification: null,
-      qualifications: other.qualifications,
+      certification: other.qualifications,
       insuranceExpiration: other.insuranceExpiration,
       stateRate: null,
       kingCountyRate: null,
@@ -55,8 +64,15 @@ export const mergeSheets = (stateRows: readonly StateRow[], nonStateRows: readon
     });
   }
 
+  // One text column holds the combined entries: a runaway cell is shortened rather than rejected.
+  const capped = people.map((person) => {
+    if (person.certification === null || person.certification.length <= MAX_CERTIFICATION_CHARS) return person;
+    notes.push({ where: "Both sheets", message: `The certifications for "${person.name}" are longer than ${MAX_CERTIFICATION_CHARS} characters; shortened.` });
+    return { ...person, certification: person.certification.slice(0, MAX_CERTIFICATION_CHARS) };
+  });
+
   const emailOwner = new Map<string, string>();
-  const unique = people.map((person) => {
+  const unique = capped.map((person) => {
     if (!person.email) return person;
     const owner = emailOwner.get(person.email);
     if (owner === undefined) {

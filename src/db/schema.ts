@@ -393,6 +393,9 @@ export const interpreterProfiles = pgTable('interpreter_profiles', {
   stateRate: numeric('state_rate', { precision: 8, scale: 2 }),
   nonStateRate: numeric('non_state_rate', { precision: 8, scale: 2 }),
   kingCountyRate: numeric('king_county_rate', { precision: 8, scale: 2 }),
+  // Certifications and qualifications as the agency's master workbook lists them ("CDI; NIC Advanced"); NULL = not recorded.
+  // AGENCY-ONLY, like the rates: never select it into anything an interpreter's browser receives.
+  certification: text('certification'),
   takesInPerson: boolean('takes_in_person').notNull().default(true),
   takesVirtual: boolean('takes_virtual').notNull().default(true),
   workEmail: varchar('work_email', { length: 255 }),

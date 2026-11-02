@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ArrowLeft, Lock, Mail, MapPin, Phone } from "lucide-react";
+import { ArrowLeft, Award, Lock, Mail, MapPin, Phone } from "lucide-react";
 import { AvailabilitySection } from "@/components/interpreters/detail/AvailabilitySection";
 import { InterpreterRatesCard } from "@/components/interpreters/detail/InterpreterRatesCard";
 import { SharedCredentialsSection } from "@/components/interpreters/detail/SharedCredentialsSection";
@@ -51,6 +51,13 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
           <p className="inline-flex items-center gap-1.5 text-[14px] text-gray-600">
             <MapPin className="h-4 w-4 text-gray-400" aria-hidden="true" />
             {location || "Location not set"}
+          </p>
+          <p className="inline-flex items-start gap-1.5 text-[14px] text-gray-600">
+            <Award className="mt-0.5 h-4 w-4 shrink-0 text-gray-400" aria-hidden="true" />
+            <span>
+              <span className="sr-only">Certification: </span>
+              {view.certification || "Certification not set"}
+            </span>
           </p>
           <p className="text-[12px] text-gray-500">{view.isRegistered ? "Registered app user" : "Shadow / external profile"}</p>
         </div>

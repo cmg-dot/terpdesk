@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { DragEvent } from "react";
 import { FileSpreadsheet } from "lucide-react";
+import { MAX_WORKBOOK_BYTES } from "@/lib/workbookImport/types";
 
 interface Props {
   fileName: string | null;
@@ -35,7 +36,7 @@ export const WorkbookDropZone = ({ fileName, disabled, onFile }: Props) => {
     >
       <FileSpreadsheet className="h-8 w-8 text-[#0B3B32]" aria-hidden="true" />
       <span className="font-medium text-gray-800">{fileName ?? "Drop the Excel file here, or click to choose it"}</span>
-      <span className="text-[13px] text-gray-500">.xlsx only, up to 700 KB</span>
+      <span className="text-[13px] text-gray-500">.xlsx only, up to {MAX_WORKBOOK_BYTES / 1_000_000} MB</span>
       <input
         id="workbook-file"
         type="file"

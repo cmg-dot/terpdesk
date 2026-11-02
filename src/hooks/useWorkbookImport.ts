@@ -50,7 +50,7 @@ export const useWorkbookImport = (): WorkbookImportState => {
       setReport(result.report);
       setPhase(mode === "preview" ? "checked" : "done");
     } catch {
-      setError("We couldn't reach the server. Check your connection and try again.");
+      setError("We couldn't reach the server. Check your connection and try again. (Files over about 4.5 MB can be refused by the hosting service before they arrive.)");
       setPhase(mode === "preview" ? "idle" : "checked");
     }
   }, []);

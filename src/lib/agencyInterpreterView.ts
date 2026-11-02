@@ -46,6 +46,8 @@ export interface AgencyInterpreterView {
   city: string;
   stateOrRegion: string;
   serviceAreas: string[];
+  /** Certifications and qualifications as imported or recorded by the agency; "" when none. Agency-only, like rates. */
+  certification: string;
   /** yyyy-MM-dd, or "" when the interpreter has not recorded it. */
   liabilityInsuranceExpiration: string;
   /** The hourly rates this agency has set, as text ("" = not set). Agency-only: this view is never sent to an interpreter. */
@@ -158,6 +160,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     city: profile?.city ?? "",
     stateOrRegion: profile?.stateOrRegion ?? "",
     serviceAreas: profile && profile.serviceAreas.length > 0 ? profile.serviceAreas : areasFromLegacy(profile?.serviceArea),
+    certification: profile?.certification ?? "",
     liabilityInsuranceExpiration: profile?.liabilityInsuranceExpiration ?? "",
     rates: {
       stateRate: rateToText(profile?.stateRate),

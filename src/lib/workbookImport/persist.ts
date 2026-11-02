@@ -12,7 +12,7 @@ import type { MergedInterpreter, PersistOutcome } from "@/lib/workbookImport/typ
  * - A person is identified by email (case-insensitive). No email on the sheet: a stable placeholder (see
  *   lib/placeholderEmail.ts), so their rates still import and a re-import finds them again.
  * - New people get an interpreter row (shadow profile), an approved roster entry for this agency and a profile row
- *   holding city, insurance expiration and the three rates, each inserted in batches.
+ *   holding city, certification, insurance expiration and the three rates, each inserted in batches.
  * - People who already exist are never overwritten: only blank fields are filled, and only for people already on this
  *   agency's roster. Anyone else's account is left alone.
  * - With `commit: false` everything runs and is then rolled back, so a preview reports exactly what an import would do.
@@ -36,6 +36,7 @@ const emailFor = (person: MergedInterpreter): string =>
 /** The profile columns this import is allowed to write. */
 const profileFields = (person: MergedInterpreter) => ({
   city: person.city,
+  certification: person.certification,
   liabilityInsuranceExpiration: person.insuranceExpiration,
   stateRate: person.stateRate,
   kingCountyRate: person.kingCountyRate,
@@ -116,6 +117,7 @@ async function write(tx: Tx, people: readonly MergedInterpreter[], agencyId: str
     }
     const blanks: Partial<typeof wanted> = {};
     if (current.city === null && wanted.city !== null) blanks.city = wanted.city;
+    if (current.certification === null && wanted.certification !== null) blanks.certification = wanted.certification;
     if (current.liabilityInsuranceExpiration === null && wanted.liabilityInsuranceExpiration !== null) blanks.liabilityInsuranceExpiration = wanted.liabilityInsuranceExpiration;
     if (current.stateRate === null && wanted.stateRate !== null) blanks.stateRate = wanted.stateRate;
     if (current.kingCountyRate === null && wanted.kingCountyRate !== null) blanks.kingCountyRate = wanted.kingCountyRate;

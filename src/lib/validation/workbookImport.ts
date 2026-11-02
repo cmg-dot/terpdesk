@@ -20,7 +20,7 @@ export const workbookImportInputSchema = z.object({
     .custom<UploadedFile>(isUploadedFile, "Choose an .xlsx file to import.")
     .refine((file) => /\.xlsx$/i.test(file.name), "That isn't an .xlsx file. Save the workbook as .xlsx and try again.")
     .refine((file) => file.size > 0, "That file is empty.")
-    .refine((file) => file.size <= MAX_WORKBOOK_BYTES, `That file is too large (over ${Math.round(MAX_WORKBOOK_BYTES / 1000)} KB). Remove unused sheets or rows and try again.`),
+    .refine((file) => file.size <= MAX_WORKBOOK_BYTES, `That file is too large (over ${MAX_WORKBOOK_BYTES / 1_000_000} MB). Remove unused sheets, images or rows and try again.`),
   mode: z.enum(["preview", "import"]),
 });
 
