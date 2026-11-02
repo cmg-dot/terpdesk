@@ -15,6 +15,7 @@ const TABS: { id: Tab; label: string; blurb: string }[] = [
  * The /admin/import screen: one workbook, two completely separate imports. Only the active tab is on the page, each with
  * its own state, its own file input and its own server action, so a file, a validation message or an error from one tab
  * can never show up in (or be sent by) the other. Switching tabs starts the other import afresh.
+ * On a phone the two tabs stack full-width (neither can run off the screen); from the sm breakpoint up they sit in one pill.
  */
 export const ImportWorkspace = () => {
   const [tab, setTab] = useState<Tab>("roster");
@@ -22,7 +23,11 @@ export const ImportWorkspace = () => {
 
   return (
     <div className="space-y-4">
-      <div role="tablist" aria-label="What to import" className="inline-flex rounded-full border border-gray-200 bg-white p-1">
+      <div
+        role="tablist"
+        aria-label="What to import"
+        className="flex w-full flex-col gap-1 rounded-2xl border border-gray-200 bg-white p-1 sm:inline-flex sm:w-auto sm:flex-row sm:rounded-full"
+      >
         {TABS.map((t) => (
           <button
             key={t.id}
@@ -32,7 +37,7 @@ export const ImportWorkspace = () => {
             aria-selected={tab === t.id}
             aria-controls={`import-panel-${t.id}`}
             onClick={() => setTab(t.id)}
-            className={`rounded-full px-5 py-2 text-sm font-medium transition-colors ${tab === t.id ? "bg-[#0B3B32] text-white" : "text-gray-700 hover:bg-gray-50"}`}
+            className={`w-full rounded-xl px-4 py-2.5 text-center text-[13px] font-medium transition-colors sm:w-auto sm:rounded-full sm:px-5 sm:py-2 sm:text-sm ${tab === t.id ? "bg-[#0B3B32] text-white" : "text-gray-700 hover:bg-gray-50"}`}
           >
             {t.label}
           </button>
