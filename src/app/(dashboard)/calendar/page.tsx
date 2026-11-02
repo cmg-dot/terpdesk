@@ -11,6 +11,9 @@ import { getIanaZone } from "@/utils/timezone";
 import { isAppointmentHappeningNow, isAppointmentPast } from "@/utils/happeningNow";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { CalendarModeToggle } from "@/components/calendar/CalendarModeToggle";
+import type { CalendarMode } from "@/components/calendar/CalendarModeToggle";
+import { InterpreterTimeline } from "@/components/calendar/InterpreterTimeline";
 
 /** Text colour for a request status on the calendar, so state reads at a glance. */
 const statusTextClass = (status: string | undefined, isHappening: boolean, isPast = false): string => {
@@ -28,6 +31,8 @@ const statusTextClass = (status: string | undefined, isHappening: boolean, isPas
 export default function CalendarPage() {
   const [requests, setRequests] = useState<any[]>([]);
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
+  // Job View is the original calendar (month / week / day of job cards). Interpreter View is the resource timeline.
+  const [mode, setMode] = useState<CalendarMode>('jobs');
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
 
@@ -73,18 +78,21 @@ export default function CalendarPage() {
 
   const weekDays = getWeekDays(currentDate);
 
+  // The Interpreter View shows one day at a time, so its arrows step by a day whatever the Job View was set to.
+  const stepView = mode === 'interpreters' ? 'day' : view;
+
   const handlePrev = () => {
     const d = new Date(currentDate);
-    if (view === 'month') d.setMonth(d.getMonth() - 1);
-    else if (view === 'week') d.setDate(d.getDate() - 7);
+    if (stepView === 'month') d.setMonth(d.getMonth() - 1);
+    else if (stepView === 'week') d.setDate(d.getDate() - 7);
     else d.setDate(d.getDate() - 1);
     setCurrentDate(d);
   };
 
   const handleNext = () => {
     const d = new Date(currentDate);
-    if (view === 'month') d.setMonth(d.getMonth() + 1);
-    else if (view === 'week') d.setDate(d.getDate() + 7);
+    if (stepView === 'month') d.setMonth(d.getMonth() + 1);
+    else if (stepView === 'week') d.setDate(d.getDate() + 7);
     else d.setDate(d.getDate() + 1);
     setCurrentDate(d);
   };
@@ -157,6 +165,11 @@ export default function CalendarPage() {
         </p>
       </div>
 
+      {/* Job View / Interpreter View */}
+      <div className="mt-6">
+        <CalendarModeToggle mode={mode} onChange={setMode} />
+      </div>
+
       {/* Controls Row */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-8 gap-4">
         <div className="flex items-center gap-2">
@@ -176,7 +189,8 @@ export default function CalendarPage() {
         </div>
       </div>
 
-      {/* View Toggle */}
+      {/* View Toggle (Job View only) */}
+      {mode === 'jobs' && (
       <div className="rounded-full p-1 flex mt-4 max-w-md relative z-10">
         {(['month', 'week', 'day'] as const).map((v) => (
           <button 
@@ -198,9 +212,10 @@ export default function CalendarPage() {
           </button>
         ))}
       </div>
+      )}
 
       <p className="text-[13px] text-[var(--sage)] mt-4">
-        {view === 'day' 
+        {mode === 'interpreters' || view === 'day' 
           ? format(currentDate, 'EEEE, MMMM d, yyyy') 
           : view === 'week' 
             ? `Week of ${format(weekDays[0], 'MMMM d, yyyy')}` 
@@ -208,7 +223,7 @@ export default function CalendarPage() {
       </p>
 
       {/* MONTH VIEW */}
-      {view === 'month' && (
+      {mode === 'jobs' && view === 'month' && (
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 mt-6 overflow-hidden">
           <div className="overflow-x-auto pb-2">
             <div className="min-w-[700px]">
@@ -282,7 +297,7 @@ export default function CalendarPage() {
       )}
 
       {/* WEEK VIEW */}
-      {view === 'week' && (
+      {mode === 'jobs' && view === 'week' && (
         <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 mt-6 overflow-hidden">
           <div className="overflow-x-auto pb-2">
             <div className="min-w-[800px]">
@@ -358,7 +373,7 @@ export default function CalendarPage() {
       )}
 
       {/* DAY VIEW */}
-      {view === 'day' && (() => {
+      {mode === 'jobs' && view === 'day' && (() => {
         const dayRequests = requests.filter(r => isEventOnDate(currentDate, r));
         const sortedDayRequests = sortDayRequests(dayRequests);
 
@@ -431,6 +446,9 @@ export default function CalendarPage() {
           </div>
         );
       })()}
+
+      {/* INTERPRETER VIEW (resource timeline): its own date-scoped fetch, the Job View's data is not used */}
+      {mode === 'interpreters' && <InterpreterTimeline dateKey={format(currentDate, 'yyyy-MM-dd')} nowMs={currentTime} />}
     </motion.div>
   );
 }
