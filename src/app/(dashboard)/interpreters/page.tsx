@@ -14,34 +14,26 @@ const parseTab = (value: string | undefined): InterpretersTab =>
   value === "requests" || value === "website" ? value : "roster";
 
 export default async function InterpretersPage({ searchParams }: { searchParams: { tab?: string } }) {
-  // Fetch live interpreters list directly from PostgreSQL via Drizzle ORM
-  const rosterRows = await getRosterInterpreters(DEFAULT_AGENCY_ID);
-
-  // Credentials text for the directory's Credentials filter. Agency-only page, so it may carry it; a failure only
-  // empties the filter, it never hides the roster.
-  let certifications = new Map<string, string>();
-  try {
-    certifications = await getRosterCertifications(DEFAULT_AGENCY_ID);
-  } catch (err) {
-    logError("InterpretersPage.certifications", err);
-  }
+  // The four reads are independent and each costs a round trip to the database, so they run together instead of one
+  // after another. Only the roster is essential: a failure in the others empties just that part of the page.
+  const quietly = async <T,>(label: string, fallback: T, read: () => Promise<T>): Promise<T> => {
+    try {
+      return await read();
+    } catch (err) {
+      logError(`InterpretersPage.${label}`, err);
+      return fallback;
+    }
+  };
+  const [rosterRows, certifications, joinRequests, websiteProfiles] = await Promise.all([
+    getRosterInterpreters(DEFAULT_AGENCY_ID),
+    // Credentials text for the directory's Credentials filter. Agency-only page, so it may carry it.
+    quietly("certifications", new Map<string, string>(), () => getRosterCertifications(DEFAULT_AGENCY_ID)),
+    // Join requests: pending agency_interpreters rows for this agency (scoped on the server, never by the browser).
+    quietly<PendingConnection[]>("joinRequests", [], () => getPendingConnectionRequests()),
+    // Website profiles: interpreters who opted in (pending) or were approved. Public fields only.
+    quietly<WebsiteProfileRequest[]>("websiteProfiles", [], () => getWebsiteProfileRequests()),
+  ]);
   const dbInterpreters = rosterRows.map((row) => ({ ...row, certification: certifications.get(row.id) ?? "" }));
-
-  // Join requests: pending agency_interpreters rows for this agency (scoped on the server, never by the browser).
-  let joinRequests: PendingConnection[] = [];
-  try {
-    joinRequests = await getPendingConnectionRequests();
-  } catch (err) {
-    logError("InterpretersPage.joinRequests", err);
-  }
-
-  // Website profiles: interpreters who opted in (pending) or were approved. Public fields only.
-  let websiteProfiles: WebsiteProfileRequest[] = [];
-  try {
-    websiteProfiles = await getWebsiteProfileRequests();
-  } catch (err) {
-    logError("InterpretersPage.websiteProfiles", err);
-  }
 
   return (
     <InterpretersPageClient
