@@ -8,6 +8,7 @@ import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessM
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import type { SelectInterpreter } from "@/db/schema";
 import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
+import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 
 /**
  * A roster row. `rosterActive` is false for archived interpreters (missing = active, e.g. just added);
@@ -135,7 +136,7 @@ export const RosterTab = ({ items, searchQuery, onManage, onAddExternal }: Roste
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[13px] text-[var(--sage)] pt-0.5">
                   <span className="inline-flex items-center gap-1.5 text-gray-600 font-medium">
                     <Mail className="w-3.5 h-3.5 text-gray-400 shrink-0" />
-                    {interpreter.email}
+                    {isPlaceholderEmail(interpreter.email) ? "No email on file" : interpreter.email}
                   </span>
 
                   {interpreter.phone && (

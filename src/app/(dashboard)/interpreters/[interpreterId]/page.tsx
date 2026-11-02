@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { ArrowLeft, Award, Lock, Mail, MapPin, Phone } from "lucide-react";
+import { EditInterpreterDetails } from "@/components/interpreters/detail/EditInterpreterDetails";
 import { AvailabilitySection } from "@/components/interpreters/detail/AvailabilitySection";
 import { InterpreterRatesCard } from "@/components/interpreters/detail/InterpreterRatesCard";
 import { SharedCredentialsSection } from "@/components/interpreters/detail/SharedCredentialsSection";
@@ -61,6 +62,13 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
           </p>
           <p className="text-[12px] text-gray-500">{view.isRegistered ? "Registered app user" : "Shadow / external profile"}</p>
         </div>
+        <EditInterpreterDetails
+          interpreterId={view.id}
+          name={view.name}
+          isRegistered={view.isRegistered}
+          hasPlaceholderEmail={view.hasPlaceholderEmail}
+          initial={{ email: view.email, certification: view.certification, city: view.city }}
+        />
       </section>
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6">

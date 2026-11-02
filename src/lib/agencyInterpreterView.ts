@@ -15,6 +15,7 @@ import {
 import { ensureAvailabilityTables, resolveInterpreterIds } from "@/app/actions/availability";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
+import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 import { readPermission } from "@/lib/agencyPermissions";
 import { filesFor } from "@/lib/credentials";
 import { areasFromLegacy } from "@/lib/serviceAreas";
@@ -43,6 +44,9 @@ export interface AgencyInterpreterView {
   id: string;
   name: string;
   isRegistered: boolean;
+  /** Their sign-in / dispatch email; "" when only the bulk-import placeholder is on file. Agency-only. */
+  email: string;
+  hasPlaceholderEmail: boolean;
   photoUrl: string;
   city: string;
   stateOrRegion: string;
@@ -76,7 +80,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
   await ensureAvailabilityTables();
 
   const [row] = await db
-    .select({ id: interpreters.id, name: interpreters.name, userId: interpreters.userId })
+    .select({ id: interpreters.id, name: interpreters.name, email: interpreters.email, userId: interpreters.userId })
     .from(interpreters)
     .innerJoin(agencyInterpreters, eq(agencyInterpreters.interpreterId, interpreters.id))
     .where(and(eq(interpreters.id, interpreterId), eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.status, "approved")))
@@ -157,6 +161,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     id: row.id,
     name: profile?.preferredName || row.name,
     isRegistered: isRegisteredInterpreter(row),
+    email: isPlaceholderEmail(row.email) ? "" : row.email,
+    hasPlaceholderEmail: isPlaceholderEmail(row.email),
     photoUrl: profile?.photoUrl ?? "",
     city: profile?.city ?? "",
     stateOrRegion: profile?.stateOrRegion ?? "",
