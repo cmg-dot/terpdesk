@@ -10,7 +10,10 @@ import { ImportInterpretersCsvModal } from "@/components/interpreters/ImportInte
 import { ManageAccessModal } from "@/components/interpreters/ManageAccessModal";
 import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
 import { JoinRequestsTab } from "@/components/interpreters/JoinRequestsTab";
+import { RosterFilterBar } from "@/components/interpreters/RosterFilterBar";
 import { RosterTab } from "@/components/interpreters/RosterTab";
+import { applyRosterFilters, countActiveFilters, NO_ROSTER_FILTERS } from "@/lib/rosterFilters";
+import type { RosterFilters } from "@/lib/rosterFilters";
 import type { RosterItem } from "@/components/interpreters/RosterTab";
 import { WebsiteProfilesTab } from "@/components/interpreters/WebsiteProfilesTab";
 import type { PendingConnection } from "@/app/actions/approvalActions";
@@ -51,6 +54,7 @@ export function InterpretersPageClient({
   const [manageTarget, setManageTarget] = useState<ManageAccessTarget | null>(null);
   const [activeTab, setActiveTab] = useState<InterpretersTab>(initialTab);
   const [searchQuery, setSearchQuery] = useState("");
+  const [rosterFilters, setRosterFilters] = useState<RosterFilters>(NO_ROSTER_FILTERS);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -77,15 +81,18 @@ export function InterpretersPageClient({
 
   const query = searchQuery.toLowerCase().trim();
 
+  // The search box and the filters both narrow the roster (each person must satisfy all of them).
   const filteredRoster = useMemo(() => {
-    if (!query) return interpreterList;
-    return interpreterList.filter(
-      (item) =>
-        item.name.toLowerCase().includes(query) ||
-        item.email.toLowerCase().includes(query) ||
-        (item.phone && item.phone.toLowerCase().includes(query))
-    );
-  }, [interpreterList, query]);
+    const searched = !query
+      ? interpreterList
+      : interpreterList.filter(
+          (item) =>
+            item.name.toLowerCase().includes(query) ||
+            item.email.toLowerCase().includes(query) ||
+            (item.phone && item.phone.toLowerCase().includes(query))
+        );
+    return applyRosterFilters(searched, rosterFilters);
+  }, [interpreterList, query, rosterFilters]);
 
   const filteredJoinRequests = useMemo(() => {
     if (!query) return joinRequests;
@@ -263,6 +270,10 @@ export function InterpretersPageClient({
         </div>
       </div>
 
+      {activeTab === "roster" && (
+        <RosterFilterBar filters={rosterFilters} onChange={setRosterFilters} shown={filteredRoster.length} total={interpreterList.length} />
+      )}
+
       {/* Tab Panels */}
       <AnimatePresence mode="wait">
         <motion.div
@@ -277,6 +288,7 @@ export function InterpretersPageClient({
             <RosterTab
               items={filteredRoster}
               searchQuery={searchQuery}
+              filtersActive={countActiveFilters(rosterFilters) > 0}
               onManage={setManageTarget}
               onAddExternal={() => setIsAddModalOpen(true)}
             />

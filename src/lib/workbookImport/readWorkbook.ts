@@ -51,28 +51,27 @@ export async function readWorkbookSheets(buffer: Buffer): Promise<WorkbookSheets
   return { ok: true, state, nonState };
 }
 
-export type SingleSheet = { ok: true; data: SheetGrid } | { ok: false; error: string };
+export type MatchedSheet = { ok: true; name: string; data: SheetGrid; others: string[] } | { ok: false; error: string };
 
 /**
- * Reads ONE sheet by name (the exact name first, so nothing else in a big workbook is parsed; otherwise a name that
- * differs in capitals or punctuation is found by reading every sheet). Used by the historical-jobs import.
+ * Finds the sheet whose NAME matches a pattern (e.g. any name containing "Job", capitals ignored) and reads it. The names
+ * are only known by reading the workbook, so every sheet is read once. If several sheets match, the first in the workbook
+ * is used and the others are reported (never read), so nothing is silently merged. Used by the historical-jobs import.
  */
-export async function readSingleSheet(buffer: Buffer, wanted: string): Promise<SingleSheet> {
+export async function readSheetMatching(buffer: Buffer, pattern: RegExp, label: string): Promise<MatchedSheet> {
+  let sheets: { sheet: string; data: SheetGrid }[];
   try {
-    try {
-      return { ok: true, data: await readSheet<string>(buffer, wanted, READ_OPTIONS) };
-    } catch (err) {
-      if (!(err instanceof SheetNotFoundError)) throw err;
-    }
-    const sheets = await readXlsxFile<string>(buffer, READ_OPTIONS);
-    const found = sheets.find((s) => sheetKey(s.sheet) === sheetKey(wanted));
-    if (found) return { ok: true, data: found.data };
-    const have = sheets.map((s) => `"${s.sheet}"`).join(", ");
-    return { ok: false, error: `The workbook has no sheet named "${wanted}". Sheets found: ${have || "none"}.` };
+    sheets = await readXlsxFile<string>(buffer, READ_OPTIONS);
   } catch (err) {
     if (err instanceof InvalidInputError || err instanceof InvalidSpreadsheetError) {
       return { ok: false, error: "That file isn't a readable .xlsx workbook. If it is an older .xls file, open it in Excel and save it as .xlsx." };
     }
     throw err;
   }
+  const matches = sheets.filter((s) => pattern.test(s.sheet));
+  if (matches.length === 0) {
+    const have = sheets.map((s) => `"${s.sheet}"`).join(", ");
+    return { ok: false, error: `The workbook has no sheet whose name contains "${label}". Sheets found: ${have || "none"}.` };
+  }
+  return { ok: true, name: matches[0].sheet, data: matches[0].data, others: matches.slice(1).map((m) => m.sheet) };
 }

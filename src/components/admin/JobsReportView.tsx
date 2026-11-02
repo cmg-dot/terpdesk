@@ -75,8 +75,14 @@ export const JobsReportView = ({ report, done }: { report: JobsReport; done: boo
         </Box>
       )}
 
-      {report.unusedColumns.length > 0 && (
-        <p className="text-gray-600">Columns in the sheet that are not imported: {report.unusedColumns.join(", ")}.</p>
+      <p className="text-gray-600">
+        Read from the sheet “{report.sheetName}”. {plural(report.withLocation, "row has", "rows have")} a location and{" "}
+        {plural(report.withConsumer, "row names", "rows name")} a consumer (consumer names are saved on the job and never shown here).
+      </p>
+      {report.otherJobSheets.length > 0 && (
+        <Box tone="amber">
+          Other sheets also contain “Job” and were <strong>not</strong> read: {report.otherJobSheets.map((n) => `“${n}”`).join(", ")}. Only the first job sheet is imported.
+        </Box>
       )}
 
       <JobSampleTable title={`First ${report.sample.length} rows, as they will be saved`} jobs={report.sample} />

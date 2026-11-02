@@ -60,7 +60,17 @@ export const buildJobRecord = (job: PlannedJob): JobRecord => {
   const raw = {
     brief: {},
     intake: {},
-    details: { startDate: job.date, startTime: job.startTime, endDate: job.date, endTime: job.endTime, timeZone: JOBS_TIME_ZONE_LABEL },
+    details: {
+      startDate: job.date,
+      startTime: job.startTime,
+      endDate: job.date,
+      endTime: job.endTime,
+      timeZone: JOBS_TIME_ZONE_LABEL,
+      // The app's own field for the deaf or hard of hearing participant (the sheet's consumer). Never put in a title.
+      ...(job.consumer ? { deafParticipant: job.consumer } : {}),
+    },
+    // The app reads the venue to show the location (and to tell in-person from virtual) exactly as typed on the sheet.
+    ...(job.location ? { location: job.location, onsite: { venue: job.location }, overview: { location: job.location } } : {}),
     slotCount: positionCount,
     slots,
     slotReplacements: {},

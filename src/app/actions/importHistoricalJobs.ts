@@ -7,15 +7,15 @@ import { NOT_ALLOWED_MESSAGE, requireRole } from "@/lib/auth/guards";
 import { planJobs } from "@/lib/jobImport/plan";
 import { persistJobs } from "@/lib/jobImport/persist";
 import { loadRosterCandidates } from "@/lib/jobImport/roster";
-import { JOBS_SHEET } from "@/lib/jobImport/types";
+import { JOBS_SHEET_LABEL, JOBS_SHEET_PATTERN } from "@/lib/jobImport/types";
 import type { ImportJobsResult } from "@/lib/jobImport/types";
 import { logError } from "@/lib/logError";
 import { jobsImportInputSchema } from "@/lib/validation/jobsImport";
-import { looksLikeXlsx, readSingleSheet } from "@/lib/workbookImport/readWorkbook";
+import { looksLikeXlsx, readSheetMatching } from "@/lib/workbookImport/readWorkbook";
 
 /**
- * Imports the agency's historical jobs from the "Jobs" sheet of the master workbook: reads each row's date and
- * start/end times as strict timestamps, splits cells that name several interpreters ("A & B", "A / B", "A and B"),
+ * Imports the agency's historical jobs from the sheet whose name contains "Job" (e.g. "Jobs 10302026- 12312027") in the
+ * master workbook. The sheet has no header row, so columns are read by position. Each row's date and shift become strict timestamps, splits cells that name several interpreters ("A & B", "A / B", "A and B"),
  * matches each name to the roster, and creates the job plus an accepted booking for every matched interpreter.
  *
  * Agency staff only. The browser sends only the file and two choices; the server re-reads and re-validates the workbook
@@ -38,13 +38,13 @@ export async function importHistoricalJobs(formData: FormData): Promise<ImportJo
     const buffer = Buffer.from(await file.arrayBuffer());
     if (!looksLikeXlsx(buffer)) return { success: false, error: "That file isn't a real .xlsx workbook." };
 
-    const sheet = await readSingleSheet(buffer, JOBS_SHEET);
+    const sheet = await readSheetMatching(buffer, JOBS_SHEET_PATTERN, JOBS_SHEET_LABEL);
     if (!sheet.ok) return { success: false, error: sheet.error };
 
     const roster = await loadRosterCandidates(DEFAULT_AGENCY_ID);
-    const plan = planJobs(sheet.data, roster, allowPartial);
+    const plan = planJobs(sheet.data, sheet.name, sheet.others, roster, allowPartial);
     if (!plan.ok) return { success: false, error: plan.error };
-    if (plan.jobs.length === 0) return { success: false, error: `No usable job rows were found on the "${JOBS_SHEET}" sheet.` };
+    if (plan.jobs.length === 0) return { success: false, error: `No usable job rows were found on the "${sheet.name}" sheet.` };
 
     const outcome = await persistJobs(plan.jobs, { commit: mode === "import" });
 

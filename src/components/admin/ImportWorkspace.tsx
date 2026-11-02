@@ -8,10 +8,14 @@ type Tab = "roster" | "jobs";
 
 const TABS: { id: Tab; label: string; blurb: string }[] = [
   { id: "roster", label: "Import interpreters", blurb: "Add interpreters and their State, King County and Non-state rates, plus certification and insurance, from the two roster sheets." },
-  { id: "jobs", label: "Import historical jobs", blurb: "Add the jobs from the Jobs sheet, booked to the interpreters named on each row. Import the interpreters first so their names can be matched." },
+  { id: "jobs", label: "Import historical jobs", blurb: "Add the jobs from the sheet whose name contains \"Job\", booked to the interpreters named on each row. Import the interpreters first so their names can be matched." },
 ];
 
-/** The /admin/import screen: one workbook, two separate imports. Each tab keeps its own file and result. */
+/**
+ * The /admin/import screen: one workbook, two completely separate imports. Only the active tab is on the page, each with
+ * its own state, its own file input and its own server action, so a file, a validation message or an error from one tab
+ * can never show up in (or be sent by) the other. Switching tabs starts the other import afresh.
+ */
 export const ImportWorkspace = () => {
   const [tab, setTab] = useState<Tab>("roster");
   const active = TABS.find((t) => t.id === tab) ?? TABS[0];
@@ -35,12 +39,8 @@ export const ImportWorkspace = () => {
         ))}
       </div>
       <p className="text-sm text-gray-600">{active.blurb}</p>
-      {/* Both stay mounted (the inactive one is only hidden), so switching tabs never loses a file or a preview. */}
-      <div role="tabpanel" id="import-panel-roster" aria-labelledby="import-tab-roster" hidden={tab !== "roster"}>
-        <WorkbookImportPanel />
-      </div>
-      <div role="tabpanel" id="import-panel-jobs" aria-labelledby="import-tab-jobs" hidden={tab !== "jobs"}>
-        <JobsImportPanel />
+      <div key={tab} role="tabpanel" id={`import-panel-${tab}`} aria-labelledby={`import-tab-${tab}`}>
+        {tab === "roster" ? <WorkbookImportPanel /> : <JobsImportPanel />}
       </div>
     </div>
   );

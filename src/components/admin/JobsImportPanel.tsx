@@ -3,12 +3,12 @@
 import { JobsReportView } from "@/components/admin/JobsReportView";
 import { WorkbookDropZone } from "@/components/admin/WorkbookDropZone";
 import { useJobsImport } from "@/hooks/useJobsImport";
-import { JOBS_SHEET } from "@/lib/jobImport/types";
+import { JOBS_SHEET_LABEL } from "@/lib/jobImport/types";
 
 const secondaryButton = "rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60";
 const primaryButton = "rounded-full bg-[#0B3B32] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60";
 
-/** Upload, check, confirm: the whole historical-jobs import. Reads only the Jobs sheet of the same workbook. */
+/** Upload, check, confirm: the whole historical-jobs import. Reads only the jobs sheet of the same workbook. */
 export const JobsImportPanel = () => {
   const { phase, fileName, report, error, chooseFile, confirmImport, reset, allowPartial, setAllowPartial } = useJobsImport();
   const busy = phase === "checking" || phase === "importing";
@@ -55,8 +55,10 @@ export const JobsImportPanel = () => {
 
       {phase === "idle" && !error && (
         <p className="text-[13px] text-gray-500">
-          Use the same workbook. Only the <strong>{JOBS_SHEET}</strong> sheet is read: its Date, Start Time, End Time and Interpreter columns. Times are read as
-          Pacific time. Cells naming several people (“A &amp; B”, “A / B”, “A and B”) are split, and each person is matched to your roster.
+          Use the same workbook. Only the sheet whose name contains <strong>{JOBS_SHEET_LABEL}</strong> is read. It has no header row, so columns are read
+          by position (counting from 0): <strong>1</strong> Date, <strong>2</strong> Location, <strong>3</strong> Time range, <strong>6</strong> Interpreter,{" "}
+          <strong>7</strong> Consumer. Times are read as Pacific time. Cells naming several people (“A &amp; B”, “A / B”, “A and B”) are split, and each
+          person is matched to your roster.
         </p>
       )}
     </section>

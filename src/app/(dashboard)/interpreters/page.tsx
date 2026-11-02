@@ -4,7 +4,7 @@ import { getWebsiteProfileRequests } from "@/app/actions/websiteProfiles";
 import type { WebsiteProfileRequest } from "@/lib/websiteProfile";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { logError } from "@/lib/logError";
-import { getRosterInterpreters } from "@/lib/roster";
+import { getRosterCertifications, getRosterInterpreters } from "@/lib/roster";
 import { InterpretersPageClient } from "./InterpretersPageClient";
 import type { InterpretersTab } from "./InterpretersPageClient";
 
@@ -15,7 +15,17 @@ const parseTab = (value: string | undefined): InterpretersTab =>
 
 export default async function InterpretersPage({ searchParams }: { searchParams: { tab?: string } }) {
   // Fetch live interpreters list directly from PostgreSQL via Drizzle ORM
-  const dbInterpreters = await getRosterInterpreters(DEFAULT_AGENCY_ID);
+  const rosterRows = await getRosterInterpreters(DEFAULT_AGENCY_ID);
+
+  // Credentials text for the directory's Credentials filter. Agency-only page, so it may carry it; a failure only
+  // empties the filter, it never hides the roster.
+  let certifications = new Map<string, string>();
+  try {
+    certifications = await getRosterCertifications(DEFAULT_AGENCY_ID);
+  } catch (err) {
+    logError("InterpretersPage.certifications", err);
+  }
+  const dbInterpreters = rosterRows.map((row) => ({ ...row, certification: certifications.get(row.id) ?? "" }));
 
   // Join requests: pending agency_interpreters rows for this agency (scoped on the server, never by the browser).
   let joinRequests: PendingConnection[] = [];

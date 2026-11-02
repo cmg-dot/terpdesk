@@ -14,12 +14,14 @@ import { isPlaceholderEmail } from "@/lib/placeholderEmail";
  * A roster row. `rosterActive` is false for archived interpreters (missing = active, e.g. just added);
  * `photoUrl` is the profile photo path, shown instead of initials when present.
  */
-export type RosterItem = SelectInterpreter & { rosterActive?: boolean; photoUrl?: string | null };
+export type RosterItem = SelectInterpreter & { rosterActive?: boolean; photoUrl?: string | null; certification?: string };
 
 interface RosterTabProps {
   /** Rows to show (already filtered by the page's search box). */
   items: RosterItem[];
   searchQuery: string;
+  /** True when the directory filters are narrowing the list (changes the empty-state message). */
+  filtersActive?: boolean;
   onManage: (target: ManageAccessTarget) => void;
   onAddExternal: () => void;
 }
@@ -49,13 +51,13 @@ function getAvatarBgColor(name: string, isRegistered: boolean): string {
 }
 
 /** Interpreters page "Roster" tab: approved connections, with the Manage access action per row. */
-export const RosterTab = ({ items, searchQuery, onManage, onAddExternal }: RosterTabProps) => {
+export const RosterTab = ({ items, searchQuery, filtersActive = false, onManage, onAddExternal }: RosterTabProps) => {
 
   if (items.length === 0) {
     return (
       <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center space-y-3">
         <p className="text-gray-600 text-sm">
-          {searchQuery ? `No interpreters matching "${searchQuery}".` : "No interpreters found in the database."}
+          {filtersActive ? "No interpreters match these filters." : searchQuery ? `No interpreters matching "${searchQuery}".` : "No interpreters found in the database."}
         </p>
         <button
           type="button"
@@ -146,6 +148,12 @@ export const RosterTab = ({ items, searchQuery, onManage, onAddExternal }: Roste
                     </span>
                   )}
                 </div>
+
+                {interpreter.certification && (
+                  <p className="pt-0.5 text-[13px] text-gray-600">
+                    <span className="font-medium text-gray-700">Credentials:</span> {interpreter.certification}
+                  </p>
+                )}
 
                 {/* Contextual dispatch note */}
                 <p className="text-[11.5px] text-gray-400 pt-1">

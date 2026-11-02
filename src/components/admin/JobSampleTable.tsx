@@ -25,7 +25,7 @@ export const JobSampleTable = ({ title, jobs }: { title: string; jobs: SampleJob
         <table className="w-full text-left text-[13px]">
           <thead className="bg-gray-50 text-gray-600">
             <tr>
-              {["Row", "Date", "Start – end (local)", "Saved as (UTC)", "Interpreter cell", "Split into"].map((heading) => (
+              {["Row", "Date", "Location", "Time range read as", "Saved as (UTC)", "Interpreter cell", "Split into"].map((heading) => (
                 <th key={heading} scope="col" className="px-3 py-2 font-medium">{heading}</th>
               ))}
             </tr>
@@ -35,7 +35,8 @@ export const JobSampleTable = ({ title, jobs }: { title: string; jobs: SampleJob
               <tr key={job.line} className="border-t border-gray-100 align-top">
                 <td className="px-3 py-2">{job.line}</td>
                 <td className="whitespace-nowrap px-3 py-2">{job.date}</td>
-                <td className="whitespace-nowrap px-3 py-2">{job.startTime} – {job.endTime}</td>
+                <td className="px-3 py-2">{job.location ?? <span className="text-gray-400">none</span>}</td>
+                <td className="whitespace-nowrap px-3 py-2">{job.timeRange} → {job.startTime} – {job.endTime}</td>
                 <td className="px-3 py-2 font-mono text-[11.5px] text-gray-600">{job.startsAt}<br />{job.endsAt}</td>
                 <td className="px-3 py-2">{job.raw ?? <span className="text-gray-400">empty</span>}</td>
                 <td className="px-3 py-2">

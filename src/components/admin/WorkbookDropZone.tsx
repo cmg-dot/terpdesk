@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import type { DragEvent } from "react";
 import { FileSpreadsheet } from "lucide-react";
 import { MAX_WORKBOOK_BYTES } from "@/lib/workbookImport/types";
@@ -14,6 +14,9 @@ interface Props {
 /** Drag-and-drop or click-to-choose for one .xlsx file. The native file input stays keyboard-operable underneath. */
 export const WorkbookDropZone = ({ fileName, disabled, onFile }: Props) => {
   const [dragging, setDragging] = useState(false);
+  // Each drop zone needs its OWN id: a label points at the first element on the page with its id, so two zones sharing
+  // one id would send a click on the second zone's label to the first zone's input (the wrong import).
+  const inputId = useId();
 
   const onDrop = (event: DragEvent<HTMLLabelElement>) => {
     event.preventDefault();
@@ -23,7 +26,7 @@ export const WorkbookDropZone = ({ fileName, disabled, onFile }: Props) => {
 
   return (
     <label
-      htmlFor="workbook-file"
+      htmlFor={inputId}
       onDragOver={(event) => {
         event.preventDefault();
         if (!disabled) setDragging(true);
@@ -38,7 +41,7 @@ export const WorkbookDropZone = ({ fileName, disabled, onFile }: Props) => {
       <span className="font-medium text-gray-800">{fileName ?? "Drop the Excel file here, or click to choose it"}</span>
       <span className="text-[13px] text-gray-500">.xlsx only, up to {MAX_WORKBOOK_BYTES / 1_000_000} MB</span>
       <input
-        id="workbook-file"
+        id={inputId}
         type="file"
         accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         className="sr-only"

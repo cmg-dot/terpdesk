@@ -3,7 +3,9 @@ import type { NameMatch } from "@/lib/jobImport/match";
 
 /** Shared shapes for the historical-jobs import. Pure types and constants: safe to import from client components. */
 
-export const JOBS_SHEET = "Jobs";
+/** Any sheet whose name contains "job" (capitals ignored), e.g. "Jobs 10302026- 12312027". */
+export const JOBS_SHEET_PATTERN = /job/i;
+export const JOBS_SHEET_LABEL = "Job";
 export const MAX_JOB_ROWS = 5_000;
 /** The sheet carries no time zone, so every job is read as agency-local time (the same zone the request form defaults to). */
 export const JOBS_TIME_ZONE_LABEL = "Pacific Time — Seattle, Los Angeles";
@@ -18,6 +20,11 @@ export interface JobRow {
   date: string;
   startTime: string;
   endTime: string;
+  /** The time range cell as text (a date Excel made from "10-3" is turned back into "10-3"). */
+  timeRange: string;
+  /** Column 2 as written (null when empty), and column 7, the consumer (never shown in reports or logs). */
+  location: string | null;
+  consumer: string | null;
   /** Strict UTC ISO timestamps. */
   startsAt: string;
   endsAt: string;
@@ -39,6 +46,8 @@ export interface SampleJob {
   date: string;
   startTime: string;
   endTime: string;
+  timeRange: string;
+  location: string | null;
   startsAt: string;
   endsAt: string;
   raw: string | null;
@@ -68,8 +77,12 @@ export interface JobsReport {
   /** Names that matched nobody (or more than one person), with how many jobs they appear in. */
   unmatched: { name: string; jobs: number; reason: "none" | "ambiguous" }[];
   outcome: JobsOutcome;
-  /** Columns in the sheet that this import does not use. */
-  unusedColumns: string[];
+  /** The sheet that was read, and any other sheet whose name also contains "job" (those are NOT read). */
+  sheetName: string;
+  otherJobSheets: string[];
+  withLocation: number;
+  /** Rows that name a consumer. The names themselves are stored on the job but never echoed here. */
+  withConsumer: number;
   notes: ImportNote[];
   notesTotal: number;
   sample: SampleJob[];

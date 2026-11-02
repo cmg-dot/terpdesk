@@ -1,7 +1,7 @@
 import { extractJobRows } from "@/lib/jobImport/jobSheet";
 import { matchInterpreterName, matchKey } from "@/lib/jobImport/match";
 import type { NameMatch, RosterCandidate } from "@/lib/jobImport/match";
-import { JOBS_SHEET, MAX_POSITIONS } from "@/lib/jobImport/types";
+import { MAX_POSITIONS } from "@/lib/jobImport/types";
 import type { JobRow, JobsReport, PlannedJob, SampleJob } from "@/lib/jobImport/types";
 import type { SheetGrid } from "@/lib/workbookImport/sheets";
 import type { ImportNote } from "@/lib/workbookImport/types";
@@ -24,6 +24,8 @@ const toSample = (job: PlannedJob): SampleJob => ({
   date: job.date,
   startTime: job.startTime,
   endTime: job.endTime,
+  timeRange: job.timeRange,
+  location: job.location,
   startsAt: job.startsAt,
   endsAt: job.endsAt,
   raw: job.interpreterText,
@@ -35,7 +37,7 @@ const toSample = (job: PlannedJob): SampleJob => ({
 });
 
 /** Looks each named interpreter up; the same person twice in one job is kept once; the app holds two positions per job. */
-const planOne = (row: JobRow, lookup: (name: string) => NameMatch, notes: ImportNote[]): PlannedJob => {
+const planOne = (row: JobRow, sheetName: string, lookup: (name: string) => NameMatch, notes: ImportNote[]): PlannedJob => {
   const seenPeople = new Set<string>();
   const assignments: PlannedJob["assignments"] = [];
   for (const name of row.names) {
@@ -48,15 +50,15 @@ const planOne = (row: JobRow, lookup: (name: string) => NameMatch, notes: Import
     assignments.push({ name, match });
   }
   if (assignments.length > MAX_POSITIONS) {
-    notes.push({ where: `${JOBS_SHEET}, row ${row.line}`, message: `Lists ${assignments.length} interpreters; a job holds ${MAX_POSITIONS}, so only the first ${MAX_POSITIONS} are assigned.` });
+    notes.push({ where: `${sheetName}, row ${row.line}`, message: `Lists ${assignments.length} interpreters; a job holds ${MAX_POSITIONS}, so only the first ${MAX_POSITIONS} are assigned.` });
   }
   return { ...row, assignments: assignments.slice(0, MAX_POSITIONS) };
 };
 
-export const planJobs = (grid: SheetGrid, roster: readonly RosterCandidate[], allowPartial: boolean): JobsPlan => {
-  const sheet = extractJobRows(grid);
+export const planJobs = (grid: SheetGrid, sheetName: string, otherJobSheets: string[], roster: readonly RosterCandidate[], allowPartial: boolean): JobsPlan => {
+  const sheet = extractJobRows(grid, sheetName);
   if (!sheet.ok) return { ok: false, error: sheet.error };
-  const { rows, rowsRead, rowsSkipped, unusedColumns } = sheet.value;
+  const { rows, rowsRead, rowsSkipped } = sheet.value;
 
   const notes: ImportNote[] = [...sheet.value.notes];
   // The same few hundred names recur across a thousand jobs: each distinct name is looked up once.
@@ -69,7 +71,7 @@ export const planJobs = (grid: SheetGrid, roster: readonly RosterCandidate[], al
     cache.set(key, found);
     return found;
   };
-  const jobs = rows.map((row) => planOne(row, lookup, notes));
+  const jobs = rows.map((row) => planOne(row, sheetName, lookup, notes));
 
   const names = { total: 0, exact: 0, partial: 0, ambiguous: 0, unmatched: 0 };
   const partial = new Map<string, { name: string; matchedTo: string; jobs: number }>();
@@ -106,7 +108,10 @@ export const planJobs = (grid: SheetGrid, roster: readonly RosterCandidate[], al
       names,
       partialMatches: byJobs(partial.values()),
       unmatched: byJobs(unmatched.values()),
-      unusedColumns: unusedColumns.slice(0, 30),
+      sheetName,
+      otherJobSheets,
+      withLocation: jobs.filter((job) => job.location !== null).length,
+      withConsumer: jobs.filter((job) => job.consumer !== null).length,
       notes: notes.slice(0, MAX_REPORTED_NOTES),
       notesTotal: notes.length,
       sample: jobs.slice(0, SAMPLE_SIZE).map(toSample),
