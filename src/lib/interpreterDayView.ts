@@ -7,6 +7,19 @@ export interface TimelineInterpreter {
   active: boolean;
   /** False for someone with a booking that day who is no longer on the agency's approved roster. */
   onRoster: boolean;
+  /** True when this interpreter lets the agency see their busy time. Without it, "free" can't be told from "busy". */
+  sharesAvailability: boolean;
+}
+
+/**
+ * A stretch of time an interpreter has marked busy and shares with the agency. Deliberately has NO label: the interpreter's
+ * private title never leaves the server.
+ */
+export interface TimelineBusy {
+  interpreterId: string;
+  /** Strict UTC ISO timestamps. */
+  startsAt: string;
+  endsAt: string;
 }
 
 export interface TimelineJob {
@@ -32,6 +45,8 @@ export interface InterpreterDayView {
   zone: string;
   interpreters: TimelineInterpreter[];
   jobs: TimelineJob[];
+  /** Busy time touching the day, only for interpreters who share availability with the agency; overlaps already merged. */
+  busy: TimelineBusy[];
 }
 
 export type InterpreterDayViewResult = { success: true; view: InterpreterDayView } | { success: false; error: string };

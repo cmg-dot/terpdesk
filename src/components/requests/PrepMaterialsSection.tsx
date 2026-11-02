@@ -7,6 +7,7 @@ import { deletePrepFile, generatePresignedUrl, listPrepFiles, saveFileRecord, se
 import { openStoredFile } from "@/lib/openFile";
 import { MAX_PREP_FILE_BYTES, PREP_FILE_ACCEPT, PREP_FILE_TYPES, formatFileSize } from "@/lib/validation/file";
 import type { PrepFile } from "@/lib/validation/file";
+import { uploadToStorage } from "@/lib/uploadToStorage";
 
 const selectClass =
   "rounded-full border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40";
@@ -42,8 +43,8 @@ export const PrepMaterialsSection = ({ requestId, cardClass }: { requestId: stri
       if (!presign.success) return setError(presign.error);
 
       setStatus("Uploading…");
-      const put = await fetch(presign.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      if (!put.ok) return setError("The upload failed. Please try again.");
+      const put = await uploadToStorage(presign.uploadUrl, file);
+      if (!put.ok) return setError(put.message);
 
       setStatus("Saving…");
       const saved = await saveFileRecord({ requestId, key: presign.key, fileName: file.name, sharedWithInterpreters: shareNext });

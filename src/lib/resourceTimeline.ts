@@ -103,6 +103,51 @@ export const layoutRow = <J extends TimedJob>(jobs: readonly J[], window: DayWin
 export const nowPercent = (window: DayWindow, nowMs: number): number | null =>
   nowMs >= window.startMs && nowMs < window.endMs ? ((nowMs - window.startMs) / (window.endMs - window.startMs)) * 100 : null;
 
+export interface Span {
+  startsAt: string;
+  endsAt: string;
+}
+
+/** Overlapping or touching spans joined into one, in time order. Invalid spans are dropped. */
+export const mergeSpans = (spans: readonly Span[]): Span[] => {
+  const sorted = spans
+    .map((s) => ({ start: new Date(s.startsAt).getTime(), end: new Date(s.endsAt).getTime() }))
+    .filter((s) => !Number.isNaN(s.start) && !Number.isNaN(s.end) && s.end > s.start)
+    .sort((a, b) => a.start - b.start);
+  const merged: { start: number; end: number }[] = [];
+  for (const span of sorted) {
+    const last = merged[merged.length - 1];
+    if (last && span.start <= last.end) last.end = Math.max(last.end, span.end);
+    else merged.push({ ...span });
+  }
+  return merged.map((m) => ({ startsAt: new Date(m.start).toISOString(), endsAt: new Date(m.end).toISOString() }));
+};
+
+export interface BusyBlock {
+  leftPct: number;
+  widthPct: number;
+  clippedStart: boolean;
+  clippedEnd: boolean;
+}
+
+/** Busy spans placed on the day's axis (clipped at midnight). Unlike jobs they never stack: they are a background layer. */
+export const layoutBusy = (spans: readonly Span[], window: DayWindow): BusyBlock[] => {
+  const total = window.endMs - window.startMs;
+  return mergeSpans(spans)
+    .map((s) => ({ start: new Date(s.startsAt).getTime(), end: new Date(s.endsAt).getTime() }))
+    .filter((s) => s.end > window.startMs && s.start < window.endMs)
+    .map((s) => {
+      const from = Math.max(s.start, window.startMs);
+      const to = Math.min(s.end, window.endMs);
+      return {
+        leftPct: ((from - window.startMs) / total) * 100,
+        widthPct: ((to - from) / total) * 100,
+        clippedStart: s.start < window.startMs,
+        clippedEnd: s.end > window.endMs,
+      };
+    });
+};
+
 export type JobTone = "live" | "past" | "attention" | "booked";
 
 /** How a block is coloured: happening now, already over, needing attention (partly staffed / replacement), or booked. */

@@ -7,6 +7,7 @@ import { deleteCredentialFile, presignCredentialFile, saveCredentialFile } from 
 import { openStoredFile } from "@/lib/openFile";
 import { CREDENTIAL_FILE_TYPES, MAX_CREDENTIAL_FILE_BYTES, MAX_FILES_PER_CREDENTIAL, formatFileSize } from "@/lib/validation/file";
 import type { CredentialFile } from "@/lib/validation/file";
+import { uploadToStorage } from "@/lib/uploadToStorage";
 
 interface CredentialFileUploadProps {
   credentialId: string;
@@ -42,8 +43,8 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
       if (!presign.success) return setError(presign.error);
 
       setStatus("Uploading…");
-      const put = await fetch(presign.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      if (!put.ok) return setError("The upload failed. Please try again.");
+      const put = await uploadToStorage(presign.uploadUrl, file);
+      if (!put.ok) return setError(put.message);
 
       setStatus("Saving…");
       const saved = await saveCredentialFile({ credentialId, key: presign.key, fileName: file.name });

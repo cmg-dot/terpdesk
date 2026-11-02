@@ -101,6 +101,7 @@ export async function inspectObject(key: string): Promise<{ sizeBytes: number; c
     return { sizeBytes: Number(head.ContentLength ?? 0), contentType: head.ContentType ?? "application/octet-stream" };
   } catch (err) {
     const status = (err as { $metadata?: { httpStatusCode?: number } } | null)?.$metadata?.httpStatusCode;
+    if (status === 403) console.error("[s3] reading an uploaded object was denied (HTTP 403): check the storage key's s3:GetObject / s3:ListBucket permissions for this folder");
     if (status === 404 || status === 403) return null;
     throw err;
   }

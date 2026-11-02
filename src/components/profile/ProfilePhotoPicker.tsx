@@ -6,6 +6,7 @@ import { ImagePlus } from "lucide-react";
 import { presignProfilePhoto, saveProfilePhoto } from "@/app/actions/profilePhotoUpload";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { MAX_PHOTO_BYTES, PHOTO_FILE_TYPES } from "@/lib/validation/file";
+import { uploadToStorage } from "@/lib/uploadToStorage";
 
 interface ProfilePhotoPickerProps {
   /** The photo currently saved on the profile ("/api/files/<id>" or an older link), or "". */
@@ -54,8 +55,8 @@ export const ProfilePhotoPicker = ({ currentPhotoUrl, name, onUploaded, onRemove
       if (!presign.success) return setError(presign.error);
 
       setStatus("Uploading…");
-      const put = await fetch(presign.uploadUrl, { method: "PUT", body: file, headers: { "Content-Type": file.type } });
-      if (!put.ok) return setError("The upload failed. Please try again.");
+      const put = await uploadToStorage(presign.uploadUrl, file);
+      if (!put.ok) return setError(put.message);
 
       setStatus("Saving…");
       const saved = await saveProfilePhoto({ key: presign.key, fileName: file.name });

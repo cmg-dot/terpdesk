@@ -17,6 +17,7 @@ const LEGEND: { swatch: string; label: string }[] = [
   { swatch: "bg-emerald-600 border-emerald-600", label: "Happening now" },
   { swatch: "bg-amber-50 border-amber-300", label: "Needs attention" },
   { swatch: "bg-gray-100 border-gray-200", label: "Finished" },
+  { swatch: "bg-gray-300 border-gray-400", label: "Busy (time the interpreter shares)" },
 ];
 
 /**
@@ -85,6 +86,8 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
           ))}
         </ul>
       </div>
+
+      <p className="text-[12px] text-gray-500 sm:hidden">Swipe sideways to see the whole day. Names stay in place.</p>
 
       {error && (
         <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
