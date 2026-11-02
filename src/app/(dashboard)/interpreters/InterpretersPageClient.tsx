@@ -15,7 +15,8 @@ import type { RosterItem } from "@/components/interpreters/RosterTab";
 import { WebsiteProfilesTab } from "@/components/interpreters/WebsiteProfilesTab";
 import type { PendingConnection } from "@/app/actions/approvalActions";
 import type { WebsitePermission, WebsiteProfileRequest } from "@/lib/websiteProfile";
-import { UserPlus, Upload, Search, CheckCircle2, X } from "lucide-react";
+import Link from "next/link";
+import { UserPlus, Upload, Search, CheckCircle2, X, FileSpreadsheet } from "lucide-react";
 
 export type InterpretersTab = "roster" | "requests" | "website";
 
@@ -205,6 +206,13 @@ export function InterpretersPageClient({
             <Upload className="w-4 h-4" />
             <span>Import CSV</span>
           </button>
+          <Link
+            href="/admin/import"
+            className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-full border border-gray-200 bg-white text-[var(--ink)] text-sm font-medium hover:bg-gray-50 transition-all active:scale-95 cursor-pointer"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Import Excel</span>
+          </Link>
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}

@@ -6,10 +6,13 @@ import {
   emailDetailsTable,
   escapeHtml,
 } from "@/lib/emailTemplate";
+import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 
 const SENDER = "dispatch@aslprofessionals.net";
 
 export const sendEmail = async (to: string, subject: string, html: string, text: string): Promise<void> => {
+  // Bulk-imported people with no email on file hold a placeholder on a reserved domain: never send to it.
+  if (isPlaceholderEmail(to)) return;
   const ses = new SESClient({
     region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2",
   });

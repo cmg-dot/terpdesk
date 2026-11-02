@@ -58,6 +58,7 @@ export const config = {
     "/hours-review/:path*",
     "/website-requests/:path*",
     "/inbox/:path*",
+    "/admin/:path*",
     "/jobs/:path*",
     "/interpreter-home/:path*",
     "/interpreter-calendar/:path*",

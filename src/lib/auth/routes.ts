@@ -16,6 +16,8 @@ export const AGENCY_PREFIXES = [
   "/hours-review",
   "/website-requests",
   "/inbox",
+  // Agency staff tools (the app has no separate admin role): bulk import.
+  "/admin",
 ] as const;
 
 export const INTERPRETER_PREFIXES = [
