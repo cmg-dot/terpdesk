@@ -9,8 +9,9 @@ import { NOT_ALLOWED_MESSAGE, requireRole } from "@/lib/auth/guards";
 import { interpreterDisplayName } from "@/lib/displayNameSql";
 import type { InterpreterDayViewResult, TimelineBusy, TimelineInterpreter, TimelineJob } from "@/lib/interpreterDayView";
 import { logError } from "@/lib/logError";
-import { getRosterInterpreters } from "@/lib/roster";
+import { getRosterInterpreters, getRosterProfileTags } from "@/lib/roster";
 import { dayWindow, mergeSpans, nextDateKey, previousDateKey } from "@/lib/resourceTimeline";
+import { splitCredentials } from "@/lib/timelineFilters";
 import { interpreterDayViewInputSchema } from "@/lib/validation/interpreterDayView";
 import { resolveRequestTimes } from "@/utils/timezone";
 
@@ -39,6 +40,9 @@ const storedStartDate = sql<string>`left(coalesce(
  * this agency (the same rule as the interpreter profile page), as bare start/end times with overlaps merged. The private
  * title is never selected, so it cannot reach the browser. Interpreters who don't share are flagged so the screen never
  * shows them as "free" when it simply can't know.
+ *
+ * Each person also carries their credential tags and location tags (agency-only data, which is why this is agency-only)
+ * so the screen can filter the rows without asking the server again when the filters or the day change.
  */
 export async function getInterpreterDayView(input: { date: string }): Promise<InterpreterDayViewResult> {
   try {
@@ -59,8 +63,9 @@ export async function getInterpreterDayView(input: { date: string }): Promise<In
     const loCreated = new Date(window.startMs - 36 * 3_600_000);
     const hiCreated = new Date(window.endMs + 36 * 3_600_000);
 
-    const [roster, sharing, busyRows, bookings] = await Promise.all([
+    const [roster, profileTags, sharing, busyRows, bookings] = await Promise.all([
       getRosterInterpreters(DEFAULT_AGENCY_ID),
+      getRosterProfileTags(DEFAULT_AGENCY_ID),
       db
         .select({ interpreterId: availabilityShares.interpreterId })
         .from(availabilityShares)
@@ -133,12 +138,16 @@ export async function getInterpreterDayView(input: { date: string }): Promise<In
 
     const shares = new Set(sharing.map((s) => s.interpreterId));
     const people = new Map<string, TimelineInterpreter>(
-      roster.map((r) => [r.id, { id: r.id, name: r.name, active: r.rosterActive !== false, onRoster: true, sharesAvailability: shares.has(r.id) }]),
+      roster.map((r) => {
+        const tags = profileTags.get(r.id);
+        return [r.id, { id: r.id, name: r.name, active: r.rosterActive !== false, onRoster: true, sharesAvailability: shares.has(r.id), credentials: splitCredentials(tags?.certification), areas: tags?.areas ?? [] }];
+      }),
     );
     // Someone booked that day who is no longer on the approved roster still gets a row, so their job is never hidden.
+    // We hold no agency-approved profile facts for them, so a credential or location filter can't match them.
     for (const job of jobs) {
       if (!people.has(job.interpreterId)) {
-        people.set(job.interpreterId, { id: job.interpreterId, name: names.get(job.interpreterId) ?? "Unknown interpreter", active: false, onRoster: false, sharesAvailability: shares.has(job.interpreterId) });
+        people.set(job.interpreterId, { id: job.interpreterId, name: names.get(job.interpreterId) ?? "Unknown interpreter", active: false, onRoster: false, sharesAvailability: shares.has(job.interpreterId), credentials: [], areas: [] });
       }
     }
     const interpretersList = Array.from(people.values()).sort((a, b) => a.name.localeCompare(b.name));

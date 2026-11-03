@@ -4,6 +4,7 @@ import { agencyInterpreters, interpreterProfiles, interpreters } from "@/db/sche
 import { ensureAvailabilityTables } from "@/app/actions/availability";
 import { ensureDisplayNameColumns } from "@/lib/displayName";
 import { interpreterDisplayName, interpreterPhotoUrl } from "@/lib/displayNameSql";
+import { areasFromLegacy, cleanAreas } from "@/lib/serviceAreas";
 
 /**
  * An agency's roster = interpreters with an APPROVED connection to it (agency_interpreters). That includes shadow /
@@ -41,9 +42,34 @@ export type RosterInterpreter = Awaited<ReturnType<typeof getRosterInterpreters>
  * go to an interpreter's browser. SERVER ONLY.
  */
 export async function getRosterCertifications(agencyId: string): Promise<Map<string, string>> {
+  const byInterpreter = new Map<string, string>();
+  for (const [id, profile] of Array.from(await getRosterProfileTags(agencyId))) {
+    if (profile.certification !== "") byInterpreter.set(id, profile.certification);
+  }
+  return byInterpreter;
+}
+
+export interface RosterProfileTags {
+  /** The agency-private certification text, trimmed ("" when none). */
+  certification: string;
+  /** Service-area tags ("Seattle", "Virtual Only"); a profile saved before tags existed falls back to its one-line service area. */
+  areas: string[];
+}
+
+/**
+ * What the Interpreter View's filters need from each roster person's profile, keyed by interpreter id (people with no
+ * profile are absent). Newest profile row wins when older data holds several. Agency-only data: the certification must
+ * never go to an interpreter's browser. SERVER ONLY.
+ */
+export async function getRosterProfileTags(agencyId: string): Promise<Map<string, RosterProfileTags>> {
   await ensureAvailabilityTables();
   const rows = await db
-    .select({ interpreterId: interpreterProfiles.interpreterId, certification: interpreterProfiles.certification })
+    .select({
+      interpreterId: interpreterProfiles.interpreterId,
+      certification: interpreterProfiles.certification,
+      serviceAreas: interpreterProfiles.serviceAreas,
+      serviceArea: interpreterProfiles.serviceArea,
+    })
     .from(interpreterProfiles)
     .innerJoin(
       agencyInterpreters,
@@ -54,10 +80,14 @@ export async function getRosterCertifications(agencyId: string): Promise<Map<str
       ),
     )
     .orderBy(desc(interpreterProfiles.updatedAt));
-  const byInterpreter = new Map<string, string>();
+  const byInterpreter = new Map<string, RosterProfileTags>();
   for (const row of rows) {
-    if (!byInterpreter.has(row.interpreterId)) byInterpreter.set(row.interpreterId, (row.certification ?? "").trim());
+    if (byInterpreter.has(row.interpreterId)) continue;
+    const tagged = cleanAreas(row.serviceAreas ?? []);
+    byInterpreter.set(row.interpreterId, {
+      certification: (row.certification ?? "").trim(),
+      areas: tagged.length > 0 ? tagged : areasFromLegacy(row.serviceArea),
+    });
   }
-  for (const [id, text] of Array.from(byInterpreter)) if (text === "") byInterpreter.delete(id);
   return byInterpreter;
 }

@@ -9,6 +9,10 @@ export interface TimelineInterpreter {
   onRoster: boolean;
   /** True when this interpreter lets the agency see their busy time. Without it, "free" can't be told from "busy". */
   sharesAvailability: boolean;
+  /** Credential tags from the agency-private certification text, for the credentials filter. Empty when none are recorded. */
+  credentials: string[];
+  /** Location tags (service areas), for the location filter. Empty when none are recorded. */
+  areas: string[];
 }
 
 /**

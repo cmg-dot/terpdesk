@@ -2,8 +2,11 @@
 
 import { useMemo, useState } from "react";
 import { Search } from "lucide-react";
+import { TimelineFilterBar } from "@/components/calendar/TimelineFilterBar";
 import { TimelineGrid } from "@/components/calendar/TimelineGrid";
 import { useInterpreterDayView } from "@/hooks/useInterpreterDayView";
+import { useTimelineFilters } from "@/hooks/useTimelineFilters";
+import { countTimelineFilters, matchesTimelineFilters, NO_TIMELINE_FILTERS } from "@/lib/timelineFilters";
 
 interface Props {
   /** The selected day, yyyy-MM-dd. */
@@ -28,6 +31,7 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
   const { view, loading, error, reload } = useInterpreterDayView(dateKey);
   const [search, setSearch] = useState("");
   const [onlyWorking, setOnlyWorking] = useState(false);
+  const [filters, setFilters] = useTimelineFilters();
 
   const jobCounts = useMemo(() => {
     const counts = new Map<string, number>();
@@ -42,11 +46,15 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
       // Archived people and people no longer on the roster only appear when they actually have work that day.
       if (!working && (!person.active || !person.onRoster)) return false;
       if (onlyWorking && !working) return false;
+      if (!matchesTimelineFilters(person, filters)) return false;
       return query === "" || person.name.toLowerCase().includes(query);
     });
-  }, [view, jobCounts, search, onlyWorking]);
+  }, [view, jobCounts, search, onlyWorking, filters]);
 
   const workingCount = jobCounts.size;
+  const filtersOn = countTimelineFilters(filters) > 0;
+  // The dropdown choices come from everyone the timeline could list, so picking one never shrinks the other's choices.
+  const filterPeople = useMemo(() => (view?.interpreters ?? []).filter((person) => person.onRoster && person.active), [view]);
 
   return (
     <section aria-label="Interpreter schedule" className="mt-6 space-y-4">
@@ -70,11 +78,14 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
         </label>
       </div>
 
+      <TimelineFilterBar people={filterPeople} filters={filters} onChange={setFilters} />
+
       <div className="flex flex-wrap items-center justify-between gap-x-6 gap-y-2 text-[13px] text-[var(--sage)]">
         <p role="status">
           {view
             ? `${view.interpreters.filter((p) => p.active && p.onRoster).length} interpreters on the roster · ${view.jobs.length} ${view.jobs.length === 1 ? "booking" : "bookings"} for ${workingCount} ${workingCount === 1 ? "interpreter" : "interpreters"}`
             : "Loading…"}
+          {view && (filtersOn || search || onlyWorking) && ` · showing ${people.length}`}
           {view && ` · times in ${view.zone.replace("_", " ")}`}
         </p>
         <ul className="flex flex-wrap gap-x-4 gap-y-1" aria-label="Colour key">
@@ -106,8 +117,20 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
             <p className="text-sm text-[var(--sage)]">No interpreter is booked on this day.</p>
           )}
           {people.length === 0 ? (
-            <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-[var(--sage)]">
-              {search || onlyWorking ? "No interpreters match." : "No interpreters on the roster yet."}
+            <div role="status" data-empty-timeline className="rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center text-sm text-[var(--sage)]">
+              {filtersOn || search || onlyWorking ? (
+                <>
+                  <p className="font-medium text-[var(--ink)]">No interpreters match these filters</p>
+                  <p className="mt-1">Try a different credential or location, or clear the filters to see everyone.</p>
+                  {filtersOn && (
+                    <button type="button" onClick={() => setFilters(NO_TIMELINE_FILTERS)} className="mt-4 rounded-full border border-gray-300 bg-white px-4 py-1.5 font-medium text-[#0B3B32] hover:bg-gray-50">
+                      Clear filters
+                    </button>
+                  )}
+                </>
+              ) : (
+                "No interpreters on the roster yet."
+              )}
             </div>
           ) : (
             <TimelineGrid view={view} people={people} nowMs={nowMs} busy={loading} />
