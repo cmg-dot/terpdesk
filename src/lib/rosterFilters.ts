@@ -1,6 +1,6 @@
 import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";
-import type { DropdownOption } from "@/lib/filterDropdown";
+import type { DropdownOption } from "@/lib/dropdown";
 import { buildFilterOptions, hasFilterTag, splitCredentials } from "@/lib/timelineFilters";
 
 /**

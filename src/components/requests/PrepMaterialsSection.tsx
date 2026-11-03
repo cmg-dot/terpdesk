@@ -4,13 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent } from "react";
 import { FileText, Trash2, Upload } from "lucide-react";
 import { deletePrepFile, generatePresignedUrl, listPrepFiles, saveFileRecord, setPrepFileVisibility } from "@/app/actions/files";
+import { Dropdown } from "@/components/ui/Dropdown";
+import type { DropdownOption } from "@/lib/dropdown";
 import { openStoredFile } from "@/lib/openFile";
 import { MAX_PREP_FILE_BYTES, PREP_FILE_ACCEPT, PREP_FILE_TYPES, formatFileSize } from "@/lib/validation/file";
 import type { PrepFile } from "@/lib/validation/file";
 import { uploadToStorage } from "@/lib/uploadToStorage";
 
-const selectClass =
-  "rounded-full border border-stone-200 bg-stone-100 px-3 py-1.5 text-sm text-gray-800 outline-none focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40";
+const selectWidth = "w-48";
+const VISIBILITY_OPTIONS: DropdownOption[] = [
+  { value: "agency", label: "Agency only" },
+  { value: "shared", label: "Assigned interpreters" },
+];
 
 /**
  * Agency request page "Prep materials": upload straight to S3 (signed PUT), then record the file. Each file is
@@ -96,15 +101,15 @@ export const PrepMaterialsSection = ({ requestId, cardClass }: { requestId: stri
                 <span className="shrink-0 text-xs font-normal text-gray-500">{formatFileSize(f.sizeBytes)}</span>
               </button>
               <div className="flex shrink-0 items-center gap-2">
-                <select
-                  aria-label={`Who can see ${f.fileName}`}
+                <Dropdown
+                  id={`prep-visibility-${f.id}`}
+                  ariaLabel={`Who can see ${f.fileName}`}
+                  variant="pill"
                   value={f.sharedWithInterpreters ? "shared" : "agency"}
-                  onChange={(e) => changeVisibility(f, e.target.value === "shared")}
-                  className={selectClass}
-                >
-                  <option value="agency">Agency only</option>
-                  <option value="shared">Assigned interpreters</option>
-                </select>
+                  onChange={(next) => changeVisibility(f, next === "shared")}
+                  options={VISIBILITY_OPTIONS}
+                  className={selectWidth}
+                />
                 <button type="button" onClick={() => remove(f)} aria-label={`Delete ${f.fileName}`} className="rounded-full p-2 text-gray-400 hover:bg-red-50 hover:text-red-600">
                   <Trash2 className="h-4 w-4" />
                 </button>
@@ -118,10 +123,14 @@ export const PrepMaterialsSection = ({ requestId, cardClass }: { requestId: stri
       <div className="bg-gray-50 rounded-2xl p-4 border border-gray-200 flex flex-col gap-4">
         <div className="flex flex-wrap justify-between items-center gap-2">
           <label htmlFor={`prep-share-${requestId}`} className="text-sm text-gray-600">Who can see this file?</label>
-          <select id={`prep-share-${requestId}`} value={shareNext ? "shared" : "agency"} onChange={(e) => setShareNext(e.target.value === "shared")} className={selectClass}>
-            <option value="agency">Agency only</option>
-            <option value="shared">Assigned interpreters</option>
-          </select>
+          <Dropdown
+            id={`prep-share-${requestId}`}
+            variant="pill"
+            value={shareNext ? "shared" : "agency"}
+            onChange={(next) => setShareNext(next === "shared")}
+            options={VISIBILITY_OPTIONS}
+            className={selectWidth}
+          />
         </div>
         <input ref={inputRef} type="file" accept={PREP_FILE_ACCEPT} onChange={upload} className="sr-only" id={`prep-file-${requestId}`} />
         <button

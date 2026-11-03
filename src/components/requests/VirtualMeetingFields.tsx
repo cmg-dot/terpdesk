@@ -1,5 +1,7 @@
 "use client";
 
+import { Dropdown } from "@/components/ui/Dropdown";
+
 export interface VirtualMeetingValues {
   platform: string;
   meetingLink: string;
@@ -48,12 +50,14 @@ export function VirtualMeetingFields({
 
       <div>
         <label htmlFor="vm-platform" className="block text-xs font-medium text-gray-700 mb-1">Platform</label>
-        <select id="vm-platform" disabled={disabled} value={values.platform} onChange={(e) => onChange("platform", e.target.value)} className={input}>
-          {!knownPlatform && values.platform && <option value={values.platform}>{values.platform}</option>}
-          {VIRTUAL_PLATFORM_OPTIONS.map((o) => (
-            <option key={o.value} value={o.value}>{o.label}</option>
-          ))}
-        </select>
+        <Dropdown
+          id="vm-platform"
+          disabled={disabled}
+          value={values.platform}
+          onChange={(platform) => onChange("platform", platform)}
+          options={knownPlatform || !values.platform ? VIRTUAL_PLATFORM_OPTIONS : [{ value: values.platform, label: values.platform }, ...VIRTUAL_PLATFORM_OPTIONS]}
+          className="w-full"
+        />
       </div>
 
       <div>

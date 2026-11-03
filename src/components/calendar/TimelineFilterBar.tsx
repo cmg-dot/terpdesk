@@ -1,7 +1,7 @@
 "use client";
 
-import { FilterDropdown } from "@/components/ui/FilterDropdown";
-import { withAnyOption } from "@/lib/filterDropdown";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { withAnyOption } from "@/lib/dropdown";
 import { buildFilterOptions, countTimelineFilters, NO_TIMELINE_FILTERS } from "@/lib/timelineFilters";
 import type { FilterFacts, TimelineFilters } from "@/lib/timelineFilters";
 
@@ -19,17 +19,19 @@ export const TimelineFilterBar = ({ people, filters, onChange }: Props) => {
   const areas = buildFilterOptions(people, "areas", filters.area);
   return (
     <div role="group" aria-label="Filter interpreters" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-6 sm:gap-y-2">
-      <FilterDropdown
+      <Dropdown
         id="timeline-filter-credential"
         label="Credentials"
+        variant="pill"
         options={withAnyOption("All credentials", credentials.options)}
         value={credentials.current}
         onChange={(credential) => onChange({ ...filters, credential })}
         className="flex-1 sm:w-56 sm:flex-none"
       />
-      <FilterDropdown
+      <Dropdown
         id="timeline-filter-area"
         label="Tags / Location"
+        variant="pill"
         options={withAnyOption("All locations", areas.options)}
         value={areas.current}
         onChange={(area) => onChange({ ...filters, area })}

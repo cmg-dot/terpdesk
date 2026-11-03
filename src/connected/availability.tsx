@@ -11,6 +11,7 @@ import {
   AlertTriangle,
 } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { IconInput } from "@/components/ui/IconInput";
 import { useGlobalState } from "@/context/GlobalContext";
 import { getIanaZone } from "@/utils/timezone";
@@ -82,6 +83,11 @@ const TIMEZONE_OPTIONS = [
   { value: "America/New_York", label: "Eastern Time — New York" },
   { value: "America/Anchorage", label: "Alaska Time" },
   { value: "Pacific/Honolulu", label: "Hawaii Time" },
+];
+
+const EXCEPTION_OPTIONS = [
+  { value: "unavailable", label: "Not available at all" },
+  { value: "available", label: "Available these hours" },
 ];
 
 export interface ConnectedAvailabilityProps {
@@ -447,10 +453,13 @@ export default function ConnectedAvailability({
               Your weekly rules and appointment hours are evaluated in this timezone.
             </p>
           </div>
-          <select
+          <Dropdown
+            id="availability-timezone"
+            ariaLabel="Profile timezone"
             value={baseTimezone}
-            onChange={(e) => {
-              const newTz = e.target.value;
+            options={TIMEZONE_OPTIONS}
+            className="w-full sm:w-72"
+            onChange={(newTz) => {
               setBaseTimezone(newTz);
               onTimezoneChanged?.(newTz);
               if (typeof window !== "undefined") {
@@ -475,14 +484,7 @@ export default function ConnectedAvailability({
                 }
               });
             }}
-            className="bg-[#F5F4F0] border-none rounded-xl px-4 py-2.5 text-sm text-[var(--ink)] focus:outline-none focus:ring-2 focus:ring-[#1B433C]/20"
-          >
-            {TIMEZONE_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
+          />
         </div>
       </div>
 
@@ -605,21 +607,22 @@ export default function ConnectedAvailability({
                   onChange={(e) => handleUpdateException(idx, { date: e.target.value })}
                   className="w-full rounded-lg border border-gray-200 bg-white py-1.5 pr-3 text-xs outline-none"
                 />
-                <select
+                <Dropdown
+                  id={`availability-exception-${idx}`}
+                  ariaLabel="Availability on this date"
+                  variant="compact"
                   value={ex.available ? "available" : "unavailable"}
-                  onChange={(e) => {
-                    const isAvail = e.target.value === "available";
+                  options={EXCEPTION_OPTIONS}
+                  className="w-full sm:w-48"
+                  onChange={(next) => {
+                    const isAvail = next === "available";
                     handleUpdateException(idx, {
                       available: isAvail,
                       startMinute: isAvail ? 540 : undefined,
                       endMinute: isAvail ? 1020 : undefined,
                     });
                   }}
-                  className="border border-gray-200 rounded-lg px-3 py-1.5 text-xs bg-white outline-none"
-                >
-                  <option value="unavailable">Not available at all</option>
-                  <option value="available">Available these hours</option>
-                </select>
+                />
 
                 {ex.available && (
                   <div className="flex items-center gap-2">

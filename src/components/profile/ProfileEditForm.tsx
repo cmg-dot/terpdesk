@@ -5,6 +5,7 @@ import type { ChangeEvent, FormEvent } from "react";
 import { updateMyProfile } from "@/app/actions/interpreterProfile";
 import { Field, FormCard as Card, inputClass } from "@/components/profile/formParts";
 import { ProfilePhotoPicker } from "@/components/profile/ProfilePhotoPicker";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { ServiceAreasInput } from "@/components/profile/ServiceAreasInput";
 import { CONTACT_VISIBILITY_OPTIONS, PROFILE_TIME_ZONES, interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
@@ -50,8 +51,17 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
     value: values[field],
     "aria-invalid": Boolean(errors[field]),
     "aria-describedby": errors[field] ? `profile-${field}-error` : undefined,
-    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setValues((v) => ({ ...v, [field]: e.target.value })),
+  });
+
+  /** The props a Dropdown shares with a text field: same id, value, error wiring and update. */
+  const choice = (field: "timeZone" | "contactVisibility") => ({
+    id: `profile-${field}`,
+    value: values[field],
+    invalid: Boolean(errors[field]),
+    describedBy: errors[field] ? `profile-${field}-error` : undefined,
+    onChange: (next: string) => setValues((v) => ({ ...v, [field]: next })),
   });
 
   // A zone the calendar saved that is not one of the seven choices stays selectable instead of silently changing.
@@ -154,12 +164,7 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
           />
         </Field>
         <Field id="profile-timeZone" label="Time zone" hint="Also used by your calendar." error={errors.timeZone}>
-          <select className={inputClass} {...text("timeZone")}>
-            {!knownZone && <option value={values.timeZone}>{values.timeZone}</option>}
-            {PROFILE_TIME_ZONES.map((z) => (
-              <option key={z.value} value={z.value}>{z.label}</option>
-            ))}
-          </select>
+          <Dropdown {...choice("timeZone")} options={knownZone ? PROFILE_TIME_ZONES : [{ value: values.timeZone, label: values.timeZone }, ...PROFILE_TIME_ZONES]} />
         </Field>
         <div className="flex flex-col gap-3 sm:flex-row sm:gap-8 md:col-span-2">
           {(["takesInPerson", "takesVirtual"] as const).map((field) => (
@@ -201,11 +206,7 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
           error={errors.contactVisibility}
           className="md:col-span-2"
         >
-          <select className={inputClass} {...text("contactVisibility")}>
-            {CONTACT_VISIBILITY_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>{o.label}</option>
-            ))}
-          </select>
+          <Dropdown {...choice("contactVisibility")} options={CONTACT_VISIBILITY_OPTIONS} />
         </Field>
       </Card>
 

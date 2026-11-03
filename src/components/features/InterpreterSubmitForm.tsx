@@ -1,5 +1,6 @@
 "use client";
 
+import { Dropdown } from "@/components/ui/Dropdown";
 import { SignaturePad } from "@/components/ui/SignaturePad";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 import { sanitizeDecimal } from "@/lib/numericInput";
@@ -73,6 +74,10 @@ const input =
   "w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
 const legInput =
   "min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
+const LEG_TYPE_OPTIONS = [
+  { value: "total", label: "Total distance already travelled" },
+  { value: "round_trip", label: "One-way distance + return on same route" },
+];
 const label = "block text-[13px] text-gray-600 mb-2";
 const errorText = "text-xs text-red-700 mt-1";
 const invalid = "border-red-400 focus:ring-red-500";
@@ -183,10 +188,16 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
                 <input type="text" disabled={locked} placeholder="To (Location)" aria-label="To (location)" value={leg.to} onChange={(e) => p.onUpdateLeg(leg.id, "to", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
                 {/* Text + decimal keypad, filtered as typed: digits and one "." only (type="number" lets letters / "e" through in some browsers). */}
                 <input type="text" inputMode="decimal" autoComplete="off" disabled={locked} placeholder="Distance (mi)" aria-label="Distance (miles)" value={leg.distance} onChange={(e) => p.onUpdateLeg(leg.id, "distance", sanitizeDecimal(e.target.value))} className={`${legInput} w-full ${m("md:w-32 md:flex-none")}`} />
-                <select disabled={locked} value={leg.type} onChange={(e) => p.onUpdateLeg(leg.id, "type", e.target.value)} className={`${legInput} w-full ${m("md:flex-[1.5]")} truncate`}>
-                  <option value="total">Total distance already travelled</option>
-                  <option value="round_trip">One-way distance + return on same route</option>
-                </select>
+                <Dropdown
+                  id={`leg-type-${leg.id}`}
+                  ariaLabel="How the distance is counted"
+                  variant="compact"
+                  disabled={locked}
+                  value={leg.type}
+                  onChange={(type) => p.onUpdateLeg(leg.id, "type", type)}
+                  options={LEG_TYPE_OPTIONS}
+                  className={`w-full ${m("md:flex-[1.5]")}`}
+                />
                 <button type="button" disabled={locked} onClick={() => p.onRemoveLeg(leg.id)} className={`text-sm font-medium text-gray-500 hover:text-red-600 self-end ${m("md:self-auto")} shrink-0 px-1 disabled:opacity-50 disabled:cursor-not-allowed`}>
                   Remove
                 </button>

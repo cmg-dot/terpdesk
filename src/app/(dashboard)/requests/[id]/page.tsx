@@ -40,7 +40,9 @@ import { legacyPosition1Hours } from "@/utils/hoursState";
 import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
 import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
 import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
+import { Dropdown } from "@/components/ui/Dropdown";
 import { IconInput } from "@/components/ui/IconInput";
+import { plainOptions, withCurrent } from "@/lib/dropdown";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getClientsAction } from "@/app/actions/clients";
 import type { ClientWithStats } from "@/app/actions/clients";
@@ -50,6 +52,10 @@ import { isStateJobRequest } from "@/lib/stateJob";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 
 /** End-of-row status in the recipient list: the same badge the Directly assign list shows, or why there is none yet. */
+const QUICK_EDIT_TIME_ZONES = plainOptions(["Pacific Time — Seattle, Los Angeles", "Mountain Time — Denver", "Arizona (no daylight saving)", "Central Time — Chicago", "Eastern Time — New York", "Alaska Time", "Hawaii Time"]);
+const QUICK_EDIT_SETTINGS = plainOptions(["Medical", "Legal", "Educational", "Mental Health", "Social Services", "General"]);
+const QUICK_EDIT_FORMATS = plainOptions(["Virtual", "In person"]);
+
 function FitTrailing({ fit, loading, failed }: { fit: InterpreterFitStatus | undefined; loading: boolean; failed: boolean }) {
   if (fit) return <InterpreterFitBadge fit={fit} showIcon={false} />;
   if (loading) return <span className="text-xs text-gray-400">Checking…</span>;
@@ -2128,19 +2134,14 @@ export default function AssignmentDetailPage() {
               
               <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">Appointment Time Zone</label>
-                <select
+                <Dropdown
+                  id="quick-edit-timezone"
+                  ariaLabel="Appointment time zone"
                   value={editTimeZone}
-                  onChange={(e) => setEditTimeZone(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                >
-                  <option value="Pacific Time — Seattle, Los Angeles">Pacific Time — Seattle, Los Angeles</option>
-                  <option value="Mountain Time — Denver">Mountain Time — Denver</option>
-                  <option value="Arizona (no daylight saving)">Arizona (no daylight saving)</option>
-                  <option value="Central Time — Chicago">Central Time — Chicago</option>
-                  <option value="Eastern Time — New York">Eastern Time — New York</option>
-                  <option value="Alaska Time">Alaska Time</option>
-                  <option value="Hawaii Time">Hawaii Time</option>
-                </select>
+                  onChange={setEditTimeZone}
+                  options={withCurrent(QUICK_EDIT_TIME_ZONES, editTimeZone)}
+                  className="w-full"
+                />
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2192,30 +2193,26 @@ export default function AssignmentDetailPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Setting</label>
-              <select
+              <Dropdown
+                id="quick-edit-setting"
+                ariaLabel="Setting"
                 value={editSetting}
-                onChange={(e) => setEditSetting(e.target.value)}
-                className="w-full bg-[#F5F4F0] border-none rounded-xl px-3.5 py-2.5 text-sm text-[var(--ink)] focus:ring-2 focus:ring-[#0B3B32] outline-none"
-              >
-                <option value="Medical">Medical</option>
-                <option value="Legal">Legal</option>
-                <option value="Educational">Educational</option>
-                <option value="Mental Health">Mental Health</option>
-                <option value="Social Services">Social Services</option>
-                <option value="General">General</option>
-              </select>
+                onChange={setEditSetting}
+                options={withCurrent(QUICK_EDIT_SETTINGS, editSetting)}
+                className="w-full"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-gray-700 mb-1.5">Format</label>
-              <select
+              <Dropdown
+                id="quick-edit-format"
+                ariaLabel="Format"
                 value={editFormat}
-                onChange={(e) => setEditFormat(e.target.value)}
-                className="w-full bg-[#F5F4F0] border-none rounded-xl px-3.5 py-2.5 text-sm text-[var(--ink)] focus:ring-2 focus:ring-[#0B3B32] outline-none"
-              >
-                <option value="Virtual">Virtual</option>
-                <option value="In person">In person</option>
-              </select>
+                onChange={setEditFormat}
+                options={withCurrent(QUICK_EDIT_FORMATS, editFormat)}
+                className="w-full"
+              />
             </div>
           </div>
 

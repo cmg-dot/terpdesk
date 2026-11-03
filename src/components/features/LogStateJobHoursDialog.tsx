@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { getPendingStateJobs } from "@/app/actions/getPendingStateJobs";
 import type { PendingStateJob } from "@/app/actions/getPendingStateJobs";
 import { logStateJobHours } from "@/app/actions/logStateJobHours";
+import { Dropdown } from "@/components/ui/Dropdown";
 import {
   Dialog,
   DialogContent,
@@ -161,22 +162,18 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
                 <label htmlFor="pending-state-job" className={labelClass}>
                   Pending State Jobs
                 </label>
-                <select
+                <Dropdown
                   id="pending-state-job"
+                  variant="pill"
                   value={selected}
-                  onChange={(e) => onSelect(e.target.value)}
+                  onChange={onSelect}
                   disabled={isPending || jobs === null}
-                  className={inputClass}
-                >
-                  <option value="">
-                    {jobs === null ? "Loading…" : jobs.length === 0 ? "No pending state jobs" : "Select a job"}
-                  </option>
-                  {(jobs ?? []).map((job) => (
-                    <option key={optionKey(job)} value={optionKey(job)}>
-                      {job.reference} · {job.dateLabel} · {job.interpreterName}
-                    </option>
-                  ))}
-                </select>
+                  className="w-full"
+                  options={[
+                    { value: "", label: jobs === null ? "Loading…" : jobs.length === 0 ? "No pending state jobs" : "Select a job" },
+                    ...(jobs ?? []).map((job) => ({ value: optionKey(job), label: `${job.reference} · ${job.dateLabel} · ${job.interpreterName}` })),
+                  ]}
+                />
                 {loadError && <p className="mt-1 ml-2 text-xs text-red-600">{loadError}</p>}
               </div>
 

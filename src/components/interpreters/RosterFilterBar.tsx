@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { FilterDropdown } from "@/components/ui/FilterDropdown";
+import { Dropdown } from "@/components/ui/Dropdown";
+import type { DropdownOption } from "@/lib/dropdown";
 import { countActiveFilters, credentialChoice, credentialChoices, NO_ROSTER_FILTERS, withCredentialChoice } from "@/lib/rosterFilters";
 import type { AccountFilter, EmailFilter, FilterableInterpreter, RosterFilters } from "@/lib/rosterFilters";
 
@@ -14,41 +15,50 @@ interface Props {
   total: number;
 }
 
-const selectClass =
-  "w-full rounded-xl border border-stone-200 bg-stone-100 px-3 py-2 text-sm text-gray-900 outline-none transition-colors focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40";
+const EMAIL_OPTIONS: DropdownOption[] = [
+  { value: "all", label: "All" },
+  { value: "real", label: "Real email" },
+  { value: "placeholder", label: "Placeholder (no email on file)" },
+];
 
-const Labelled = ({ id, label, children }: { id: string; label: string; children: React.ReactNode }) => (
-  <div className="min-w-[160px] flex-1 space-y-1">
-    <label htmlFor={id} className="block text-[12px] font-medium text-gray-600">{label}</label>
-    {children}
-  </div>
-);
+const ACCOUNT_OPTIONS: DropdownOption[] = [
+  { value: "all", label: "All" },
+  { value: "registered", label: "Registered app user" },
+  { value: "shadow", label: "Shadow / external" },
+];
+
+const Column = ({ children }: { children: React.ReactNode }) => <div className="min-w-[160px] flex-1">{children}</div>;
 
 /** Email status, Account status and Credentials filters for the roster, with a result count and a way to clear them. */
 export const RosterFilterBar = ({ filters, onChange, people, shown, total }: Props) => {
   const active = countActiveFilters(filters);
-  const set = (patch: Partial<RosterFilters>) => onChange({ ...filters, ...patch });
   const choices = useMemo(() => credentialChoices(people, filters), [people, filters]);
 
   return (
     <section aria-label="Filter the roster" className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
       <div className="flex flex-wrap items-end gap-4">
-        <Labelled id="filter-email" label="Email status">
-          <select id="filter-email" value={filters.email} onChange={(e) => set({ email: e.target.value as EmailFilter })} className={selectClass}>
-            <option value="all">All</option>
-            <option value="real">Real email</option>
-            <option value="placeholder">Placeholder (no email on file)</option>
-          </select>
-        </Labelled>
-        <Labelled id="filter-account" label="Account status">
-          <select id="filter-account" value={filters.account} onChange={(e) => set({ account: e.target.value as AccountFilter })} className={selectClass}>
-            <option value="all">All</option>
-            <option value="registered">Registered app user</option>
-            <option value="shadow">Shadow / external</option>
-          </select>
-        </Labelled>
-        <div className="min-w-[160px] flex-1">
-          <FilterDropdown
+        <Column>
+          <Dropdown
+            id="filter-email"
+            label="Email status"
+            layout="stacked"
+            options={EMAIL_OPTIONS}
+            value={filters.email}
+            onChange={(email) => onChange({ ...filters, email: email as EmailFilter })}
+          />
+        </Column>
+        <Column>
+          <Dropdown
+            id="filter-account"
+            label="Account status"
+            layout="stacked"
+            options={ACCOUNT_OPTIONS}
+            value={filters.account}
+            onChange={(account) => onChange({ ...filters, account: account as AccountFilter })}
+          />
+        </Column>
+        <Column>
+          <Dropdown
             id="filter-credentials"
             label="Credentials"
             layout="stacked"
@@ -56,7 +66,7 @@ export const RosterFilterBar = ({ filters, onChange, people, shown, total }: Pro
             value={credentialChoice(filters)}
             onChange={(choice) => onChange(withCredentialChoice(filters, choice))}
           />
-        </div>
+        </Column>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px] text-gray-600">
         <p role="status">

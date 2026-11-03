@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { addCredential, updateCredential } from "@/app/actions/credentials";
 import { Field, FormCard, inputClass } from "@/components/profile/formParts";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { plainOptions } from "@/lib/dropdown";
 import { CREDENTIAL_TYPES, credentialSchema } from "@/lib/validation/credential";
 import type { CredentialField, CredentialInput, MyCredential } from "@/lib/validation/credential";
 
@@ -48,7 +50,7 @@ export const CredentialForm = ({ initial, onSaved, onCancel }: CredentialFormPro
     value: values[field],
     "aria-invalid": Boolean(errors[field]),
     "aria-describedby": errors[field] ? `credential-${field}-error` : undefined,
-    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) =>
+    onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setValues((v) => ({ ...v, [field]: e.target.value })),
   });
 
@@ -93,11 +95,15 @@ export const CredentialForm = ({ initial, onSaved, onCancel }: CredentialFormPro
           <input type="text" placeholder="For example: NIC Certification" className={inputClass} {...bind("name")} />
         </Field>
         <Field id="credential-type" label="Type" error={errors.type}>
-          <select className={inputClass} {...bind("type")}>
-            {CREDENTIAL_TYPES.map((t) => (
-              <option key={t} value={t}>{t}</option>
-            ))}
-          </select>
+          <Dropdown
+            id="credential-type"
+            value={values.type}
+            invalid={Boolean(errors.type)}
+            describedBy={errors.type ? "credential-type-error" : undefined}
+            // The choices are exactly CREDENTIAL_TYPES (and the server re-validates), so the picked text is one of them.
+            onChange={(type) => setValues((v) => ({ ...v, type: type as CredentialInput["type"] }))}
+            options={plainOptions(CREDENTIAL_TYPES)}
+          />
         </Field>
         <Field id="credential-issuedBy" label="Issued by (optional)" error={errors.issuedBy}>
           <input type="text" className={inputClass} {...bind("issuedBy")} />
