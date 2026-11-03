@@ -7,14 +7,13 @@ import { useRequests } from "@/context/RequestsContext";
 import { useGlobalState } from "@/context/GlobalContext";
 import { ChevronDown, Copy, Check, ExternalLink, Video, MapPin, Edit2, X, Lock, Clock, Building2 } from "lucide-react";
 import { fetchLiveRequestById } from "@/app/actions/getRequests";
-import { updateRequestDetails } from "@/app/actions/updateRequestDetails";
 import { removeBooking } from "@/app/actions/removeBooking";
 import { getInterpreters } from "@/app/actions/getInterpreters";
 import { createOffer } from "@/app/actions/createOffer";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { cancelRequest } from "@/app/actions/cancelRequest";
 import { wallClockToUtc, wallClockToUtcDate, getIanaZone, parseInstantInZone, resolveJobZone, resolveRequestTimes } from "@/utils/timezone";
-import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
+import { formatInTimeZone } from "date-fns-tz";
 import { isAppointmentHappeningNow, isUnfilledPastDue } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
@@ -37,12 +36,12 @@ import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPane
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { legacyPosition1Hours } from "@/utils/hoursState";
-import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
-import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
-import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
-import { Dropdown } from "@/components/ui/Dropdown";
-import { IconInput } from "@/components/ui/IconInput";
-import { plainOptions, withCurrent } from "@/lib/dropdown";
+import { bookedRecipients } from "@/utils/messageRecipients";
+import { QuickEditAccessModal } from "@/components/requests/QuickEditAccessModal";
+import type { SavedDetails } from "@/components/requests/QuickEditAccessModal";
+import { syncStoredJob } from "@/lib/quickEditAccess";
+import type { QuickEditValues } from "@/lib/quickEditAccess";
+import { formatDetailsDate, mapSafeZone, parseSafeDate } from "@/lib/requestDetailsFormat";
 import { getTimesheetStatus } from "@/app/actions/getTimesheetStatus";
 import { getClientsAction } from "@/app/actions/clients";
 import type { ClientWithStats } from "@/app/actions/clients";
@@ -52,10 +51,6 @@ import { isStateJobRequest } from "@/lib/stateJob";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 
 /** End-of-row status in the recipient list: the same badge the Directly assign list shows, or why there is none yet. */
-const QUICK_EDIT_TIME_ZONES = plainOptions(["Pacific Time — Seattle, Los Angeles", "Mountain Time — Denver", "Arizona (no daylight saving)", "Central Time — Chicago", "Eastern Time — New York", "Alaska Time", "Hawaii Time"]);
-const QUICK_EDIT_SETTINGS = plainOptions(["Medical", "Legal", "Educational", "Mental Health", "Social Services", "General"]);
-const QUICK_EDIT_FORMATS = plainOptions(["Virtual", "In person"]);
-
 function FitTrailing({ fit, loading, failed }: { fit: InterpreterFitStatus | undefined; loading: boolean; failed: boolean }) {
   if (fit) return <InterpreterFitBadge fit={fit} showIcon={false} />;
   if (loading) return <span className="text-xs text-gray-400">Checking…</span>;
@@ -90,50 +85,6 @@ function CopyButton({ text, label }: { text: string; label?: string }) {
     </button>
   );
 }
-
-const parseSafeDate = (dateVal: any) => {
-  if (!dateVal) return null;
-  let d = new Date(dateVal);
-  if (!isNaN(d.getTime())) return d;
-  if (typeof dateVal === 'string') {
-    d = new Date(dateVal.replace(' ', 'T'));
-    if (!isNaN(d.getTime())) return d;
-    if (/^\d+$/.test(dateVal)) {
-      d = new Date(parseInt(dateVal, 10));
-      if (!isNaN(d.getTime())) return d;
-    }
-  }
-  return null;
-};
-
-const mapSafeZone = (tz?: string) => getIanaZone(tz);
-
-const formatDetailsDate = (startStr?: string | Date | null, endStr?: string | Date | null, timeZone?: string) => {
-  try {
-    if (!startStr) return "Date TBD";
-    const safeZone = getIanaZone(timeZone);
-    const start = parseInstantInZone(startStr, safeZone);
-    if (!start) return "Date TBD";
-
-    const dateStart = formatInTimeZone(start, safeZone, "EEE, MMM d");
-    const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
-    
-    let timeEnd = "";
-    if (endStr) {
-      const end = parseInstantInZone(endStr, safeZone);
-      if (end) {
-        timeEnd = formatInTimeZone(end, safeZone, "h:mm a zzz");
-      }
-    }
-    if (!timeEnd) {
-      timeEnd = formatInTimeZone(start, safeZone, "h:mm a zzz");
-    }
-    
-    return `${dateStart} · ${timeStart} – ${timeEnd}`;
-  } catch (e) {
-    return "Date TBD";
-  }
-};
 
 function getMockInterpreterDetails(id: string) {
   if (id === 'terp-1') return { name: "Active Interpreter" };
@@ -465,10 +416,8 @@ export default function AssignmentDetailPage() {
     : "This appointment has already started, so its booked details can no longer be edited.";
   // While an interpreter is booked, date, time and time zone are fixed (the server ignores them too).
   const isScheduleLocked = hasAcceptedBooking && !isEditLocked;
-  const [quickEditMessage, setQuickEditMessage] = useState('');
   // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
   const messageRecipients = bookedRecipients(realOffers);
-  const [quickEditRecipient, setQuickEditRecipient] = useState('');
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const [activityVersion, setActivityVersion] = useState(0);
 
@@ -478,185 +427,22 @@ export default function AssignmentDetailPage() {
  const cancelReason = foundRequest?.cancelReason || cancelReasonInput;
  const cancelDate = foundRequest?.canceledAt || '';
 
-  // Quick-update access & location state
+  // Quick-update access & location: the modal owns its whole form (QuickEditAccessModal), so typing or picking in it never
+  // re-renders this page. The page only opens it and refreshes after a save.
   const [isEditAccessOpen, setIsEditAccessOpen] = useState(false);
-  const [editSetting, setEditSetting] = useState('Medical');
-  const [editFormat, setEditFormat] = useState('Virtual');
-  const [editPlatform, setEditPlatform] = useState('Zoom');
-  const [editMeetingLink, setEditMeetingLink] = useState('');
-  const [editMeetingId, setEditMeetingId] = useState('');
-  const [editPasscode, setEditPasscode] = useState('');
-  const [editVirtualInstructions, setEditVirtualInstructions] = useState('');
-  const [editVenue, setEditVenue] = useState('');
-  const [editAddress, setEditAddress] = useState('');
-  const [editBuilding, setEditBuilding] = useState('');
-  const [editContact, setEditContact] = useState('');
-  const [editContactMethod, setEditContactMethod] = useState('');
-  const [editStartDate, setEditStartDate] = useState('');
-  const [editStartTime, setEditStartTime] = useState('');
-  const [editEndDate, setEditEndDate] = useState('');
-  const [editEndTime, setEditEndTime] = useState('');
-  const [editTimeZone, setEditTimeZone] = useState('Pacific Time — Seattle, Los Angeles');
-  const [isSavingAccess, setIsSavingAccess] = useState(false);
-  const [saveError, setSaveError] = useState<string | null>(null);
+  const openEditAccessModal = () => setIsEditAccessOpen(true);
+  const closeEditAccessModal = () => setIsEditAccessOpen(false);
 
-  let isQuickEditTimeInvalid = false;
-  if (editStartDate && editStartTime && editEndDate && editEndTime) {
-    try {
-      const ianaTz = getIanaZone(editTimeZone);
-      const startUtc = fromZonedTime(`${editStartDate}T${editStartTime}:00`, ianaTz);
-      const endUtc = fromZonedTime(`${editEndDate}T${editEndTime}:00`, ianaTz);
-      isQuickEditTimeInvalid = endUtc.getTime() <= startUtc.getTime();
-    } catch (e) {
-      isQuickEditTimeInvalid = new Date(`${editStartDate}T${editStartTime}`) >= new Date(`${editEndDate}T${editEndTime}`);
-    }
-  }
-
-  const openEditAccessModal = () => {
-    const isVirt = foundRequest?.isVirtual ?? (foundRequest?.details?.format?.toLowerCase().includes('virtual') ?? true);
-    setEditSetting(foundRequest?.setting || foundRequest?.details?.setting || 'Medical');
-    setEditFormat(foundRequest?.format || foundRequest?.details?.format || (isVirt ? 'Virtual' : 'In person'));
-    setEditPlatform(foundRequest?.platform || foundRequest?.details?.platform || 'Zoom');
-    setEditMeetingLink(foundRequest?.meetingLink || foundRequest?.details?.meetingLink || foundRequest?.virtualLink || foundRequest?.details?.virtualLink || '');
-    setEditMeetingId(foundRequest?.meetingId || foundRequest?.details?.meetingId || '');
-    setEditPasscode(foundRequest?.passcode || foundRequest?.details?.passcode || foundRequest?.accessCode || foundRequest?.details?.accessCode || '');
-    setEditVirtualInstructions(foundRequest?.virtualInstructions || foundRequest?.details?.virtualInstructions || '');
-    setEditVenue(foundRequest?.onsite?.venue || '');
-    setEditAddress(foundRequest?.onsite?.address || '');
-    setEditBuilding(foundRequest?.onsite?.building || '');
-    setEditContact(foundRequest?.onsite?.contact || '');
-    setEditContactMethod(foundRequest?.onsite?.contactMethod || '');
-
-    // Pre-fill date and time in the appointment's target timezone
-    const apptTz = foundRequest?.details?.timeZone || foundRequest?.timeZone || 'Pacific Time — Seattle, Los Angeles';
-    const safeZone = getIanaZone(apptTz);
-    const sDate = parseSafeDate(foundRequest?.startsAt) || new Date();
-    const eDate = parseSafeDate(foundRequest?.endsAt) || new Date(sDate.getTime() + 3600000);
-
-    setEditStartDate(formatInTimeZone(sDate, safeZone, 'yyyy-MM-dd'));
-    setEditStartTime(formatInTimeZone(sDate, safeZone, 'HH:mm'));
-    setEditEndDate(formatInTimeZone(eDate, safeZone, 'yyyy-MM-dd'));
-    setEditEndTime(formatInTimeZone(eDate, safeZone, 'HH:mm'));
-    setEditTimeZone(apptTz);
-
-    setSaveError(null);
-    setQuickEditMessage('');
-    setQuickEditRecipient(defaultRecipient(messageRecipients, foundRequest?.data?.clarifications));
-    setIsEditAccessOpen(true);
-  };
-
-  const handleSaveAccess = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault();
-    if (isEditLocked) {
-      setSaveError(editLockMessage);
-      return;
-    }
-    if (!isScheduleLocked && isQuickEditTimeInvalid) return;
-    setIsSavingAccess(true);
-    setSaveError(null);
-    try {
-      const result = await updateRequestDetails({
-        requestId: id,
-        setting: editSetting,
-        format: editFormat,
-        platform: editPlatform,
-        meetingLink: editMeetingLink,
-        meetingId: editMeetingId,
-        passcode: editPasscode,
-        virtualInstructions: editVirtualInstructions,
-        venue: editVenue,
-        address: editAddress,
-        building: editBuilding,
-        contact: editContact,
-        contactMethod: editContactMethod,
-        ...(isScheduleLocked
-          ? { messageToInterpreter: quickEditMessage, messageRecipientId: quickEditRecipient || undefined }
-          : {
-              startDate: editStartDate,
-              startTime: editStartTime,
-              endDate: editEndDate,
-              endTime: editEndTime,
-              timeZone: editTimeZone,
-            }),
-      });
-      if (!result.success) {
-        // The server enforces the same lock; show its reason instead of a generic failure.
-        setSaveError(result.error);
-        return;
-      }
-      const updatedRow = result.request;
-      setActivityVersion((v) => v + 1);
-      setQuickEditMessage('');
-      setEditNotice(
-        result.notifiedInterpreters > 0
-          ? `Saved. ${result.notifiedInterpreters === 1 ? "The booked interpreter was" : `${result.notifiedInterpreters} booked interpreters were`} emailed what changed.`
-          : null,
-      );
-
-      const updated = await fetchLiveRequestById(id);
-      setFoundRequest(updated);
-
-      if (typeof window !== 'undefined') {
-        try {
-          const storedJobs = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
-          const idx = storedJobs.findIndex((j: any) => String(j.id) === String(id) || String(j.requestId) === String(id));
-          if (idx > -1) {
-            const isVirt = editFormat.toLowerCase().includes('virtual');
-            const newStartsAt = updated?.startsAt || (updatedRow?.data as any)?.startsAt;
-            const newEndsAt = updated?.endsAt || (updatedRow?.data as any)?.endsAt;
-            storedJobs[idx] = {
-              ...storedJobs[idx],
-              setting: editSetting,
-              format: editFormat,
-              isVirtual: isVirt,
-              startsAt: newStartsAt || storedJobs[idx].startsAt,
-              endsAt: newEndsAt || storedJobs[idx].endsAt,
-              timeZone: editTimeZone,
-              location: isVirt
-                ? (editPlatform ? `${editPlatform} (Virtual)` : 'Virtual')
-                : (editVenue ? (editAddress ? `${editVenue} · ${editAddress}` : editVenue) : 'In person'),
-              meetingLink: editMeetingLink,
-              virtualLink: editMeetingLink,
-              meetingId: editMeetingId,
-              passcode: editPasscode,
-              accessCode: editPasscode,
-              platform: editPlatform,
-              virtualInstructions: editVirtualInstructions,
-              details: {
-                ...(storedJobs[idx].details || {}),
-                setting: editSetting,
-                format: editFormat,
-                timeZone: editTimeZone,
-                startsAt: newStartsAt,
-                endsAt: newEndsAt,
-                startDate: editStartDate,
-                startTime: editStartTime,
-                endDate: editEndDate,
-                endTime: editEndTime,
-              },
-              onsite: {
-                ...(storedJobs[idx].onsite || {}),
-                venue: editVenue,
-                address: editAddress,
-                building: editBuilding,
-                contact: editContact,
-                contactMethod: editContactMethod,
-              }
-            };
-            localStorage.setItem('terpdesk_interpreter_jobs', JSON.stringify(storedJobs));
-          }
-        } catch (e) {
-          console.error("[requests/[id] page] operation failed");
-        }
-      }
-
-      setIsEditAccessOpen(false);
-    } catch (err: any) {
-      console.error("[requests/[id] page] operation failed");
-      setSaveError(err.message || 'Failed to update details. Please try again.');
-    } finally {
-      setIsSavingAccess(false);
-    }
+  const handleAccessSaved = async (result: SavedDetails, values: QuickEditValues) => {
+    setActivityVersion((v) => v + 1);
+    setEditNotice(
+      result.notifiedInterpreters > 0
+        ? `Saved. ${result.notifiedInterpreters === 1 ? "The booked interpreter was" : `${result.notifiedInterpreters} booked interpreters were`} emailed what changed.`
+        : null,
+    );
+    const updated = await fetchLiveRequestById(id);
+    setFoundRequest(updated);
+    syncStoredJob(id, values, updated, result.request?.data);
   };
 
   const [showRemoveBookingModal, setShowRemoveBookingModal] = useState(false);
@@ -2097,241 +1883,16 @@ export default function AssignmentDetailPage() {
  )}
 
   {isEditAccessOpen && (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-7 w-full max-w-[560px] mx-auto shadow-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-5 pb-3 border-b border-gray-100">
-          <div>
-            <h3 className="text-xl font-semibold text-[var(--ink)]">Update Access & Location</h3>
-            <p className="text-xs text-gray-500 mt-0.5">Changes will reflect immediately for interpreters and agency staff.</p>
-          </div>
-          <button
-            onClick={() => setIsEditAccessOpen(false)}
-            className="text-gray-400 hover:text-gray-600 p-1 rounded-full hover:bg-gray-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSaveAccess} className="space-y-4">
-          {/* Schedule & Time */}
-          {isScheduleLocked ? (
-            <div className="p-4 bg-amber-50/70 rounded-xl border border-amber-200/80 space-y-2.5">
-              <div className="flex items-center gap-2 text-amber-900 font-semibold text-xs">
-                <Lock className="w-3.5 h-3.5 text-amber-700 shrink-0" />
-                <span>Date, time & timezone are locked</span>
-              </div>
-              <p className="text-xs text-amber-800 leading-relaxed">
-                The date, time and time zone cannot be changed while an interpreter is booked: moving them would skip the availability check they were booked under. You can still update meeting credentials, venue instructions, contacts and notes below.
-              </p>
-              <div className="text-xs text-gray-700 bg-white/90 p-2.5 rounded-lg border border-amber-200/50 flex items-center justify-between">
-                <span>{formatDetailsDate(assignment.startsAt, assignment.endsAt, editTimeZone)}</span>
-                <span className="font-mono text-gray-500">{editTimeZone.split(' — ')[0]}</span>
-              </div>
-            </div>
-          ) : (
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200/60 space-y-3.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Date, Time & Timezone</h4>
-              
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Appointment Time Zone</label>
-                <Dropdown
-                  id="quick-edit-timezone"
-                  ariaLabel="Appointment time zone"
-                  value={editTimeZone}
-                  onChange={setEditTimeZone}
-                  options={withCurrent(QUICK_EDIT_TIME_ZONES, editTimeZone)}
-                  className="w-full"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
-                  <IconInput kind="date"
-                    value={editStartDate}
-                    onChange={(e) => setEditStartDate(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Start Time</label>
-                  <IconInput kind="time"
-                    value={editStartTime}
-                    onChange={(e) => setEditStartTime(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
-                  <IconInput kind="date"
-                    value={editEndDate}
-                    onChange={(e) => setEditEndDate(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">End Time</label>
-                  <IconInput kind="time"
-                    value={editEndTime}
-                    onChange={(e) => setEditEndTime(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-              </div>
-
-              {isQuickEditTimeInvalid && (
-                <p className="text-xs text-red-600 font-medium mt-1">
-                  The end time must be after the start time.
-                </p>
-              )}
-            </div>
-          )}
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Setting</label>
-              <Dropdown
-                id="quick-edit-setting"
-                ariaLabel="Setting"
-                value={editSetting}
-                onChange={setEditSetting}
-                options={withCurrent(QUICK_EDIT_SETTINGS, editSetting)}
-                className="w-full"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">Format</label>
-              <Dropdown
-                id="quick-edit-format"
-                ariaLabel="Format"
-                value={editFormat}
-                onChange={setEditFormat}
-                options={withCurrent(QUICK_EDIT_FORMATS, editFormat)}
-                className="w-full"
-              />
-            </div>
-          </div>
-
-          {isVirtualFormat(editFormat) ? (
-            <VirtualMeetingFields
-              values={{ platform: editPlatform, meetingLink: editMeetingLink, meetingId: editMeetingId, passcode: editPasscode, virtualInstructions: editVirtualInstructions }}
-              onChange={(field, value) => {
-                if (field === 'platform') setEditPlatform(value);
-                else if (field === 'meetingLink') setEditMeetingLink(value);
-                else if (field === 'meetingId') setEditMeetingId(value);
-                else if (field === 'passcode') setEditPasscode(value);
-                else setEditVirtualInstructions(value);
-              }}
-            />
-          ) : (
-            <div className="p-4 bg-gray-50 rounded-xl border border-gray-200/60 space-y-3.5">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-500">Physical Location Details</h4>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Venue / Facility Name</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Medical Center or Clinic"
-                  value={editVenue}
-                  onChange={(e) => setEditVenue(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Address</label>
-                <input
-                  type="text"
-                  placeholder="e.g. 325 9th Ave, Seattle, WA 98104"
-                  value={editAddress}
-                  onChange={(e) => setEditAddress(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                />
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Building / Room</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. West Wing, Room 302"
-                    value={editBuilding}
-                    onChange={(e) => setEditBuilding(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">On-site Contact</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. Dr. Silva"
-                    value={editContact}
-                    onChange={(e) => setEditContact(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-medium text-gray-700 mb-1">Contact Method</label>
-                <input
-                  type="text"
-                  placeholder="e.g. Text message or Phone"
-                  value={editContactMethod}
-                  onChange={(e) => setEditContactMethod(e.target.value)}
-                  className="w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
-                />
-              </div>
-            </div>
-          )}
-
-          {isScheduleLocked && (
-            <div>
-              <label htmlFor="quick-edit-interpreter-message" className="block text-xs font-medium text-gray-700 mb-1">Message to interpreter (Optional)</label>
-              <textarea
-                id="quick-edit-interpreter-message"
-                rows={3}
-                maxLength={1000}
-                value={quickEditMessage}
-                onChange={(e) => setQuickEditMessage(e.target.value)}
-                className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]"
-              />
-              <p className="mt-1 text-[11px] text-gray-500">
-                Added to the “Job details updated” email the booked interpreter gets when you save, e.g. to answer their question, and kept on their job page. It is emailed, so don't include client names or health information. ({quickEditMessage.length}/1000)
-              </p>
-              {quickEditMessage.trim() && (
-                <MessageRecipientSelect id="quick-edit-recipient" className="mt-3" recipients={messageRecipients} value={quickEditRecipient} onChange={setQuickEditRecipient} />
-              )}
-            </div>
-          )}
-
-          {saveError && (
-            <p className="text-xs text-red-600 bg-red-50 p-2.5 rounded-lg border border-red-100">{saveError}</p>
-          )}
-
-          <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
-            <button
-              type="button"
-              onClick={() => setIsEditAccessOpen(false)}
-              className="px-5 py-2 rounded-full text-sm font-medium border border-gray-300 hover:bg-gray-50 text-gray-700 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={isSavingAccess || (!isScheduleLocked && isQuickEditTimeInvalid) || (isScheduleLocked && Boolean(quickEditMessage.trim()) && messageRecipients.length > 1 && !quickEditRecipient)}
-              className="px-6 py-2 rounded-full text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest)]/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSavingAccess ? 'Saving...' : 'Save details'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+    <QuickEditAccessModal
+      requestId={id}
+      request={foundRequest}
+      scheduleLocked={isScheduleLocked}
+      editLocked={isEditLocked}
+      editLockMessage={editLockMessage}
+      recipients={messageRecipients}
+      onSaved={handleAccessSaved}
+      onClose={closeEditAccessModal}
+    />
   )}
 
   {showRemoveBookingModal && (
