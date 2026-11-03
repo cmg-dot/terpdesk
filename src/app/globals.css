@@ -53,4 +53,32 @@ body {
       scrollbar-color: rgba(139, 164, 158, 0.4) transparent;
     }
   }
+
+  /*
+   * The same slim scrollbar for the emerald dropdown menus (FilterDropdown), but always visible: a menu is short-lived, and
+   * a hidden scrollbar would hide that the list scrolls. Transparent track so it blends into the green, rounded light-green
+   * thumb that brightens under the pointer. Same ::-webkit / @supports split as above.
+   */
+  .menu-scroll::-webkit-scrollbar {
+    width: 8px;
+  }
+  .menu-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .menu-scroll::-webkit-scrollbar-thumb {
+    background-color: rgba(167, 243, 208, 0.28);
+    background-clip: padding-box;
+    border: 2px solid transparent;
+    border-radius: 9999px;
+  }
+  .menu-scroll::-webkit-scrollbar-thumb:hover {
+    background-color: rgba(167, 243, 208, 0.5);
+  }
+
+  @supports not selector(::-webkit-scrollbar) {
+    .menu-scroll {
+      scrollbar-width: thin;
+      scrollbar-color: rgba(167, 243, 208, 0.35) transparent;
+    }
+  }
 }
