@@ -40,14 +40,15 @@ export const splitCredentials = (text: string | null | undefined): string[] => {
   return out;
 };
 
-const hasTag = (tags: readonly string[], wanted: string): boolean => {
+/** True when `tags` holds `wanted` as a whole tag (ignoring capitals and extra spaces). */
+export const hasFilterTag = (tags: readonly string[], wanted: string): boolean => {
   const key = keyOf(wanted);
   return tags.some((tag) => keyOf(tag) === key);
 };
 
 export const matchesTimelineFilters = (person: FilterFacts, filters: TimelineFilters): boolean =>
-  (keyOf(filters.credential) === "" || hasTag(person.credentials, filters.credential)) &&
-  (keyOf(filters.area) === "" || hasTag(person.areas, filters.area));
+  (keyOf(filters.credential) === "" || hasFilterTag(person.credentials, filters.credential)) &&
+  (keyOf(filters.area) === "" || hasFilterTag(person.areas, filters.area));
 
 /** How many filters are narrowing the rows. */
 export const countTimelineFilters = (filters: TimelineFilters): number =>

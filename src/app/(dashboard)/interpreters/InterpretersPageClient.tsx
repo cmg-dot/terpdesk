@@ -253,7 +253,7 @@ export function InterpretersPageClient({
       </div>
 
       {activeTab === "roster" && (
-        <RosterFilterBar filters={rosterFilters} onChange={setRosterFilters} shown={filteredRoster.length} total={interpreterList.length} />
+        <RosterFilterBar filters={rosterFilters} onChange={setRosterFilters} people={interpreterList} shown={filteredRoster.length} total={interpreterList.length} />
       )}
 
       {/* Tab Panels */}

@@ -1,11 +1,15 @@
 "use client";
 
-import { countActiveFilters, NO_ROSTER_FILTERS } from "@/lib/rosterFilters";
-import type { AccountFilter, CredentialFilter, EmailFilter, RosterFilters } from "@/lib/rosterFilters";
+import { useMemo } from "react";
+import { FilterDropdown } from "@/components/ui/FilterDropdown";
+import { countActiveFilters, credentialChoice, credentialChoices, NO_ROSTER_FILTERS, withCredentialChoice } from "@/lib/rosterFilters";
+import type { AccountFilter, EmailFilter, FilterableInterpreter, RosterFilters } from "@/lib/rosterFilters";
 
 interface Props {
   filters: RosterFilters;
   onChange: (next: RosterFilters) => void;
+  /** The whole roster (not just who is showing), so the Credentials list is complete whatever else is filtered. */
+  people: readonly FilterableInterpreter[];
   shown: number;
   total: number;
 }
@@ -21,9 +25,10 @@ const Labelled = ({ id, label, children }: { id: string; label: string; children
 );
 
 /** Email status, Account status and Credentials filters for the roster, with a result count and a way to clear them. */
-export const RosterFilterBar = ({ filters, onChange, shown, total }: Props) => {
+export const RosterFilterBar = ({ filters, onChange, people, shown, total }: Props) => {
   const active = countActiveFilters(filters);
   const set = (patch: Partial<RosterFilters>) => onChange({ ...filters, ...patch });
+  const choices = useMemo(() => credentialChoices(people, filters), [people, filters]);
 
   return (
     <section aria-label="Filter the roster" className="mb-6 rounded-2xl border border-gray-200 bg-white p-4">
@@ -42,34 +47,16 @@ export const RosterFilterBar = ({ filters, onChange, shown, total }: Props) => {
             <option value="shadow">Shadow / external</option>
           </select>
         </Labelled>
-        <Labelled id="filter-credentials" label="Credentials">
-          <select
+        <div className="min-w-[160px] flex-1">
+          <FilterDropdown
             id="filter-credentials"
-            value={filters.credentials}
-            onChange={(e) => {
-              const credentials = e.target.value as CredentialFilter;
-              // "No credentials" and "contains some text" contradict each other: choosing it clears the text.
-              set({ credentials, ...(credentials === "none" ? { credentialText: "" } : {}) });
-            }}
-            className={selectClass}
-          >
-            <option value="all">All</option>
-            <option value="has">Has credentials</option>
-            <option value="none">No credentials listed</option>
-          </select>
-        </Labelled>
-        <Labelled id="filter-credential-text" label="Credential contains">
-          <input
-            id="filter-credential-text"
-            type="text"
-            value={filters.credentialText}
-            disabled={filters.credentials === "none"}
-            placeholder="e.g. CDI"
-            autoComplete="off"
-            onChange={(e) => set({ credentialText: e.target.value })}
-            className={`${selectClass} placeholder:text-gray-400 disabled:cursor-not-allowed disabled:opacity-60`}
+            label="Credentials"
+            layout="stacked"
+            options={choices}
+            value={credentialChoice(filters)}
+            onChange={(choice) => onChange(withCredentialChoice(filters, choice))}
           />
-        </Labelled>
+        </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-3 text-[13px] text-gray-600">
         <p role="status">
