@@ -1,32 +1,97 @@
-import { Calendar, Clock } from "lucide-react";
-import type { InputHTMLAttributes } from "react";
+"use client";
 
-type IconInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
-  /** "date" shows a calendar icon, "time" a clock. */
+import { Calendar, Clock } from "lucide-react";
+import { CalendarGrid } from "@/components/ui/CalendarGrid";
+import { PickerField } from "@/components/ui/PickerField";
+import { TimeSelector } from "@/components/ui/TimeSelector";
+import { formatDateLabel, formatTimeLabel } from "@/lib/dateTimePicker";
+
+/** What `onChange` receives: the same `event.target.value` the native input gave, so no caller changed. */
+export interface PickerChangeEvent {
+  target: { value: string };
+  currentTarget: { value: string };
+}
+
+interface IconInputProps {
+  /** "date" opens a month calendar, "time" an hour / minute / AM-PM selector. */
   kind: "date" | "time";
-  /** Classes for the wrapper (the input's own look comes from `className`). Default: full width, shrinkable inside a flex row. */
+  /** yyyy-MM-dd for a date, HH:mm (24 hour) for a time, "" for none. */
+  value?: string;
+  onChange?: (event: PickerChangeEvent) => void;
+  /** Classes for the field (its look, as the page gave the input it replaced). */
+  className?: string;
+  /** Classes for the wrapper. Default: full width, shrinkable inside a flex row. */
   wrapperClassName?: string;
   /** Smaller icon and less left padding, for dense rows (e.g. the weekly hours list). */
   compact?: boolean;
-};
+  disabled?: boolean;
+  /** Earliest date that can be picked (dates only). */
+  min?: string;
+  /** Latest date that can be picked (dates only). */
+  max?: string;
+  id?: string;
+  placeholder?: string;
+  "aria-label"?: string;
+  "aria-invalid"?: boolean;
+  "aria-describedby"?: string;
+}
 
 /**
- * A native date or time input with its icon inside, on the left. The native picker still works: the browser's own
- * (now invisible) picker button stays at the right edge of the field, so tapping there opens the calendar or the
- * clock exactly as before, and typing, keyboard use and mobile pickers are untouched.
+ * A date or time field with its icon inside, on the left. Clicking it opens a cream-and-emerald popup: a mini calendar
+ * for a date, an hour / minute / AM-PM selector for a time (see PickerField). No typing is needed. The value is still the
+ * text a native input held (yyyy-MM-dd, HH:mm) and `onChange` still gets `event.target.value`, so every form works as before.
  */
-export function IconInput({ kind, className = "", wrapperClassName = "relative w-full min-w-0", compact = false, ...rest }: IconInputProps) {
+export function IconInput({
+  kind,
+  value = "",
+  onChange,
+  className = "",
+  wrapperClassName = "relative w-full min-w-0",
+  compact = false,
+  disabled = false,
+  min,
+  max,
+  id,
+  placeholder,
+  "aria-label": ariaLabel,
+  "aria-invalid": invalid,
+  "aria-describedby": describedBy,
+}: IconInputProps) {
   const Icon = kind === "date" ? Calendar : Clock;
   const iconClass = compact ? "left-2.5 h-3.5 w-3.5" : "left-4 h-4 w-4";
+  const emit = (next: string) => onChange?.({ target: { value: next }, currentTarget: { value: next } });
+
   return (
-    <div className={wrapperClassName}>
-      <Icon aria-hidden="true" strokeWidth={1.75} className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-gray-500 ${iconClass}`} />
-      <input
-        {...rest}
-        type={kind}
-        // pl-11 (pl-8 compact) clears the icon; the invisible WebKit picker button keeps its click target at the right edge.
-        className={`${className} ${compact ? "pl-8" : "pl-11"} [&::-webkit-calendar-picker-indicator]:cursor-pointer [&::-webkit-calendar-picker-indicator]:opacity-0`}
-      />
-    </div>
+    <PickerField
+      popoverLabel={kind === "date" ? "Choose a date" : "Choose a time"}
+      text={kind === "date" ? formatDateLabel(value) : formatTimeLabel(value)}
+      placeholder={placeholder ?? (kind === "date" ? "Choose a date" : "Choose a time")}
+      icon={<Icon aria-hidden="true" strokeWidth={1.75} className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[#0B3B32]/70 ${iconClass}`} />}
+      className={className}
+      wrapperClassName={wrapperClassName}
+      compact={compact}
+      disabled={disabled}
+      id={id}
+      ariaLabel={ariaLabel}
+      invalid={invalid}
+      describedBy={describedBy}
+    >
+      {(close) =>
+        kind === "date" ? (
+          <CalendarGrid
+            value={value}
+            min={min}
+            max={max}
+            onPick={(key) => {
+              emit(key);
+              close();
+            }}
+            onDone={close}
+          />
+        ) : (
+          <TimeSelector value={value} onPick={emit} onDone={close} />
+        )
+      }
+    </PickerField>
   );
 }

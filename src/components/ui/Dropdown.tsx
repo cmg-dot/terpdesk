@@ -1,9 +1,10 @@
 "use client";
 
-import { memo, useCallback, useRef, useState } from "react";
+import { memo, useCallback, useRef, useState, useTransition } from "react";
 import type { KeyboardEvent } from "react";
 import { ChevronDown } from "lucide-react";
-import { DropdownMenu, measureAnchor } from "@/components/ui/DropdownMenu";
+import { DropdownMenu } from "@/components/ui/DropdownMenu";
+import { measureAnchor } from "@/hooks/useAnchoredPanel";
 import type { Anchor, DropdownOption } from "@/lib/dropdown";
 
 export type DropdownVariant = "pill" | "field" | "compact" | "form" | "formLarge";
@@ -70,18 +71,19 @@ const DropdownField = memo(function DropdownField({
 }: DropdownProps) {
   // `open` and the highlight live here, so opening, closing and hovering re-render this dropdown only, never the form around it.
   const [open, setOpen] = useState(false);
-  // The menu stays mounted a moment after `open` turns false, to fade out; `present` is "the menu is mounted".
-  const [present, setPresent] = useState(false);
   const [active, setActive] = useState(0);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const root = useRef<HTMLDivElement>(null);
   const button = useRef<HTMLButtonElement>(null);
   const keyboardNav = useRef(true);
-  // While the menu fades out it is still on screen but frozen as last drawn, so its clicks must check the live state.
-  const isOpen = useRef(open);
-  isOpen.current = open;
+  // A pick tells the parent in a transition: the menu closes and the button shows the choice at once, and a heavy form
+  // re-renders afterwards (and can be interrupted) instead of freezing the click. If the parent refuses the change, the
+  // button goes back to the value it passed.
+  const [picking, startPicking] = useTransition();
+  const [picked, setPicked] = useState<string | null>(null);
+  const shown = picking && picked !== null ? picked : value;
 
-  const selectedIndex = options.findIndex((option) => option.value === value);
+  const selectedIndex = options.findIndex((option) => option.value === shown);
   const selected = options[selectedIndex];
   const last = options.length - 1;
 
@@ -90,20 +92,18 @@ const DropdownField = memo(function DropdownField({
     keyboardNav.current = true;
     setActive(Math.max(selectedIndex, 0));
     setAnchor(measureAnchor(button.current));
-    setPresent(true);
     setOpen(true);
   };
   const close = useCallback(() => setOpen(false), []);
-  const gone = useCallback(() => setPresent(false), []);
   const hover = useCallback((index: number) => {
     keyboardNav.current = false;
     setActive(index);
   }, []);
   const pick = useCallback(
     (option: DropdownOption) => {
-      if (!isOpen.current) return;
       setOpen(false);
-      onChange(option.value);
+      setPicked(option.value);
+      startPicking(() => onChange(option.value));
     },
     [onChange],
   );
@@ -184,9 +184,8 @@ const DropdownField = memo(function DropdownField({
           <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
           <ChevronDown className={`h-4 w-4 flex-none text-[#0B3B32] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>
-        {present && anchor && (
+        {open && anchor && (
           <DropdownMenu
-            open={open}
             id={id}
             ariaLabel={ariaLabel ?? label}
             options={options}
@@ -201,7 +200,6 @@ const DropdownField = memo(function DropdownField({
             onClose={close}
             onPick={pick}
             onHover={hover}
-            onGone={gone}
           />
         )}
       </div>

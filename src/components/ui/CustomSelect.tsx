@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { plainOptions, withCurrent } from "@/lib/dropdown";
 
@@ -25,6 +25,9 @@ export const CustomSelect = ({ options, value, onChange, disabled = false, size 
   const id = useId();
   const [own, setOwn] = useState(options[0] ?? "");
   const current = value ?? own;
+  // The pages build `options` afresh on every render (a 300-client list included): rebuild the choices only when the text changes.
+  const content = JSON.stringify(options);
+  const choices = useMemo(() => withCurrent(plainOptions(Array.from(new Set(options))), current), [content, current]);
   return (
     <Dropdown
       id={id}
@@ -32,7 +35,7 @@ export const CustomSelect = ({ options, value, onChange, disabled = false, size 
       variant={size === "large" ? "formLarge" : "form"}
       disabled={disabled}
       value={current}
-      options={withCurrent(plainOptions(Array.from(new Set(options))), current)}
+      options={choices}
       className="w-full"
       onChange={(next) => {
         if (value === undefined) setOwn(next);
