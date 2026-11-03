@@ -2,6 +2,7 @@
 
 import { isStateAgencyClient } from "@/lib/validation/client";
 import React, { useState, useRef, useEffect, useMemo } from "react";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useRequests } from "@/context/RequestsContext";
 import { useClients } from "@/context/ClientsContext";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -14,62 +15,6 @@ import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, ty
 import { isInvalidEmail } from "@/utils/validation";
 import { IconInput } from "@/components/ui/IconInput";
 import type { RequestData, Program } from "@/db/schema";
-
-function CustomSelect({ options, value, onChange }: { options: string[], value?: string, onChange?: (val: string) => void }) {
- const [isOpen, setIsOpen] = useState(false);
- const [selected, setSelected] = useState(value || options[0]);
- const dropdownRef = useRef<HTMLDivElement>(null);
-
- useEffect(() => {
- if (value !== undefined) setSelected(value);
- }, [value]);
-
- useEffect(() => {
- const handleClickOutside = (event: MouseEvent) => {
- if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
- setIsOpen(false);
- }
- };
- document.addEventListener("mousedown", handleClickOutside);
- return () => document.removeEventListener("mousedown", handleClickOutside);
- }, []);
-
- return (
- <div className="relative w-full" ref={dropdownRef}>
- <button
- type="button"
- onClick={() => setIsOpen(!isOpen)}
- className={`w-full bg-[#F4F3EF] rounded-full px-4 py-2.5 text-sm text-left text-gray-800 relative outline-none transition-shadow ${
- isOpen ? "ring-1 ring-[#0B3B32] border-[#0B3B32]" : ""
- }`}
- >
- <span className="block truncate pr-6">{selected}</span>
- <span className="absolute inset-y-0 right-0 flex items-center pr-4 pointer-events-none">
- <svg className="h-4 w-4 text-[var(--sage)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
- </svg>
- </span>
- </button>
- {isOpen && (
- <div className="absolute z-50 w-full mt-1 bg-[#F4F3EF] border border-gray-300 max-h-60 overflow-y-auto rounded-2xl border border-gray-200 py-1">
- {options.map((opt) => (
- <div
- key={opt}
- className="px-4 py-2 text-sm text-gray-800 cursor-pointer hover:bg-blue-600 hover:text-white"
- onClick={() => {
- setSelected(opt);
- if (onChange) onChange(opt);
- setIsOpen(false);
- }}
- >
- {opt}
- </div>
- ))}
- </div>
- )}
- </div>
- );
-}
 
 function LimitedTextarea({ className = "", maxLength = 1000, value, onChange }: { className?: string, maxLength?: number, value?: string, onChange?: (val: string) => void }) {
  const [internalValue, setInternalValue] = useState(value || "");

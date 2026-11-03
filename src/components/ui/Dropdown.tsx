@@ -6,7 +6,7 @@ import { ChevronDown } from "lucide-react";
 import { DropdownMenu, measureAnchor } from "@/components/ui/DropdownMenu";
 import type { Anchor, DropdownOption } from "@/lib/dropdown";
 
-export type DropdownVariant = "pill" | "field" | "compact";
+export type DropdownVariant = "pill" | "field" | "compact" | "form" | "formLarge";
 
 export interface DropdownProps {
   id: string;
@@ -21,7 +21,7 @@ export interface DropdownProps {
   /** With `label`: "inline" puts it beside the button, "stacked" above. */
   layout?: "inline" | "stacked";
   ariaLabel?: string;
-  /** pill: filter bars; field: form inputs; compact: small inline rows. */
+  /** pill: filter bars; field: form inputs; compact: small inline rows; form / formLarge: the agency forms' fully rounded inputs. */
   variant?: DropdownVariant;
   disabled?: boolean;
   invalid?: boolean;
@@ -37,7 +37,12 @@ const TRIGGER_SHAPE: Record<DropdownVariant, string> = {
   pill: "rounded-full py-2 pl-3.5 pr-3 text-[13px] font-medium",
   field: "rounded-xl py-2.5 pl-3.5 pr-3 text-sm",
   compact: "rounded-lg py-1.5 pl-3 pr-2.5 text-xs",
+  // The rounded-full inputs of the agency request and client forms (form), and the taller filter row on the requests list (formLarge).
+  form: "rounded-full py-2.5 pl-5 pr-4 text-sm",
+  formLarge: "rounded-full py-3.5 pl-6 pr-5 text-[14px]",
 };
+
+const ROW_TEXT: Record<DropdownVariant, string> = { pill: "text-[13px]", field: "text-[13px]", compact: "text-xs", form: "text-sm", formLarge: "text-[14px]" };
 
 const sameOptions = (a: readonly DropdownOption[], b: readonly DropdownOption[]): boolean =>
   a === b || (a.length === b.length && a.every((o, i) => o.value === b[i].value && o.label === b[i].label && o.count === b[i].count && o.group === b[i].group));
@@ -174,7 +179,7 @@ const DropdownField = memo(function DropdownField({
           onKeyDown={onKeyDown}
           // Space activates a button on key-up in some browsers: stop it re-opening the menu we just closed.
           onKeyUp={(e) => { if (e.key === " ") e.preventDefault(); }}
-          className={`flex w-full min-w-0 items-center justify-between gap-2 border border-stone-200 bg-[#F4F3EF] text-left leading-5 tracking-tight text-slate-800 outline-none transition-colors hover:bg-emerald-50 aria-expanded:bg-emerald-50 focus-visible:border-[#0B3B32] focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-red-400 ${TRIGGER_SHAPE[variant]}`}
+          className={`flex w-full min-w-0 items-center justify-between gap-2 border border-stone-200 bg-[#F4F3EF] text-left leading-5 tracking-tight text-slate-800 outline-none transition-colors hover:border-[#0B3B32]/40 hover:bg-emerald-50 aria-expanded:border-[#0B3B32]/40 aria-expanded:bg-emerald-50 focus-visible:border-[#0B3B32] focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-red-400 ${TRIGGER_SHAPE[variant]}`}
         >
           <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
           <ChevronDown className={`h-4 w-4 flex-none text-[#0B3B32] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
@@ -187,7 +192,7 @@ const DropdownField = memo(function DropdownField({
             options={options}
             selectedIndex={selectedIndex}
             active={active}
-            rowText={variant === "compact" ? "text-xs" : "text-[13px]"}
+            rowText={ROW_TEXT[variant]}
             anchor={anchor}
             keyboardNav={keyboardNav}
             rootRef={root}

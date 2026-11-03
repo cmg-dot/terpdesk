@@ -1,68 +1,13 @@
 "use client";
 
 import { CLIENT_TYPE_LABELS, CLIENT_TYPE_OPTIONS, clientTypeFromLabel, normalizeClientType } from "@/lib/validation/client";
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { useClients } from "@/context/ClientsContext";
 import { getClientByIdAction } from "@/app/actions/clients";
 import { isInvalidEmail } from "@/utils/validation";
-
-function CustomSelect({ options, value, onChange }: { options: string[], value?: string, onChange?: (val: string) => void }) {
- const [isOpen, setIsOpen] = useState(false);
- const [selected, setSelected] = useState(value || options[0]);
- const dropdownRef = useRef<HTMLDivElement>(null);
-
- useEffect(() => {
- if (value !== undefined) setSelected(value);
- }, [value]);
-
- useEffect(() => {
- const handleClickOutside = (event: MouseEvent) => {
- if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
- setIsOpen(false);
- }
- };
- document.addEventListener("mousedown", handleClickOutside);
- return () => document.removeEventListener("mousedown", handleClickOutside);
- }, []);
-
- return (
- <div className="relative w-full" ref={dropdownRef}>
- <button
- type="button"
- onClick={() => setIsOpen(!isOpen)}
- className={`w-full bg-[#F4F3EF] rounded-full px-5 py-3 text-sm text-left text-gray-800 relative outline-none transition-shadow ${
- isOpen ? "ring-2 ring-[#0B3B32]" : ""
- }`}
- >
- <span className="block truncate pr-6">{selected}</span>
- <span className="absolute inset-y-0 right-0 flex items-center pr-5 pointer-events-none">
- <svg className="h-4 w-4 text-[var(--sage)]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
- <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
- </svg>
- </span>
- </button>
- {isOpen && (
- <div className="absolute z-50 w-full mt-1 bg-[#F4F3EF] border border-[#0B3B32] max-h-60 overflow-y-auto rounded-2xl border border-gray-200 py-1">
- {options.map((opt) => (
- <div
- key={opt}
- className="px-5 py-2.5 text-sm text-gray-800 cursor-pointer hover:bg-blue-600 hover:text-white"
- onClick={() => {
- setSelected(opt);
- if (onChange) onChange(opt);
- setIsOpen(false);
- }}
- >
- {opt}
- </div>
- ))}
- </div>
- )}
- </div>
- );
-}
 
 function Field({ label, children, fullWidth = false }: { label: string, children: React.ReactNode, fullWidth?: boolean }) {
  return (

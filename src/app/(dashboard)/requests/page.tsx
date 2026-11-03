@@ -2,63 +2,20 @@
 
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { CustomSelect } from "@/components/ui/CustomSelect";
 import Link from "next/link";
 import { useRequests } from "@/context/RequestsContext";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Suspense } from "react";
-import { RefreshCw, Building2, MapPin, Users2, ChevronDown } from "lucide-react";
+import { RefreshCw, Building2, MapPin, Users2 } from "lucide-react";
 import { getStaffingLabel, getStaffingRatio, getStatusFilters, formatReference } from "@/utils/statusEngine";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatInTimeZone } from "date-fns-tz";
 import { getIanaZone } from "@/utils/timezone";
-
-function CustomSelect({ options, value, onChange }: { options: string[], value: string, onChange: (val: string) => void }) {
- const [isOpen, setIsOpen] = useState(false);
- const ref = useRef<HTMLDivElement>(null);
-
- useEffect(() => {
- function handleClickOutside(event: MouseEvent) {
- if (ref.current && !ref.current.contains(event.target as Node)) {
- setIsOpen(false);
- }
- }
- document.addEventListener("mousedown", handleClickOutside);
- return () => document.removeEventListener("mousedown", handleClickOutside);
- }, []);
-
- return (
- <div className="relative w-full" ref={ref}>
- <div 
- className={`flex items-center justify-between rounded-full bg-[#F3F2EE] px-6 py-3.5 cursor-pointer border transition-colors ${isOpen ? 'border-[#0B3B32] ring-1 ring-[#0B3B32]' : 'border-neutral-200/50'}`}
- onClick={() => setIsOpen(!isOpen)}
- >
- <span className="text-[14px] text-slate-700 truncate">{value}</span>
- <ChevronDown className={`h-4 w-4 text-[var(--sage)] shrink-0 ml-2 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
- </div>
- 
- {isOpen && (
- <div className="absolute left-0 mt-1 w-full z-50 bg-[var(--canvas)] rounded-2xl border border-neutral-200/50 py-2 overflow-hidden">
- {options.map((option, idx) => (
- <div 
- key={idx}
- className={`px-4 py-2 text-[14px] cursor-pointer transition-colors ${value === option ? 'bg-blue-50/50 text-blue-800 font-medium' : 'text-gray-800 hover:bg-blue-600 hover:text-white'}`}
- onClick={() => {
- onChange(option);
- setIsOpen(false);
- }}
- >
- {option}
- </div>
- ))}
- </div>
- )}
- </div>
- );
-}
 
 // Helper to render the colored badges based on string
 function StatusBadge({ status }: { status: string }) {
@@ -310,9 +267,9 @@ function RequestsPageContent() {
  className="w-full rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[14px] text-slate-700 placeholder:text-[var(--sage)] border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[#0B3B32]/30"
  />
  </div>
- <CustomSelect options={orgOptions} value={orgFilter} onChange={setOrgFilter} />
- <CustomSelect options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
- <CustomSelect options={["Appointments", "Happening now", "Needing coverage", "Needs replacement", "Pending offers", "Partially staffed", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
+ <CustomSelect size="large" options={orgOptions} value={orgFilter} onChange={setOrgFilter} />
+ <CustomSelect size="large" options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
+ <CustomSelect size="large" options={["Appointments", "Happening now", "Needing coverage", "Needs replacement", "Pending offers", "Partially staffed", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
  </div>
  </div>
 

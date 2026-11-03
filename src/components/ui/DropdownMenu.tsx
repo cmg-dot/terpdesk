@@ -42,7 +42,7 @@ const Row = memo(function Row({ id, index, option, showGroup, isActive, isSelect
         title={option.label}
         onClick={() => onPick(option)}
         onMouseEnter={() => onHover(index)}
-        className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 leading-5 tracking-tight text-slate-800 ${rowText} ${isActive ? "bg-emerald-50 text-slate-900" : ""} ${isSelected ? "font-medium" : ""}`}
+        className={`flex cursor-pointer items-center gap-2 rounded-lg px-2.5 py-1.5 leading-5 tracking-tight ${rowText} ${isActive ? "bg-emerald-50 text-[#0B3B32] shadow-[inset_3px_0_0_#0B3B32]" : "text-slate-800"} ${isSelected ? "font-medium" : ""}`}
       >
         <Check className={`h-3.5 w-3.5 flex-none text-[#0B3B32] ${isSelected ? "" : "invisible"}`} aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{option.label}</span>
