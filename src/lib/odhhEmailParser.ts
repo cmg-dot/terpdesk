@@ -62,7 +62,24 @@ export const SRN_PATTERNS: readonly RegExp[] = [
   /Service\s+Request\s*(?:#|No\.?|Number)\s*:?\s*#?\s*([A-Za-z0-9-]+)/i,
   /\bSRN\s*[:#]?\s*#?\s*([A-Za-z0-9-]+)/i,
 ];
-const DATE_PATTERN = /^[ \t]*(?:Appointment[ \t]+|Service[ \t]+)?Date[ \t]*:[ \t]*(\d{1,2}\/\d{1,2}\/\d{2,4})/im;
+// Only the appointment's own date. A bare "Date:" line is the forwarded message's header ("Date: 11/02/2026 11:45 AM PST",
+// the day it was SENT), and "Date of Interpreter Request - ..." is the day it was requested: neither is the appointment.
+const DATE_PATTERN = /^[ \t]*(?:Appointment|Service)[ \t]+Date[ \t]*:[ \t]*(\d{1,2}\/\d{1,2}\/\d{2,4})\b/im;
+// The same number as it appears in a subject: "Interpreter Request - 12/7/2026 - #202786930".
+const SUBJECT_SRN_PATTERN = /#[ \t]*(\d{6,12})\b/;
+
+/**
+ * A job email must carry at least one of these labels. A conversational reply ("RE: email update") has none, so it is
+ * never turned into a calendar event.
+ */
+export const JOB_ANCHOR_PATTERNS: readonly RegExp[] = [
+  /^[ \t]*Appointment[ \t]*:/im,
+  /^[ \t]*Appointment[ \t]+Date[ \t]*:/im,
+  /^[ \t]*HCA[ \t]+Reference[ \t]+Number[ \t]*:/im,
+  /^[ \t]*BOOKING[ \t]+Appointment[ \t]+Date[ \t]+and[ \t]+Time[ \t]*:/im,
+];
+
+export const hasJobAnchor = (text: string): boolean => JOB_ANCHOR_PATTERNS.some((pattern) => pattern.test(text));
 const START_TIME_PATTERN = new RegExp(
   String.raw`^[ \t]*(?:Appointment[ \t]+)?Start[ \t]+Time[ \t]*:[ \t]*(${TIME_FRAGMENT})`,
   "im"
@@ -164,6 +181,8 @@ export const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
 export function normalizeEmailText(raw: string): string {
   let text = raw.replace(/\r\n?/g, "\n");
+  // Real non-breaking spaces (Outlook, Comcast) and zero-width characters would defeat the "[ \t]" in every label pattern.
+  text = text.replace(/[   ]/g, " ").replace(/[​-‍﻿]/g, "");
   if (/<[a-z][^>]*>/i.test(text)) {
     text = text
       .replace(/<br\s*\/?>/gi, "\n")
@@ -176,7 +195,8 @@ export function normalizeEmailText(raw: string): string {
       .replace(/&quot;/gi, '"')
       .replace(/&#39;/gi, "'");
   }
-  return text;
+  // A forward quotes the original with "> " (nested: "> > "). Every pattern is line-anchored, so the markers go.
+  return text.replace(/^[ \t]*(?:>[ \t]*)+/gm, "");
 }
 
 export function cleanValue(value: string | undefined): string | null {
@@ -209,8 +229,9 @@ export function toIsoDate(usDate: string): string | null {
   const [, mm, dd, yy] = m;
   const month = Number(mm);
   const day = Number(dd);
-  if (month < 1 || month > 12 || day < 1 || day > 31) return null;
   const year = yy.length === 2 ? `20${yy}` : yy;
+  // A real calendar day only: 2/31 must not roll over into March.
+  if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(Number(year), month, 0)).getUTCDate()) return null;
   return `${year}-${mm.padStart(2, "0")}-${dd.padStart(2, "0")}`;
 }
 
@@ -327,7 +348,7 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
   // SRN: body first, then subject line as a fallback.
   let srn: string | null = null;
   for (const source of [text, subject]) {
-    for (const pattern of SRN_PATTERNS) {
+    for (const pattern of source === subject ? [...SRN_PATTERNS, SUBJECT_SRN_PATTERN] : SRN_PATTERNS) {
       srn = sanitizeSrn(source.match(pattern)?.[1]);
       if (srn) break;
     }
@@ -419,25 +440,38 @@ export function parseWarnings(parsed: ParsedIntakeEmail): string[] {
 }
 
 /**
- * Appointment start/end as UTC from the email's Pacific wall-clock times. A missing or unusable end defaults to one
- * hour after the start. Both are null when the start cannot be computed. Adds to `warnings` when it has to guess.
+ * The appointment's start and end, read ONLY from the email's own Pacific wall-clock date and times (the instant is held
+ * as a Date; the zone is always America/Los_Angeles, DST included). Nothing is guessed: no arrival time, no `new Date()`,
+ * no "one hour after the start". Both are null unless date, start and end are all present and the end is after the start.
  */
 export function appointmentTimes(parsed: ParsedIntakeEmail, warnings: string[]): { startsAt: Date | null; endsAt: Date | null } {
-  let startsAt: Date | null = null;
-  let endsAt: Date | null = null;
-  if (parsed.isoDate && parsed.start24) {
-    startsAt = fromZonedTime(`${parsed.isoDate}T${parsed.start24}:00`, ODHH_TIME_ZONE_IANA);
-    if (Number.isNaN(startsAt.getTime())) {
-      startsAt = null;
-      warnings.push("Could not compute start timestamp");
-    }
+  if (!parsed.isoDate || !parsed.start24 || !parsed.end24) return { startsAt: null, endsAt: null };
+  const startsAt = fromZonedTime(`${parsed.isoDate}T${parsed.start24}:00`, ODHH_TIME_ZONE_IANA);
+  const endsAt = fromZonedTime(`${parsed.isoDate}T${parsed.end24}:00`, ODHH_TIME_ZONE_IANA);
+  if (Number.isNaN(startsAt.getTime()) || Number.isNaN(endsAt.getTime())) {
+    warnings.push("Could not compute appointment timestamps");
+    return { startsAt: null, endsAt: null };
   }
-  if (startsAt) {
-    if (parsed.end24) endsAt = fromZonedTime(`${parsed.isoDate}T${parsed.end24}:00`, ODHH_TIME_ZONE_IANA);
-    if (!endsAt || Number.isNaN(endsAt.getTime()) || endsAt <= startsAt) {
-      if (parsed.end24) warnings.push("End time not after start; defaulted to 1 hour");
-      endsAt = new Date(startsAt.getTime() + 60 * 60 * 1000);
-    }
+  if (endsAt <= startsAt) {
+    warnings.push("End time is not after start time");
+    return { startsAt: null, endsAt: null };
+  }
+  return { startsAt, endsAt };
+}
+
+/**
+ * The only way a draft job gets a schedule. Null means "not a job we can place on the calendar": the email has none of
+ * the core anchors, or its date/time could not be read. The caller must then create nothing (the email stays in the Inbox).
+ */
+export function jobSchedule(rawContent: string, parsed: ParsedIntakeEmail, warnings: string[]): { startsAt: Date; endsAt: Date } | null {
+  if (!hasJobAnchor(normalizeEmailText(rawContent))) {
+    warnings.push("No appointment anchor found");
+    return null;
+  }
+  const { startsAt, endsAt } = appointmentTimes(parsed, warnings);
+  if (!startsAt || !endsAt) {
+    warnings.push("Appointment date and times could not be read");
+    return null;
   }
   return { startsAt, endsAt };
 }

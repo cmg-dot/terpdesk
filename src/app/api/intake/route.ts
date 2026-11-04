@@ -17,7 +17,7 @@ import {
   ODHH_PROGRAM,
   ODHH_TIME_ZONE_IANA,
   ODHH_TIME_ZONE_LABEL,
-  appointmentTimes,
+  jobSchedule,
   parseIntakeEmail,
   parseWarnings,
   sanitizeSrn,
@@ -66,6 +66,14 @@ interface WebhookSuccessResponse {
   warnings: string[];
 }
 
+/** The email has no appointment anchor or no readable date/times (e.g. a conversational reply): no job was created. */
+interface NotAJobResponse {
+  success: true;
+  outcome: "not_a_job";
+  /** Fixed warning labels only, never text from the email. */
+  warnings: string[];
+}
+
 /** A repeat of an email whose job is already saved: nothing was inserted. */
 interface DuplicateIntakeResponse {
   success: true;
@@ -110,7 +118,7 @@ function validatePayload(
 
 export async function POST(
   req: Request
-): Promise<NextResponse<WebhookSuccessResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | WebhookErrorResponse>> {
+): Promise<NextResponse<WebhookSuccessResponse | NotAJobResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | WebhookErrorResponse>> {
   try {
     const denied = rejectUnlessIntakeAuthorized(req, "Intake Webhook");
     if (denied) return denied;
@@ -163,8 +171,15 @@ export async function POST(
     const contentHash = contentFingerprint(rawContent);
     const warnings = parseWarnings(parsed);
 
-    // Appointment start/end in UTC from the email's Pacific wall-clock times.
-    const { startsAt, endsAt } = appointmentTimes(parsed, warnings);
+    // Appointment start/end from the email's own Pacific wall-clock date and times. Nothing is guessed: without an anchor
+    // line and a readable date, start and end, no job is created and the email stays in the Inbox.
+    const schedule = jobSchedule(rawContent, parsed, warnings);
+    if (!schedule) {
+      // 200 on purpose: a non-2xx would make AWS retry an email that will never become a job. Labels only in the log.
+      console.log("[Intake Webhook] No job created", { contentLength: rawContent.length, warnings });
+      return NextResponse.json({ success: true, outcome: "not_a_job", warnings }, { status: 200 });
+    }
+    const { startsAt, endsAt } = schedule;
 
     const locationLabel = parsed.venue ?? parsed.address ?? "TBD";
     const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
@@ -219,8 +234,8 @@ export async function POST(
         date: parsed.date,
         startTime: parsed.startTime,
         endTime: parsed.endTime,
-        startsAt: startsAt ? startsAt.toISOString() : null,
-        endsAt: endsAt ? endsAt.toISOString() : null,
+        startsAt: startsAt.toISOString(),
+        endsAt: endsAt.toISOString(),
       },
       source: {
         channel: "aws_lambda_email",
@@ -243,8 +258,8 @@ export async function POST(
         // This parser only handles ODHH emails (program is always WA ODHH), so these are always state jobs.
         isStateJob: true,
         data: requestData,
-        // The app reads createdAt as the appointment start (see createRequest); default now() if unparsed.
-        ...(startsAt ? { createdAt: startsAt } : {}),
+        // The app reads createdAt as the appointment start (see createRequest). Always the parsed start, never "now".
+        createdAt: startsAt,
       },
       { srn, contentHash },
     );
