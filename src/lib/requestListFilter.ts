@@ -62,6 +62,9 @@ export function matchesStatusFilter(req: ListedRequest, filter: string, currentT
   }
 }
 
+/** A cancelled job, by the same rule the "Cancelled" filter uses. */
+export const isCancelledRequest = (req: ListedRequest): boolean => getStatusFilters(req).isCancelled;
+
 /** The badge text on a list card: "Completed" for a closed job, else the usual staffing label. */
 export function requestStatusLabel(req: ListedRequest): string {
   return req.isCompleted ? "Completed" : getStaffingLabel(req);

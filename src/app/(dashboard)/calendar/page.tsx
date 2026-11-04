@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { format } from "date-fns";
@@ -14,6 +14,8 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { CalendarModeToggle } from "@/components/calendar/CalendarModeToggle";
 import type { CalendarMode } from "@/components/calendar/CalendarModeToggle";
 import { InterpreterTimeline } from "@/components/calendar/InterpreterTimeline";
+import { CANCELLED_CARD, CANCELLED_TITLE, CalendarStatusFilter, CancelledBadge } from "@/components/calendar/CalendarStatusFilter";
+import { DEFAULT_STATUS_FILTER, isCancelledRequest, matchesStatusFilter } from "@/lib/requestListFilter";
 
 /** Text colour for a request status on the calendar, so state reads at a glance. */
 const statusTextClass = (status: string | undefined, isHappening: boolean, isPast = false): string => {
@@ -35,6 +37,8 @@ export default function CalendarPage() {
   const [mode, setMode] = useState<CalendarMode>('jobs');
   const [currentDate, setCurrentDate] = useState(() => new Date());
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+  // Same filter, same default and same rule as Requests & assignments: cancelled jobs stay off the grid until asked for.
+  const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
 
   // 60-second tick for live status engine
   useEffect(() => {
@@ -47,6 +51,8 @@ export default function CalendarPage() {
   useEffect(() => {
     fetchLiveRequests().then(setRequests).catch(() => console.error("[calendar page] request failed"));
   }, []);
+
+  const visibleRequests = useMemo(() => requests.filter((r) => matchesStatusFilter(r, statusFilter, currentTime)), [requests, statusFilter, currentTime]);
 
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
@@ -191,7 +197,8 @@ export default function CalendarPage() {
 
       {/* View Toggle (Job View only) */}
       {mode === 'jobs' && (
-      <div className="rounded-full p-1 flex mt-4 max-w-md relative z-10">
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between relative z-10">
+      <div className="rounded-full p-1 flex w-full max-w-md relative z-10">
         {(['month', 'week', 'day'] as const).map((v) => (
           <button 
             key={v}
@@ -211,6 +218,8 @@ export default function CalendarPage() {
             </span>
           </button>
         ))}
+      </div>
+      <CalendarStatusFilter value={statusFilter} onChange={setStatusFilter} />
       </div>
       )}
 
@@ -236,7 +245,7 @@ export default function CalendarPage() {
               </div>
               <div className="grid grid-cols-7 border-t border-l border-gray-200">
                 {cells.map((date, idx) => {
-                  const dayRequests = date ? requests.filter(r => isEventOnDate(date, r)) : [];
+                  const dayRequests = date ? visibleRequests.filter(r => isEventOnDate(date, r)) : [];
                   const sortedDayRequests = sortDayRequests(dayRequests);
 
                   return (
@@ -248,7 +257,8 @@ export default function CalendarPage() {
                       )}
                       <div className="flex-1 overflow-y-auto space-y-1 max-h-[160px]">
                         {sortedDayRequests.map(req => {
-                          const isHappening = isAppointmentHappeningNow(req, currentTime);
+                          const isCancelled = isCancelledRequest(req);
+                  const isHappening = !isCancelled && isAppointmentHappeningNow(req, currentTime);
                   const isPast = !isHappening && isAppointmentPast(req, currentTime);
                           const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
                           const timeStr = formatEventTime(startsAt, endsAt, safeZone);
@@ -258,7 +268,7 @@ export default function CalendarPage() {
                               href={`/requests/${req.id}`} 
                               key={req.id} 
                               className={`block rounded-md p-1.5 text-xs transition-all ${
-                                isHappening 
+                                isCancelled ? CANCELLED_CARD.month : isHappening 
                                   ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400 hover:bg-emerald-700' 
                                   : isPast
                                     ? 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
@@ -275,12 +285,12 @@ export default function CalendarPage() {
                                 </div>
                               )}
                               <div className="flex flex-col gap-1 p-0.5">
-                                <div className="font-medium text-sm truncate leading-tight">{req.title || "Request"}</div>
+                                <div className={`font-medium text-sm truncate leading-tight ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</div>
                                 <div className={`text-xs truncate leading-tight ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>
                                   {timeStr}
                                 </div>
                                 <div className={`text-[11px] font-semibold capitalize truncate leading-tight text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-                                  {req.status}
+                                  {isCancelled ? <CancelledBadge /> : req.status}
                                 </div>
                               </div>
                             </Link>
@@ -315,7 +325,7 @@ export default function CalendarPage() {
               </div>
               <div className="grid grid-cols-7 min-h-[500px]">
                 {weekDays.map((dayDate, dayIdx) => {
-                  const dayRequests = requests.filter(r => isEventOnDate(dayDate, r));
+                  const dayRequests = visibleRequests.filter(r => isEventOnDate(dayDate, r));
                   const sortedDayRequests = sortDayRequests(dayRequests);
 
                   return (
@@ -326,7 +336,8 @@ export default function CalendarPage() {
                         </div>
                       ) : (
                         sortedDayRequests.map(req => {
-                          const isHappening = isAppointmentHappeningNow(req, currentTime);
+                          const isCancelled = isCancelledRequest(req);
+                  const isHappening = !isCancelled && isAppointmentHappeningNow(req, currentTime);
                   const isPast = !isHappening && isAppointmentPast(req, currentTime);
                           const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
                           const timeStr = formatEventTime(startsAt, endsAt, safeZone);
@@ -336,7 +347,7 @@ export default function CalendarPage() {
                               href={`/requests/${req.id}`} 
                               key={req.id} 
                               className={`block rounded-lg p-2.5 text-xs transition-all ${
-                                isHappening 
+                                isCancelled ? CANCELLED_CARD.week : isHappening 
                                   ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400 hover:bg-emerald-700' 
                                   : isPast
                                     ? 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
@@ -353,10 +364,10 @@ export default function CalendarPage() {
                                 </div>
                               )}
                               <div className="flex flex-col gap-1 p-0.5">
-                                <div className="font-medium text-sm truncate">{req.title || "Request"}</div>
+                                <div className={`font-medium text-sm truncate ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</div>
                                 <div className={`text-xs truncate ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>{timeStr}</div>
                                 <div className={`text-[11px] font-semibold capitalize truncate text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-                                  {req.status}
+                                  {isCancelled ? <CancelledBadge /> : req.status}
                                 </div>
                               </div>
                             </Link>
@@ -374,7 +385,7 @@ export default function CalendarPage() {
 
       {/* DAY VIEW */}
       {mode === 'jobs' && view === 'day' && (() => {
-        const dayRequests = requests.filter(r => isEventOnDate(currentDate, r));
+        const dayRequests = visibleRequests.filter(r => isEventOnDate(currentDate, r));
         const sortedDayRequests = sortDayRequests(dayRequests);
 
         return (
@@ -395,7 +406,8 @@ export default function CalendarPage() {
             ) : (
               <div className="space-y-3">
                 {sortedDayRequests.map(req => {
-                  const isHappening = isAppointmentHappeningNow(req, currentTime);
+                  const isCancelled = isCancelledRequest(req);
+                  const isHappening = !isCancelled && isAppointmentHappeningNow(req, currentTime);
                   const isPast = !isHappening && isAppointmentPast(req, currentTime);
                   const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
                   const timeStr = formatEventTime(startsAt, endsAt, safeZone);
@@ -406,7 +418,7 @@ export default function CalendarPage() {
                       href={`/requests/${req.id}`} 
                       key={req.id} 
                       className={`block rounded-xl p-4 sm:p-5 transition-all ${
-                        isHappening 
+                        isCancelled ? CANCELLED_CARD.day : isHappening 
                           ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 hover:bg-emerald-700' 
                           : isPast
                             ? 'bg-slate-50 border border-gray-200 text-gray-500 hover:bg-gray-100'
@@ -417,7 +429,7 @@ export default function CalendarPage() {
                         <div className="space-y-1">
                           <div className="flex items-center gap-2 flex-wrap">
                             {isHappening && <HappeningNowBadge size="sm" />}
-                            <h3 className="font-semibold text-base">{req.title || "Request"}</h3>
+                            <h3 className={`font-semibold text-base ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</h3>
                           </div>
                           <div className={`text-sm ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-500' : 'text-[var(--ink)]'}`}>
                             {timeStr}
@@ -428,7 +440,9 @@ export default function CalendarPage() {
                         </div>
                         <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
                           <span className={`rounded-full px-3 py-0.5 text-xs font-medium capitalize ${
-                            isHappening 
+                            isCancelled
+                              ? 'bg-gray-200 text-gray-600'
+                              : isHappening 
                               ? 'bg-emerald-500 text-white' 
                               : isPast
                                 ? 'bg-gray-200 text-gray-600'
