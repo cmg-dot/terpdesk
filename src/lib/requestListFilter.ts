@@ -3,13 +3,15 @@ import { getStaffingLabel, getStatusFilters } from "@/utils/statusEngine";
 
 /**
  * The status filter on the Requests & assignments page. Pure functions, no I/O.
- *  - "Appointments" (the default) lists everything except cancelled jobs.
+ *  - "Active Appointments" (the default) lists everything except cancelled jobs.
  *  - "All appointments" bypasses every status rule: upcoming, past, completed and cancelled.
  *  - "Completed" is a closed job (request status or billing status "completed"); "Cancelled" is a cancelled one.
  */
 
+export const DEFAULT_STATUS_FILTER = "Active Appointments";
+
 export const STATUS_FILTER_OPTIONS = [
-  "Appointments",
+  DEFAULT_STATUS_FILTER,
   "All appointments",
   "Happening now",
   "Needing coverage",
@@ -37,7 +39,7 @@ export function matchesStatusFilter(req: ListedRequest, filter: string, currentT
   if (flags.isCancelled) return false;
 
   switch (filter) {
-    case "Appointments":
+    case DEFAULT_STATUS_FILTER:
       return true;
     case "Completed":
       return Boolean(req.isCompleted);

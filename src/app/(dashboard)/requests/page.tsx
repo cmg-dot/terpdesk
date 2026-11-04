@@ -11,7 +11,7 @@ import { motion } from "framer-motion";
 import { Suspense } from "react";
 import { RefreshCw, Building2, MapPin, Users2 } from "lucide-react";
 import { getStaffingRatio, formatReference } from "@/utils/statusEngine";
-import { STATUS_FILTER_OPTIONS, listCopy, matchesStatusFilter, requestStatusLabel, tabForFilter } from "@/lib/requestListFilter";
+import { DEFAULT_STATUS_FILTER, STATUS_FILTER_OPTIONS, listCopy, matchesStatusFilter, requestStatusLabel, tabForFilter } from "@/lib/requestListFilter";
 import { RequestStatusBadge } from "@/components/requests/RequestStatusBadge";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
@@ -73,7 +73,7 @@ function RequestsPageContent() {
   const [orgFilter, setOrgFilter] = useState("All organizations");
   const [formatFilter, setFormatFilter] = useState("All formats");
 
-  let initialStatus = "Appointments";
+  let initialStatus: string = DEFAULT_STATUS_FILTER;
   if (filterParam === "happening-now") initialStatus = "Happening now";
   else if (filterParam === "needing-coverage") initialStatus = "Needing coverage";
   else if (filterParam === "pending-offers") initialStatus = "Pending offers";
