@@ -35,6 +35,13 @@ export function formatReference(id?: string): string {
   return `APT-${clean}`;
 }
 
+/** A closed job: the request status is "completed", or its billing status is "completed". Never true for a cancelled one. */
+export function isCompletedRequest(status?: string | null, billingStatus?: string | null): boolean {
+  const s = (status ?? "").toLowerCase();
+  if (s === "cancelled" || s === "canceled") return false;
+  return s === "completed" || billingStatus === "completed";
+}
+
 export function isNeedsReplacementStatus(status?: string | null): boolean {
   return !!status && status.toLowerCase().replace(/[\s_-]+/g, '') === 'needsreplacement';
 }

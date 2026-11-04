@@ -4,7 +4,7 @@ import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
-import { formatReference, isNeedsReplacementStatus } from "@/utils/statusEngine";
+import { formatReference, isCompletedRequest, isNeedsReplacementStatus } from "@/utils/statusEngine";
 import { rawJobZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
@@ -206,6 +206,10 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     travelStartTime: row.travelStartTime ? row.travelStartTime.toISOString() : null,
     travelEndTime: row.travelEndTime ? row.travelEndTime.toISOString() : null,
     serviceCompleted: row.serviceCompleted,
+    // `status` above is the staffing view (a closed job with an interpreter reads "Fully staffed"), so the closed state
+    // is carried separately for the requests list's "Completed" filter.
+    billingStatus: row.billingStatus ?? null,
+    isCompleted: isCompletedRequest(row.status, row.billingStatus),
     canceledAt: row.canceledAt ? row.canceledAt.toISOString() : null,
     cancelReason: row.cancelReason,
     clientRequestedCancellation: row.clientRequestedCancellation,

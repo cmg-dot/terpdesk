@@ -10,63 +10,14 @@ import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Suspense } from "react";
 import { RefreshCw, Building2, MapPin, Users2 } from "lucide-react";
-import { getStaffingLabel, getStaffingRatio, getStatusFilters, formatReference } from "@/utils/statusEngine";
+import { getStaffingRatio, formatReference } from "@/utils/statusEngine";
+import { STATUS_FILTER_OPTIONS, listCopy, matchesStatusFilter, requestStatusLabel, tabForFilter } from "@/lib/requestListFilter";
+import { RequestStatusBadge } from "@/components/requests/RequestStatusBadge";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatInTimeZone } from "date-fns-tz";
 import { getIanaZone } from "@/utils/timezone";
-
-// Helper to render the colored badges based on string
-function StatusBadge({ status }: { status: string }) {
- if (status === "Offer awaiting response" || status === "Awaiting response") {
- return (
- <span className="rounded-full bg-[#EAE8F4] px-3 py-1 text-[11px] font-semibold text-[#544B84]">
- Offer awaiting response
- </span>
- );
- }
- if (status === "Unfilled / draft") {
- return (
- <span className="rounded-full bg-[#F4EBE0] px-3 py-1 text-[11px] font-semibold text-[#8B6A3E]">
- Unfilled / draft
- </span>
- );
- }
- if (status === "Cancelled") {
- return (
- <span className="rounded-full bg-[#FEF2F2] px-3 py-1 text-[11px] font-semibold text-[#991B1B] border border-[#FCA5A5]/30">
- Cancelled
- </span>
- );
- }
- if (status === "Fully staffed" || status === "Booked" || status === "Assigned") {
- return (
- <span className="rounded-full bg-[#E6EFEA] px-3 py-1 text-[11px] font-semibold text-[#385B52]">
- {status}
- </span>
- );
- }
- if (status === "Needs replacement") {
- return (
- <span className="rounded-full bg-[#FEF3C7] px-3 py-1 text-[11px] font-semibold text-[#92400E] border border-[#FDE68A]/60">
- Needs replacement
- </span>
- );
- }
- if (status === "Partially staffed") {
- return (
- <span className="rounded-full bg-[#E8F3EE] px-3 py-1 text-[11px] font-semibold text-[#466960]">
- Partially staffed
- </span>
- );
- }
- return (
- <span className="rounded-full bg-[#E9E4D6] px-3 py-1 text-[11px] font-semibold text-[#665D46]">
- {status}
- </span>
- );
-}
 
 const parseSafeDate = (dateVal: any) => {
   if (!dateVal) return null;
@@ -131,7 +82,13 @@ function RequestsPageContent() {
   else if (filterParam === "partially-staffed") initialStatus = "Partially staffed";
 
   const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>('upcoming');
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>(tabForFilter(initialStatus) ?? 'upcoming');
+  const chooseStatus = (value: string) => {
+    setStatusFilter(value);
+    const tab = tabForFilter(value);
+    if (tab) setActiveTab(tab);
+  };
+  const copy = listCopy(statusFilter);
 
   const [interpreterJobs, setInterpreterJobs] = useState<any[]>([]);
   useEffect(() => {
@@ -190,23 +147,7 @@ function RequestsPageContent() {
       if (format !== formatFilter && !(formatFilter === "In Person" && format === "In person")) return false;
     }
 
-    const filters = getStatusFilters(req as any);
-  
-    if (statusFilter === "Cancelled") return filters.isCancelled;
-    if (filters.isCancelled) return false;
-  
-    if (statusFilter !== "Appointments") {
-      if (statusFilter === "Happening now") return isAppointmentHappeningNow(req, currentTime);
-      if (statusFilter === "Needing coverage") return filters.needingCoverage;
-      if (statusFilter === "Pending offers") return filters.hasPendingOffer;
-      if (statusFilter === "Partially staffed") return filters.partiallyStaffed || getStaffingLabel(req as any) === "Partially staffed";
-      if (statusFilter === "Fully staffed") return filters.fullyStaffed;
-      if (statusFilter === "Needs replacement") return filters.needsReplacement;
-      if (statusFilter === "Staff follow-up") return filters.staffFollowUp;
-      return false;
-    }
-  
-    return true;
+    return matchesStatusFilter(req, statusFilter, currentTime);
   });
 
   const upcomingRequests = sortUpcomingWithHappeningNow(
@@ -224,7 +165,7 @@ function RequestsPageContent() {
  Requests & assignments
  </h1>
  <p className="text-[15px] text-[var(--sage)]">
- Upcoming appointments and unresolved past appointments
+ {copy.subtitle}
  </p>
  </div>
  <div className="flex items-center gap-3">
@@ -269,7 +210,7 @@ function RequestsPageContent() {
  </div>
  <CustomSelect size="large" options={orgOptions} value={orgFilter} onChange={setOrgFilter} />
  <CustomSelect size="large" options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
- <CustomSelect size="large" options={["Appointments", "Happening now", "Needing coverage", "Needs replacement", "Pending offers", "Partially staffed", "Fully staffed", "Staff follow-up", "Cancelled"]} value={statusFilter} onChange={setStatusFilter} />
+ <CustomSelect size="large" options={[...STATUS_FILTER_OPTIONS]} value={statusFilter} onChange={chooseStatus} />
  </div>
  </div>
 
@@ -311,7 +252,7 @@ function RequestsPageContent() {
  const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
  const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
  const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(req as any);
- const statusLabel = getStaffingLabel(req as any);
+ const statusLabel = requestStatusLabel(req);
  let staffingText = isCancelled ? "0 of 0 staffed" : `${bookedCount} of ${totalSlots} staffed`;
  if (bookedSlots.length > 0) {
    staffingText += ` (${bookedSlots.map(s => s.interpreterName).join(', ')})`;
@@ -332,7 +273,7 @@ function RequestsPageContent() {
  {isAppointmentHappeningNow(req, currentTime) && (
    <HappeningNowBadge size="sm" />
  )}
- <StatusBadge status={statusLabel} />
+ <RequestStatusBadge status={statusLabel} />
  </div>
  </div>
 
@@ -374,9 +315,9 @@ function RequestsPageContent() {
  {activeTab === 'past' && (
  <div className="space-y-5 pb-12">
  <div className="space-y-1 pl-1">
- <h2 className="text-[19px] font-semibold text-[var(--ink)]">Past — unresolved</h2>
+ <h2 className="text-[19px] font-semibold text-[var(--ink)]">{copy.pastHeading}</h2>
  <p className="text-[14px] text-[var(--sage)]">
- These appointments still need coverage, an offer response, or access follow-up.
+ {copy.pastNote}
  </p>
  </div>
  
@@ -394,7 +335,7 @@ function RequestsPageContent() {
  const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
  const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
  const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(req as any);
- const statusLabel = getStaffingLabel(req as any);
+ const statusLabel = requestStatusLabel(req);
  let staffingText = isCancelled ? "0 of 0 staffed" : `${bookedCount} of ${totalSlots} staffed`;
  if (bookedSlots.length > 0) {
    staffingText += ` (${bookedSlots.map(s => s.interpreterName).join(', ')})`;
@@ -412,7 +353,7 @@ function RequestsPageContent() {
  <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
  </div>
  <div className="flex items-center gap-2">
- <StatusBadge status={statusLabel} />
+ <RequestStatusBadge status={statusLabel} />
  </div>
  </div>
 
