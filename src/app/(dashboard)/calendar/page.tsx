@@ -5,9 +5,8 @@ import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
 import { format } from "date-fns";
-import { formatInTimeZone } from "date-fns-tz";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
-import { getIanaZone } from "@/utils/timezone";
+import { AGENCY_TIME_ZONE, agencyDateKey, agencyToday, civilKey, formatAgencyTimeRange } from "@/lib/agencyTime";
 import { isAppointmentHappeningNow, isAppointmentPast } from "@/utils/happeningNow";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
@@ -35,7 +34,8 @@ export default function CalendarPage() {
   const [view, setView] = useState<'month' | 'week' | 'day'>('month');
   // Job View is the original calendar (month / week / day of job cards). Interpreter View is the resource timeline.
   const [mode, setMode] = useState<CalendarMode>('jobs');
-  const [currentDate, setCurrentDate] = useState(() => new Date());
+  // A civil date (see lib/agencyTime): starts on today in Los Angeles, whatever zone this browser is in.
+  const [currentDate, setCurrentDate] = useState(() => agencyToday());
   const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
   // Same filter, same default and same rule as Requests & assignments: cancelled jobs stay off the grid until asked for.
   const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
@@ -52,6 +52,8 @@ export default function CalendarPage() {
     fetchLiveRequests().then(setRequests).catch(() => console.error("[calendar page] request failed"));
   }, []);
 
+  // Today in Los Angeles, re-read every minute with the clock below, so the highlight rolls over at Pacific midnight.
+  const todayKey = agencyDateKey(currentTime);
   const visibleRequests = useMemo(() => requests.filter((r) => matchesStatusFilter(r, statusFilter, currentTime)), [requests, statusFilter, currentTime]);
 
   const year = currentDate.getFullYear();
@@ -65,7 +67,7 @@ export default function CalendarPage() {
 
   const cells: (Date | null)[] = [];
   for (let i = 0; i < firstDayIndex; i++) cells.push(null);
-  for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(year, month, i));
+  for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(year, month, i, 12));
 
   // Add trailing empty cells to complete the grid (if 35 or 42)
   const totalCells = cells.length > 35 ? 42 : 35;
@@ -104,13 +106,12 @@ export default function CalendarPage() {
   };
 
   const handleToday = () => {
-    setCurrentDate(new Date());
+    setCurrentDate(agencyToday());
   };
 
   const getRequestSchedule = (req: any) => {
-    const tz = req.details?.timeZone || req.data?.details?.timeZone || req.data?.timeZone || req.timeZone || 'America/Los_Angeles';
-    const safeZone = getIanaZone(tz);
-    
+    const safeZone = AGENCY_TIME_ZONE;
+
     const hasStart = Boolean(
       req.startsAt || req.data?.startsAt || (req.data?.details?.startDate && req.data?.details?.startTime),
     );
@@ -127,27 +128,13 @@ export default function CalendarPage() {
     const { safeZone, startsAt } = getRequestSchedule(req);
     if (!startsAt) return false;
     try {
-      const reqDateKey = formatInTimeZone(new Date(startsAt), safeZone, 'yyyy-MM-dd');
-      const cellDateKey = format(cellDate, 'yyyy-MM-dd');
-      return reqDateKey === cellDateKey;
+      return agencyDateKey(startsAt) === civilKey(cellDate);
     } catch (e) {
       return false;
     }
   };
 
-  const formatEventTime = (startsAt?: string, endsAt?: string, tz?: string) => {
-    if (!startsAt) return "Time not specified";
-    const safeZone = getIanaZone(tz);
-    try {
-      const start = new Date(startsAt);
-      const end = endsAt ? new Date(endsAt) : start;
-      const timeStart = formatInTimeZone(start, safeZone, 'h:mm a');
-      const timeEnd = formatInTimeZone(end, safeZone, 'h:mm a zzz');
-      return `${timeStart} – ${timeEnd}`;
-    } catch (e) {
-      return "Time not specified";
-    }
-  };
+  const formatEventTime = (startsAt?: string, endsAt?: string, _zone?: string) => (startsAt ? formatAgencyTimeRange(startsAt, endsAt) : "Time not specified");
 
   const sortDayRequests = (reqs: any[]) => {
     return [...reqs].sort((a, b) => {
@@ -247,11 +234,12 @@ export default function CalendarPage() {
                 {cells.map((date, idx) => {
                   const dayRequests = date ? visibleRequests.filter(r => isEventOnDate(date, r)) : [];
                   const sortedDayRequests = sortDayRequests(dayRequests);
+                  const isToday = date !== null && civilKey(date) === todayKey;
 
                   return (
-                    <div key={idx} className={`min-h-[120px] border-r border-b border-gray-200 p-2 flex flex-col ${!date ? 'bg-[#F9F8F4]' : 'bg-white'}`}>
+                    <div key={idx} className={`min-h-[120px] border-r border-b border-gray-200 p-2 flex flex-col ${!date ? 'bg-[#F9F8F4]' : isToday ? 'bg-[#F1F8F4]' : 'bg-white'}`} data-today={isToday ? 'true' : undefined}>
                       {date && (
-                        <div className="text-sm font-medium text-[var(--ink)] mb-1 px-1">
+                        <div className={`mb-1 w-fit text-sm font-medium px-1 ${isToday ? 'rounded-full bg-[#0B3B32] px-2 text-white' : 'text-[var(--ink)]'}`}>
                           {date.getDate()}
                         </div>
                       )}
@@ -313,7 +301,7 @@ export default function CalendarPage() {
             <div className="min-w-[800px]">
               <div className="grid grid-cols-7 border-b border-gray-200">
                 {weekDays.map((dayDate, dayIdx) => (
-                  <div key={dayIdx} className="text-center py-3 border-r border-gray-100 last:border-r-0">
+                  <div key={dayIdx} data-today={civilKey(dayDate) === todayKey ? 'true' : undefined} className={`text-center py-3 border-r border-gray-100 last:border-r-0 ${civilKey(dayDate) === todayKey ? 'bg-[#E5F0EB]' : ''}`}>
                     <div className="text-[12px] font-semibold text-[var(--ink)] uppercase tracking-wider">
                       {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]}
                     </div>
@@ -329,7 +317,7 @@ export default function CalendarPage() {
                   const sortedDayRequests = sortDayRequests(dayRequests);
 
                   return (
-                    <div key={dayIdx} className="border-r border-gray-100 last:border-r-0 p-2 flex flex-col gap-2 bg-[#FAFAFA]/50">
+                    <div key={dayIdx} className={`border-r border-gray-100 last:border-r-0 p-2 flex flex-col gap-2 ${civilKey(dayDate) === todayKey ? 'bg-[#F1F8F4]' : 'bg-[#FAFAFA]/50'}`}>
                       {sortedDayRequests.length === 0 ? (
                         <div className="text-[11px] text-gray-400 text-center py-6">
                           No bookings
@@ -391,8 +379,9 @@ export default function CalendarPage() {
         return (
           <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 mt-6 min-h-[400px]">
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-[var(--ink)]">
+              <h2 className="flex items-center gap-2 text-xl font-semibold text-[var(--ink)]">
                 {format(currentDate, 'EEEE, MMMM d, yyyy')}
+                {civilKey(currentDate) === todayKey && <span data-today-chip className="rounded-full bg-[#0B3B32] px-2.5 py-0.5 text-xs font-medium text-white">Today</span>}
               </h2>
               <span className="text-sm text-[var(--sage)]">
                 {sortedDayRequests.length} {sortedDayRequests.length === 1 ? 'appointment' : 'appointments'}
@@ -462,7 +451,7 @@ export default function CalendarPage() {
       })()}
 
       {/* INTERPRETER VIEW (resource timeline): its own date-scoped fetch, the Job View's data is not used */}
-      {mode === 'interpreters' && <InterpreterTimeline dateKey={format(currentDate, 'yyyy-MM-dd')} nowMs={currentTime} />}
+      {mode === 'interpreters' && <InterpreterTimeline dateKey={civilKey(currentDate)} nowMs={currentTime} />}
     </motion.div>
   );
 }
