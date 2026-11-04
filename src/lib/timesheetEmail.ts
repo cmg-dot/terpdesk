@@ -11,6 +11,11 @@ import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 const SENDER = "dispatch@aslprofessionals.net";
 
 export const sendEmail = async (to: string, subject: string, html: string, text: string): Promise<void> => {
+  // Global Silent Mode: a server-only switch (read at call time) that suppresses every outbound email, e.g. during a bulk import.
+  if (process.env.EMAIL_SILENT_MODE === "true") {
+    console.log("Silent mode active: Email suppressed");
+    return;
+  }
   // Bulk-imported people with no email on file hold a placeholder on a reserved domain: never send to it.
   if (isPlaceholderEmail(to)) return;
   const ses = new SESClient({
