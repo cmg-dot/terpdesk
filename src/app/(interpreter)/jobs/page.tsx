@@ -1,5 +1,6 @@
 "use client";
 
+import { settingLabel } from "@/lib/settingLabel";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { RefreshCw, MapPin } from "lucide-react";
@@ -288,7 +289,7 @@ export default function InterpreterJobsPage() {
                   </div>
                   <div className="flex flex-wrap gap-1.5 mt-2.5">
                     <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
-                      {job.setting || (job as any).details?.setting || "Medical"}
+                      {settingLabel(job.setting, (job as any).details?.setting)}
                     </span>
                     <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
                       {job.isVirtual ? "Virtual" : (job.format || (job as any).details?.format || "In person")}
@@ -425,7 +426,7 @@ export default function InterpreterJobsPage() {
                       {/* Setting and format pills */}
                       <div className="flex flex-wrap gap-1.5 my-2.5">
                         <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full bg-white">
-                          {job.setting || (job as any).details?.setting || "Medical"}
+                          {settingLabel(job.setting, (job as any).details?.setting)}
                         </span>
                         <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full bg-white">
                           {job.isVirtual ? "Virtual" : "In person"}

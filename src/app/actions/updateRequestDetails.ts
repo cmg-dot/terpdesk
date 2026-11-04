@@ -1,5 +1,6 @@
 "use server";
 
+import { realSetting } from "@/lib/settingLabel";
 import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
@@ -64,7 +65,7 @@ export async function updateRequestDetails(requested: UpdateRequestDetailsPayloa
   const existingOnsite = existingData.onsite || {};
 
   const newFormat = payload.format || existingDetails.format || existingData.format || "Virtual";
-  const newSetting = payload.setting || existingDetails.setting || existingData.setting || "Medical";
+  const newSetting = realSetting(payload.setting) || realSetting(existingDetails.setting) || realSetting(existingData.setting);
   const isVirtual = newFormat.toLowerCase().includes('virtual');
 
   const newMeetingLink = payload.meetingLink !== undefined ? payload.meetingLink : (existingDetails.meetingLink || existingDetails.virtualLink || null);

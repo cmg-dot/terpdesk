@@ -1,5 +1,6 @@
 "use server";
 
+import { settingLabel } from "@/lib/settingLabel";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
@@ -84,8 +85,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
 
     const { startsAt, endsAt } = resolveRequestTimes(row.request);
 
-    const rawSetting = rowData.setting || details.setting;
-    const setting = rawSetting && rawSetting !== "Choose a setting" ? rawSetting : "Medical";
+    const setting = settingLabel(rowData.setting, details.setting);
 
     const format = details.format || rowData.format || (onsite.venue && !onsite.venue.toLowerCase().includes('virtual') ? "In person" : "Virtual");
     const isVirtual = format.toLowerCase().includes('virtual');

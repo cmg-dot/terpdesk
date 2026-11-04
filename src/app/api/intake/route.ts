@@ -8,6 +8,9 @@ import { contentFingerprint, insertOdhhRequestOnce } from "@/lib/odhhDedupe";
 import { respondToServiceVerification } from "@/lib/serviceVerification";
 import type { TimesheetIntakeResponse } from "@/lib/serviceVerification";
 import { resolveIntakeType } from "@/lib/odhhVerificationParser";
+import { buildDraftData, draftTitle } from "@/lib/odhhDraft";
+import { enrichRequestFromForm } from "@/lib/odhhEnrichStore";
+import { parseFormExtras } from "@/lib/odhhFormFields";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
@@ -181,73 +184,21 @@ export async function POST(
     }
     const { startsAt, endsAt } = schedule;
 
-    const locationLabel = parsed.venue ?? parsed.address ?? "TBD";
     const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
-    // A "Comment:" line inside the client/employee section stays in that (private) block and is not copied into the
-    // interpreter-visible preparation notes.
-    const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
-    const prepNotes = noteAlreadyInBlock ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
-    const title = srn
-      ? `ODHH SRN #${srn}${parsed.venue ? ` — ${parsed.venue}` : ""}`
-      : subject.trim().slice(0, 200) || `Inbound email from ${email}`;
-
-    const requestData: RequestData = {
-      brief: {},
-      intake: {
-        program: ODHH_PROGRAM,
-        ...(srn ? { odhhSrn: srn } : {}),
-      },
-      details: {
-        timeZone: ODHH_TIME_ZONE_LABEL,
-        ...(parsed.format ? { format: FORMAT_LABELS[parsed.format], formatCode: parsed.format } : {}),
-        ...(parsed.clientName ? { deafParticipant: parsed.clientName } : {}),
-        ...(parsed.purpose ? { purpose: parsed.purpose } : {}),
-        ...(parsed.platform ? { platform: parsed.platform } : {}),
-        ...(parsed.meetingLink ? { meetingLink: parsed.meetingLink, virtualLink: parsed.meetingLink } : {}),
-      },
-      // The ODHH "Appointment Note" lands in the agency's Preparation notes field, so staff review it before booking.
-      // Preparation notes are shared with booked interpreters, so they hold ONLY the appointment note from the email.
-      ...(prepNotes ? { prepNotes } : {}),
-      // The whole CLIENT/EMPLOYEE INFORMATION section (gender, hearing identity, comments, ...) is sensitive: it goes
-      // to "Agency-private notes" (requests.data.privateNotes), which interpreters never receive.
-      ...(parsed.clientInfoBlock ? { privateNotes: parsed.clientInfoBlock } : {}),
-      onsite: {
-        venue: parsed.venue ?? "",
-        address: parsed.address ?? "",
-      },
-      overview: { location: locationLabel, status: "Unfilled / draft" },
-      // One-time requester for this job: the ODHH requestor from the email. `oneTime` stops the edit page from
-      // swapping in a saved client's default contact (it matches saved clients by organisation name).
-      // Only if the email names no requestor at all is the forwarding address kept as the contact.
-      requester: {
-        org: "WA ODHH",
-        oneTime: true,
-        ...(hasRequestor
-          ? {
-              ...(parsed.requestorName ? { name: parsed.requestorName } : {}),
-              ...(parsed.requestorPhone ? { phone: parsed.requestorPhone } : {}),
-              ...(parsed.requestorEmail ? { email: parsed.requestorEmail } : {}),
-            }
-          : { email }),
-      },
-      schedule: {
-        date: parsed.date,
-        startTime: parsed.startTime,
-        endTime: parsed.endTime,
-        startsAt: startsAt.toISOString(),
-        endsAt: endsAt.toISOString(),
-      },
-      source: {
-        channel: "aws_lambda_email",
-        fromEmail: email,
-        subject,
-        rawContent,
-        // Fingerprint of the email text (not the text): lets a repeat of an email with no readable SRN be recognised.
-        contentHash,
-        receivedAt,
-        parseWarnings: warnings,
-      },
-    };
+    const title = draftTitle({ srn, parsed, subject, fromEmail: email });
+    const requestData: RequestData = buildDraftData({
+      parsed,
+      extras: parseFormExtras(rawContent),
+      srn,
+      fromEmail: email,
+      subject,
+      rawContent,
+      contentHash,
+      receivedAt,
+      warnings,
+      startsAt,
+      endsAt,
+    });
 
     // Saved at most once per SRN: AWS retries and repeat emails must not create a second job. Runs inside the outer
     // try: any connection/constraint failure falls through to the 500 handler.
@@ -266,8 +217,17 @@ export async function POST(
 
     if (inserted.duplicate) {
       // 200 on purpose: the job is already saved, and a non-2xx would make AWS retry the delivery again.
-      await logActivity({ requestId: inserted.id, kind: "duplicate_email_ignored", audience: "agency", message: "A repeat of this request's email was received and ignored", actorLabel: "Email intake" });
-      console.log("[Intake Webhook] Duplicate email ignored", { id: inserted.id });
+      // The email may be the state's original form for a job imported from a spreadsheet: fill that job's blanks.
+      const enriched = await enrichRequestFromForm(inserted.id, requestData);
+      if (enriched?.applied) {
+        console.log("[Intake Webhook] Existing request filled from the form", { id: inserted.id, fields: enriched.plan.changed.length });
+        revalidatePath("/requests");
+        revalidatePath(`/requests/${inserted.id}`);
+        revalidatePath("/calendar");
+      } else {
+        await logActivity({ requestId: inserted.id, kind: "duplicate_email_ignored", audience: "agency", message: "A repeat of this request's email was received and ignored", actorLabel: "Email intake" });
+        console.log("[Intake Webhook] Duplicate email ignored", { id: inserted.id });
+      }
       return NextResponse.json({ success: true, duplicate: true, outcome: "duplicate", id: inserted.id }, { status: 200 });
     }
 

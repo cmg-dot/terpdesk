@@ -1,3 +1,4 @@
+import { realSetting } from "@/lib/settingLabel";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
 import type { UpdateRequestDetailsPayload } from "@/app/actions/updateRequestDetails";
 import { parseSafeDate } from "@/lib/requestDetailsFormat";
@@ -57,7 +58,7 @@ export function initialQuickEditValues(request: unknown): QuickEditValues {
   const end = parseSafeDate(field("endsAt")) ?? new Date(start.getTime() + 3_600_000);
 
   return {
-    setting: firstText(field("setting"), detail("setting")) || "Medical",
+    setting: realSetting(firstText(field("setting"), detail("setting"))),
     format: firstText(field("format"), detail("format")) || (isVirtual ? "Virtual" : "In person"),
     platform: firstText(field("platform"), detail("platform")) || "Zoom",
     meetingLink: firstText(field("meetingLink"), detail("meetingLink"), field("virtualLink"), detail("virtualLink")),

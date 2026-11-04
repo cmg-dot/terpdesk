@@ -264,7 +264,7 @@ function extractNote(text: string): string | null {
 }
 
 /** Non-empty lines of the section that starts at `header`, up to the next section heading or rule line. */
-function sectionLines(text: string, header: RegExp): string[] | null {
+export function sectionLines(text: string, header: RegExp): string[] | null {
   const lines = text.split("\n");
   const start = lines.findIndex((line) => header.test(line));
   if (start < 0) return null;
@@ -286,14 +286,14 @@ function extractClientInfoBlock(text: string): string | null {
 }
 
 /** First e-mail address in the value (a trailing "mailto:", brackets or punctuation are ignored). */
-function parseEmailAddress(value: string | null): string | null {
+export function parseEmailAddress(value: string | null): string | null {
   if (!value) return null;
   const found = value.match(/[A-Za-z0-9._%+'-]+@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}/);
   return found ? found[0].toLowerCase().slice(0, 120) : null;
 }
 
 /** The first phone number in the value, as written (with any extension), when it has at least 7 digits. */
-function parsePhoneNumber(value: string | null): string | null {
+export function parsePhoneNumber(value: string | null): string | null {
   if (!value) return null;
   const found = value.match(/\+?\(?\d[\d\s().-]{5,}\d(?:[ \t]*(?:x|ext\.?|#)[ \t]*\d{1,6})?/i)?.[0];
   const cleaned = found?.replace(/\s+/g, " ").trim().slice(0, 40) ?? null;

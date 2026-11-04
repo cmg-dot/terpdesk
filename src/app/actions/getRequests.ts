@@ -1,10 +1,12 @@
 "use server";
 
+import { settingLabel } from "@/lib/settingLabel";
 import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { formatReference, isCompletedRequest, isNeedsReplacementStatus } from "@/utils/statusEngine";
+import { isVoidedData } from "@/lib/voidReasons";
 import { rawJobZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
@@ -14,8 +16,7 @@ function mapRequestRow(row: any, requestOffers: any[]) {
   const onsite = rowData.onsite || {};
   const requester = rowData.requester || { org: rowData?.intake?.program || "General" };
 
-  const rawSetting = rowData.setting || details.setting;
-  const setting = rawSetting && rawSetting !== "Choose a setting" ? rawSetting : "Medical";
+  const setting = settingLabel(rowData.setting, details.setting);
 
   const format = details.format || rowData.format || (onsite.venue && !onsite.venue.toLowerCase().includes('virtual') ? "In person" : "Virtual");
   const isVirtual = format.toLowerCase().includes('virtual');
@@ -184,6 +185,8 @@ function mapRequestRow(row: any, requestOffers: any[]) {
       venue: onsite.venue || (isVirtual ? "Virtual" : "Location pending"),
       address: onsite.address || "",
       building: onsite.building || "",
+      floor: onsite.floor || "",
+      room: onsite.room || "",
       parking: onsite.parking || "",
       entrance: onsite.entrance || "",
       contact: onsite.contact || "",
@@ -210,6 +213,8 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     // is carried separately for the requests list's "Completed" filter.
     billingStatus: row.billingStatus ?? null,
     isCompleted: isCompletedRequest(row.status, row.billingStatus),
+    // A voided job is closed like a cancelled one (status Cancelled) and also carries data.void: its own badge and filter.
+    isVoided: isVoidedData(rowData),
     canceledAt: row.canceledAt ? row.canceledAt.toISOString() : null,
     cancelReason: row.cancelReason,
     clientRequestedCancellation: row.clientRequestedCancellation,

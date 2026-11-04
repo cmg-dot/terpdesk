@@ -21,6 +21,3 @@ export const isStateJobRequest =(row: StateJobSource): boolean => {
 };
 
 export const STATE_JOB_BADGE_TEXT = "State Job: Hours managed via ODHH";
-
-/** Where staff mirror an ODHH booking. PLACEHOLDER: the ODHH home page until the exact portal address is confirmed. */
-export const ODHH_PORTAL_URL = "https://odhh.wa.gov/";

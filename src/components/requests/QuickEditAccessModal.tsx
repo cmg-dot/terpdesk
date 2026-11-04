@@ -103,7 +103,7 @@ const ModalBody = memo(function ModalBody({ requestId, request, scheduleLocked, 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
                 <label htmlFor="quick-edit-setting" className={labelClass}>Setting</label>
-                <Dropdown id="quick-edit-setting" value={values.setting} onChange={(setting) => change({ setting })} options={withCurrent(SETTINGS, values.setting)} className="w-full" />
+                <Dropdown id="quick-edit-setting" value={values.setting} onChange={(setting) => change({ setting })} options={withCurrent(SETTINGS, values.setting)} placeholder="Not stated" className="w-full" />
               </div>
               <div>
                 <label htmlFor="quick-edit-format" className={labelClass}>Format</label>

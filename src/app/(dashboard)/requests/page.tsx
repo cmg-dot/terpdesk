@@ -1,5 +1,6 @@
 "use client";
 
+import { settingLabel } from "@/lib/settingLabel";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import React, { useState, useEffect, useMemo } from "react";
@@ -247,7 +248,7 @@ function RequestsPageContent() {
  getKey={(req) => req.id}
  renderItem={(req) => {
  const org = req.requester?.org || "Organization not provided";
- const setting = req.setting || req.details?.setting || "Medical";
+ const setting = settingLabel(req.setting, req.details?.setting);
  const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
  const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
  const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
@@ -330,7 +331,7 @@ function RequestsPageContent() {
  getKey={(req) => req.id}
  renderItem={(req) => {
  const org = req.requester?.org || "Organization not provided";
- const setting = req.setting || req.details?.setting || "Medical";
+ const setting = settingLabel(req.setting, req.details?.setting);
  const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
  const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
  const isCancelled = req.status === "Cancelled" || req.state === "cancelled";

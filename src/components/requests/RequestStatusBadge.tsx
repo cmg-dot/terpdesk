@@ -12,6 +12,9 @@ export function RequestStatusBadge({ status }: { status: string }) {
   if (status === "Cancelled") {
     return <span className={`${PILL} border border-[#FCA5A5]/30 bg-[#FEF2F2] text-[#991B1B]`}>Cancelled</span>;
   }
+  if (status === "Voided") {
+    return <span className={`${PILL} border border-slate-300 bg-slate-200 text-slate-700`}>Voided</span>;
+  }
   if (status === "Completed") {
     return <span className={`${PILL} bg-[#DDEBE5] text-[#0B3B32]`}>Completed</span>;
   }

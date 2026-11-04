@@ -22,6 +22,7 @@ export const STATUS_FILTER_OPTIONS = [
   "Staff follow-up",
   "Completed",
   "Cancelled",
+  "Voided",
 ] as const;
 
 export type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number];
@@ -29,13 +30,15 @@ export type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number];
 type StatusFilterInput = Parameters<typeof getStatusFilters>[0];
 
 /** A request as the list receives it from fetchLiveRequests. */
-export type ListedRequest = StatusFilterInput & { isCompleted?: boolean };
+export type ListedRequest = StatusFilterInput & { isCompleted?: boolean; isVoided?: boolean };
 
 export function matchesStatusFilter(req: ListedRequest, filter: string, currentTime: number): boolean {
   if (filter === "All appointments") return true;
 
   const flags = getStatusFilters(req);
-  if (filter === "Cancelled") return flags.isCancelled;
+  // A voided job is closed like a cancelled one, but it has its own filter: "Cancelled" is the real cancellations only.
+  if (filter === "Cancelled") return flags.isCancelled && !req.isVoided;
+  if (filter === "Voided") return flags.isCancelled && Boolean(req.isVoided);
   if (flags.isCancelled) return false;
 
   switch (filter) {
@@ -67,6 +70,7 @@ export const isCancelledRequest = (req: ListedRequest): boolean => getStatusFilt
 
 /** The badge text on a list card: "Completed" for a closed job, else the usual staffing label. */
 export function requestStatusLabel(req: ListedRequest): string {
+  if (req.isVoided) return "Voided";
   return req.isCompleted ? "Completed" : getStaffingLabel(req);
 }
 
@@ -75,7 +79,7 @@ export function requestStatusLabel(req: ListedRequest): string {
  * leaving the person on an empty Upcoming tab. Other filters keep whichever tab is open.
  */
 export function tabForFilter(filter: string): "past" | null {
-  return filter === "Completed" || filter === "Cancelled" ? "past" : null;
+  return filter === "Completed" || filter === "Cancelled" || filter === "Voided" ? "past" : null;
 }
 
 export interface ListCopy {
@@ -96,6 +100,8 @@ export function listCopy(filter: string): ListCopy {
       return { subtitle: "Completed appointments", pastHeading: "Past — completed", pastNote: "Appointments that have taken place and are closed." };
     case "Cancelled":
       return { subtitle: "Cancelled appointments", pastHeading: "Cancelled", pastNote: "Appointments that were cancelled. They are kept here for the record." };
+    case "Voided":
+      return { subtitle: "Voided appointments", pastHeading: "Voided", pastNote: "Jobs that should never have existed (wrong form, duplicates). They are kept for the record and are not billed." };
     case "All appointments":
       return { subtitle: "Every appointment: upcoming, past, completed and cancelled", pastHeading: "Past and cancelled", pastNote: "Every appointment that has already ended or was cancelled." };
     default:

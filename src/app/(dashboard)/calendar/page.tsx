@@ -278,7 +278,7 @@ export default function CalendarPage() {
                                   {timeStr}
                                 </div>
                                 <div className={`text-[11px] font-semibold capitalize truncate leading-tight text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-                                  {isCancelled ? <CancelledBadge /> : req.status}
+                                  {isCancelled ? <CancelledBadge voided={Boolean(req.isVoided)} /> : req.status}
                                 </div>
                               </div>
                             </Link>
@@ -355,7 +355,7 @@ export default function CalendarPage() {
                                 <div className={`font-medium text-sm truncate ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</div>
                                 <div className={`text-xs truncate ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>{timeStr}</div>
                                 <div className={`text-[11px] font-semibold capitalize truncate text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-                                  {isCancelled ? <CancelledBadge /> : req.status}
+                                  {isCancelled ? <CancelledBadge voided={Boolean(req.isVoided)} /> : req.status}
                                 </div>
                               </div>
                             </Link>
@@ -437,7 +437,7 @@ export default function CalendarPage() {
                                 ? 'bg-gray-200 text-gray-600'
                                 : 'bg-[#E5F0EB] text-[#0A3D31]'
                           }`}>
-                            {req.status}
+                            {isCancelled && req.isVoided ? 'Void' : req.status}
                           </span>
                         </div>
                       </div>

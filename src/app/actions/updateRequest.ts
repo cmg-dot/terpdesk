@@ -1,5 +1,6 @@
 "use server";
 
+import { realSetting } from "@/lib/settingLabel";
 import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
@@ -105,7 +106,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
 
   // 2. Resolve Title, Setting, Format, and Location
   const newTitle = payload.appointmentTitle || payload.title || existing.title;
-  const newSetting = payload.setting || payload.details?.setting || existingData.setting || existingDetails.setting || "Medical";
+  const newSetting = realSetting(payload.setting) || realSetting(payload.details?.setting) || realSetting(existingData.setting) || realSetting(existingDetails.setting);
   const newFormat = payload.format || payload.details?.format || payload.modality || existingData.format || existingDetails.format || "In person";
   const isVirtual = newFormat.toLowerCase().includes('virtual');
 

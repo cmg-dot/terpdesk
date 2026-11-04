@@ -14,8 +14,8 @@ export const CalendarStatusFilter = ({ value, onChange }: { value: string; onCha
 );
 
 /** The grey "Cancelled" pill on a cancelled job's calendar card. */
-export const CancelledBadge = () => (
-  <span className="inline-block rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">Cancelled</span>
+export const CancelledBadge = ({ voided = false }: { voided?: boolean }) => (
+  <span className="inline-block rounded-full bg-gray-200 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-gray-600">{voided ? "Void" : "Cancelled"}</span>
 );
 
 /** The muted, dashed look of a cancelled job's card, used in place of the live / past / upcoming look. */

@@ -1,5 +1,6 @@
 "use client";
 
+import { settingLabel } from "@/lib/settingLabel";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
@@ -26,6 +27,10 @@ import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/Expired
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
 import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
+import { RequestHeadline } from "@/components/requests/RequestHeadline";
+import { OriginalFormPanel } from "@/components/requests/OriginalFormPanel";
+import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
+import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
 import { OfferBlockedNotice } from "@/components/requests/OfferBlockedNotice";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { offerBlock } from "@/lib/offerAvailability";
@@ -422,6 +427,7 @@ export default function AssignmentDetailPage() {
   const [activityVersion, setActivityVersion] = useState(0);
 
  const [showCancelModal, setShowCancelModal] = useState(false);
+ const [showVoidModal, setShowVoidModal] = useState(false);
  const [cancelReasonInput, setCancelReasonInput] = useState('');
  const [clientRequested, setClientRequested] = useState(false);
  const cancelReason = foundRequest?.cancelReason || cancelReasonInput;
@@ -765,7 +771,7 @@ export default function AssignmentDetailPage() {
  status: isCancelled ? "Cancelled" : (foundRequest.status || "Unfilled"),
  ...(isRepeating ? { repeats: recurrenceDisplay } : {})
  },
- details: foundRequest.details || { setting: foundRequest.setting || "Medical", purpose: "Routine checkup", format: foundRequest.format || "In person", timeZone: "Pacific Time — Seattle, Los Angeles", deafParticipant: "1", peopleNeeding: "1", commPreferences: "ASL", qualifications: "Medical certified" },
+ details: foundRequest.details || { setting: settingLabel(foundRequest.setting), purpose: "Routine checkup", format: foundRequest.format || "In person", timeZone: "Pacific Time — Seattle, Los Angeles", deafParticipant: "1", peopleNeeding: "1", commPreferences: "ASL", qualifications: "Medical certified" },
  onsite: foundRequest.onsite || { venue: foundRequest.location || "Location pending", address: "", building: "", parking: "", entrance: "", contact: "", contactMethod: "" },
  requester: foundRequest.requester || { name: "Ralph Chrysler Silva", org: "Freshflow", email: "ralphchryslersilva65@gmail.com", phone: "09218648143", prefContact: "Text message", reqInterpreter: "No preference", teamSuggested: "Team suggested", billOrg: "Organization on file", billContact: "Billing Dept", billEmail: "ralphchryslersilva65@gmail.com", poNumber: "PO-9921" },
  prepNotes: foundRequest.prepNotes || "Please arrive 15 minutes early.",
@@ -782,6 +788,13 @@ export default function AssignmentDetailPage() {
  // State-program requests are always shown as state assignments; otherwise the client's own type decides.
  const bannerClientType = isOdhhRequest ? 'state_agency' : normalizeClientType(matchedClient?.type);
  const programLabel = isOdhhRequest ? 'WA ODHH (State Agency)' : 'Private Hospital / Standard Agency';
+ // The first-look facts for the header and the overview: who it is for, the state SRN, when, and where.
+ const organizationName = requestOrganization(foundRequest);
+ const requestSrnValue = requestSrn(foundRequest);
+ const where = requestWhere(foundRequest);
+ const isStateRequest = isStateJobRequest({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data });
+ const whenText = formatDetailsDate(assignment.startsAt, assignment.endsAt, assignment.details?.timeZone || assignment.timeZone);
+ const showMissingAddress = where.missingAddress && !where.virtual && where.text !== 'Location pending';
 
  // Requester card: only these fields, and only when something was actually provided.
  const textOf = (v: unknown): string => (typeof v === 'string' || typeof v === 'number' ? String(v).trim() : '');
@@ -825,17 +838,15 @@ export default function AssignmentDetailPage() {
 
  {/* Header Flex Row */}
  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
- <div>
- <h1 className="text-[28px] font-medium tracking-tight text-[var(--ink)]">{assignment.title}</h1>
- <div className="flex flex-wrap items-center gap-2 mt-1">
-   <p className="text-[var(--sage)]">{formatDetailsDate(assignment.startsAt, assignment.endsAt, assignment.details?.timeZone || assignment.timeZone)}</p>
-   {isRepeating && (
-     <span className="inline-flex items-center text-xs font-medium text-emerald-800 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200/60">
-       Repeats: {recurrenceDisplay}
-     </span>
-   )}
- </div>
- </div>
+ <RequestHeadline
+   organization={organizationName}
+   title={assignment.title}
+   idLabel={requestSrnValue ? "State SRN" : "Reference"}
+   idValue={requestSrnValue ?? assignment.overview.reference}
+   whenText={whenText}
+   where={where}
+   repeatsText={isRepeating ? recurrenceDisplay : null}
+ />
  <div className="flex flex-wrap items-center gap-3">
  {isAppointmentHappeningNow(assignment, currentTime) && (
    <HappeningNowBadge />
@@ -852,8 +863,11 @@ export default function AssignmentDetailPage() {
    </span>
  )}
  {isCancelled && (
- <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
+ foundRequest?.isVoided
+ ? <span className="bg-slate-200 text-slate-700 text-[13px] font-medium px-3 py-1 rounded-full border border-slate-300">Voided</span>
+ : <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
  )}
+ <OriginalFormPanel requestId={id} />
  <button className="rounded-full px-5 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 transition-colors">
  View in calendar
  </button>
@@ -901,6 +915,15 @@ export default function AssignmentDetailPage() {
  Cancel appointment
  </button>
  )}
+ {!isCancelled && (
+ <button
+ type="button"
+ onClick={() => setShowVoidModal(true)}
+ className="rounded-full px-5 py-2 text-sm font-medium text-white bg-slate-600 hover:bg-slate-700 transition-colors"
+ >
+ Void job
+ </button>
+ )}
  </div>
  </div>
 
@@ -924,13 +947,23 @@ export default function AssignmentDetailPage() {
  </div>
  )}
 
- {/* ODHH keeps its own record: once someone is booked, staff mirror the booking on the state portal. */}
- {isOdhhRequest && hasAcceptedBooking && !isCancelled && <OdhhPortalReminder />}
+ {/* The state keeps its own record: once someone is booked, staff confirm the booking on the state portal. */}
+ {isStateRequest && hasAcceptedBooking && !isCancelled && <OdhhPortalReminder srn={requestSrnValue} />}
 
  {/* Questions from interpreters: first, so staff see them immediately. */}
  <ClarificationsCard clarifications={foundRequest?.data?.clarifications} />
 
- {isCancelled && (
+ {isCancelled && foundRequest?.isVoided && (
+ <div className="space-y-4 mb-6">
+ <div className="bg-slate-100 border border-slate-300 text-slate-700 px-6 py-4 rounded-2xl text-[14px] leading-relaxed">
+ This appointment was voided: it should never have been a job. It is closed, off billing and kept for the record. Nobody is expected to work it.
+ </div>
+ <div className="bg-[#F5F4F0] text-gray-600 px-6 py-4 rounded-2xl border border-gray-200 text-sm">
+ Internal reason (agency only): {foundRequest?.cancelReason || "No reason provided"}
+ </div>
+ </div>
+ )}
+ {isCancelled && !foundRequest?.isVoided && (
  <div className="space-y-4 mb-6">
  <div className="bg-[#FEF2F2] border border-[#FCA5A5]/30 text-[#991B1B] px-6 py-4 rounded-2xl border border-gray-200 text-[14px] leading-relaxed">
  This appointment was cancelled {cancelDate ? (() => {
@@ -955,11 +988,19 @@ export default function AssignmentDetailPage() {
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Overview</h2>
  <div className="flex flex-col">
- <DataRow label="Request source" value={programLabel} />
- <DataRow label="Location" value={<LocationLines text={assignment.overview.location} />} />
- <DataRow label="Reference" value={assignment.overview.reference} />
+ <DataRow label="Organization" value={organizationName ?? "Not provided"} />
+ <DataRow label="Date & time" value={whenText} />
+ <DataRow
+   label={where.virtual ? "Format" : "Location"}
+   value={<><LocationLines text={where.text} />{showMissingAddress && <span className="mt-1 block text-xs font-normal text-amber-700">No street address on file. Add it with Quick edit, or forward the state's original email to fill it in.</span>}</>}
+ />
+ <DataRow
+   label={requestSrnValue ? "State SRN" : "Reference"}
+   value={requestSrnValue ? <>{requestSrnValue}<span className="block text-xs font-normal text-gray-500">terpDESK ref {assignment.overview.reference}</span></> : assignment.overview.reference}
+ />
  <DataRow label="Status" value={assignment.overview.status} />
  {assignment.overview.repeats && <DataRow label="Repeats" value={String(assignment.overview.repeats)} />}
+ <DataRow label="Program" value={programLabel} />
  </div>
 
  <ClientAssignmentBanner clientType={bannerClientType} clientName={bannerClientName} />
@@ -1003,7 +1044,7 @@ export default function AssignmentDetailPage() {
             />
             <DataRow
               label="Setting"
-              value={textOf(assignment.details?.setting) || textOf(foundRequest?.setting) || 'Medical'}
+              value={settingLabel(assignment.details?.setting, foundRequest?.setting)}
             />
           </div>
         </div>
@@ -1802,6 +1843,13 @@ export default function AssignmentDetailPage() {
 
  </div>
 
+ <VoidJobDialog
+ open={showVoidModal}
+ onOpenChange={setShowVoidModal}
+ requestId={id}
+ hasInterpreters={hasAcceptedBooking}
+ onVoided={async () => { try { setFoundRequest(await fetchLiveRequestById(id)); } catch { console.error("[requests/[id] page] request failed"); } }}
+ />
  {showCancelModal && (
  <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
  <div className="bg-white rounded-2xl border border-gray-200 p-6 w-full max-w-[500px] mx-auto shadow-xl">

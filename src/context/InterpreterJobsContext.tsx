@@ -1,5 +1,6 @@
 "use client";
 
+import { settingLabel } from "@/lib/settingLabel";
 import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
@@ -90,7 +91,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           travelStartTime: (o as any).travelStartTime,
           travelEndTime: (o as any).travelEndTime,
           serviceCompleted: (o as any).serviceCompleted,
-          setting: o.setting || o.details?.setting || "Medical",
+          setting: settingLabel(o.setting, o.details?.setting),
           format: o.format || o.details?.format || (o.isVirtual ? "Virtual" : "In person"),
           meetingLink: o.meetingLink || o.virtualLink || null,
           virtualLink: o.meetingLink || o.virtualLink || null,

@@ -1,4 +1,5 @@
 "use client";
+import { settingLabel } from "@/lib/settingLabel";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import React from "react";
@@ -403,7 +404,7 @@ export default function DashboardPage() {
                 renderItem={(job) => {
                   const isHappening = isAppointmentHappeningNow(job, currentTime);
                   const tz = job.details?.timeZone || job.data?.details?.timeZone;
-                  const setting = job.setting || job.details?.setting || "Medical";
+                  const setting = settingLabel(job.setting, job.details?.setting);
                   const format = job.format || job.details?.format || (job.isVirtual ? "Virtual" : "In person");
                   const venue = job.location || job.onsite?.venue || (String(format).toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
                   const org = job.requester?.org;
