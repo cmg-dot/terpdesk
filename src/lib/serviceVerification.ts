@@ -10,11 +10,15 @@ import { notifyAgencyAdmins } from "@/lib/notifications";
 import { logError } from "@/lib/logError";
 import { missingVerificationFields, parseServiceVerification, reportsNoService } from "@/lib/odhhVerificationParser";
 import type { ParsedServiceVerification, VerificationHints } from "@/lib/odhhVerificationParser";
+import type { DbTx } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
 import { removeObjectsQuietly } from "@/lib/s3";
 import { recordStateJobHours } from "@/lib/stateJobHours";
 import { pickSignature, signatureUrlFor, storeSignature } from "@/lib/verificationSignature";
 import type { StoredSignature } from "@/lib/verificationSignature";
+import { verificationNote } from "@/lib/verificationPending";
+import type { PendingVerification } from "@/lib/verificationPending";
+import { appendPendingVerification, reportIdFor, resolveBookedInterpreter } from "@/lib/verificationPendingStore";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezone";
 
@@ -22,6 +26,10 @@ import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezo
  * Applies an ODHH "SERVICE VERIFICATION" email (the state's receipt, which acts as the timesheet) to the existing
  * request with the same SRN. It never creates a request: a receipt with no matching request is reported, not turned
  * into a draft.
+ *
+ * Which interpreter is it for? One booked: that person. Two booked (a team job): the one whose name the report gives.
+ * Nobody booked, or no name that fits: the report is parked on the job as a pending verification (signature already
+ * stored) and staff pick the interpreter in Hours review (see verificationAssignment.ts).
  *
  * Every query is parameterized. Database errors are not caught here: the intake route reports them through logError
  * (no bound values), and nothing here logs names, SRNs, times or fees: only outcomes and counts.
@@ -31,17 +39,47 @@ import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezo
 
 export type VerificationOutcome =
   | "pending_review" // saved as a submitted timesheet: waiting under Hours review > "Awaiting review"
+  | "needs_interpreter" // kept on the job; staff choose the interpreter in Hours review > "Needs an interpreter"
   | "unchanged" // already recorded with these same values
   | "conflict" // already recorded with different values: left as is, staff notified
   | "no_matching_request"
   | "ambiguous_srn" // more than one open request has this SRN
-  | "no_booking" // nobody is booked on the request yet
-  | "ambiguous_booking" // more than one interpreter is booked
   | "not_state_job";
 
 export type ServiceVerificationResult =
   | { ok: true; outcome: VerificationOutcome; requestId?: string }
   | { ok: false; error: string; missingFields?: string[] };
+
+/**
+ * Everything the pipeline touches outside the request itself, in one place: a test or a replay passes an open transaction
+ * and silent stand-ins, so a rehearsal can run the real code and roll it all back with nothing leaked.
+ */
+export interface VerificationEffects {
+  exec: DbTx;
+  storeSignature: typeof storeSignature;
+  removeObjects: (keys: string[]) => Promise<void>;
+  notify: (title: string, message: string, requestId?: string, href?: string) => Promise<void>;
+  audit: (entry: { action: string; details: string }) => Promise<void>;
+  activity: typeof logActivity;
+  refresh: (requestId: string) => void;
+}
+
+/** What the staff see when a receipt could not be applied automatically. Never includes names or times. */
+async function flagForStaff(title: string, message: string, requestId?: string, href?: string): Promise<void> {
+  await notifyAgencyAdmins({ type: "job", href: href ?? (requestId ? `/requests/${requestId}` : "/requests"), title, message });
+}
+
+export const liveEffects = (): VerificationEffects => ({
+  exec: db as unknown as DbTx,
+  storeSignature,
+  removeObjects: removeObjectsQuietly,
+  notify: flagForStaff,
+  audit: writeAuditLog,
+  activity: logActivity,
+  refresh: (requestId) => {
+    for (const path of ["/hours-review", "/dashboard", "/requests", `/requests/${requestId}`, "/jobs"]) revalidatePath(path);
+  },
+});
 
 interface LooseData {
   details?: { timeZone?: string; timezone?: string };
@@ -51,20 +89,6 @@ interface LooseData {
 
 const MAX_SHIFT_HOURS = 24;
 const FUTURE_TOLERANCE_MS = 10 * 60_000;
-
-/** What staff see when a receipt could not be applied automatically. Never includes names or times. */
-async function flagForStaff(title: string, message: string, requestId?: string, href?: string): Promise<void> {
-  await notifyAgencyAdmins({ type: "job", href: href ?? (requestId ? `/requests/${requestId}` : "/requests"), title, message });
-}
-
-/** The service-note line for what the state wrote: the comment is the state's own words, kept on the timesheet only. */
-const verificationNote = (parsed: ParsedServiceVerification): string => {
-  const parts = ["Recorded from the ODHH service verification."];
-  if (parsed.otherFeesText) parts.push(`Other fee(s): ${parsed.otherFeesText}`);
-  if (parsed.cancellation) parts.push(`${parsed.cancellation}.`);
-  if (parsed.comments) parts.push(`ODHH comments: ${parsed.comments}`);
-  return parts.join(" ");
-};
 
 function computeTimes(parsed: ParsedServiceVerification, appointmentStartsAt: string, zone: string): { start: Date; end: Date } | string {
   const appointmentDate = formatInTimeZone(new Date(appointmentStartsAt), zone, "yyyy-MM-dd");
@@ -96,7 +120,13 @@ export async function respondToServiceVerification(rawContent: string, hintsRaw:
   return NextResponse.json({ success: true, type: "timesheet", outcome: result.outcome, id: result.requestId }, { status: 200 });
 }
 
-export async function processServiceVerification(rawContent: string, hints?: VerificationHints, attachmentsRaw?: unknown): Promise<ServiceVerificationResult> {
+export async function processServiceVerification(
+  rawContent: string,
+  hints?: VerificationHints,
+  attachmentsRaw?: unknown,
+  fx: VerificationEffects = liveEffects(),
+): Promise<ServiceVerificationResult> {
+  const { exec } = fx;
   const parsed = parseServiceVerification(rawContent, hints);
   const missing = missingVerificationFields(parsed);
   if (missing.length > 0) {
@@ -105,27 +135,27 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
   const srn = parsed.srn as string;
 
   // The SRN lives in the request's JSON. The value is a bound parameter, never part of the SQL text.
-  const matches = await db
+  const matches = await exec
     .select({ id: requests.id, createdAt: requests.createdAt, data: requests.data, isStateJob: requests.isStateJob })
     .from(requests)
     .where(and(sql`${requests.data} #>> '{intake,odhhSrn}' = ${srn}`, isNull(requests.canceledAt)))
     .limit(3);
 
   if (matches.length === 0) {
-    await flagForStaff("Service verification without a request", "A service verification email arrived for an SRN with no open request. Check the SRN and add the request if needed.");
-    await writeAuditLog({ action: "service_verification_received", details: "outcome=no_matching_request" });
+    await fx.notify("Service verification without a request", "A service verification email arrived for an SRN with no open request. Check the SRN and add the request if needed.");
+    await fx.audit({ action: "service_verification_received", details: "outcome=no_matching_request" });
     return { ok: true, outcome: "no_matching_request" };
   }
   if (matches.length > 1) {
-    await flagForStaff("Service verification needs review", "A service verification email matches more than one open request. Record its hours manually.");
-    await writeAuditLog({ action: "service_verification_received", details: `outcome=ambiguous_srn; matches=${matches.length}` });
+    await fx.notify("Service verification needs review", "A service verification email matches more than one open request. Record its hours manually.");
+    await fx.audit({ action: "service_verification_received", details: `outcome=ambiguous_srn; matches=${matches.length}` });
     return { ok: true, outcome: "ambiguous_srn" };
   }
 
   const request = matches[0];
   const requestId = request.id;
   if (!isStateJobRequest(request)) {
-    await writeAuditLog({ action: "service_verification_received", details: `outcome=not_state_job; requestId=${requestId}` });
+    await fx.audit({ action: "service_verification_received", details: `outcome=not_state_job; requestId=${requestId}` });
     return { ok: true, outcome: "not_state_job", requestId };
   }
 
@@ -153,29 +183,18 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
     cancelledBy: parsed.cancelledBy,
     comments: parsed.comments,
   };
-  await db.execute(sql`
+  await exec.execute(sql`
     UPDATE requests
-    SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{serviceVerification}', ${JSON.stringify(record)}::jsonb),
+    SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{serviceVerification}', coalesce(data -> 'serviceVerification', '{}'::jsonb) || ${JSON.stringify(record)}::jsonb),
         updated_at = now()
     WHERE id = ${requestId}
   `);
 
-  const booked = await db
+  const booked = await exec
     .select({ interpreterId: offers.interpreterId })
     .from(offers)
     .where(and(eq(offers.requestId, requestId), eq(offers.status, "accepted")));
-  const interpreterIds = Array.from(new Set(booked.map((b) => b.interpreterId)));
-  if (interpreterIds.length !== 1) {
-    const outcome: VerificationOutcome = interpreterIds.length === 0 ? "no_booking" : "ambiguous_booking";
-    await flagForStaff(
-      "Service verification needs review",
-      interpreterIds.length === 0 ? "A service verification arrived for a request with no booked interpreter." : "A service verification arrived for a request with more than one booked interpreter.",
-      requestId,
-    );
-    await writeAuditLog({ action: "service_verification_received", details: `outcome=${outcome}; requestId=${requestId}` });
-    return { ok: true, outcome, requestId };
-  }
-  const interpreterId = interpreterIds[0];
+  const resolution = await resolveBookedInterpreter(exec, Array.from(new Set(booked.map((b) => b.interpreterId))), parsed.interpreterName);
 
   // The signature (first real PDF / image attachment, never an inline logo) goes to the private bucket first. If the
   // storage is unavailable the hours are still recorded and staff are told the signature is missing.
@@ -183,36 +202,74 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
   let stored: StoredSignature | null = null;
   if (signatureFile) {
     try {
-      stored = await storeSignature(requestId, signatureFile);
+      stored = await fx.storeSignature(requestId, signatureFile);
     } catch (err) {
       logError("Service verification signature upload", err);
     }
   }
   const signatureLost = Boolean(signatureFile) && !stored;
 
+  if (resolution.kind === "pending") {
+    // Kept on the job with its signature until staff choose the interpreter. A re-sent copy of the same email is not added twice.
+    const entry: PendingVerification = {
+      id: reportIdFor(rawContent),
+      receivedAt: record.receivedAt,
+      reason: resolution.reason,
+      reportInterpreter: { id: parsed.interpreterId, name: parsed.interpreterName, credentials: parsed.interpreterCredentials },
+      actualStart: record.actualStart,
+      actualEnd: record.actualEnd,
+      totalMiles,
+      otherFeesText: parsed.otherFeesText,
+      serviceComplete: parsed.serviceComplete,
+      cancellation: parsed.cancellation,
+      cancelledBy: parsed.cancelledBy,
+      comments: parsed.comments,
+      signature: stored,
+    };
+    const added = await appendPendingVerification(exec, requestId, entry);
+    if (!added) {
+      if (stored) await fx.removeObjects([stored.storageKey]);
+      await fx.audit({ action: "service_verification_received", details: `outcome=unchanged; requestId=${requestId}; pending=duplicate` });
+      return { ok: true, outcome: "unchanged", requestId };
+    }
+    await fx.notify(
+      "ODHH hours need an interpreter",
+      `A service verification was received that needs its interpreter confirmed. Open Hours review to assign it.${signatureLost ? " Its signature could not be saved; check the original email." : ""}`,
+      requestId,
+      "/hours-review",
+    );
+    await fx.audit({ action: "service_verification_received", details: `outcome=needs_interpreter; reason=${resolution.reason}; requestId=${requestId}; reportId=${entry.id}; signature=${stored ? "stored" : signatureLost ? "failed" : "none"}` });
+    fx.refresh(requestId);
+    return { ok: true, outcome: "needs_interpreter", requestId };
+  }
+  const interpreterId = resolution.interpreterId;
+
   const timesheetId = randomUUID();
-  const created = await recordStateJobHours({
-    requestId,
-    interpreterId,
-    start: times?.start ?? null,
-    end: times?.end ?? null,
-    serviceHours,
-    totalMiles,
-    note: verificationNote(parsed),
-    review: {
-      timesheetId,
-      serviceCompleted: parsed.serviceComplete,
-      // Shown on the review card next to "Not completed": who cancelled, and what the state wrote.
-      cancellationReason: reportsNoService(parsed) ? [parsed.cancellation, parsed.comments].filter(Boolean).join(" - ") || null : null,
-      signature: stored ? { stored, url: signatureUrlFor(timesheetId) } : null,
+  const created = await recordStateJobHours(
+    {
+      requestId,
+      interpreterId,
+      start: times?.start ?? null,
+      end: times?.end ?? null,
+      serviceHours,
+      totalMiles,
+      note: verificationNote(parsed),
+      review: {
+        timesheetId,
+        serviceCompleted: parsed.serviceComplete,
+        // Shown on the review card next to "Not completed": who cancelled, and what the state wrote.
+        cancellationReason: reportsNoService(parsed) ? [parsed.cancellation, parsed.comments].filter(Boolean).join(" - ") || null : null,
+        signature: stored ? { stored, url: signatureUrlFor(timesheetId) } : null,
+      },
     },
-  });
+    exec,
+  );
 
   if (!created) {
-    if (stored) await removeObjectsQuietly([stored.storageKey]); // a repeat of an email already recorded: no second copy
+    if (stored) await fx.removeObjects([stored.storageKey]); // a repeat of an email already recorded: no second copy
     // A timesheet already exists. The same figures are a no-op (a re-sent email); different figures are never
     // overwritten automatically, because the earlier ones may already be paid. Staff decide.
-    const [existing] = await db
+    const [existing] = await exec
       .select({ start: timesheets.actualStartTime, end: timesheets.actualEndTime, mileage: timesheets.mileage })
       .from(timesheets)
       .where(and(eq(timesheets.requestId, requestId), eq(timesheets.interpreterId, interpreterId)))
@@ -222,13 +279,13 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
       (existing?.end?.getTime() ?? null) === (times?.end.getTime() ?? null) &&
       Number(existing?.mileage ?? 0) === Number(totalMiles.toFixed(1));
     if (!same) {
-      await flagForStaff("Service verification differs from recorded hours", "A new service verification has different hours or mileage than what is already recorded. Review the request.", requestId);
+      await fx.notify("Service verification differs from recorded hours", "A new service verification has different hours or mileage than what is already recorded. Review the request.", requestId);
     }
-    await writeAuditLog({ action: "service_verification_received", details: `outcome=${same ? "unchanged" : "conflict"}; requestId=${requestId}` });
+    await fx.audit({ action: "service_verification_received", details: `outcome=${same ? "unchanged" : "conflict"}; requestId=${requestId}` });
     return { ok: true, outcome: same ? "unchanged" : "conflict", requestId };
   }
 
-  await logActivity({
+  await fx.activity({
     requestId,
     interpreterId,
     audience: "shared",
@@ -237,21 +294,17 @@ export async function processServiceVerification(rawContent: string, hints?: Ver
     actorLabel: "ODHH service verification",
   });
   // Generic wording only: no names, dates, comments or cancellation details in notifications (security.md).
-  await flagForStaff(
+  await fx.notify(
     "ODHH hours to review",
     `A service verification was received and is waiting in Hours review.${reportsNoService(parsed) ? " It reports the service was not completed or was cancelled." : ""}${signatureLost ? " Its signature could not be saved; check the original email." : ""}`,
     requestId,
     "/hours-review",
   );
-  await writeAuditLog({
+  await fx.audit({
     action: "service_verification_received",
-    details: `outcome=pending_review; requestId=${requestId}; timesheetId=${created.id}; serviceHours=${serviceHours.toFixed(2)}; signature=${stored ? "stored" : signatureLost ? "failed" : "none"}`,
+    details: `outcome=pending_review; requestId=${requestId}; timesheetId=${created.id}; serviceHours=${serviceHours.toFixed(2)}; signature=${stored ? "stored" : signatureLost ? "failed" : "none"}; matchedBy=${booked.length > 1 ? "report_name" : "only_booking"}`,
   });
 
-  revalidatePath("/hours-review");
-  revalidatePath("/dashboard");
-  revalidatePath("/requests");
-  revalidatePath(`/requests/${requestId}`);
-  revalidatePath("/jobs");
+  fx.refresh(requestId);
   return { ok: true, outcome: "pending_review", requestId };
 }

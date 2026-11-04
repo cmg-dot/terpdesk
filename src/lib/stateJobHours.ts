@@ -3,6 +3,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { requests, timesheets } from "@/db/schema";
 import { lockRequestForPosition } from "@/lib/positionClaim";
+import type { DbTx } from "@/lib/positionClaim";
 import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
 import { hashToken } from "@/lib/timesheetToken";
 import type { StoredSignature } from "@/lib/verificationSignature";
@@ -45,10 +46,11 @@ export interface StateJobHoursInput {
 }
 
 /** The new timesheet's id, or null when this interpreter already has a timesheet on the job (nothing is changed). */
-export async function recordStateJobHours(input: StateJobHoursInput): Promise<{ id: string } | null> {
+export async function recordStateJobHours(input: StateJobHoursInput, exec: DbTx = db as unknown as DbTx): Promise<{ id: string } | null> {
   const { requestId, interpreterId, start, end, serviceHours, totalMiles, note, review } = input;
   const now = new Date();
-  return db.transaction(async (tx) => {
+  // `exec` is the database, or an open transaction (a savepoint then), so a caller can make this part of a bigger all-or-nothing step.
+  return exec.transaction(async (tx) => {
     if (!(await lockRequestForPosition(tx, requestId))) return null;
     const [existing] = await tx
       .select({ id: timesheets.id })
@@ -91,13 +93,20 @@ export async function recordStateJobHours(input: StateJobHoursInput): Promise<{ 
 
     if (review.signature) {
       // Staff-only record on the request (interpreters never receive `serviceVerification`): where the file lives.
-      const pointer = JSON.stringify({ signature: review.signature.stored });
+      // `signature` is the latest one (older readers); `signatures[timesheetId]` is each timesheet's own, so the two
+      // interpreters of a team job can never be shown each other's signature.
+      const stored = JSON.stringify(review.signature.stored);
+      const latest = JSON.stringify({ signature: review.signature.stored });
       await tx.execute(sql`
         UPDATE requests
         SET data = jsonb_set(
-          coalesce(data, '{}'::jsonb),
-          '{serviceVerification}',
-          coalesce(data -> 'serviceVerification', '{}'::jsonb) || ${pointer}::jsonb
+          jsonb_set(
+            coalesce(data, '{}'::jsonb),
+            '{serviceVerification}',
+            coalesce(data -> 'serviceVerification', '{}'::jsonb) || ${latest}::jsonb
+          ),
+          '{serviceVerification,signatures}',
+          coalesce(data #> '{serviceVerification,signatures}', '{}'::jsonb) || jsonb_build_object(${review.timesheetId}::text, ${stored}::jsonb)
         )
         WHERE id = ${requestId}
       `);

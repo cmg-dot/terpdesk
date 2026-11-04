@@ -15,6 +15,7 @@ import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone, parseInstantI
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
 import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
+import { PendingVerifications } from "@/components/features/PendingVerifications";
 import { BillableTimeRow } from "@/components/features/BillableTimeRow";
 import { SignatureImage } from "@/components/features/SignatureImage";
 import { MileageApprovalField, needsMileageReason } from "@/components/features/MileageApprovalField";
@@ -522,8 +523,11 @@ function HoursReviewContent() {
         <LogStateJobHoursDialog onLogged={() => window.dispatchEvent(new Event('storage'))} />
       </div>
 
+      {/* Reports that could not be tied to one booked interpreter; assigning one reloads the records below through the same "storage" listener. */}
+      <PendingVerifications onAssigned={() => window.dispatchEvent(new Event('storage'))} />
+
       <div className="flex flex-wrap gap-3 mb-8">
-        <button 
+        <button
           onClick={() => selectTab('awaiting')}
           className={`w-full sm:w-auto px-5 py-2.5 transition-colors text-sm font-medium rounded-full ${
             activeTab === 'awaiting' 

@@ -30,8 +30,9 @@ export async function GET(_req: Request, { params }: { params: { timesheetId: st
     const [row] = await db
       .select({
         requestId: timesheets.requestId,
-        key: sql<string | null>`${requests.data} #>> '{serviceVerification,signature,storageKey}'`,
-        fileName: sql<string | null>`${requests.data} #>> '{serviceVerification,signature,fileName}'`,
+        // This timesheet's own signature first; the request-level pointer is the fallback (older records, and the backfill).
+        key: sql<string | null>`coalesce(jsonb_extract_path_text(${requests.data}, 'serviceVerification', 'signatures', ${id.data}, 'storageKey'), ${requests.data} #>> '{serviceVerification,signature,storageKey}')`,
+        fileName: sql<string | null>`coalesce(jsonb_extract_path_text(${requests.data}, 'serviceVerification', 'signatures', ${id.data}, 'fileName'), ${requests.data} #>> '{serviceVerification,signature,fileName}')`,
       })
       .from(timesheets)
       .innerJoin(requests, eq(requests.id, timesheets.requestId))
