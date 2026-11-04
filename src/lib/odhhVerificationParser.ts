@@ -64,6 +64,10 @@ export interface ParsedServiceVerification {
   cancelledBy: string | null;
   /** The state's free-text comment (single line). Staff-only: it is never put in a notification or email. */
   comments: string | null;
+  /** The interpreter the report is about, from "Interpreter: 42 - Nivia Crest (NIC)": the state's id, the name, the credentials. */
+  interpreterId: string | null;
+  interpreterName: string | null;
+  interpreterCredentials: string | null;
 }
 
 const ACTUAL_START = labelPattern(["Actual[ \\t]+Start(?:[ \\t]+Time)?", "Actual[ \\t]+Time[ \\t]+In"]);
@@ -85,6 +89,12 @@ const CANCELLATION_FIELD = labelPattern(["Cancell?ation(?:[ \\t]+(?:Status|Type)
 // "Comments:cancelled 10/8 8 am" (no space after the colon is fine)
 const COMMENTS = labelPattern(["Comments?"]);
 const MAX_COMMENTS_LENGTH = 1000;
+
+// "Interpreter: 42 - Nivia Crest (NIC)" (the line under APPOINTMENT INFORMATION). Not "Interpreter Signature" or "Interpreter Agency".
+const INTERPRETER_LINE = labelPattern(["Interpreter"]);
+// "42 - Nivia Crest (NIC)" | "9999 - Name (CI , CT )" | "Name (NIC)" (no id)
+const INTERPRETER_VALUE = /^(?:(\d{1,8})[ \t]*[-–—][ \t]*)?(.+?)[ \t]*(?:\(([^()]*)\))?$/;
+const MAX_INTERPRETER_NAME = 100;
 
 const MAX_MILES = 2000;
 const MAX_FEES = 10000;
@@ -148,6 +158,7 @@ export function parseServiceVerification(rawContent: string, hints: Verification
   const end = parseDateTimeValue(pick(ACTUAL_END, hints.actualEndTime));
   const fees = parseFees(pick(OTHER_FEES, hints.otherFees));
 
+  const interpreter = parseInterpreterLine(cleanValue(text.match(INTERPRETER_LINE)?.[1]));
   const cancelledLine = text.match(CANCELLED_BY);
   const cancellation = cleanValue(cancelledLine?.[1]) ?? cleanValue(text.match(CANCELLATION_FIELD)?.[1]) ?? cleanValue(asText(hints.cancellation));
   const cancelledBy = cleanValue(cancelledLine?.[2]) ?? cleanValue(asText(hints.cancelledBy));
@@ -165,7 +176,36 @@ export function parseServiceVerification(rawContent: string, hints: Verification
     cancellation,
     cancelledBy,
     comments: longText(text.match(COMMENTS)?.[1]) ?? longText(asText(hints.comments)),
+    interpreterId: interpreter.id,
+    interpreterName: interpreter.name,
+    interpreterCredentials: interpreter.credentials,
   };
+}
+
+/** The id, name and credentials in the report's "Interpreter:" line; all null when the line is missing or unreadable. */
+export function parseInterpreterLine(value: string | null): { id: string | null; name: string | null; credentials: string | null } {
+  const match = value ? INTERPRETER_VALUE.exec(value.replace(/\s+/g, " ").trim()) : null;
+  const name = match?.[2] ? match[2].replace(/[\u0000-\u001F\u007F]+/g, " ").trim().slice(0, MAX_INTERPRETER_NAME) : "";
+  if (!match || name === "" || EMPTY_VALUE.test(name)) return { id: null, name: null, credentials: null };
+  const credentials = match[3] ? match[3].replace(/\s*,\s*/g, ", ").replace(/\s+/g, " ").trim().slice(0, 60) : "";
+  return { id: match[1] ?? null, name, credentials: credentials || null };
+}
+
+const NAME_SUFFIXES = new Set(["jr", "sr", "ii", "iii", "iv"]);
+const nameTokens = (name: string): string[] =>
+  name.normalize("NFKC").toLowerCase().replace(/[.,;:'"()]/g, " ").split(/\s+/).filter((t) => t !== "" && !NAME_SUFFIXES.has(t));
+
+/**
+ * Is the name in the report the same person as this roster name? Same first and last name, ignoring capitals, punctuation
+ * and suffixes (Jr / III): "William Ross" is "William Ross III". A first name alone never matches, so two people who share
+ * one can't be confused. Pure.
+ */
+export function sameInterpreterName(reportName: string | null | undefined, candidate: string | null | undefined): boolean {
+  if (!reportName || !candidate) return false;
+  const a = nameTokens(reportName);
+  const b = nameTokens(candidate);
+  if (a.length < 2 || b.length < 2) return a.length > 0 && a.join(" ") === b.join(" ");
+  return a[0] === b[0] && a[a.length - 1] === b[b.length - 1];
 }
 
 /** The state reports the service did not happen (not completed, or cancelled): actual times may legitimately be empty. */

@@ -1,10 +1,14 @@
 import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { getIanaZone } from "@/utils/timezone";
+import { requestReference } from "@/utils/statusEngine";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 
 export interface ServiceRecord {
   id: string;
   appointmentId: string;
+  /** The job's title and a human reference ("SRN #202786433" or "APT-1A2B3C"): the review card's header, instead of the request id. */
+  title?: string;
+  reference?: string;
   interpreterName: string;
   state: 'not_started' | 'draft' | 'submitted' | 'awaiting_review' | 'changes_requested' | 'correction_requested' | 'approved';
   scheduledStart: string;
@@ -87,6 +91,8 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             id: recordId,
             timeZone: getIanaZone(req.details?.timeZone ?? req.data?.details?.timeZone ?? req.timeZone ?? req.data?.timeZone),
             appointmentId: req.id,
+            title: req.title,
+            reference: requestReference(req.data?.intake?.odhhSrn, req.id),
             positionIndex: pos,
             interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || (pos === 2 ? "Position 2 Interpreter" : "Position 1 Interpreter"),
             state: state,
@@ -144,6 +150,8 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
           timesheetId: ts.timesheetId,
       timeZone: ts.timeZone,
           appointmentId: ts.requestId,
+          title: ts.title,
+          reference: ts.reference,
           interpreterName: ts.interpreterName,
           state: ts.status === 'approved' ? 'approved' : 'awaiting_review',
           scheduledStart: ts.scheduledStart,

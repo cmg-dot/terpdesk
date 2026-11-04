@@ -6,11 +6,16 @@ import { db } from "@/db";
 import { interpreters, requests, timesheets } from "@/db/schema";
 import type { TimesheetTravelLeg } from "@/db/schema";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
+import { requestReference } from "@/utils/statusEngine";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
 export interface SubmittedTimesheet {
   timesheetId: string;
   requestId: string;
+  /** The job's title ("HCA SRN #202786433"), shown on the review card instead of the request id. */
+  title: string;
+  /** "SRN #202786433" when the job has an ODHH SRN, otherwise its APT reference. */
+  reference: string;
   interpreterName: string;
   scheduledStart: string;
   scheduledEnd: string;
@@ -38,7 +43,7 @@ export interface SubmittedTimesheet {
 }
 
 interface LooseData {
-  intake?: { program?: string };
+  intake?: { program?: string; odhhSrn?: string };
   details?: { timeZone?: string; timezone?: string };
   timeZone?: string;
   timezone?: string;
@@ -72,6 +77,7 @@ export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
       signatureDataUrl: timesheets.signatureDataUrl,
       submittedAt: timesheets.submittedAt,
       createdAt: requests.createdAt,
+      title: requests.title,
       data: requests.data,
     })
     .from(timesheets)
@@ -87,6 +93,8 @@ export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
     return {
       timesheetId: r.timesheetId,
       requestId: r.requestId,
+      title: r.title,
+      reference: requestReference(loose.intake?.odhhSrn, r.requestId),
       interpreterName: r.interpreterName,
       scheduledStart: startsAt,
       scheduledEnd: endsAt,

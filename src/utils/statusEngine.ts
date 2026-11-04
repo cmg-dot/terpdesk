@@ -42,6 +42,12 @@ export function isCompletedRequest(status?: string | null, billingStatus?: strin
   return s === "completed" || billingStatus === "completed";
 }
 
+/** How staff refer to a job: "SRN #202786433" when it has an ODHH SRN, otherwise its APT reference. */
+export function requestReference(srn: string | null | undefined, id?: string): string {
+  const clean = typeof srn === "string" ? srn.trim() : "";
+  return clean ? `SRN #${clean}` : formatReference(id);
+}
+
 export function isNeedsReplacementStatus(status?: string | null): boolean {
   return !!status && status.toLowerCase().replace(/[\s_-]+/g, '') === 'needsreplacement';
 }

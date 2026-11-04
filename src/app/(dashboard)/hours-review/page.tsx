@@ -10,6 +10,7 @@ import { approveTimesheet } from "@/app/actions/approveTimesheet";
 import { getSubmittedTimesheets } from "@/app/actions/getSubmittedTimesheets";
 import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords";
+import { formatReference } from "@/utils/statusEngine";
 import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone, parseInstantInZone } from "@/utils/timezone";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
@@ -177,7 +178,9 @@ function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord, onUpda
     <div className="bg-white p-6 sm:p-8 rounded-2xl border border-gray-200 mb-4">
       <div className="flex justify-between items-start mb-6">
         <div>
-          <h2 className="font-semibold text-lg text-[var(--ink)] mb-6">Appointment {record.appointmentId}{record.positionIndex ? ` · Position ${record.positionIndex}` : ''}</h2>
+          <h2 className="font-semibold text-lg text-[var(--ink)]">{record.title || record.reference || formatReference(record.appointmentId)}{record.positionIndex ? ` · Position ${record.positionIndex}` : ''}</h2>
+          {/* The reference sits under the title unless the title already says it (e.g. "ODHH SRN #202786433"). */}
+          <p className="mb-5 text-xs text-[var(--sage)]">{record.title && record.reference && !record.title.includes(record.reference.replace('SRN ', '')) ? record.reference : ' '}</p>
           <h3 className="font-medium text-[16px] text-[var(--ink)]">{record.interpreterName}</h3>
         </div>
         <div className="flex flex-col items-end gap-5">
