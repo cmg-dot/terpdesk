@@ -33,7 +33,7 @@ export function InboxView({ emails: serverEmails }: { emails: InboxListItem[] })
 
         <section aria-label="Email" className={`min-w-0 md:block ${hasSelection ? "h-[calc(100vh-14rem)] min-h-[320px] md:h-auto" : "hidden"}`}>
           {hasSelection ? (
-            <InboxMessage email={openEmail} isLoading={isLoading} error={error} onBack={close} onMarkUnread={markUnread} />
+            <InboxMessage email={openEmail} isLoading={isLoading} error={error} onBack={close} onMarkUnread={markUnread} jobRef={emails.find((e) => e.id === selectedId)} />
           ) : (
             <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-[var(--sage)]">
               <Inbox className="h-8 w-8" />

@@ -1,3 +1,4 @@
+import { InboxJobLink } from "@/components/features/inbox/InboxJobLink";
 import { formatDateInZone, getIanaZone } from "@/utils/timezone";
 import type { InboxListItem } from "@/types/inbox";
 
@@ -18,12 +19,12 @@ export function InboxList({ emails, selectedId, onSelect }: InboxListProps) {
       {emails.map((email) => {
         const selected = email.id === selectedId;
         return (
-          <li key={email.id}>
+          <li key={email.id} className={selected ? "bg-[#E6EFEA]" : "hover:bg-gray-50"}>
             <button
               type="button"
               onClick={() => onSelect(email.id)}
               aria-current={selected ? "true" : undefined}
-              className={`flex w-full items-start gap-3 px-4 py-3 text-left transition-colors ${selected ? "bg-[#E6EFEA]" : "hover:bg-gray-50"}`}
+              className="flex w-full items-start gap-3 px-4 py-3 text-left transition-colors"
             >
               <span
                 aria-label={email.isRead ? undefined : "Unread"}
@@ -41,6 +42,12 @@ export function InboxList({ emails, selectedId, onSelect }: InboxListProps) {
                 </span>
               </span>
             </button>
+            {email.srn && (
+              // Outside the button (a link cannot sit inside one): its own click goes to the request, not to the email.
+              <div className="-mt-1.5 pb-2.5 pl-9 pr-4 text-xs">
+                <InboxJobLink srn={email.srn} jobId={email.jobId} />
+              </div>
+            )}
           </li>
         );
       })}

@@ -145,7 +145,7 @@ export default function NewRequestPage() {
   const [extras, setExtras] = useState<FormExtras>(EMPTY_EXTRAS);
  const changeExtras = (field: keyof FormExtras, value: string | boolean) => setExtras((prev) => ({ ...prev, [field]: value }) as FormExtras);
  const [formData, setFormData] = useState({
- client: targetClient ? targetClient.name : "New or one-time requester — no saved client",
+ client: targetClient ? targetClient.name : "New or one-time requester — no saved organization",
  requesterOrgOrContact: "New organization or contact",
  requesterName: "",
  requesterOrg: "",
@@ -231,7 +231,7 @@ export default function NewRequestPage() {
    formData.requesterOrgOrContact.trim() === "" ||
    formData.requesterOrgOrContact.startsWith("New ") ||
    !formData.client ||
-   formData.client === "New or one-time requester — no saved client" ||
+   formData.client === "New or one-time requester — no saved organization" ||
    formData.client.trim() === "" ||
    formData.client.startsWith("New ");
 
@@ -301,7 +301,7 @@ export default function NewRequestPage() {
       setFormData(prev => ({
         ...prev,
         requesterOrgOrContact: value as string,
-        client: "New or one-time requester — no saved client",
+        client: "New or one-time requester — no saved organization",
         saveOrg: false
       }));
       return;
@@ -330,7 +330,7 @@ export default function NewRequestPage() {
   }
 
   if (field === "client") {
-    if (value === "New or one-time requester — no saved client") {
+    if (value === "New or one-time requester — no saved organization") {
       setFormData(prev => ({
         ...prev,
         client: value as string,
@@ -554,13 +554,13 @@ export default function NewRequestPage() {
 
  {/* Client Section */}
  <div className={cardClass}>
- <h2 className={sectionTitleClass}>Client</h2>
+ <h2 className={sectionTitleClass}>Organization</h2>
  <Field 
- label="Requesting client on file"
- subtext="A saved client is optional. Nothing is merged automatically by name or email, and no login is created."
+ label="Requesting organization on file"
+ subtext="A saved organization is optional. Nothing is merged automatically by name or email, and no login is created."
  >
  <CustomSelect 
- options={["New or one-time requester — no saved client", ...dbClients.map(c => c.name)]} 
+ options={["New or one-time requester — no saved organization", ...dbClients.map(c => c.name)]} 
  value={formData.client} 
  onChange={(val) => handleChange("client", val)} 
  />

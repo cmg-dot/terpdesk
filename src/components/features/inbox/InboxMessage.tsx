@@ -1,5 +1,6 @@
 import { ArrowLeft } from "lucide-react";
 import { InboxEmailBody } from "@/components/features/inbox/InboxEmailBody";
+import { InboxJobLink } from "@/components/features/inbox/InboxJobLink";
 import { senderLabel } from "@/components/features/inbox/InboxList";
 import { formatDateInZone, getIanaZone } from "@/utils/timezone";
 import type { InboxEmail } from "@/types/inbox";
@@ -10,10 +11,12 @@ interface InboxMessageProps {
   error: string | null;
   onBack: () => void;
   onMarkUnread: () => void;
+  /** The state request number this email is about and the job that has it, when known. */
+  jobRef?: { srn: string | null; jobId: string | null };
 }
 
 /** The reading pane for the selected email: loading skeleton, error, or the message itself. */
-export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread }: InboxMessageProps) {
+export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jobRef }: InboxMessageProps) {
   return (
     <div className="flex h-full flex-col">
       <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-3 sm:px-6">
@@ -51,6 +54,12 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread }: 
                 {email.senderName?.trim() && <span className="text-slate-500"> &lt;{email.senderEmail}&gt;</span>}
               </p>
               <p className="text-xs text-slate-500">{formatDateInZone(email.receivedAt, getIanaZone(), "EEE, MMM d, yyyy 'at' h:mm a zzz")}</p>
+              {jobRef?.srn && (
+                <p className="pt-1 text-sm">
+                  <InboxJobLink srn={jobRef.srn} jobId={jobRef.jobId} />
+                  {jobRef.jobId && <span className="text-slate-500"> · open the request</span>}
+                </p>
+              )}
             </header>
             <InboxEmailBody email={email} />
           </article>

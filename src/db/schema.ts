@@ -26,6 +26,9 @@ export interface RequestData {
     isMixedGroup?: boolean;
     /** Section 5 / patient information, entered on the request forms. Staff-only: never sent to interpreters. */
     clientGender?: string;
+    /** Staff marked this state job's booking as confirmed on the ODHH portal (a record of a manual step), and when. */
+    odhhConfirmed?: boolean;
+    odhhConfirmedAt?: string;
   };
   [key: string]: any;
 }

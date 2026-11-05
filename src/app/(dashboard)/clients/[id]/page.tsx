@@ -111,7 +111,7 @@ export default function ClientDetailsPage() {
  if (isLoading) {
  return (
  <div className="max-w-[1200px] mx-auto p-6 flex flex-col items-center justify-center h-[50vh]">
- <h1 className="text-2xl font-bold text-gray-800 mb-4">Loading client details...</h1>
+ <h1 className="text-2xl font-bold text-gray-800 mb-4">Loading organization details...</h1>
  </div>
  );
  }
@@ -119,9 +119,9 @@ export default function ClientDetailsPage() {
  if (!client) {
  return (
  <div className="max-w-[1200px] mx-auto p-6 flex flex-col items-center justify-center h-[50vh]">
- <h1 className="text-2xl font-bold text-gray-800 mb-4">Client not found</h1>
+ <h1 className="text-2xl font-bold text-gray-800 mb-4">Organization not found</h1>
  <Link href="/clients" className="bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full font-medium transition-opacity hover:opacity-90">
- ← Return to all clients
+ ← Return to all organizations
  </Link>
  </div>
  );
@@ -134,14 +134,14 @@ export default function ClientDetailsPage() {
  <div className="max-w-[1200px] mx-auto p-6 space-y-6 pb-24 antialiased">
  {/* Breadcrumb */}
  <Link href="/clients" className="text-[13px] text-[var(--sage)] hover:text-[var(--ink)] transition-colors inline-block mb-1">
- ← All clients
+ ← All organizations
  </Link>
 
  {/* Header & Subtitle */}
  <div className="space-y-2 mb-6">
  <h1 className="text-[28px] font-semibold tracking-tight text-[var(--ink)]">{client.name}</h1>
  {client.isArchived ? (
- <p className="text-[15px] text-[var(--sage)]">Archived. Existing jobs keep their details; restore the client to use it on new requests.</p>
+ <p className="text-[15px] text-[var(--sage)]">Archived. Existing jobs keep their details; restore the organization to use it on new requests.</p>
  ) : (
  <p className="text-[15px] text-[var(--sage)]">Saved details are only a starting point. Each job keeps the details confirmed for that job.</p>
  )}
@@ -152,22 +152,22 @@ export default function ClientDetailsPage() {
  {client.isArchived ? (
  <>
  <button className="bg-[#8BA49E] text-white/80 px-6 py-2.5 rounded-full text-sm font-medium cursor-not-allowed">
- New request for this client
+ New request for this organization
  </button>
  <button onClick={() => restoreClient(client.id)} className="bg-white text-gray-700 border border-gray-200 px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
- Restore client
+ Restore organization
  </button>
  <button onClick={() => setClientToDelete(true)} className="bg-white text-[#9B1C1C] border border-[#9B1C1C] px-6 py-2.5 rounded-full text-sm font-medium hover:bg-red-50 transition-colors">
- Delete client
+ Delete organization
  </button>
  </>
  ) : (
  <>
  <Link href={`/requests/new?clientId=${client.id}`} className="bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity">
- New request for this client
+ New request for this organization
  </Link>
  <button onClick={() => archiveClient(client.id)} className="bg-white text-gray-700 border border-gray-200 px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
- Archive client
+ Archive organization
  </button>
  </>
  )}
@@ -175,12 +175,12 @@ export default function ClientDetailsPage() {
 
  {/* Card 1: Client Details */}
  <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
- <h2 className="text-lg font-medium text-[var(--ink)] mb-6">Client details</h2>
+ <h2 className="text-lg font-medium text-[var(--ink)] mb-6">Organization details</h2>
  <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-6">
- <Field label="Client name">
+ <Field label="Organization name">
  <input type="text" className={inputClass} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} />
  </Field>
- <Field label="Client type">
+ <Field label="Organization type">
  <CustomSelect
  options={CLIENT_TYPE_OPTIONS.map((o) => o.label)}
  value={CLIENT_TYPE_LABELS[normalizeClientType(formData.type)]}
@@ -219,7 +219,7 @@ export default function ClientDetailsPage() {
 
  <div className="mt-4">
  <p className="text-[12px] text-[var(--sage)] mb-4 ml-2">
- Only agency staff can read these notes. Interpreters never see the client directory, billing contacts or these notes.
+ Only agency staff can read these notes. Interpreters never see the organization directory, billing contacts or these notes.
  </p>
  <button 
  disabled={isGeneralEmailInvalid}
@@ -233,7 +233,7 @@ export default function ClientDetailsPage() {
    isGeneralEmailInvalid ? "bg-[#8BA49E] text-white/70 opacity-60 cursor-not-allowed" : "bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90"
  }`}
  >
- {isSaving ? "Saved!" : "Save client details"}
+ {isSaving ? "Saved!" : "Save organization details"}
  </button>
  </div>
  </div>
@@ -353,7 +353,7 @@ export default function ClientDetailsPage() {
  onChange={e => setNewContactForm({ ...newContactForm, isDefault: e.target.checked })}
  className="h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
  />
- <span className="text-[14px] text-gray-600">Use as the default for this client</span>
+ <span className="text-[14px] text-gray-600">Use as the default for this organization</span>
  </div>
  <div className="mt-4">
  <button 
@@ -452,7 +452,7 @@ export default function ClientDetailsPage() {
  onChange={e => setNewLocationForm({...newLocationForm, isDefault: e.target.checked})}
  className="h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
  />
- <span className="text-[14px] text-gray-600">Use as the default location for this client</span>
+ <span className="text-[14px] text-gray-600">Use as the default location for this organization</span>
  </div>
  <div className="mt-4">
  <button 
@@ -500,10 +500,10 @@ export default function ClientDetailsPage() {
  ))}
  </div>
  ) : (
- <p className="text-sm text-[var(--ink)] mb-2">No jobs are linked to this client yet.</p>
+ <p className="text-sm text-[var(--ink)] mb-2">No jobs are linked to this organization yet.</p>
  )}
  <p className="text-[14px] text-[var(--sage)]">
- Changing saved client details never rewrites these jobs. Each job keeps the address, contact and instructions that were confirmed when it was booked.
+ Changing saved organization details never rewrites these jobs. Each job keeps the address, contact and instructions that were confirmed when it was booked.
  </p>
  </div>
 
@@ -587,7 +587,7 @@ export default function ClientDetailsPage() {
  {clientToDelete && (
  <div className="fixed inset-0 bg-black/20 z-50 flex items-center justify-center">
  <div className="bg-white rounded-xl p-6 max-w-sm w-full mx-4">
- <p className="text-[var(--ink)] font-medium mb-6">Are you sure you want to permanently delete this client? This cannot be undone.</p>
+ <p className="text-[var(--ink)] font-medium mb-6">Are you sure you want to permanently delete this organization? This cannot be undone.</p>
  <div className="flex justify-end gap-3">
  <button onClick={() => setClientToDelete(false)} className="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-50 rounded-full transition-colors">
  Cancel

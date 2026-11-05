@@ -44,7 +44,7 @@ const COPY: Record<ClientType, BannerCopy> = {
 
 /** Informational box under "Overview": wording and icon follow the client's type and name. */
 export const ClientAssignmentBanner = ({ clientType, clientName }: { clientType: ClientType; clientName?: string | null }) => {
-  const name = clientName?.trim() || "Unknown Client";
+  const name = clientName?.trim() || "Unknown Organization";
   const copy = COPY[clientType];
   const Icon = copy.icon;
 

@@ -45,13 +45,14 @@ function Section({ section, missing }: { section: FormSection; missing: string }
   );
 }
 
-export function StateFormDocument({ view }: { view: StateFormView }) {
+/** `embedded`: drawn inside the collapsible card, which supplies the border and the "Request form" title. */
+export function StateFormDocument({ view, embedded = false }: { view: StateFormView; embedded?: boolean }) {
   const missing = MISSING[view.source === "email" ? "email" : "records"];
   return (
-    <article aria-label="The state's request form" data-state-form={view.source} className="rounded-2xl border border-gray-200 bg-white">
+    <article aria-label="The state's request form" data-state-form={view.source} className={embedded ? "" : "rounded-2xl border border-gray-200 bg-white"}>
       <header className="border-b border-gray-100 px-6 py-4 sm:px-8">
-        <h2 className="text-[18px] font-medium text-[var(--ink)]">Request form</h2>
-        <p className="mt-0.5 text-xs text-[var(--sage)]">
+        {!embedded && <h2 className="text-[18px] font-medium text-[var(--ink)]">Request form</h2>}
+        <p className={`text-xs text-[var(--sage)] ${embedded ? "" : "mt-0.5"}`}>
           {view.source === "email"
             ? `The state's request, as it was sent${view.sentAt ? ` (${view.sentAt})` : ""}.`
             : "The state's original form is not on file for this job. This is the same form built from the details we have; forward the original email to fill it in."}

@@ -79,7 +79,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               </Link>
               <Link href="/clients" className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/clients') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
                 <Building className="h-4 w-4" />
-                Clients
+                Organizations
               </Link>
               <Link href="/website-requests" className={`flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors ${pathname.startsWith('/website-requests') ? 'bg-white/10 text-white' : 'text-[#8BA49E] hover:bg-white/5 hover:text-white'}`}>
                 <Globe className="h-4 w-4" />
@@ -185,7 +185,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   </Link>
                   <Link href="/clients" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/clients') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Building className="h-5 w-5" />
-                    Clients
+                    Organizations
                   </Link>
                   <Link href="/website-requests" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/website-requests') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Globe className="h-5 w-5" />

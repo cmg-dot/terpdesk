@@ -27,13 +27,13 @@ export default function ClientsPage() {
  const [isCreating, setIsCreating] = useState(false);
  const [newName, setNewName] = useState("");
  const [newType, setNewType] = useState<string>("organization");
- const [filter, setFilter] = useState<'Active clients' | 'Archived clients' | 'All clients'>('Active clients');
+ const [filter, setFilter] = useState<'Active organizations' | 'Archived organizations' | 'All organizations'>('Active organizations');
  const [searchQuery, setSearchQuery] = useState("");
 
  const filteredClients = clients.filter(c => {
  // Status filter
- if (filter === 'Active clients' && c.isArchived) return false;
- if (filter === 'Archived clients' && !c.isArchived) return false;
+ if (filter === 'Active organizations' && c.isArchived) return false;
+ if (filter === 'Archived organizations' && !c.isArchived) return false;
  
  // Search filter
  if (searchQuery.trim()) {
@@ -78,7 +78,7 @@ export default function ClientsPage() {
  {/* Top Banner */}
  {/* Header & Subtitle */}
  <div className="space-y-2 mb-8">
- <h1 className="text-[28px] font-semibold tracking-tight text-[var(--ink)]">Clients</h1>
+ <h1 className="text-[28px] font-semibold tracking-tight text-[var(--ink)]">Organizations</h1>
  <p className="text-[15px] text-[var(--sage)]">
  Organizations and individuals who request interpreting. The person receiving service is named on each assignment, never stored here.
  </p>
@@ -90,7 +90,7 @@ export default function ClientsPage() {
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6">
  <div className="flex-1 flex flex-col md:flex-row gap-6">
  <div className="flex-1">
- <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Search clients, contacts and locations</label>
+ <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Search organizations, contacts and locations</label>
  <input
  type="text"
  value={searchQuery}
@@ -102,7 +102,7 @@ export default function ClientsPage() {
  <div className="md:w-[250px]">
  <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Show</label>
  <CustomSelect 
- options={["Active clients", "Archived clients", "All clients"]}
+ options={["Active organizations", "Archived organizations", "All organizations"]}
  value={filter}
  onChange={(val) => setFilter(val as any)}
  />
@@ -110,16 +110,16 @@ export default function ClientsPage() {
  </div>
  <Dialog open={isCreating} onOpenChange={setIsCreating}>
  <DialogTrigger className="w-full md:w-auto shrink-0 bg-[var(--forest)] text-[var(--canvas)] px-6 py-2.5 rounded-full text-sm font-medium hover:opacity-90 transition-opacity h-[40px]">
- Add client
+ Add organization
  </DialogTrigger>
  <DialogContent className="overflow-visible">
  <DialogHeader>
- <DialogTitle>Add client</DialogTitle>
- <DialogDescription>Creating a client never creates a login, sends an invitation or sends email.</DialogDescription>
+ <DialogTitle>Add organization</DialogTitle>
+ <DialogDescription>Creating an organization never creates a login, sends an invitation or sends email.</DialogDescription>
  </DialogHeader>
  <div className="space-y-5">
  <div>
- <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Client name</label>
+ <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Organization name</label>
  <input
  type="text"
  value={newName}
@@ -131,7 +131,7 @@ export default function ClientsPage() {
  />
  </div>
  <div>
- <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Client type</label>
+ <label className="block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2">Organization type</label>
  <CustomSelect
  options={CLIENT_TYPE_OPTIONS.map((o) => o.label)}
  value={CLIENT_TYPE_LABELS[normalizeClientType(newType)]}
@@ -154,7 +154,7 @@ export default function ClientsPage() {
  newName.trim() ? "bg-[var(--forest)]" : "bg-[#7B958F]"
  }`}
  >
- Create client
+ Create organization
  </button>
  </DialogFooter>
  </DialogContent>
@@ -162,7 +162,7 @@ export default function ClientsPage() {
  </div>
  </div>
 
- {/* Client Grid */}
+ {/* Organization grid */}
  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-8">
  {filteredClients.map((client) => (
  <div
@@ -204,9 +204,9 @@ export default function ClientsPage() {
  ))}
  {filteredClients.length === 0 && (
  <div className="col-span-full bg-white rounded-2xl border border-gray-200 p-12 text-center">
- <p className="text-[15px] font-medium text-[var(--ink)] mb-1">No clients found</p>
+ <p className="text-[15px] font-medium text-[var(--ink)] mb-1">No organizations found</p>
  <p className="text-sm text-[var(--sage)]">
- {searchQuery ? "Try adjusting your search terms." : "Add your first client to start organizing contacts and locations."}
+ {searchQuery ? "Try adjusting your search terms." : "Add your first organization to start organizing contacts and locations."}
  </p>
  </div>
  )}

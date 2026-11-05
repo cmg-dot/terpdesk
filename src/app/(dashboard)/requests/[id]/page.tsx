@@ -31,7 +31,8 @@ import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
-import { StateFormDocument } from "@/components/requests/StateFormDocument";
+import { CollapsibleStateForm } from "@/components/requests/CollapsibleStateForm";
+import { setOdhhConfirmed } from "@/app/actions/odhhConfirmation";
 import { StaffingPanel } from "@/components/requests/staffing/StaffingPanel";
 import type { Position, PositionView, StaffBooking, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
 import { buildStateFormView, notesWithoutFormSection5 } from "@/lib/stateFormView";
@@ -326,6 +327,10 @@ export default function AssignmentDetailPage() {
   // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
   const messageRecipients = bookedRecipients(realOffers);
   const [editNotice, setEditNotice] = useState<string | null>(null);
+  // The ODHH portal confirmation: what staff last saved here wins over the loaded copy until the page is loaded again.
+  const [odhhConfirmedSaved, setOdhhConfirmedSaved] = useState<boolean | null>(null);
+  const [odhhSaving, setOdhhSaving] = useState(false);
+  const [odhhError, setOdhhError] = useState<string | null>(null);
   const [activityVersion, setActivityVersion] = useState(0);
 
  const [showCancelModal, setShowCancelModal] = useState(false);
@@ -903,7 +908,28 @@ export default function AssignmentDetailPage() {
  )}
 
  {/* The state keeps its own record: once someone is booked, staff confirm the booking on the state portal. */}
- {isStateRequest && hasAcceptedBooking && !isCancelled && <OdhhPortalReminder srn={requestSrnValue} />}
+ {isStateRequest && hasAcceptedBooking && !isCancelled && (
+ <OdhhPortalReminder
+   srn={requestSrnValue}
+   confirmed={odhhConfirmedSaved ?? foundRequest?.data?.intake?.odhhConfirmed === true}
+   busy={odhhSaving}
+   error={odhhError}
+   onConfirmedChange={async (confirmed) => {
+     if (!foundRequest?.id) return;
+     setOdhhSaving(true);
+     setOdhhError(null);
+     try {
+       const result = await setOdhhConfirmed({ requestId: String(foundRequest.id), confirmed });
+       if (result.success) setOdhhConfirmedSaved(result.confirmed);
+       else setOdhhError(result.error);
+     } catch {
+       setOdhhError("We could not save that. Please try again.");
+     } finally {
+       setOdhhSaving(false);
+     }
+   }}
+ />
+ )}
 
  {/* Questions from interpreters: first, so staff see them immediately. */}
  <ClarificationsCard clarifications={foundRequest?.data?.clarifications} />
@@ -939,7 +965,7 @@ export default function AssignmentDetailPage() {
 
  <div className="flex flex-col gap-6 w-full">
  {/* The state's request form is the page: its five numbered sections, from the saved email or from what the job has on file. */}
- <StateFormDocument view={stateFormView} />
+ <CollapsibleStateForm view={stateFormView} summary={{ srn: requestSrnValue, when: whenText, location: where.text }} />
 
  {/* Staffing and booking, directly under the form. */}
  {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} />}
