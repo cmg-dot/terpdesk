@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ingestInboxStateForm } from "@/lib/inboxFormIngest";
 import { logError } from "@/lib/logError";
-import { parseSesNotification, storeInboxEmail } from "@/lib/sesInbox";
+import { parseSesNotification, sesAuthenticated, storeInboxEmail } from "@/lib/sesInbox";
 import { isSnsUrl, snsMessageSchema, verifySnsSignature } from "@/lib/snsVerify";
 
 export const dynamic = "force-dynamic";
@@ -59,8 +59,9 @@ export async function POST(req: Request) {
     }
     const outcome = await storeInboxEmail(email);
     console.log(`[${TAG}] Email ${outcome}`);
-    // A state request form that came in through the Inbox is applied like one that came through /api/intake. Never throws.
-    const form = await ingestInboxStateForm({ senderEmail: email.senderEmail, subject: email.subject ?? "", bodyText: email.bodyText ?? null });
+    // A state request form that came in through the Inbox is applied like one that came through /api/intake, and the state's
+    // "Request Voided" notice voids its job when the sender can be trusted. Never throws.
+    const form = await ingestInboxStateForm({ senderEmail: email.senderEmail, subject: email.subject ?? "", bodyText: email.bodyText ?? null, authenticated: sesAuthenticated(message.Message) });
     if (form !== "skipped") console.log(`[${TAG}] State form ${form}`);
     return reply(200, { success: true, outcome });
   } catch (error) {

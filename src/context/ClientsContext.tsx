@@ -32,6 +32,10 @@ export interface ClientItem {
   isArchived?: boolean;
   generalEmail?: string;
   generalPhone?: string;
+  contactEmail?: string;
+  contactPhone?: string;
+  contactEmailFrom?: string | null;
+  contactPhoneFrom?: string | null;
   billingOrg?: string;
   billingAddress?: string;
   privateNotes?: string;
@@ -80,6 +84,10 @@ export function ClientsProvider({ children }: { children: ReactNode }) {
         isArchived: c.isArchived,
         generalEmail: c.generalEmail,
         generalPhone: c.generalPhone,
+        contactEmail: c.contactEmail,
+        contactPhone: c.contactPhone,
+        contactEmailFrom: c.contactEmailFrom,
+        contactPhoneFrom: c.contactPhoneFrom,
         billingOrg: c.billingOrg,
         billingAddress: c.billingAddress,
         privateNotes: c.privateNotes,

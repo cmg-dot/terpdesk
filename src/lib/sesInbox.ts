@@ -34,6 +34,32 @@ const sesNotificationSchema = z.object({
   content: z.string().optional(),
 });
 
+const verdictSchema = z.object({ status: z.string().optional() }).optional();
+const receiptVerdictsSchema = z.object({
+  receipt: z
+    .object({ dkimVerdict: verdictSchema, dmarcVerdict: verdictSchema, spamVerdict: verdictSchema, virusVerdict: verdictSchema })
+    .optional(),
+});
+
+/**
+ * Whether SES vouches for the sender: the mail passed DKIM or DMARC and was not flagged as spam or a virus. Absent verdicts count
+ * as "no" (fails closed). This does not say WHO the sender is, only that the From address was not forged. Pure.
+ */
+export function sesAuthenticated(messageJson: string): boolean {
+  let json: unknown;
+  try {
+    json = JSON.parse(messageJson);
+  } catch {
+    return false;
+  }
+  const parsed = receiptVerdictsSchema.safeParse(json);
+  const receipt = parsed.success ? parsed.data.receipt : undefined;
+  if (!receipt) return false;
+  const pass = (v: { status?: string } | undefined) => v?.status?.toUpperCase() === "PASS";
+  const fail = (v: { status?: string } | undefined) => v?.status?.toUpperCase() === "FAIL";
+  return (pass(receipt.dkimVerdict) || pass(receipt.dmarcVerdict)) && !fail(receipt.spamVerdict) && !fail(receipt.virusVerdict);
+}
+
 export type ParsedInboxEmail = Omit<InsertAgencyInbox, "id" | "isRead">;
 
 const clip = (value: string | undefined | null, max: number): string => (value ?? "").slice(0, max);

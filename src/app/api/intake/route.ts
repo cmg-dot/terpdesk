@@ -7,6 +7,8 @@ import { respondToServiceVerification } from "@/lib/serviceVerification";
 import type { TimesheetIntakeResponse } from "@/lib/serviceVerification";
 import { resolveIntakeType } from "@/lib/odhhVerificationParser";
 import { processJobOfferEmail } from "@/lib/odhhIntakeProcess";
+import { parseVoidNotice } from "@/lib/stateVoidParse";
+import { processStateVoidNotice } from "@/lib/stateVoidNotice";
 import { sanitizeSrn, type AppointmentFormat } from "@/lib/odhhEmailParser";
 
 /**
@@ -65,6 +67,12 @@ interface DuplicateIntakeResponse {
   id: string;
 }
 
+interface VoidNoticeResponse {
+  success: true;
+  outcome: "void_notice";
+  result: string;
+}
+
 interface WebhookErrorResponse {
   success: false;
   error: string;
@@ -101,7 +109,7 @@ function validatePayload(
 
 export async function POST(
   req: Request
-): Promise<NextResponse<WebhookSuccessResponse | NotAJobResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | WebhookErrorResponse>> {
+): Promise<NextResponse<WebhookSuccessResponse | NotAJobResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | VoidNoticeResponse | WebhookErrorResponse>> {
   try {
     const denied = rejectUnlessIntakeAuthorized(req, "Intake Webhook");
     if (denied) return denied;
@@ -137,6 +145,15 @@ export async function POST(
     if (intakeType === "timesheet") {
       const { verification, attachments } = body as Record<string, unknown>;
       return respondToServiceVerification(rawContent, verification, attachments);
+    }
+
+    // The state's "Request Voided" notice voids the job with that SRN. This route is API-key protected, so the mail counts as
+    // authenticated; the sender must still be on the trusted list (see stateVoidNotice.ts). Never throws; 200 so AWS never retries.
+    const voidNotice = parseVoidNotice(subject);
+    if (voidNotice) {
+      const voided = await processStateVoidNotice({ srn: voidNotice.srn, senderEmail: email, authenticated: true });
+      console.log("[Intake Webhook] Voided notice handled", { outcome: voided.outcome });
+      return NextResponse.json({ success: true, outcome: "void_notice", result: voided.outcome }, { status: 200 });
     }
 
     // HIPAA: log only that an email arrived and its size. The sender, subject and body can hold PHI, so none are logged.

@@ -8,6 +8,8 @@ import { clients, requests, type ClientContact, type ClientLocation, type Client
 import { eq, desc, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logError } from "@/lib/logError";
+import { contactInfoFor } from "@/lib/clientContactInfo";
+import { matchesClientRequest } from "@/lib/clientRequestMatch";
 
 let clientsTableEnsured = false;
 
@@ -38,6 +40,12 @@ export interface ClientWithStats {
   isArchived: boolean;
   generalEmail?: string;
   generalPhone?: string;
+  /** What the card shows: the general email / phone, else a billing (or other) contact's. */
+  contactEmail?: string;
+  contactPhone?: string;
+  /** Where a shown email / phone came from when it is not the organization's own ("Billing contact: Pat Lee"). */
+  contactEmailFrom?: string | null;
+  contactPhoneFrom?: string | null;
   billingOrg?: string;
   billingAddress?: string;
   privateNotes?: string;
@@ -47,33 +55,6 @@ export interface ClientWithStats {
   linkedJobsCount: number;
   stats: string;
   contactSummary: string;
-}
-
-function matchesClientRequest(requestRow: { data: any }, clientName: string): boolean {
-  if (!clientName || !clientName.trim()) return false;
-  const target = clientName.trim().toLowerCase();
-  const rData = (requestRow?.data || {}) as any;
-
-  const candidateFields: Array<string | undefined | null> = [
-    rData.client,
-    rData.clientName,
-    rData.requester?.org,
-    rData.requester?.billOrg,
-    rData.details?.organization,
-    rData.details?.client,
-    rData.intake?.organization,
-    rData.intake?.org,
-    rData.intake?.client,
-    rData.overview?.organization,
-    rData.overview?.client
-  ];
-
-  return candidateFields.some(field => {
-    if (typeof field === "string" && field.trim()) {
-      return field.trim().toLowerCase() === target;
-    }
-    return false;
-  });
 }
 
 export async function getClientsAction(): Promise<ClientWithStats[]> {
@@ -99,11 +80,8 @@ export async function getClientsAction(): Promise<ClientWithStats[]> {
       const linkedJobsCount = linkedJobs.length;
       const stats = `${contacts.length} contacts · ${locations.length} locations · ${linkedJobsCount} linked jobs`;
 
-      const defaultContact = contacts.find(co => co.isDefault && !co.isArchived) || contacts.find(co => !co.isArchived);
-      const contactSummary = [
-        cData.generalEmail || defaultContact?.email,
-        cData.generalPhone || defaultContact?.phone
-      ].filter(Boolean).join(" · ") || "No contact info";
+      const info = contactInfoFor(cData);
+      const contactSummary = [info.email, info.phone].filter(Boolean).join(" · ") || "No contact info";
 
       return {
         id: c.id,
@@ -112,6 +90,10 @@ export async function getClientsAction(): Promise<ClientWithStats[]> {
         isArchived: Boolean(c.archived),
         generalEmail: cData.generalEmail || "",
         generalPhone: cData.generalPhone || "",
+        contactEmail: info.email,
+        contactPhone: info.phone,
+        contactEmailFrom: info.emailFrom,
+        contactPhoneFrom: info.phoneFrom,
         billingOrg: cData.billingOrganization || cData.billingOrg || "",
         billingAddress: cData.billingAddress || "",
         privateNotes: cData.privateNotes || "",

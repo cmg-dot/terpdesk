@@ -1,4 +1,6 @@
 import { logError } from "@/lib/logError";
+import { parseVoidNotice } from "@/lib/stateVoidParse";
+import { processStateVoidNotice } from "@/lib/stateVoidNotice";
 import { processJobOfferEmail } from "@/lib/odhhIntakeProcess";
 import { resolveIntakeType } from "@/lib/odhhVerificationParser";
 
@@ -15,12 +17,22 @@ export interface InboxMail {
   senderEmail: string;
   subject: string;
   bodyText: string | null;
+  /** SES vouched for the sender (DKIM/DMARC passed). Needed before a "Request Voided" notice may void a job. */
+  authenticated?: boolean;
 }
 
-export type InboxIngestResult = "created" | "filled" | "unchanged" | "skipped" | "failed";
+export type InboxIngestResult = "created" | "filled" | "unchanged" | "skipped" | "failed" | "voided" | "void_held" | "void_ignored";
 
 export async function ingestInboxStateForm(mail: InboxMail): Promise<InboxIngestResult> {
   const text = mail.bodyText ?? "";
+  // The state's "Request Voided" notice: void the job that has that SRN (when the sender can be trusted). Never throws.
+  const voidNotice = parseVoidNotice(mail.subject);
+  if (voidNotice) {
+    const result = await processStateVoidNotice({ srn: voidNotice.srn, senderEmail: mail.senderEmail, authenticated: mail.authenticated === true });
+    if (result.outcome === "voided") return "voided";
+    if (result.outcome === "failed") return "failed";
+    return result.outcome === "unverified" || result.outcome === "needs_review" ? "void_held" : "void_ignored";
+  }
   // Service-verification receipts (hours) are a different flow: they are never read as a job request here.
   if (resolveIntakeType(undefined, text) !== "job_offer") return "skipped";
   try {

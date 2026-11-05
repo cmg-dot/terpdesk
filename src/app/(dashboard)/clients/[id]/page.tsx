@@ -200,9 +200,19 @@ export default function ClientDetailsPage() {
      Please enter a valid email address (e.g., name@organization.org).
    </p>
  )}
+ {!formData.generalEmail.trim() && client.contactEmail && (
+   <p className="text-xs text-[var(--sage)] mt-1" data-contact-hint="email">
+     Shown on the list from {client.contactEmailFrom ?? "a contact"}: {client.contactEmail}
+   </p>
+ )}
  </Field>
  <Field label="General phone">
  <input type="tel" className={inputClass} value={formData.generalPhone} onChange={(e) => setFormData({...formData, generalPhone: e.target.value})} />
+ {!formData.generalPhone.trim() && client.contactPhone && (
+   <p className="text-xs text-[var(--sage)] mt-1" data-contact-hint="phone">
+     Shown on the list from {client.contactPhoneFrom ?? "a contact"}: {client.contactPhone}
+   </p>
+ )}
  </Field>
 
  <Field label="Billing organization">

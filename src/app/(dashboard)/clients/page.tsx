@@ -184,11 +184,11 @@ export default function ClientsPage() {
  <ul className="space-y-3 text-[13px] text-[var(--sage)]">
  <li className="flex items-center gap-2.5">
  <Mail className="w-4 h-4 shrink-0 text-gray-400" aria-hidden="true" />
- <span className="break-all">{client.generalEmail || "No email on file"}</span>
+ <span className="break-all" title={client.contactEmailFrom ?? undefined}>{client.contactEmail || client.generalEmail || "No email on file"}</span>
  </li>
  <li className="flex items-center gap-2.5">
  <Phone className="w-4 h-4 shrink-0 text-gray-400" aria-hidden="true" />
- <span>{client.generalPhone || "No phone on file"}</span>
+ <span title={client.contactPhoneFrom ?? undefined}>{client.contactPhone || client.generalPhone || "No phone on file"}</span>
  </li>
  <li className="flex items-center gap-2.5">
  <Link2 className="w-4 h-4 shrink-0 text-gray-400" aria-hidden="true" />

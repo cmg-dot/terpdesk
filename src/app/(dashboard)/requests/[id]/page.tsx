@@ -21,7 +21,6 @@ import { formatReference } from "@/utils/statusEngine";
 import { getInterpretersFitForJob } from "@/app/actions/availability";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
-import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
 import { RequestActionBar } from "@/components/requests/RequestActionBar";
 import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
@@ -32,7 +31,6 @@ import { formatHoursMinutes } from "@/lib/durationFormat";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { CollapsibleStateForm } from "@/components/requests/CollapsibleStateForm";
-import { setOdhhConfirmed } from "@/app/actions/odhhConfirmation";
 import { StaffingPanel } from "@/components/requests/staffing/StaffingPanel";
 import type { Position, PositionView, StaffBooking, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
 import { buildStateFormView, notesWithoutFormSection5 } from "@/lib/stateFormView";
@@ -327,10 +325,6 @@ export default function AssignmentDetailPage() {
   // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
   const messageRecipients = bookedRecipients(realOffers);
   const [editNotice, setEditNotice] = useState<string | null>(null);
-  // The ODHH portal confirmation: what staff last saved here wins over the loaded copy until the page is loaded again.
-  const [odhhConfirmedSaved, setOdhhConfirmedSaved] = useState<boolean | null>(null);
-  const [odhhSaving, setOdhhSaving] = useState(false);
-  const [odhhError, setOdhhError] = useState<string | null>(null);
   const [activityVersion, setActivityVersion] = useState(0);
 
  const [showCancelModal, setShowCancelModal] = useState(false);
@@ -905,30 +899,6 @@ export default function AssignmentDetailPage() {
  <span>{editNotice}</span>
  <button type="button" onClick={() => setEditNotice(null)} className="text-emerald-700 hover:text-emerald-900" aria-label="Dismiss"><X className="w-4 h-4" /></button>
  </div>
- )}
-
- {/* The state keeps its own record: once someone is booked, staff confirm the booking on the state portal. */}
- {isStateRequest && hasAcceptedBooking && !isCancelled && (
- <OdhhPortalReminder
-   srn={requestSrnValue}
-   confirmed={odhhConfirmedSaved ?? foundRequest?.data?.intake?.odhhConfirmed === true}
-   busy={odhhSaving}
-   error={odhhError}
-   onConfirmedChange={async (confirmed) => {
-     if (!foundRequest?.id) return;
-     setOdhhSaving(true);
-     setOdhhError(null);
-     try {
-       const result = await setOdhhConfirmed({ requestId: String(foundRequest.id), confirmed });
-       if (result.success) setOdhhConfirmedSaved(result.confirmed);
-       else setOdhhError(result.error);
-     } catch {
-       setOdhhError("We could not save that. Please try again.");
-     } finally {
-       setOdhhSaving(false);
-     }
-   }}
- />
  )}
 
  {/* Questions from interpreters: first, so staff see them immediately. */}
