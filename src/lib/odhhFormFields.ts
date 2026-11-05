@@ -51,13 +51,26 @@ const inSection = (lines: string[] | null, label: string): string | null => {
   return null;
 };
 
+/**
+ * A "Label: value" the form wrapped onto its next line ("Department of Services for the Blind - Vancouver -" then
+ * "Thompson"): joined only when the first line ends in a dash and the next line is short and is not itself a "Label:" line.
+ */
+const wrappedValue = (text: string, pattern: RegExp): string | undefined => {
+  const match = pattern.exec(text);
+  if (!match) return undefined;
+  const value = match[1];
+  if (!/[-–—]$/.test(value.trim())) return value;
+  const next = (text.slice(match.index + match[0].length).split("\n")[1] ?? "").trim();
+  return next !== "" && next.length <= 80 && !next.includes(":") ? `${value.trim()} ${next}` : value;
+};
+
 export function parseFormExtras(rawContent: string): FormExtras {
   const text = normalizeEmailText(rawContent);
   const location = sectionLines(text, LOCATION_HEADER);
   const account = sectionLines(text, ACCOUNT_HEADER);
   return {
     setting: real(text.match(APPOINTMENT_SETTING)?.[1]) ?? real(text.match(PLAIN_SETTING)?.[1]),
-    billingOrganization: real(text.match(BILLING_ORG)?.[1]),
+    billingOrganization: real(wrappedValue(text, BILLING_ORG)),
     building: real(text.match(BUILDING)?.[1]),
     floor: real(text.match(FLOOR)?.[1]),
     room: real(text.match(ROOM)?.[1]),
