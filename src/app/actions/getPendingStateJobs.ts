@@ -6,7 +6,8 @@ import { db } from "@/db";
 import { interpreters, offers, requests, timesheets } from "@/db/schema";
 import { requireRole } from "@/lib/auth/guards";
 import { isStateJobRequest } from "@/lib/stateJob";
-import { formatReference } from "@/utils/statusEngine";
+import { requestReference } from "@/utils/statusEngine";
+import { requestOrganization, requestSrn } from "@/lib/requestSummary";
 import { getIanaZone, resolveRequestTimes, utcToWallClock } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
@@ -14,10 +15,14 @@ export interface PendingStateJob {
   requestId: string;
   interpreterId: string;
   interpreterName: string;
-  /** Short job reference, e.g. APT-D18510. */
+  /** "SRN #202786433"; the short APT reference (e.g. APT-D18510) only for a job that has no SRN. */
   reference: string;
   /** Appointment date in the job's own time zone. */
   dateLabel: string;
+  /** Appointment start and end as clock times in the job's zone, e.g. "9:00 AM – 10:30 AM PST". */
+  timeLabel: string;
+  /** Who the job is for ("Seattle Children's"), or null when only a funding program is on file. */
+  organization: string | null;
   /** Scheduled start/end as wall-clock strings (yyyy-MM-ddTHH:mm) in the job's zone, for prefilling. */
   scheduledStart: string;
   scheduledEnd: string;
@@ -80,8 +85,10 @@ export async function getPendingStateJobs(): Promise<PendingStateJob[]> {
       requestId: row.requestId,
       interpreterId: row.interpreterId,
       interpreterName: row.interpreterName,
-      reference: formatReference(row.requestId),
+      reference: requestReference(requestSrn({ data: row.data }), row.requestId),
       dateLabel: formatInTimeZone(startsAt, zone, "MMM d, yyyy"),
+      timeLabel: `${formatInTimeZone(startsAt, zone, "h:mm a")} – ${formatInTimeZone(endsAt, zone, "h:mm a zzz")}`,
+      organization: requestOrganization({ requester: row.data.requester, data: row.data }),
       scheduledStart: utcToWallClock(startsAt, zone),
       scheduledEnd: utcToWallClock(endsAt, zone),
       timeZone: zone,

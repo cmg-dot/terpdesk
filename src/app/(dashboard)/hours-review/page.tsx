@@ -1,7 +1,6 @@
 "use client";
 
-import React, { Suspense, useState, useEffect } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import React, { Suspense, useMemo, useState, useEffect } from "react";
 import Link from "next/link";
 import { ChevronDown, ChevronRight, Copy, Check } from "lucide-react";
 import { approveHours, requestHoursCorrection } from "@/app/actions/reviewHours";
@@ -9,13 +8,16 @@ import { fetchLiveRequests } from "@/app/actions/getRequests";
 import { approveTimesheet } from "@/app/actions/approveTimesheet";
 import { getSubmittedTimesheets } from "@/app/actions/getSubmittedTimesheets";
 import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
-import { isAwaitingReview, mergeHoursRecords } from "@/utils/hoursReviewRecords";
+import { mergeHoursRecords } from "@/utils/hoursReviewRecords";
 import { formatReference } from "@/utils/statusEngine";
 import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone, parseInstantInZone } from "@/utils/timezone";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { buildPageTokens } from "@/components/ui/AnimatedPaginatedList";
 import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDialog";
 import { PendingVerifications } from "@/components/features/PendingVerifications";
+import { HoursReviewFilterBar } from "@/components/features/hours-review/HoursReviewFilterBar";
+import { useHoursReviewFilters } from "@/hooks/useHoursReviewFilters";
+import { DEFAULT_FILTERS, countActiveFilters, filterRecords, hrefForPage, statusCounts as countStatuses } from "@/lib/hoursReviewFilter";
 import { BillableTimeRow } from "@/components/features/BillableTimeRow";
 import { SignatureImage } from "@/components/features/SignatureImage";
 import { MileageApprovalField, needsMileageReason } from "@/components/features/MileageApprovalField";
@@ -441,9 +443,7 @@ const ITEMS_PER_PAGE = 5;
 const pagerBase = "inline-flex items-center justify-center min-w-[2.5rem] px-4 py-2 text-sm font-medium border border-gray-200 rounded-lg transition-colors";
 
 function HoursReviewContent() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const [activeTab, setActiveTab] = useState<'awaiting' | 'all'>('awaiting');
+  const { filters, requestedPage, pathname, setFilters } = useHoursReviewFilters();
   const [records, setRecords] = useState<ServiceRecord[]>([]);
   
   useEffect(() => {
@@ -488,27 +488,14 @@ function HoursReviewContent() {
     }
   };
   
-  const awaitingRecords = records.filter(isAwaitingReview);
-  const submittedCount = awaitingRecords.length;
-  const allCount = records.length;
-  
-  const displayedRecords = activeTab === 'awaiting' ? awaitingRecords : records;
+  // The search and filters live in the URL (?q=&status=&range=&sig=&page=), so a view survives a reload and can be shared.
+  const displayedRecords = useMemo(() => filterRecords(records, filters), [records, filters]);
+  const statusCounts = useMemo(() => countStatuses(records), [records]);
 
-  // Page lives in the URL (?page=2) so it survives reloads and can be shared. 20 records per page.
-  const requestedPage = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10) || 1);
   const totalPages = Math.max(1, Math.ceil(displayedRecords.length / ITEMS_PER_PAGE));
   const page = Math.min(requestedPage, totalPages);
   const pageRecords = displayedRecords.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
-
-  const goToPage = (next: number) => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.set('page', String(next));
-    router.push(`?${params.toString()}`);
-  };
-  const selectTab = (tab: 'awaiting' | 'all') => {
-    setActiveTab(tab);
-    if (requestedPage !== 1) goToPage(1);
-  };
+  const pageHref = (target: number) => hrefForPage(filters, target, pathname);
 
   return (
     <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-6 pb-24 antialiased pt-6">
@@ -523,37 +510,31 @@ function HoursReviewContent() {
         <LogStateJobHoursDialog onLogged={() => window.dispatchEvent(new Event('storage'))} />
       </div>
 
-      {/* Reports that could not be tied to one booked interpreter; assigning one reloads the records below through the same "storage" listener. */}
-      <PendingVerifications onAssigned={() => window.dispatchEvent(new Event('storage'))} />
+      <HoursReviewFilterBar
+        filters={filters}
+        onChange={setFilters}
+        statusCounts={statusCounts}
+        shown={displayedRecords.length}
+        total={records.length}
+      />
 
-      <div className="flex flex-wrap gap-3 mb-8">
-        <button
-          onClick={() => selectTab('awaiting')}
-          className={`w-full sm:w-auto px-5 py-2.5 transition-colors text-sm font-medium rounded-full ${
-            activeTab === 'awaiting' 
-              ? 'bg-[#145347] text-white hover:bg-[#0f4037]' 
-              : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 '
-          }`}
-        >
-          Awaiting review ({submittedCount})
-        </button>
-        <button 
-          onClick={() => selectTab('all')}
-          className={`w-full sm:w-auto px-5 py-2.5 transition-colors text-sm font-medium rounded-full ${
-            activeTab === 'all' 
-              ? 'bg-[#145347] text-white hover:bg-[#0f4037]' 
-              : 'bg-white border border-gray-200 text-gray-700 hover:bg-gray-50 '
-          }`}
-        >
-          All reported hours ({allCount})
-        </button>
-      </div>
+      {/* Reports that could not be tied to one booked interpreter; assigning one reloads the records below through the same "storage" listener. The search box filters them too. */}
+      <PendingVerifications onAssigned={() => window.dispatchEvent(new Event('storage'))} query={filters.q} />
 
       <div className="flex flex-col gap-6 w-full">
         {displayedRecords.length === 0 ? (
           <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center flex flex-col items-center justify-center">
             <h3 className="text-lg font-medium text-[var(--ink)] mb-2">No service records found</h3>
-            <p className="text-sm text-[var(--sage)]">There are currently no records to review.</p>
+            {countActiveFilters(filters) > 0 ? (
+              <>
+                <p className="text-sm text-[var(--sage)] mb-4">No records match your search and filters.</p>
+                <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="text-sm font-medium text-[#0B3B32] hover:underline">
+                  Clear filters
+                </button>
+              </>
+            ) : (
+              <p className="text-sm text-[var(--sage)]">There are currently no records to review.</p>
+            )}
           </div>
         ) : (
           pageRecords.map(record => (
@@ -565,7 +546,7 @@ function HoursReviewContent() {
       {/* Same numbered-block look as "Needs attention" and "Upcoming bookings". */}
       <nav aria-label="Pagination" className="flex flex-wrap items-center gap-2 mt-6 py-4 border-t border-gray-200">
         {page > 1 ? (
-          <Link href={`?page=${page - 1}`} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
+          <Link href={pageHref(page - 1)} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
             Prev
           </Link>
         ) : (
@@ -578,7 +559,7 @@ function HoursReviewContent() {
           typeof token === 'number' ? (
             <Link
               key={token}
-              href={`?page=${token}`}
+              href={pageHref(token)}
               aria-current={token === page ? 'page' : undefined}
               className={`${pagerBase} ${
                 token === page
@@ -596,7 +577,7 @@ function HoursReviewContent() {
         )}
 
         {page < totalPages ? (
-          <Link href={`?page=${page + 1}`} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
+          <Link href={pageHref(page + 1)} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
             Next
           </Link>
         ) : (

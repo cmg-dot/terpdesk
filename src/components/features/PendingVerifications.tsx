@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { assignVerificationInterpreter, getPendingVerifications } from "@/app/actions/pendingVerifications";
+import { matchesSearch } from "@/lib/hoursReviewFilter";
 import { SignatureImage } from "@/components/features/SignatureImage";
 import { Dropdown } from "@/components/ui/Dropdown";
 import type { DropdownOption } from "@/lib/dropdown";
@@ -118,7 +119,7 @@ function PendingCard({ item, onDone }: { item: PendingVerificationView; onDone: 
  * Hours review > "Needs an interpreter": service-verification reports that could not be tied to one booked interpreter.
  * Renders nothing when there are none. After an assignment it asks the page to reload its records (`onAssigned`).
  */
-export function PendingVerifications({ onAssigned }: { onAssigned: () => void }) {
+export function PendingVerifications({ onAssigned, query = "" }: { onAssigned: () => void; /** The search box's text: only reports whose SRN, title or named interpreter match are shown. */ query?: string }) {
   const [items, setItems] = useState<PendingVerificationView[] | null>(null);
 
   const load = useCallback(async () => {
@@ -131,14 +132,20 @@ export function PendingVerifications({ onAssigned }: { onAssigned: () => void })
     return () => window.removeEventListener("storage", load);
   }, [load]);
 
+  const shown = useMemo(
+    () => (items ?? []).filter((item) => matchesSearch(query, item.reference, item.title, item.reportInterpreter.name)),
+    [items, query],
+  );
+
   if (!items || items.length === 0) return null;
   return (
     <section aria-label="Reports that need an interpreter" className="space-y-4">
       <div>
-        <h2 className="text-xl font-semibold text-[var(--ink)]">Needs an interpreter ({items.length})</h2>
+        <h2 className="text-xl font-semibold text-[var(--ink)]">Needs an interpreter ({shown.length === items.length ? items.length : `${shown.length} of ${items.length}`})</h2>
         <p className="text-sm text-[var(--sage)]">These ODHH reports arrived for a job where nobody is booked, or where the report does not say which of two interpreters it is for.</p>
+        {shown.length === 0 && <p role="status" className="mt-2 text-sm text-[var(--sage)]">None of these match your search.</p>}
       </div>
-      {items.map((item) => (
+      {shown.map((item) => (
         <PendingCard key={item.reportId} item={item} onDone={() => { onAssigned(); void load(); }} />
       ))}
     </section>

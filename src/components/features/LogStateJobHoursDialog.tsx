@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import { getPendingStateJobs } from "@/app/actions/getPendingStateJobs";
 import type { PendingStateJob } from "@/app/actions/getPendingStateJobs";
 import { logStateJobHours } from "@/app/actions/logStateJobHours";
-import { Dropdown } from "@/components/ui/Dropdown";
+import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import type { SearchableOption } from "@/components/ui/SearchableSelect";
+import { stateJobOptionDescription, stateJobOptionLabel } from "@/lib/pendingStateJobOption";
 import {
   Dialog,
   DialogContent,
@@ -124,6 +126,10 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
     }
   };
 
+  const jobOptions = useMemo<SearchableOption[]>(
+    () => (jobs ?? []).map((job) => ({ id: optionKey(job), label: stateJobOptionLabel(job), description: stateJobOptionDescription(job) })),
+    [jobs],
+  );
   const selectedJob = jobs?.find((j) => optionKey(j) === selected);
   const canSubmit = Boolean(selectedJob && start && end && serviceHours) && !isPending;
 
@@ -159,20 +165,17 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
           <form onSubmit={onSubmit} noValidate>
             <div className="space-y-5">
               <div>
-                <label htmlFor="pending-state-job" className={labelClass}>
-                  Pending State Jobs
-                </label>
-                <Dropdown
+                <SearchableSelect
                   id="pending-state-job"
-                  variant="pill"
+                  variant="cream"
+                  label="Pending State Jobs"
+                  labelClassName={labelClass}
                   value={selected}
                   onChange={onSelect}
-                  disabled={isPending || jobs === null}
-                  className="w-full"
-                  options={[
-                    { value: "", label: jobs === null ? "Loading…" : jobs.length === 0 ? "No pending state jobs" : "Select a job" },
-                    ...(jobs ?? []).map((job) => ({ value: optionKey(job), label: `${job.reference} · ${job.dateLabel} · ${job.interpreterName}` })),
-                  ]}
+                  disabled={isPending}
+                  placeholder={jobs === null ? "Loading…" : jobs.length === 0 ? "No pending state jobs" : "Search by SRN or interpreter"}
+                  emptyText={jobs === null ? "Loading state jobs…" : jobs.length === 0 ? "No pending state jobs." : "No jobs match your search."}
+                  options={jobOptions}
                 />
                 {loadError && <p className="mt-1 ml-2 text-xs text-red-600">{loadError}</p>}
               </div>

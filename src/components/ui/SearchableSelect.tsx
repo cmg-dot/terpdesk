@@ -13,7 +13,30 @@ export interface SearchableOption {
   trailing?: ReactNode;
 }
 
+/** default: white with a gray border (page panels); cream: the cream field and emerald hover of Dropdown, for forms and dialogs. */
+export type SearchableSelectVariant = "default" | "cream";
+
+const VARIANT_STYLES: Record<SearchableSelectVariant, { input: string; list: string; active: string }> = {
+  default: {
+    input: "border border-gray-200 bg-white",
+    list: "border border-gray-200 bg-white",
+    active: "bg-[#F5F4F0]",
+  },
+  cream: {
+    input: "border border-stone-200 bg-[#F4F3EF] hover:border-[#0B3B32]/40 hover:bg-emerald-50 focus:bg-emerald-50",
+    list: "border border-stone-200 bg-[#F4F3EF]",
+    active: "bg-emerald-50",
+  },
+};
+
+const DEFAULT_LABEL_CLASS = "mb-2 block text-sm text-[var(--sage)]";
+
 interface SearchableSelectProps {
+  /** The id of the text input, so a page's own `<label htmlFor>` or test can find it. Generated when left out. */
+  id?: string;
+  variant?: SearchableSelectVariant;
+  /** Replaces the label's default look (use it to match the form the select sits in). */
+  labelClassName?: string;
   label: string;
   options: SearchableOption[];
   value: string;
@@ -23,7 +46,8 @@ interface SearchableSelectProps {
   disabled?: boolean;
 }
 
-const matches = (option: SearchableOption, query: string): boolean => {
+/** True when every word typed appears in the option's label or description (any order, any case). */
+export const matches = (option: SearchableOption, query: string): boolean => {
   const haystack = `${option.label} ${option.description ?? ""}`.toLowerCase();
   return query
     .toLowerCase()
@@ -33,9 +57,11 @@ const matches = (option: SearchableOption, query: string): boolean => {
 };
 
 /** A type-to-filter dropdown (ARIA combobox): arrow keys move, Enter picks, Escape closes. */
-export const SearchableSelect = ({ label, options, value, onChange, placeholder = "Search…", emptyText = "No matches.", disabled }: SearchableSelectProps) => {
+export const SearchableSelect = ({ id, variant = "default", labelClassName = DEFAULT_LABEL_CLASS, label, options, value, onChange, placeholder = "Search…", emptyText = "No matches.", disabled }: SearchableSelectProps) => {
   const uid = useId();
   const listId = `${uid}-list`;
+  const inputId = id ?? `${uid}-input`;
+  const styles = VARIANT_STYLES[variant];
   const [query, setQuery] = useState("");
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -60,18 +86,20 @@ export const SearchableSelect = ({ label, options, value, onChange, placeholder 
       e.preventDefault();
       if (visible[activeIndex]) pick(visible[activeIndex]);
     } else if (e.key === "Escape" && open) {
+      // Keep a surrounding dialog from also treating this Escape as "close me".
       e.preventDefault();
+      e.stopPropagation();
       setOpen(false);
     }
   };
 
   return (
     <div className="relative" onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget)) setOpen(false); }}>
-      <label htmlFor={`${uid}-input`} className="mb-2 block text-sm text-[var(--sage)]">{label}</label>
+      <label htmlFor={inputId} className={labelClassName}>{label}</label>
       <div className="relative">
         <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" aria-hidden="true" />
         <input
-          id={`${uid}-input`}
+          id={inputId}
           type="text"
           role="combobox"
           aria-expanded={open}
@@ -86,7 +114,7 @@ export const SearchableSelect = ({ label, options, value, onChange, placeholder 
           onClick={() => setOpen(true)}
           onChange={(e) => { setQuery(e.target.value); setActive(0); setOpen(true); }}
           onKeyDown={onKeyDown}
-          className="w-full rounded-full border border-gray-200 bg-white py-2.5 pl-10 pr-10 text-sm text-gray-800 outline-none transition-shadow focus:ring-2 focus:ring-[#0B3B32] disabled:opacity-60"
+          className={`w-full rounded-full py-2.5 pl-10 pr-10 text-sm text-gray-800 outline-none transition-shadow focus:ring-2 focus:ring-[#0B3B32] disabled:opacity-60 ${styles.input}`}
         />
         {selected && !disabled && (
           <button
@@ -100,7 +128,7 @@ export const SearchableSelect = ({ label, options, value, onChange, placeholder 
         )}
       </div>
       {open && (
-        <ul id={listId} role="listbox" aria-label={label} className="absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-2xl border border-gray-200 bg-white p-1 shadow-lg">
+        <ul id={listId} role="listbox" aria-label={label} className={`absolute z-20 mt-2 max-h-64 w-full overflow-auto rounded-2xl p-1 shadow-lg ${styles.list}`}>
           {visible.length === 0 ? (
             <li role="presentation" className="px-4 py-3 text-sm text-gray-500">{emptyText}</li>
           ) : (
@@ -113,7 +141,7 @@ export const SearchableSelect = ({ label, options, value, onChange, placeholder 
                 // mousedown (not click) so the input does not lose focus and close the list first
                 onMouseDown={(e) => { e.preventDefault(); pick(option); }}
                 onMouseEnter={() => setActive(i)}
-                className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm ${i === activeIndex ? "bg-[#F5F4F0]" : ""}`}
+                className={`flex cursor-pointer items-center justify-between gap-3 rounded-xl px-3 py-2 text-sm ${i === activeIndex ? styles.active : ""}`}
               >
                 <span className="min-w-0">
                   <span className="block truncate font-medium text-[var(--ink)]">{option.label}</span>
