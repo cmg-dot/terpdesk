@@ -10,8 +10,7 @@ import { useHoursRecords } from "@/hooks/useHoursRecords";
 import { useHoursReviewFilters } from "@/hooks/useHoursReviewFilters";
 import { DEFAULT_FILTERS, countActiveFilters, filterRecords, hrefForPage, statusCounts as countStatuses } from "@/lib/hoursReviewFilter";
 
-// Hardcoded to 5 for current testing.
-const ITEMS_PER_PAGE = 5;
+const ITEMS_PER_PAGE = 10;
 
 // Reuses the records hook's "storage" listener: firing the event reloads the records (and the pending reports) everywhere on the page.
 const reloadRecords = () => window.dispatchEvent(new Event('storage'));
@@ -27,6 +26,7 @@ function HoursReviewContent() {
   const totalPages = Math.max(1, Math.ceil(displayedRecords.length / ITEMS_PER_PAGE));
   const page = Math.min(requestedPage, totalPages);
   const pageRecords = displayedRecords.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
+  const hrefFor = (target: number) => hrefForPage(filters, target, pathname);
 
   return (
     <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-6 pb-24 antialiased pt-6">
@@ -51,7 +51,9 @@ function HoursReviewContent() {
       {/* Reports that could not be tied to one booked interpreter; assigning one reloads the records below. The search box filters them too. */}
       <PendingVerifications onAssigned={reloadRecords} query={filters.q} />
 
-      <div className="flex flex-col gap-6 w-full">
+      {totalPages > 1 && <HoursPager position="top" page={page} totalPages={totalPages} hrefFor={hrefFor} />}
+
+      <div className="flex flex-col gap-3 w-full">
         {displayedRecords.length === 0 ? (
           <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center flex flex-col items-center justify-center">
             <h3 className="text-lg font-medium text-[var(--ink)] mb-2">No service records found</h3>
@@ -73,7 +75,7 @@ function HoursReviewContent() {
         )}
       </div>
 
-      <HoursPager page={page} totalPages={totalPages} hrefFor={(target) => hrefForPage(filters, target, pathname)} />
+      {totalPages > 1 && <HoursPager page={page} totalPages={totalPages} hrefFor={hrefFor} />}
     </div>
   );
 }

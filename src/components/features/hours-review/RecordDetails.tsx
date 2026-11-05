@@ -2,23 +2,21 @@ import { BillableTimeRow } from "@/components/features/BillableTimeRow";
 import { MileageLegsList } from "@/components/features/MileageLegsList";
 import { CopyButton } from "@/components/features/hours-review/CopyButton";
 import { formatHoursMinutes } from "@/lib/durationFormat";
-import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone, parseInstantInZone } from "@/utils/timezone";
+import { serviceMinutesOf } from "@/lib/hoursReviewSummary";
+import { formatDateInZone, formatDateTimeRangeInZone, getIanaZone } from "@/utils/timezone";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 /** What was booked and what was reported: times, mileage, notes, mileage legs, and the "approved" line. Every time is in the job's own zone. */
 export function RecordDetails({ record }: { record: ServiceRecord }) {
   // Every time on this card is shown in the job's own zone, never the browser's.
   const zone = getIanaZone(record.timeZone);
-  const actualStartDt = parseInstantInZone(record.actualStart, zone) ?? new Date(NaN);
-  const actualEndDt = parseInstantInZone(record.actualEnd, zone) ?? new Date(NaN);
   const formattedActual = formatDateTimeRangeInZone(record.actualStart, record.actualEnd, zone);
   const formattedScheduled = formatDateTimeRangeInZone(record.scheduledStart, record.scheduledEnd, zone);
   const formattedTravel = record.travelStart && record.travelEnd
     ? formatDateTimeRangeInZone(record.travelStart, record.travelEnd, zone)
     : "None reported";
 
-  const diffMs = actualEndDt.getTime() - actualStartDt.getTime();
-  const serviceMinutes = Math.max(0, (diffMs / 60000) - (record.breakMinutes || 0));
+  const serviceMinutes = serviceMinutesOf(record);
   const serviceTime = formatHoursMinutes(serviceMinutes);
 
   return (

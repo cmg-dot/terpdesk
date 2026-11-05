@@ -6,17 +6,24 @@ import { approveTimesheet } from "@/app/actions/approveTimesheet";
 import { needsMileageReason } from "@/components/features/MileageApprovalField";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
+const APPROVE_FAILED = "We could not approve these hours. Nothing was changed. Please try again.";
+const CORRECTION_FAILED = "We could not send the correction request. Nothing was changed. Please try again.";
+
 /**
- * The agency's review of one hours record: the mileage to approve (and why it differs), a signature exception, the correction
- * message, and the two actions. `onUpdate` receives the record in its new state once an action is done.
+ * The agency's review of one hours record: the mileage to approve (and why it differs), approving without a signature, the
+ * correction message, and the two actions. `onUpdate` receives the record in its new state only once the server has accepted the
+ * change; when it fails, the record stays as it was and the reason is shown in the panel.
  */
 export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRecord) => void) {
   const [hasException, setHasException] = useState(false);
   const [showSignatureError, setShowSignatureError] = useState(false);
 
   // Correction / Approval State
+  const [isCorrecting, setIsCorrecting] = useState(false);
   const [correctionText, setCorrectionText] = useState("");
   const [showCorrectionError, setShowCorrectionError] = useState(false);
+  const [correctionError, setCorrectionError] = useState<string | null>(null);
+  const [isSendingCorrection, setIsSendingCorrection] = useState(false);
 
   const [mileageToApprove, setMileageToApprove] = useState(record.reportedMileage.toString());
   const [showMileageError, setShowMileageError] = useState(false);
@@ -26,6 +33,14 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
   // React 18: an async startTransition does not stay pending across the await, so track it explicitly.
   const [isApproving, setIsApproving] = useState(false);
   const [approveError, setApproveError] = useState<string | null>(null);
+
+  const startCorrection = () => setIsCorrecting(true);
+  const cancelCorrection = () => {
+    setIsCorrecting(false);
+    setCorrectionText("");
+    setShowCorrectionError(false);
+    setCorrectionError(null);
+  };
 
   const handleApprove = async () => {
     if (isApproving) return;
@@ -60,7 +75,11 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
         return;
       }
     } catch (e) {
-      console.error("[hours-review page] operation failed");
+      // The call failed, so the hours are not approved: say so instead of showing the card as done.
+      console.error("[hours-review page] approve failed");
+      setApproveError(APPROVE_FAILED);
+      setIsApproving(false);
+      return;
     }
     setIsApproving(false);
 
@@ -88,17 +107,29 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
   };
 
   const handleRequestCorrection = async () => {
+    if (isSendingCorrection) return;
     if (!correctionText.trim()) {
       setShowCorrectionError(true);
       return;
     }
     setShowCorrectionError(false);
+    setCorrectionError(null);
+    setIsSendingCorrection(true);
 
     try {
-      await requestHoursCorrection(record.appointmentId, correctionText, record.positionIndex || 1);
+      const result = await requestHoursCorrection(record.appointmentId, correctionText, record.positionIndex || 1);
+      if (!result.success) {
+        setCorrectionError(CORRECTION_FAILED);
+        setIsSendingCorrection(false);
+        return;
+      }
     } catch (e) {
-      console.error("[hours-review page] operation failed");
+      console.error("[hours-review page] correction request failed");
+      setCorrectionError(CORRECTION_FAILED);
+      setIsSendingCorrection(false);
+      return;
     }
+    setIsSendingCorrection(false);
 
     const prevHistory = Array.isArray(record.history) ? record.history : [];
     const corrEntry = {
@@ -117,6 +148,7 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
       reviewMessage: correctionText,
       history: [...prevHistory, corrEntry],
     });
+    setIsCorrecting(false);
   };
 
   return {
@@ -124,10 +156,15 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
     setHasException,
     showSignatureError,
     setShowSignatureError,
+    isCorrecting,
+    startCorrection,
+    cancelCorrection,
     correctionText,
     setCorrectionText,
     showCorrectionError,
     setShowCorrectionError,
+    correctionError,
+    isSendingCorrection,
     mileageToApprove,
     setMileageToApprove,
     showMileageError,

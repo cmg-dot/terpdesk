@@ -1,5 +1,6 @@
 "use client";
 
+import { useId } from "react";
 import { mileageDiffers } from "@/lib/timesheetSchemas";
 
 /** True when the typed mileage is a valid number that differs from the reported mileage, so a reason is required. */
@@ -31,14 +32,18 @@ export function MileageApprovalField({
   showValueError,
   showReasonError,
 }: MileageApprovalFieldProps) {
+  // Each field gets its own ids: several records can be open on one page, and a shared id would send a label's click to the first one.
+  const uid = useId();
+  const valueId = `${uid}-mileage-to-approve`;
+  const reasonId = `${uid}-mileage-adjustment-reason`;
   const adjusting = needsMileageReason(reported, value);
   return (
     <div className="mb-5">
-      <label className="block text-xs text-gray-600 mb-2" htmlFor="mileage-to-approve">
+      <label className="block text-xs text-gray-600 mb-2" htmlFor={valueId}>
         Mileage to approve (reported: {reported.toFixed(1)} mi)
       </label>
       <input
-        id="mileage-to-approve"
+        id={valueId}
         type="text"
         inputMode="decimal"
         value={value}
@@ -48,11 +53,11 @@ export function MileageApprovalField({
       {showValueError && <p className="text-[#C23B22] text-xs mt-1">Please enter a valid non-negative number.</p>}
       {adjusting && (
         <div className="mt-3">
-          <label className="block text-xs text-gray-600 mb-2" htmlFor="mileage-adjustment-reason">
+          <label className="block text-xs text-gray-600 mb-2" htmlFor={reasonId}>
             Reason for the change (required, the interpreter will see it)
           </label>
           <textarea
-            id="mileage-adjustment-reason"
+            id={reasonId}
             rows={2}
             maxLength={1000}
             value={reason}

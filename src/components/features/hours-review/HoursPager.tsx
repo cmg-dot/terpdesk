@@ -8,12 +8,18 @@ interface Props {
   totalPages: number;
   /** The link to a page, with the search and filters kept (see hrefForPage). */
   hrefFor: (page: number) => string;
+  /** "top" sits above the list (no rule, and says which page you are on); "bottom" closes it. */
+  position?: "top" | "bottom";
 }
 
 /** Same numbered-block look as "Needs attention" and "Upcoming bookings". */
-export function HoursPager({ page, totalPages, hrefFor }: Props) {
+export function HoursPager({ page, totalPages, hrefFor, position = "bottom" }: Props) {
+  const top = position === "top";
   return (
-    <nav aria-label="Pagination" className="flex flex-wrap items-center gap-2 mt-6 py-4 border-t border-gray-200">
+    <nav
+      aria-label={top ? "Pagination, above the list" : "Pagination"}
+      className={`flex flex-wrap items-center gap-2 ${top ? "" : "mt-6 py-4 border-t border-gray-200"}`}
+    >
       {page > 1 ? (
         <Link href={hrefFor(page - 1)} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
           Prev
@@ -54,6 +60,8 @@ export function HoursPager({ page, totalPages, hrefFor }: Props) {
           Next
         </span>
       )}
+
+      {top && <span className="ml-auto text-[13px] text-gray-600">Page {page} of {totalPages}</span>}
     </nav>
   );
 }
