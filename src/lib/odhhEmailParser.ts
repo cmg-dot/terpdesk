@@ -159,7 +159,8 @@ const REQUESTOR_EMAIL_PATTERN = labelPattern(["Requestor[ \t]+E-?mail(?:[ \t]+Ad
 // Section headings may be numbered ("5. CLIENT/EMPLOYEE INFORMATION", "5) ...").
 const SECTION_NUMBER = String.raw`(?:\d{1,2}[.)][ \t]*)?`;
 // Section 5 is "CLIENT/EMPLOYEE INFORMATION" on most forms and "PATIENT INFORMATION" on the health-care (HCA) ones.
-const CLIENT_BLOCK_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}((?:CLIENT[ \t]*\/[ \t]*EMPLOYEE|PATIENT)[ \t]+INFORMATION)[ \t]*:?[ \t]*$`, "im");
+// Some forms print a tag after it: "5. CLIENT/EMPLOYEE INFORMATION, Public".
+const CLIENT_BLOCK_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}((?:CLIENT[ \t]*\/[ \t]*EMPLOYEE|PATIENT)[ \t]+INFORMATION)(?:[ \t]*[,;:–—-][ \t]*[A-Za-z][^\n]{0,40}?)?[ \t]*:?[ \t]*$`, "im");
 const REQUESTOR_SECTION_HEADER = new RegExp(
   String.raw`^[ \t]*${SECTION_NUMBER}REQUES?TOR(?:[ \t]+(?:INFORMATION|INFO|DETAILS))?[ \t]*:?[ \t]*$`,
   "im",

@@ -20,25 +20,21 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { getInterpretersFitForJob } from "@/app/actions/availability";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
-import { InterpreterFitBadge, FitWarningNotice } from "@/components/scheduling-ui";
-import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
-import { ExpiredOfferNotice, pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
-import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
-import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
 import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
 import { RequestActionBar } from "@/components/requests/RequestActionBar";
 import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
 import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
-import { OfferBlockedNotice } from "@/components/requests/OfferBlockedNotice";
-import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { offerBlock } from "@/lib/offerAvailability";
 import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from "@/lib/offerExpiry";
-import { OfferExpiryInput } from "@/components/requests/OfferExpiryInput";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
+import { StateFormDocument } from "@/components/requests/StateFormDocument";
+import { StaffingPanel } from "@/components/requests/staffing/StaffingPanel";
+import type { Position, PositionView, StaffBooking, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
+import { buildStateFormView } from "@/lib/stateFormView";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { bookedRecipients } from "@/utils/messageRecipients";
@@ -54,13 +50,6 @@ import { ClientAssignmentBanner } from "@/components/features/ClientAssignmentBa
 import { normalizeClientType } from "@/lib/validation/client";
 import { isStateJobRequest } from "@/lib/stateJob";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
-
-/** End-of-row status in the recipient list: the same badge the Directly assign list shows, or why there is none yet. */
-function FitTrailing({ fit, loading, failed }: { fit: InterpreterFitStatus | undefined; loading: boolean; failed: boolean }) {
-  if (fit) return <InterpreterFitBadge fit={fit} showIcon={false} />;
-  if (loading) return <span className="text-xs text-gray-400">Checking…</span>;
-  return failed ? <span className="text-xs text-gray-400">Check failed</span> : null;
-}
 
 function getErrorMessage(error: unknown): string {
   if (error instanceof Error) return error.message;
@@ -125,93 +114,6 @@ function LocationLines({ text }: { text: string }) {
 function formatLabel(key: string) {
  const result = key.replace(/([A-Z])/g, " $1");
  return result.charAt(0).toUpperCase() + result.slice(1);
-}
-
-function CollapsiblePreviousOffers({
-  pastOffers,
-  isAppointmentFinished,
-  apptTz,
-}: {
-  pastOffers: any[];
-  isAppointmentFinished: boolean;
-  apptTz?: string;
-}) {
-  const [isOpen, setIsOpen] = useState(false);
-
-  if (!pastOffers || pastOffers.length === 0) return null;
-
-  return (
-    <div className="bg-[#F5F4F0] rounded-xl p-4 mb-6 transition-all">
-      <button
-        type="button"
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between text-left focus:outline-none cursor-pointer group"
-      >
-        <div className="flex items-center gap-2">
-          <ChevronDown
-            className={`w-4 h-4 text-gray-700 transition-transform duration-200 ${
-              isOpen ? "rotate-0" : "-rotate-90"
-            }`}
-          />
-          <span className="font-medium text-sm text-[var(--ink)]">
-            Previous offers ({pastOffers.length})
-          </span>
-        </div>
-        <span className="text-xs text-[var(--sage)] font-normal group-hover:text-gray-700 transition-colors">
-          {isOpen ? "Hide" : "Show"}
-        </span>
-      </button>
-
-      {isOpen && (
-        <div className="mt-3.5 space-y-3 pt-3 border-t border-gray-200/60">
-          {pastOffers.map((offer: any, idx: number) => {
-            const rawState = offer.status || offer.state || 'pending';
-            const deadlineMs = offer.expiresAt ? new Date(offer.expiresAt).getTime() : NaN;
-            const deadlinePassed = !Number.isNaN(deadlineMs) && Date.now() > deadlineMs;
-            const isExpired = rawState === 'expired' || (rawState === 'pending' && (isAppointmentFinished || deadlinePassed));
-            const displayState = isExpired ? 'expired' : rawState;
-
-            let badgeClass = "bg-white border border-gray-200 text-gray-600";
-            if (isExpired) {
-              badgeClass = "bg-amber-100 text-amber-900 border border-amber-300 font-semibold";
-            } else if (displayState === 'withdrawn') {
-              badgeClass = "bg-gray-100 text-gray-700 border border-gray-200";
-            } else if (displayState === 'declined') {
-              badgeClass = "bg-red-50 text-red-700 border border-red-200";
-            }
-
-            return (
-              <div key={idx} className="last:mb-0">
-                <div className="flex items-center gap-2 pl-6 flex-wrap">
-                  <span className="text-xs sm:text-sm text-gray-700 font-medium">{offer.interpreterName} ·</span>
-                  <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full capitalize ${badgeClass}`}>
-                    {isExpired ? 'Expired' : displayState}
-                  </span>
-                </div>
-                <div className="text-xs sm:text-sm text-[var(--sage)] pl-6 mt-1 text-wrap">
-                  {isExpired ? (
-                    <span>{isAppointmentFinished ? 'Expired · Appointment ended before response was submitted' : 'Expired · No response before the offer deadline'}</span>
-                  ) : (
-                    <span>
-                      {displayState.charAt(0).toUpperCase() + displayState.slice(1)} {(() => {
-                        try {
-                          const d = parseSafeDate(offer.expiresAt);
-                          if (!d) return '';
-                          return formatInTimeZone(d, mapSafeZone(apptTz), 'MMM d, h:mm a');
-                        } catch (e) {
-                          return '';
-                        }
-                      })()}
-                    </span>
-                  )}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
 }
 
 export default function AssignmentDetailPage() {
@@ -828,6 +730,105 @@ export default function AssignmentDetailPage() {
  // Remove booking remains unlocked for future appointments even if test hours were logged during earlier bypass testing.
  const isBookingLocked = !isFutureAppointment && (isAppointmentInProgress || isAppointmentPassed);
 
+ // ---- What the form document and the staffing panel are given (the state and the server calls stay in this page) ----
+ const stateFormView = buildStateFormView({
+   data: foundRequest?.data,
+   startsAt: reqStartsAt,
+   endsAt: reqEndsAt,
+   timeZone: assignment.details?.timeZone || assignment.timeZone,
+ });
+ const privateNotesText = textOf(foundRequest?.privateNotes);
+ const prepNotesText = textOf(foundRequest?.prepNotes);
+ const requestedInterpreterName = textOf(foundRequest?.data?.intake?.requestedInterpreter) || null;
+ const fullRoster = activeRoster.map((person) => ({ id: String(person.id), name: String(person.name ?? '') }));
+
+ const setRecipientFor = (posIdx: Position, value: string) => {
+   // One way to book at a time: while an interpreter is picked in "Directly assign" the offer form is paused.
+   if (value && assignEngaged[posIdx]) return;
+   if (value) applyDefaultExpiry(posIdx);
+   if (posIdx === 1) {
+     setRecipient1(value);
+     if (value && recipient2 === value) setRecipient2('');
+   } else {
+     setRecipient2(value);
+     if (value && recipient1 === value) setRecipient1('');
+   }
+ };
+
+ const positionViews: PositionView[] = ([1, 2].slice(0, totalPositions) as Position[]).map((posIdx) => {
+   const isSlot1 = posIdx === 1;
+   const accepted: StaffBooking | null = isSlot1 ? slot1Accepted : slot2Accepted;
+   const reservedBy = isSlot1
+     ? (foundRequest?.slots?.find((s: { positionIndex: number }) => s.positionIndex === 1)?.reservedBy || foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId)
+     : (foundRequest?.slots?.find((s: { positionIndex: number }) => s.positionIndex === 2)?.reservedBy || foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId);
+   return {
+     posIdx,
+     accepted,
+     activeOffer: (isSlot1 ? slot1ActiveOffer : slot2ActiveOffer) as StaffActiveOffer | null,
+     pastOffers: isSlot1 ? slot1PastOffers : slot2PastOffers,
+     needsReplacement: isSlot1 ? slot1NeedsReplacement : slot2NeedsReplacement,
+     roster: isSlot1 ? rosterSlot1 : rosterSlot2,
+     recipient: isSlot1 ? recipient1 : recipient2,
+     expiryHours: isSlot1 ? expiryHours1 : expiryHours2,
+     expiryMinutes: isSlot1 ? expiryMinutes1 : expiryMinutes2,
+     errorMessage: isSlot1 ? errorMessage1 : errorMessage2,
+     successMessage: isSlot1 ? successMessage1 : successMessage2,
+     isSending: isSlot1 ? isSendingOffer1 : isSendingOffer2,
+     offerLocked: assignEngaged[posIdx],
+     assignedInterpreterId: accepted
+       ? String(accepted.interpreterId || reservedBy || dbInterpreters.find((i: { name: string }) => i.name === accepted.interpreterName)?.id || '')
+       : '',
+   };
+ });
+
+ const staffingCtx: StaffingContext = {
+   requestId: String(foundRequest?.id || id || ''),
+   totalPositions,
+   offers: realOffers,
+   nowMs: currentTime,
+   isCancelled,
+   isFutureAppointment,
+   isAppointmentInProgress,
+   isAppointmentFinished,
+   isBookingLocked,
+   isStateJob: isStateJobRequest({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data }),
+   startsAtIso: reqStartsAt,
+   endsAtIso: reqEndsAt,
+   startsAt: parseSafeDate(foundRequest?.startsAt),
+   jobZone: resolveJobZone(foundRequest),
+   apptTimeZone: foundRequest?.details?.timeZone || foundRequest?.timeZone,
+   fits: interpreterFitMap,
+   fitsLoading: isInterpreterFitLoading,
+   fitsError: interpreterFitError,
+   timesheetFlags,
+ };
+
+ const staffingActions: StaffingActions = {
+   setRecipient: setRecipientFor,
+   setExpiry: (posIdx, next) => {
+     (posIdx === 1 ? setExpiryHours1 : setExpiryHours2)(next.hours);
+     (posIdx === 1 ? setExpiryMinutes1 : setExpiryMinutes2)(next.minutes);
+     expiryEditedRef.current[posIdx] = true;
+     (posIdx === 1 ? setErrorMessage1 : setErrorMessage2)('');
+   },
+   createOffer: handleCreateOffer,
+   withdrawOffer: async (offerId) => {
+     try {
+       await updateOfferStatus(offerId, 'withdrawn');
+       const updatedRequest = await fetchLiveRequestById(id);
+       setFoundRequest(updatedRequest);
+     } catch (err) {
+       console.error("[requests/[id] page] operation failed");
+     }
+   },
+   directlyAssigned: handleDirectlyAssigned,
+   setAssignEngaged: (posIdx, engaged) => setAssignEngaged((prev) => (prev[posIdx] === engaged ? prev : { ...prev, [posIdx]: engaged })),
+   openRemoveBooking: handleOpenRemoveBookingModal,
+   openAccess: openEditAccessModal,
+   toast: showToast,
+   reloadTimesheetFlags: (requestId) => { void loadTimesheetFlags(requestId); },
+ };
+
  return (
  <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-6 pb-24 antialiased">
  {/* Test Banner */}
@@ -936,7 +937,19 @@ export default function AssignmentDetailPage() {
  )}
 
  <div className="flex flex-col gap-6 w-full">
- {/* Main Details */}
+ {/* The state's request form is the page: its five numbered sections, from the saved email or from what the job has on file. */}
+ <StateFormDocument view={stateFormView} />
+
+ {/* Staffing and booking, directly under the form. */}
+ {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} />}
+
+ {/* The older detail cards (still editable from here) are folded away so the form stays the focus. */}
+ <details data-job-details className="group rounded-2xl border border-gray-200 bg-white">
+ <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 text-[16px] font-medium text-[var(--ink)] sm:px-8 [&::-webkit-details-marker]:hidden">
+ <span>Job details on file <span className="ml-1 text-sm font-normal text-[var(--sage)]">overview, format, location, preparation notes, requester</span></span>
+ <ChevronDown className="h-5 w-5 flex-none text-[#0B3B32] transition-transform group-open:rotate-180" aria-hidden="true" />
+ </summary>
+ <div className="flex flex-col gap-6 border-t border-gray-100 p-4 sm:p-6">
  
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Overview</h2>
@@ -1149,7 +1162,7 @@ export default function AssignmentDetailPage() {
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Preparation notes</h2>
  <p className="text-gray-800 text-[15px] leading-relaxed">
- {assignment.prepNotes}
+ {prepNotesText || <span className="text-sm italic text-gray-400">No preparation notes.</span>}
  </p>
  </div>
 
@@ -1213,6 +1226,9 @@ export default function AssignmentDetailPage() {
  <span className="text-sm text-gray-800 leading-snug">Ask each interpreter for a service-verification signature</span>
  </label>
  </div>
+
+ </div>
+ </details>
 
  {(() => {
    const isOdhh = foundRequest?.data?.intake?.program === 'WA ODHH' || foundRequest?.data?.intake?.program === 'wa_odhh' || foundRequest?.program === 'WA ODHH' || foundRequest?.program === 'wa_odhh';
@@ -1435,355 +1451,10 @@ export default function AssignmentDetailPage() {
    );
  })()}
 
- {!isCancelled && (
- <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 border border-gray-200/50 shadow-none mb-4">
- <h2 className="text-[18px] font-medium text-[var(--ink)] mb-4">Staffing</h2>
- <p className="text-sm text-[var(--sage)] mb-1">Pending offers do not reserve time.</p>
- <p className="text-sm text-[var(--sage)] mb-6">Back-to-back appointments are allowed. Travel time is not checked.</p>
- 
-  <div className="space-y-6">
-    {([1, 2].slice(0, totalPositions) as (1 | 2)[]).map((posIdx) => {
-      const isSlot1 = posIdx === 1;
-      const accepted = isSlot1 ? slot1Accepted : slot2Accepted;
-      const activeOffer = isSlot1 ? slot1ActiveOffer : slot2ActiveOffer;
-      const pastOffers = isSlot1 ? slot1PastOffers : slot2PastOffers;
-      const needsReplacement = isSlot1 ? slot1NeedsReplacement : slot2NeedsReplacement;
-      const roster = isSlot1 ? rosterSlot1 : rosterSlot2;
-      const rec = isSlot1 ? recipient1 : recipient2;
-      // One way to book at a time: while an interpreter is picked in "Directly assign" the offer form is faded and disabled
-      // (clear that choice to use it). The same goes the other way round, via the Direct assign panel's lockedReason.
-      const offerLocked = assignEngaged[posIdx];
-      const setRec = (val: string) => {
-        if (val && offerLocked) return;
-        if (val) applyDefaultExpiry(posIdx);
-        if (isSlot1) {
-          setRecipient1(val);
-          if (val && recipient2 === val) setRecipient2('');
-        } else {
-          setRecipient2(val);
-          if (val && recipient1 === val) setRecipient1('');
-        }
-      };
-
-      const expHours = isSlot1 ? expiryHours1 : expiryHours2;
-      const expMinutes = isSlot1 ? expiryMinutes1 : expiryMinutes2;
-      const errMsg = isSlot1 ? errorMessage1 : errorMessage2;
-      const setErrMsg = isSlot1 ? setErrorMessage1 : setErrorMessage2;
-      const successMsg = isSlot1 ? successMessage1 : successMessage2;
-      const isSending = isSlot1 ? isSendingOffer1 : isSendingOffer2;
-      // A standard offer needs an interpreter who isn't unavailable / outside usual hours (the server checks too).
-      const recFit = rec ? interpreterFitMap[rec] : undefined;
-      const recBlock = rec ? offerBlock(recFit, roster.find((i) => i.id === rec)?.name ?? 'This interpreter') : null;
-      const recChecking = Boolean(rec) && !recFit && isInterpreterFitLoading;
-      const offerDisabled = !rec || isSending || Boolean(recBlock) || recChecking;
-
-      let slotBadgeColor = 'bg-[#FEF3C7] text-[#92400E]';
-      let slotBadgeText = 'Booking: Unfilled';
-      if (accepted) {
-        slotBadgeColor = 'bg-green-100 text-green-700';
-        slotBadgeText = 'Booking: Filled';
-      } else if (activeOffer) {
-        slotBadgeColor = 'bg-blue-100 text-blue-700';
-        slotBadgeText = 'Booking: Offer awaiting response';
-      } else if (needsReplacement) {
-        slotBadgeColor = 'bg-[#FDE8E8] text-[#9B1C1C]';
-        slotBadgeText = 'Booking: Needs replacement';
-      }
-
-      return (
-        <div 
-          key={posIdx} 
-          className={totalPositions === 2 ? 'p-5 sm:p-6 rounded-2xl border border-gray-200/80 bg-[#FAFAF8]' : ''}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="font-semibold text-[var(--ink)] text-base">Position {posIdx} · interpreter</h3>
-            {totalPositions === 2 && (
-              <span className="text-xs text-[var(--sage)] font-medium">Position {posIdx} of 2</span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2 mb-3">
-            <span className={`px-3 py-1 text-[12px] font-medium rounded-full ${slotBadgeColor}`}>
-              {slotBadgeText}
-            </span>
-            <span className="px-3 py-1 bg-white border border-gray-200 text-gray-600 text-[12px] font-medium rounded-full">
-              Access: Available
-            </span>
-          </div>
-
-          <p className="text-sm text-gray-700 mt-3 mb-4">
-            Assigned interpreter: <span className="text-[var(--sage)]">{accepted ? accepted.interpreterName : 'Unfilled'}</span>
-          </p>
-
-          {!accepted ? (
-            <>
-              {!activeOffer && (
-                <ExpiredOfferNotice
-                  pastOffers={pastOffers}
-                  appointmentFinished={isAppointmentFinished}
-                  now={currentTime}
-                  onOfferAgain={setRec}
-                />
-              )}
-
-              {pastOffers.length > 0 && (
-                <CollapsiblePreviousOffers
-                  pastOffers={pastOffers}
-                  isAppointmentFinished={isAppointmentFinished}
-                  apptTz={foundRequest?.details?.timeZone || foundRequest?.timeZone}
-                />
-              )}
-
-              {activeOffer ? (
-                <div className="bg-[#F5F4F0] p-4 rounded-xl mb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="text-[var(--ink)] font-medium">{activeOffer.interpreterName}</span>
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-semibold capitalize">{activeOffer.state || activeOffer.status}</span>
-                  </div>
-                  <p className="text-sm text-[var(--sage)] mt-2 mb-4">
-                    Response due {(() => {
-                      try {
-                        const d = parseSafeDate(activeOffer.expiresAt);
-                        if (!d) return 'Unknown';
-                        const apptTz = foundRequest?.details?.timeZone || foundRequest?.timeZone;
-                        return formatInTimeZone(d, mapSafeZone(apptTz), 'MM/dd/yyyy h:mm:ss a');
-                      } catch (e) {
-                        return 'Unknown';
-                      }
-                    })()}
-                  </p>
-                  <button 
-                    type="button"
-                    onClick={async () => {
-                      try {
-                        await updateOfferStatus(activeOffer.id, 'withdrawn');
-                        const updatedRequest = await fetchLiveRequestById(id);
-                        setFoundRequest(updatedRequest);
-                      } catch (err) {
-                        console.error("[requests/[id] page] operation failed");
-                      }
-                    }}
-                    className="bg-white border border-gray-300 rounded-full px-4 py-2 text-sm font-medium hover:bg-gray-50 transition-colors"
-                  >
-                    Withdraw offer
-                  </button>
-                </div>
-              ) : !isFutureAppointment ? (
-                // Started or past: no new offers (the server refuses them too) until the time is edited forward.
-                <div className="rounded-xl border border-gray-200 bg-gray-50 p-4 text-sm text-gray-700">
-                  <p className="flex items-center gap-2 font-medium text-[var(--ink)]">
-                    <Lock className="h-4 w-4 text-gray-500" aria-hidden="true" />
-                    {isAppointmentInProgress ? "This appointment is under way" : "This appointment's time has passed"}
-                  </p>
-                  <p className="mt-1 text-xs text-[var(--sage)]">
-                    New offers can&apos;t be sent for a job that has started or ended. To offer it again, edit the request
-                    to a future date and time.
-                  </p>
-                </div>
-              ) : (
-                <fieldset
-                  disabled={offerLocked}
-                  aria-disabled={offerLocked}
-                  className={`m-0 min-w-0 border-0 p-0 transition-opacity ${offerLocked ? 'opacity-50' : ''}`}
-                >
-                  {offerLocked && (
-                    <p role="status" className="mb-3 text-xs font-medium text-gray-700">
-                      Offers are paused while an interpreter is selected in &ldquo;Directly assign&rdquo; below. Clear that selection to send an offer instead.
-                    </p>
-                  )}
-                  <label className="flex items-start gap-3 cursor-pointer mb-6">
-                    <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" />
-                    <span className="text-sm text-gray-700">Deliberately offer this slot to multiple interpreters</span>
-                  </label>
-
-                  <div className="space-y-4">
-                    <div>
-                      <SearchableSelect
-                        label="Select one recipient"
-                        placeholder="Search by name or email"
-                        emptyText="No interpreters match your search."
-                        value={rec}
-                        onChange={setRec}
-                        options={roster.map((interpreter) => ({
-                          id: interpreter.id,
-                          label: interpreter.name,
-                          description: [interpreter.email, pastOfferNote(pastOffers, interpreter.id, isAppointmentFinished, currentTime)].filter(Boolean).join(' · ') || undefined,
-                          trailing: <FitTrailing fit={interpreterFitMap[interpreter.id]} loading={isInterpreterFitLoading} failed={Boolean(interpreterFitError)} />,
-                        }))}
-                      />
-                      {/* Unavailable / outside usual hours stop the offer; the Directly assign panel below ignores this. */}
-                      {recBlock && <OfferBlockedNotice block={recBlock} />}
-                      {rec && !recBlock && (
-                        recChecking
-                          ? <p role="status" className="mt-2 text-xs text-gray-500">Checking availability…</p>
-                          : <FitWarningNotice fit={recFit} />
-                      )}
-                      {interpreterFitError && (
-                        <p className="mt-2 text-xs text-red-700" role="alert">
-                          Unable to load interpreter availability: {interpreterFitError}
-                        </p>
-                      )}
-                    </div>
-                    
-                    <div>
-                      <OfferExpiryInput
-                        hours={expHours}
-                        minutes={expMinutes}
-                        nowMs={currentTime}
-                        timeZone={resolveJobZone(foundRequest)}
-                        startsAt={parseSafeDate(foundRequest?.startsAt)}
-                        disabled={offerLocked}
-                        onChange={(next) => {
-                          (isSlot1 ? setExpiryHours1 : setExpiryHours2)(next.hours);
-                          (isSlot1 ? setExpiryMinutes1 : setExpiryMinutes2)(next.minutes);
-                          expiryEditedRef.current[posIdx] = true;
-                          setErrMsg('');
-                        }}
-                      />
-                      <p className="text-xs text-[var(--sage)] mt-2 mb-2">Defaults to 24 hours; it must end before the appointment starts. An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
-                      {errMsg && <p className="text-[#C23B22] text-sm mb-4">{errMsg}</p>}
-                      {successMsg && (
-                        <p className="text-[#059669] text-sm mb-4 font-medium flex items-center gap-1.5">
-                          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                            <polyline points="20 6 9 17 4 12"/>
-                          </svg>
-                          {successMsg}
-                        </p>
-                      )}
-                    </div>
-
-                    <button 
-                      type="button"
-                      onClick={() => handleCreateOffer(posIdx)}
-                      disabled={offerDisabled}
-                      title={recBlock?.message}
-                      className={`rounded-full px-6 py-2 text-sm font-medium transition-colors mt-2 w-auto flex items-center gap-2 ${
-                        offerDisabled
-                          ? 'bg-[#8BA49E] text-white opacity-50 cursor-not-allowed' 
-                          : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
-                      }`}
-                    >
-                      {isSending ? (
-                        <>
-                          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
-                          </svg>
-                          <span>Sending offer...</span>
-                        </>
-                      ) : (
-                        'Create offer'
-                      )}
-                    </button>
-                  </div>
-                </fieldset>
-              )}
-
-              {/* Works even while an offer is out: assigning withdraws it. Not offered once the job has started. */}
-              {isFutureAppointment && (
-                <DirectAssignPanel
-                  jobId={id}
-                  positionIndex={posIdx}
-                  showPosition={totalPositions === 2}
-                  roster={roster}
-                  fits={interpreterFitMap}
-                  offers={realOffers}
-                  onAssigned={(result) => handleDirectlyAssigned(posIdx, result)}
-                  onEngagedChange={(engaged) => setAssignEngaged((prev) => (prev[posIdx] === engaged ? prev : { ...prev, [posIdx]: engaged }))}
-                  lockedReason={rec && !activeOffer ? 'Direct assignment is paused while a recipient is selected for an offer above. Clear that selection to assign directly instead.' : undefined}
-                />
-              )}
-            </>
-          ) : (
-            <div className="space-y-4">
-              <div className="bg-[#F5F4F0] p-4 rounded-xl">
-                <div className="flex items-center justify-between flex-wrap gap-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm text-[var(--ink)] font-medium">{accepted.interpreterName}</span>
-                    <span className="bg-green-100 text-green-700 px-2 py-0.5 rounded-full text-xs font-semibold capitalize">Assigned</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {(() => {
-                      const assignedInterpId = String(
-                        accepted.interpreterId ||
-                        (isSlot1
-                          ? (foundRequest?.slots?.find((s: any) => s.positionIndex === 1)?.reservedBy || foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId)
-                          : (foundRequest?.slots?.find((s: any) => s.positionIndex === 2)?.reservedBy || foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId)) ||
-                        dbInterpreters.find((i: any) => i.name === accepted.interpreterName)?.id ||
-                        ''
-                      );
-                      const reqId = String(foundRequest?.id || id || '');
-                      if (!assignedInterpId || !reqId) return null;
-                      return (
-                        <RequestTimesheetButton
-                          requestId={reqId}
-                          interpreterId={assignedInterpId}
-                          assignmentId={String(accepted.id || '')}
-                          startTime={reqStartsAt}
-                          endTime={reqEndsAt}
-                          timezone={foundRequest?.details?.timeZone || foundRequest?.timeZone}
-                          timesheetDispatched={Boolean(timesheetFlags[assignedInterpId]?.dispatched)}
-                          timesheetSubmitted={Boolean(timesheetFlags[assignedInterpId]?.submitted)}
-                          timesheetApproved={Boolean(timesheetFlags[assignedInterpId]?.approved)}
-                          isStateJob={isStateJobRequest({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data })}
-                          className="mb-0"
-                          onSuccess={(message) => {
-                            showToast(message);
-                            void loadTimesheetFlags(reqId);
-                          }}
-                        />
-                      );
-                    })()}
-                    {/* Booked: staff can re-send the booking confirmation (with the secure details link). */}
-                    {!isCancelled && <ResendDetailsButton requestId={id} positionIndex={posIdx} />}
-                    {isBookingLocked ? (
-                      <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-200/70 text-gray-600 text-xs font-medium">
-                        <Lock className="w-3.5 h-3.5 text-gray-500" />
-                        <span>{isAppointmentInProgress ? 'Locked · In progress' : 'Locked · Appointment passed'}</span>
-                      </div>
-                    ) : (
-                      <button 
-                        type="button"
-                        onClick={() => handleOpenRemoveBookingModal(posIdx, accepted.id, accepted.interpreterName)}
-                        className="text-[var(--sage)] hover:text-red-600 text-sm font-medium transition-colors"
-                      >
-                        Remove booking
-                      </button>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {pastOffers.length > 0 && (
-                <CollapsiblePreviousOffers
-                  pastOffers={pastOffers}
-                  isAppointmentFinished={isAppointmentFinished}
-                  apptTz={foundRequest?.details?.timeZone || foundRequest?.timeZone}
-                />
-              )}
-            </div>
-          )}
-        </div>
-      );
-    })}
-  </div>
-
- <div className="mt-6">
- <button
- type="button"
- onClick={openEditAccessModal}
- className="text-sm font-medium text-[var(--forest)] hover:underline transition-colors"
- >
- Manage access & virtual credentials →
- </button>
- </div>
- </div>
- )}
-
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Agency-private notes</h2>
- <p className="text-gray-800 text-[15px] leading-relaxed">
- {assignment.privateNotes}
+ <p className="whitespace-pre-line text-gray-800 text-[15px] leading-relaxed">
+ {privateNotesText || <span className="text-sm italic text-gray-400">No private notes.</span>}
  </p>
  </div>
 
