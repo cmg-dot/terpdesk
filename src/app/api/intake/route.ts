@@ -2,39 +2,18 @@ export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
-import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
-import { contentFingerprint, insertOdhhRequestOnce } from "@/lib/odhhDedupe";
 import { respondToServiceVerification } from "@/lib/serviceVerification";
 import type { TimesheetIntakeResponse } from "@/lib/serviceVerification";
 import { resolveIntakeType } from "@/lib/odhhVerificationParser";
-import { buildDraftData, draftTitle } from "@/lib/odhhDraft";
-import { enrichRequestFromForm } from "@/lib/odhhEnrichStore";
-import { parseFormExtras } from "@/lib/odhhFormFields";
-import { seedClientQuietly } from "@/lib/clientUpsert";
-import { revalidatePath } from "next/cache";
-import { fromZonedTime } from "date-fns-tz";
-import { db } from "@/db";
-import type { RequestData } from "@/db/schema";
-import {
-  FORMAT_LABELS,
-  ODHH_PROGRAM,
-  ODHH_TIME_ZONE_IANA,
-  ODHH_TIME_ZONE_LABEL,
-  jobSchedule,
-  parseIntakeEmail,
-  parseWarnings,
-  sanitizeSrn,
-  type AppointmentFormat,
-} from "@/lib/odhhEmailParser";
-
-/** Only the appointment note goes into the interpreter-visible preparation notes (the parser already caps it). */
-const MAX_PREP_NOTES_LENGTH = 1000;
+import { processJobOfferEmail } from "@/lib/odhhIntakeProcess";
+import { sanitizeSrn, type AppointmentFormat } from "@/lib/odhhEmailParser";
 
 /**
  * Webhook receiver for the AWS Lambda email forwarder.
  * Lambda POSTs each inbound domain email as JSON: { email, subject, rawContent, type?, verification? }.
- *  - type "job_offer" (default): parsed into a new draft request.
+ *  - type "job_offer" (default): a new draft request, or the blanks of the job that already has the SRN filled in
+ *    (see lib/odhhIntakeProcess.ts, which the Inbox uses too).
  *  - type "timesheet": an ODHH SERVICE VERIFICATION. It updates the existing request with the same SRN and never
  *    creates a draft (see lib/serviceVerification.ts). When `type` is missing it is inferred from the email text.
  *    `attachments` (base64 PDF / image files) may come with it: the first real, non-inline one is the state's signature.
@@ -163,99 +142,38 @@ export async function POST(
     // HIPAA: log only that an email arrived and its size. The sender, subject and body can hold PHI, so none are logged.
     console.log("[Intake Webhook] Inbound email received", { contentLength: rawContent.length });
 
-    const receivedAt = new Date().toISOString();
-    const parsed = parseIntakeEmail(rawContent, subject);
-    // The SRN that identifies this job: read from the email, else the Lambda's own extraction if it sent one.
+    // The SRN the Lambda extracted itself, used only when the email text has none.
     const verificationHint = (body as Record<string, unknown>).verification;
     const hintedSrn =
       verificationHint && typeof verificationHint === "object" && !Array.isArray(verificationHint)
         ? sanitizeSrn(String((verificationHint as { srn?: unknown }).srn ?? "").trim() || undefined)
         : null;
-    const srn = parsed.srn ?? hintedSrn;
-    const contentHash = contentFingerprint(rawContent);
-    const warnings = parseWarnings(parsed);
 
-    // Appointment start/end from the email's own Pacific wall-clock date and times. Nothing is guessed: without an anchor
-    // line and a readable date, start and end, no job is created and the email stays in the Inbox.
-    const schedule = jobSchedule(rawContent, parsed, warnings);
-    if (!schedule) {
+    const result = await processJobOfferEmail({ email, subject, rawContent, hintedSrn });
+
+    if (result.outcome === "not_a_job") {
       // 200 on purpose: a non-2xx would make AWS retry an email that will never become a job. Labels only in the log.
-      console.log("[Intake Webhook] No job created", { contentLength: rawContent.length, warnings });
-      return NextResponse.json({ success: true, outcome: "not_a_job", warnings }, { status: 200 });
-    }
-    const { startsAt, endsAt } = schedule;
-
-    const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
-    const title = draftTitle({ srn, parsed, subject, fromEmail: email });
-    const extras = parseFormExtras(rawContent);
-    const requestData: RequestData = buildDraftData({
-      parsed,
-      extras,
-      srn,
-      fromEmail: email,
-      subject,
-      rawContent,
-      contentHash,
-      receivedAt,
-      warnings,
-      startsAt,
-      endsAt,
-    });
-
-    // Saved at most once per SRN: AWS retries and repeat emails must not create a second job. Runs inside the outer
-    // try: any connection/constraint failure falls through to the 500 handler.
-    const inserted = await insertOdhhRequestOnce(
-      {
-        title,
-        status: "draft",
-        // This parser only handles ODHH emails (program is always WA ODHH), so these are always state jobs.
-        isStateJob: true,
-        data: requestData,
-        // The app reads createdAt as the appointment start (see createRequest). Always the parsed start, never "now".
-        createdAt: startsAt,
-      },
-      { srn, contentHash },
-    );
-
-    // The organization the form bills (DVR, Seattle Children's, ...) joins the Clients list, with its billing contact. Never
-    // throws: a Clients problem must not fail an intake whose job is already saved.
-    if (extras.billingOrganization) {
-      const seeded = await seedClientQuietly({
-        organization: extras.billingOrganization,
-        billingContact: { name: extras.billingContactName, email: extras.billingContactEmail, phone: extras.billingContactPhone },
-      });
-      if (seeded && (seeded.created || seeded.contactAdded)) revalidatePath("/clients");
+      console.log("[Intake Webhook] No job created", { contentLength: rawContent.length, warnings: result.warnings });
+      return NextResponse.json({ success: true, outcome: "not_a_job", warnings: result.warnings }, { status: 200 });
     }
 
-    if (inserted.duplicate) {
+    if (result.outcome === "duplicate") {
       // 200 on purpose: the job is already saved, and a non-2xx would make AWS retry the delivery again.
-      // The email may be the state's original form for a job imported from a spreadsheet: fill that job's blanks.
-      const enriched = await enrichRequestFromForm(inserted.id, requestData);
-      if (enriched?.applied) {
-        console.log("[Intake Webhook] Existing request filled from the form", { id: inserted.id, fields: enriched.plan.changed.length });
-        revalidatePath("/requests");
-        revalidatePath(`/requests/${inserted.id}`);
-        revalidatePath("/calendar");
-      } else {
-        await logActivity({ requestId: inserted.id, kind: "duplicate_email_ignored", audience: "agency", message: "A repeat of this request's email was received and ignored", actorLabel: "Email intake" });
-        console.log("[Intake Webhook] Duplicate email ignored", { id: inserted.id });
-      }
-      return NextResponse.json({ success: true, duplicate: true, outcome: "duplicate", id: inserted.id }, { status: 200 });
+      console.log(
+        result.filled.length > 0 ? "[Intake Webhook] Existing request filled from the form" : "[Intake Webhook] Duplicate email ignored",
+        { id: result.id, fields: result.filled.length },
+      );
+      return NextResponse.json({ success: true, duplicate: true, outcome: "duplicate", id: result.id }, { status: 200 });
     }
 
-    await logActivity({ requestId: inserted.id, kind: "created", audience: "shared", message: "Request created", actorLabel: "Email intake" });
-
-    revalidatePath("/requests");
-    revalidatePath("/dashboard");
-    revalidatePath("/calendar");
-
+    const { parsed, warnings, hasRequestor } = result;
     // HIPAA: the request id and the parser's fixed warning labels only. No SRN, names, dates or other parsed values.
-    console.log("[Intake Webhook] Draft request created", { id: inserted.id, warnings });
+    console.log("[Intake Webhook] Draft request created", { id: result.id, warnings });
 
     return NextResponse.json(
       {
         success: true,
-        id: inserted.id,
+        id: result.id,
         received: { email, subject, contentLength: rawContent.length },
         parsed: {
           srn: parsed.srn,

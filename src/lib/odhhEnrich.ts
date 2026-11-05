@@ -38,7 +38,12 @@ const FILL_ONLY = [
   "onsite.room",
   "onsite.contact",
   "onsite.contactMethod",
+  "intake.requestedInterpreter",
+  "intake.bookingPeriod",
 ] as const;
+
+/** Yes/no flags from the form: set when the form says yes and the job has not already got it. */
+const FLAGS = ["intake.preAuthorizationRequired", "intake.crucialAppointment"] as const;
 
 export interface EnrichmentPlan {
   data: Bag;
@@ -46,13 +51,25 @@ export interface EnrichmentPlan {
   changed: string[];
   /** The form's start or end differs from the job's. Reported to staff, never applied. */
   scheduleDiffers: boolean;
+  /** The form says virtual where the job says in person (or the other way round). Reported to staff, never applied. */
+  formatDiffers: boolean;
 }
 
-/** "Puyallup" is a bare place name inside "Puyallup Tribal Health Authority" or its street address. */
-const isBarePlaceOf = (existing: string, venue: string, address: string): boolean => {
+/** "virtual" / "in_person" / "hybrid" from a job's saved format code, or its label ("In person", "Virtual"). */
+const formatKind = (details: Bag): string => {
+  const code = text(details.formatCode).toLowerCase();
+  if (code) return code;
+  const label = text(details.format).toLowerCase();
+  return label.includes("hybrid") ? "hybrid" : label.includes("virtual") ? "virtual" : label.includes("in person") || label.includes("in-person") ? "in_person" : "";
+};
+
+/**
+ * "Puyallup" is a bare place name inside the venue "Puyallup Tribal Health Authority". Only the venue's own name counts: a city
+ * that merely appears in the street address ("sound" at "... Seattle") is not a reason to replace the city already on the job.
+ */
+const isBarePlaceOf = (existing: string, venue: string): boolean => {
   const bare = existing.toLowerCase();
-  if (!bare) return false;
-  return [venue, address].some((fuller) => fuller.toLowerCase().includes(bare) && fuller.toLowerCase() !== bare);
+  return bare !== "" && venue.toLowerCase().includes(bare) && venue.toLowerCase() !== bare;
 };
 
 export interface ExistingJob {
@@ -72,7 +89,7 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
   };
   const formSection = (name: string): Bag => asBag(form[name]);
 
-  if (existing.status === "Cancelled") return { data: existing.data, changed, scheduleDiffers: false };
+  if (existing.status === "Cancelled") return { data: existing.data, changed, scheduleDiffers: false, formatDiffers: false };
 
   for (const path of FILL_ONLY) {
     const [sectionName, field] = path.split(".");
@@ -82,6 +99,14 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
     if (!incoming || text(asBag(existing.data[sectionName])[field])) continue;
     section(sectionName)[field] = formSection(sectionName)[field];
     changed.push(path);
+  }
+
+  for (const path of FLAGS) {
+    const [sectionName, field] = path.split(".");
+    if (formSection(sectionName)[field] === true && asBag(existing.data[sectionName])[field] !== true) {
+      section(sectionName)[field] = true;
+      changed.push(path);
+    }
   }
 
   // The organization: only a real one from the form, and only where the job has none (or a funding-program placeholder).
@@ -94,11 +119,10 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
 
   // The place: a street address fills in, and a bare place name ("Puyallup") becomes the full venue.
   const venue = text(formSection("onsite").venue);
-  const address = text(formSection("onsite").address);
   const currentVenue = text(asBag(existing.data.onsite).venue);
   let place: string | null = null;
   if (venue && !currentVenue) place = venue;
-  else if (venue && currentVenue !== venue && isBarePlaceOf(currentVenue, venue, address)) place = venue;
+  else if (venue && currentVenue !== venue && isBarePlaceOf(currentVenue, venue)) place = venue;
   if (place) {
     section("onsite").venue = place;
     changed.push("onsite.venue");
@@ -106,16 +130,19 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
     next.location = place;
   }
 
-  // Notes: only into the agency-private notes, and only when they are empty. The appointment note is not copied into
-  // preparation notes here: a booked interpreter may already have read them.
-  if (!text(existing.data.privateNotes)) {
-    const note = text(form.prepNotes);
-    const block = text(form.privateNotes);
-    const combined = [note ? `Appointment note (state form): ${note}` : "", block].filter(Boolean).join("\n\n");
-    if (combined) {
-      next.privateNotes = combined;
-      changed.push("privateNotes");
-    }
+  // Notes: only into the agency-private notes, and only by adding what is not there yet (the state's flags and section 5),
+  // never by changing what staff wrote. The appointment note goes in only when the private notes are empty. It is not
+  // copied into preparation notes here: a booked interpreter may already have read them.
+  const currentPrivate = text(existing.data.privateNotes);
+  const block = text(form.privateNotes);
+  const note = text(form.prepNotes);
+  const additions = [
+    !currentPrivate && note ? `Appointment note (state form): ${note}` : "",
+    block && !currentPrivate.includes(block) ? block : "",
+  ].filter(Boolean);
+  if (additions.length > 0) {
+    next.privateNotes = [currentPrivate, ...additions].filter(Boolean).join("\n\n");
+    changed.push("privateNotes");
   }
 
   if (!isBag(existing.data.source) && isBag(form.source)) {
@@ -131,5 +158,9 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
     (startsAt !== "" && new Date(startsAt).getTime() !== existing.startsAt.getTime()) ||
     (endsAt !== "" && existingEnd !== "" && new Date(endsAt).getTime() !== new Date(existingEnd).getTime());
 
-  return { data: changed.length > 0 ? next : existing.data, changed, scheduleDiffers };
+  const formKind = formatKind(formSection("details"));
+  const jobKind = formatKind(asBag(existing.data.details));
+  const formatDiffers = formKind !== "" && jobKind !== "" && formKind !== jobKind;
+
+  return { data: changed.length > 0 ? next : existing.data, changed, scheduleDiffers, formatDiffers };
 }

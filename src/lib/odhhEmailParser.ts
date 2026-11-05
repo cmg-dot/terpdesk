@@ -1,5 +1,10 @@
 import { fromZonedTime } from "date-fns-tz";
 import { type Program } from "@/db/schema";
+import { resolveLocation } from "@/lib/odhhLocationParse";
+import { MAX_FIELD_LENGTH, cleanValue, EMPTY_VALUE } from "@/lib/odhhText";
+
+// Kept importable from here: other parsers read these helpers from this module.
+export { cleanValue, EMPTY_VALUE };
 
 /**
  * Parser for forwarded ODHH dispatch emails (pure functions, no I/O). Used by the /api/intake webhook.
@@ -13,7 +18,6 @@ export const ODHH_PROGRAM: Program = "WA ODHH";
 export const ODHH_TIME_ZONE_IANA = "America/Los_Angeles";
 export const ODHH_TIME_ZONE_LABEL = "Pacific Time — Seattle, Los Angeles";
 const SRN_ALLOWED = /^[A-Za-z0-9-]{0,40}$/;
-const MAX_FIELD_LENGTH = 300;
 
 export type AppointmentFormat = "in_person" | "virtual" | "hybrid";
 
@@ -32,7 +36,11 @@ export interface ParsedIntakeEmail {
   endTime: string | null;
   start24: string | null; // 08:00
   end24: string | null;
+  /** The place's name. Null when the Location line is a room code ("E1", see `locationCode`) or only says "Virtual". */
   venue: string | null;
+  /** A short room / unit code from the Location line. A detail of the place (its room), never its name. */
+  locationCode: string | null;
+  /** The physical address. A meeting link on the Address line is moved to `meetingLink`, leaving just the city. */
   address: string | null;
   format: AppointmentFormat | null;
   formatInferred: boolean;
@@ -126,6 +134,7 @@ const PURPOSE_PATTERN = labelPattern([
 ]);
 
 const MEETING_PATTERN = labelPattern([
+  "Virtual[ \t]+Meeting[ \t]*/[ \t]*Platform",
   "Virtual[ \t]+Meeting(?:[ \t]+(?:Platform|Link|URL|Information|Info))?",
   "Virtual[ \t]+(?:Platform|Link)",
   "Meeting[ \t]+(?:Platform|Link|URL)",
@@ -149,7 +158,8 @@ const REQUESTOR_PHONE_PATTERN = labelPattern([
 const REQUESTOR_EMAIL_PATTERN = labelPattern(["Requestor[ \t]+E-?mail(?:[ \t]+Address)?", "Requester[ \t]+E-?mail(?:[ \t]+Address)?"]);
 // Section headings may be numbered ("5. CLIENT/EMPLOYEE INFORMATION", "5) ...").
 const SECTION_NUMBER = String.raw`(?:\d{1,2}[.)][ \t]*)?`;
-const CLIENT_BLOCK_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}CLIENT[ \t]*\/[ \t]*EMPLOYEE[ \t]+INFORMATION[ \t]*:?[ \t]*$`, "im");
+// Section 5 is "CLIENT/EMPLOYEE INFORMATION" on most forms and "PATIENT INFORMATION" on the health-care (HCA) ones.
+const CLIENT_BLOCK_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}((?:CLIENT[ \t]*\/[ \t]*EMPLOYEE|PATIENT)[ \t]+INFORMATION)[ \t]*:?[ \t]*$`, "im");
 const REQUESTOR_SECTION_HEADER = new RegExp(
   String.raw`^[ \t]*${SECTION_NUMBER}REQUES?TOR(?:[ \t]+(?:INFORMATION|INFO|DETAILS))?[ \t]*:?[ \t]*$`,
   "im",
@@ -176,7 +186,6 @@ const isMimeArtifactLine = (line: string): boolean =>
   SIGNATURE_DELIMITER_PATTERN.test(line);
 /** A quoted-printable soft line break leaves a trailing "=" on the line; it is removed from kept text. */
 const stripSoftLineBreak = (line: string): string => line.replace(/[ \t]*=[ \t]*$/, "");
-export const EMPTY_VALUE = /^(?:n\/?a|none|no|not applicable|not provided|-+)$/i;
 
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
 export function normalizeEmailText(raw: string): string {
@@ -197,12 +206,6 @@ export function normalizeEmailText(raw: string): string {
   }
   // A forward quotes the original with "> " (nested: "> > "). Every pattern is line-anchored, so the markers go.
   return text.replace(/^[ \t]*(?:>[ \t]*)+/gm, "");
-}
-
-export function cleanValue(value: string | undefined): string | null {
-  if (!value) return null;
-  const cleaned = value.replace(/\s+/g, " ").trim().slice(0, MAX_FIELD_LENGTH);
-  return cleaned.length > 0 ? cleaned : null;
 }
 
 /** Enforces /^[A-Za-z0-9-]{0,40}$/. Anything else is discarded rather than stored. */
@@ -278,11 +281,12 @@ export function sectionLines(text: string, header: RegExp): string[] | null {
   return out;
 }
 
-/** The CLIENT/EMPLOYEE INFORMATION section, heading plus every line in it, capped so it can't flood the notes. */
+/** Section 5 (CLIENT/EMPLOYEE or PATIENT INFORMATION), heading plus every line in it, capped so it can't flood the notes. */
 function extractClientInfoBlock(text: string): string | null {
   const lines = sectionLines(text, CLIENT_BLOCK_HEADER);
   if (!lines || lines.length === 0) return null;
-  return ["CLIENT/EMPLOYEE INFORMATION", ...lines].join("\n").slice(0, MAX_CLIENT_BLOCK_LENGTH);
+  const heading = text.split("\n").map((line) => CLIENT_BLOCK_HEADER.exec(line)?.[1]).find(Boolean) ?? "CLIENT/EMPLOYEE INFORMATION";
+  return [heading.replace(/\s+/g, " "), ...lines].join("\n").slice(0, MAX_CLIENT_BLOCK_LENGTH);
 }
 
 /** First e-mail address in the value (a trailing "mailto:", brackets or punctuation are ignored). */
@@ -322,26 +326,6 @@ function extractRequestor(text: string): { name: string | null; phone: string | 
   return { name, phone, email };
 }
 
-/** Known video platforms by hostname or name; anything else keeps the text the email gave. */
-function platformFrom(value: string): string | null {
-  if (/zoom/i.test(value)) return "Zoom";
-  if (/teams/i.test(value)) return "Microsoft Teams";
-  if (/meet\.google|google\s*meet/i.test(value)) return "Google Meet";
-  if (/webex/i.test(value)) return "Webex";
-  return null;
-}
-
-/** "Virtual Meeting: Zoom https://..." -> platform "Zoom" + link. Only http(s) links are ever kept. */
-function parseMeeting(value: string | null): { platform: string | null; meetingLink: string | null } {
-  if (!value || EMPTY_VALUE.test(value)) return { platform: null, meetingLink: null };
-  const url = value.match(/https?:\/\/[^\s<>"']+/i)?.[0].replace(/[.,;)]+$/, "") ?? null;
-  const label = cleanValue(url ? value.replace(url, "") : value)?.replace(/[:\-–—\s]+$/, "") ?? null;
-  // Free text is kept as the platform name only if it isn't a URL-like value ("javascript:...", "file:...").
-  const plainLabel = label && !EMPTY_VALUE.test(label) && !/^[a-z][a-z0-9+.-]*:\S/i.test(label) ? label.slice(0, 80) : null;
-  const platform = platformFrom(url ?? "") ?? platformFrom(label ?? "") ?? plainLabel;
-  return { platform: platform ?? (url ? "Virtual" : null), meetingLink: url };
-}
-
 export function parseIntakeEmail(rawContent: string, subject: string): ParsedIntakeEmail {
   const text = normalizeEmailText(rawContent);
 
@@ -365,20 +349,23 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
     endTime = endTime ?? cleanValue(range?.[2]);
   }
 
-  const venue = cleanValue(text.match(VENUE_PATTERN)?.[1]);
-  const address = cleanValue(text.match(ADDRESS_PATTERN)?.[1]);
-
-  const meeting = parseMeeting(cleanValue(text.match(MEETING_PATTERN)?.[1]));
+  // Location / Address / Virtual Meeting lines, sorted into a place name, a room code, a physical address and a meeting link.
+  const where = resolveLocation({
+    location: cleanValue(text.match(VENUE_PATTERN)?.[1]),
+    address: cleanValue(text.match(ADDRESS_PATTERN)?.[1]),
+    meetingValue: cleanValue(text.match(MEETING_PATTERN)?.[1]),
+  });
+  const { venue, locationCode, address } = where;
 
   let format = normalizeFormat(cleanValue(text.match(FORMAT_PATTERN)?.[1]));
   let formatInferred = false;
-  if (!format && address) {
-    // A physical street address with no stated format implies an on-site job.
-    format = "in_person";
-    formatInferred = true;
-  } else if (!format && (meeting.platform || meeting.meetingLink)) {
-    // A meeting platform or link and no street address implies a virtual job.
+  if (!format && where.virtual) {
+    // An online location, a platform line or a meeting link means a virtual job, even when an address (the host's) is also given.
     format = "virtual";
+    formatInferred = true;
+  } else if (!format && address) {
+    // A physical street address with no stated format and nothing online implies an on-site job.
+    format = "in_person";
     formatInferred = true;
   }
 
@@ -393,13 +380,14 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
     start24: startTime ? to24HourTime(startTime) : null,
     end24: endTime ? to24HourTime(endTime) : null,
     venue,
+    locationCode,
     address,
     format,
     formatInferred,
     clientName: cleanValue(text.match(CLIENT_PATTERN)?.[1]),
     purpose: cleanValue(text.match(PURPOSE_PATTERN)?.[1]),
-    platform: meeting.platform,
-    meetingLink: meeting.meetingLink,
+    platform: where.platform,
+    meetingLink: where.meetingLink,
     appointmentNote: extractNote(text),
     requestorName: requestor.name,
     requestorPhone: requestor.phone,
@@ -424,7 +412,7 @@ export function parseWarnings(parsed: ParsedIntakeEmail): string[] {
   if (!parsed.startTime) warnings.push("Start time not found");
   else if (!parsed.start24) warnings.push("Start time malformed");
   if (parsed.endTime && !parsed.end24) warnings.push("End time malformed");
-  if (!parsed.venue && !parsed.address) warnings.push("Location not found");
+  if (!parsed.venue && !parsed.address && !parsed.locationCode) warnings.push("Location not found");
   if (!parsed.format) warnings.push("Format not found");
   else if (parsed.formatInferred) warnings.push("Format inferred as in_person from address");
   if (!parsed.clientName) warnings.push("Client name not found");

@@ -13,6 +13,14 @@ export interface RequestData {
     odhhSrn?: string;
     odhhAccessCode?: string;
     providerOneNumber?: string;
+    /** The interpreter the state's form asks for by name ("Specific Interpreter Requested"): a preference, not a booking. */
+    requestedInterpreter?: string;
+    /** The state's form says the request needs pre-authorization. */
+    preAuthorizationRequired?: boolean;
+    /** The state marks the appointment "Crucial". */
+    crucialAppointment?: boolean;
+    /** "72 Hours": the state's booking period for the request. */
+    bookingPeriod?: string;
   };
   [key: string]: any;
 }

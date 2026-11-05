@@ -1,6 +1,6 @@
 import type { RequestData } from "@/db/schema";
 import { FORMAT_LABELS, ODHH_PROGRAM, ODHH_TIME_ZONE_LABEL, type ParsedIntakeEmail } from "@/lib/odhhEmailParser";
-import { contactMethodText, type FormExtras } from "@/lib/odhhFormFields";
+import { contactMethodText, stateFlagsLine, type FormExtras } from "@/lib/odhhFormFields";
 
 /**
  * What a state request email says, as the app's request data. Used twice: to make the draft request when the email is
@@ -37,10 +37,21 @@ export function buildDraftData(input: DraftInput): RequestData {
   const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
   const prepNotes = noteAlreadyInBlock ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
   const contactMethod = contactMethodText(extras);
+  // Agency-private notes: the state's flags first, then the whole of section 5 (gender, hearing identity, comments, ...).
+  const privateNotes = [stateFlagsLine(extras), parsed.clientInfoBlock ?? ""].filter(Boolean).join("\n\n");
+  // The room: the form's own Room line, else a short code the Location line held ("E1"). It is never the place's name.
+  const room = extras.room ?? parsed.locationCode;
 
   return {
     brief: {},
-    intake: { program: ODHH_PROGRAM, ...(srn ? { odhhSrn: srn } : {}) },
+    intake: {
+      program: ODHH_PROGRAM,
+      ...(srn ? { odhhSrn: srn } : {}),
+      ...(extras.requestedInterpreter ? { requestedInterpreter: extras.requestedInterpreter } : {}),
+      ...(extras.preAuthorizationRequired ? { preAuthorizationRequired: true } : {}),
+      ...(extras.crucialAppointment ? { crucialAppointment: true } : {}),
+      ...(extras.bookingPeriod ? { bookingPeriod: extras.bookingPeriod } : {}),
+    },
     details: {
       timeZone: ODHH_TIME_ZONE_LABEL,
       ...(parsed.format ? { format: FORMAT_LABELS[parsed.format], formatCode: parsed.format } : {}),
@@ -55,17 +66,17 @@ export function buildDraftData(input: DraftInput): RequestData {
     ...(prepNotes ? { prepNotes } : {}),
     // The whole CLIENT/EMPLOYEE INFORMATION section (gender, hearing identity, comments, ...) is sensitive: it goes
     // to "Agency-private notes" (requests.data.privateNotes), which interpreters never receive.
-    ...(parsed.clientInfoBlock ? { privateNotes: parsed.clientInfoBlock } : {}),
+    ...(privateNotes ? { privateNotes } : {}),
     onsite: {
       venue: parsed.venue ?? "",
       address: parsed.address ?? "",
       ...(extras.building ? { building: extras.building } : {}),
       ...(extras.floor ? { floor: extras.floor } : {}),
-      ...(extras.room ? { room: extras.room } : {}),
+      ...(room ? { room } : {}),
       ...(extras.contactName ? { contact: extras.contactName } : {}),
       ...(contactMethod ? { contactMethod } : {}),
     },
-    overview: { location: parsed.venue ?? parsed.address ?? "TBD", status: "Unfilled / draft" },
+    overview: { location: parsed.venue ?? parsed.address ?? (parsed.format === "virtual" ? "Virtual" : "TBD"), status: "Unfilled / draft" },
     // One-time requester for this job: the ODHH requestor from the email. `oneTime` stops the edit page from swapping in
     // a saved client's default contact (it matches saved clients by organisation name). The organization is the form's
     // "Billing Organization Name" (DVR, Seattle Children's, ...), and "WA ODHH" only when the form names none.

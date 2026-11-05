@@ -23,6 +23,14 @@ export interface FormExtras {
   billingContactName: string | null;
   billingContactEmail: string | null;
   billingContactPhone: string | null;
+  /** "Specific Interpreter Requested" in section 5: a preference to honour, not a booking. */
+  requestedInterpreter: string | null;
+  /** "THIS REQUEST REQUIRES PRE-AUTHORIZATION" (the state's banner above section 1). */
+  preAuthorizationRequired: boolean;
+  /** The "3. APPOINTMENT INFORMATION - Crucial Appointment" heading. */
+  crucialAppointment: boolean;
+  /** "Booking Period: 72 Hours". */
+  bookingPeriod: string | null;
 }
 
 const APPOINTMENT_SETTING = labelPattern(["Appointment[ \\t]+Setting"]);
@@ -31,6 +39,10 @@ const BILLING_ORG = labelPattern(["Billing[ \\t]+Organization(?:[ \\t]+Name)?"])
 const BUILDING = labelPattern(["Building"]);
 const FLOOR = labelPattern(["Floor"]);
 const ROOM = labelPattern(["Room"]);
+const REQUESTED_INTERPRETER = labelPattern(["Specific[ \\t]+Interpreter[ \\t]+Requested"]);
+const BOOKING_PERIOD = labelPattern(["Booking[ \\t]+Period"]);
+const PRE_AUTHORIZATION = /^[ \t]*THIS[ \t]+REQUEST[ \t]+REQUIRES[ \t]+PRE-?[ \t]*AUTHORI[SZ]ATION\b/im;
+const CRUCIAL_APPOINTMENT = /^[ \t]*(?:\d{1,2}[.)][ \t]*)?APPOINTMENT[ \t]+INFORMATION[ \t]*[-:–—][ \t]*Crucial[ \t]+Appointment\b/im;
 const SECTION = String.raw`(?:\d{1,2}[.)][ \t]*)?`;
 const LOCATION_HEADER = new RegExp(String.raw`^[ \t]*${SECTION}APPOINTMENT[ \t]+LOCATION[ \t]*:?[ \t]*$`, "im");
 const ACCOUNT_HEADER = new RegExp(String.raw`^[ \t]*${SECTION}ACCOUNT[ \t]+INFORMATION[ \t]*:?[ \t]*$`, "im");
@@ -81,8 +93,25 @@ export function parseFormExtras(rawContent: string): FormExtras {
     billingContactName: inSection(account, "Contact"),
     billingContactEmail: parseEmailAddress(inSection(account, "Email")),
     billingContactPhone: parsePhoneNumber(inSection(account, "Phone")),
+    requestedInterpreter: real(text.match(REQUESTED_INTERPRETER)?.[1]),
+    preAuthorizationRequired: PRE_AUTHORIZATION.test(text),
+    crucialAppointment: CRUCIAL_APPOINTMENT.test(text),
+    bookingPeriod: real(text.match(BOOKING_PERIOD)?.[1]),
   };
 }
+
+/**
+ * The state's flags for a job as one line for the agency-private notes ("Requires pre-authorization · Crucial appointment ·
+ * Booking period: 72 Hours"), or "" when it has none.
+ */
+export const stateFlagsLine = (extras: Pick<FormExtras, "preAuthorizationRequired" | "crucialAppointment" | "bookingPeriod">): string => {
+  const parts = [
+    extras.preAuthorizationRequired ? "Requires pre-authorization" : "",
+    extras.crucialAppointment ? "Crucial appointment" : "",
+    extras.bookingPeriod ? `Booking period: ${extras.bookingPeriod}` : "",
+  ].filter(Boolean);
+  return parts.length > 0 ? `State request flags: ${parts.join(" · ")}` : "";
+};
 
 /** How the on-site contact is reached, as one line: "360-555-0100 · a@b.gov · text 360-555-0101". */
 export const contactMethodText = (extras: Pick<FormExtras, "contactPhone" | "contactEmail" | "contactText">): string =>

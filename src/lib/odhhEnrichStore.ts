@@ -41,6 +41,11 @@ export async function enrichRequestFromForm(requestId: string, form: RequestData
       actorLabel: "Email intake",
     });
   }
+  // Said once, when the form first fills the job (a later repeat of the same email changes nothing and stays quiet).
+  if (applied && plan.formatDiffers) {
+    await logActivity({ requestId, kind: "form_format_differs", audience: "agency", message: "The state's request form describes this job as a different format (virtual or in person) than the one on file. Nothing was changed; please check it.", actorLabel: "Email intake" });
+    await notifyAgencyAdmins({ type: "job", href: `/requests/${requestId}`, title: "Form format differs from the job", message: "A state request form describes the job as virtual or in person differently from the job on file. Open the request to check it." });
+  }
   if (plan.scheduleDiffers) {
     await logActivity({ requestId, kind: "form_schedule_differs", audience: "agency", message: "The state's request form lists a different date or time than this job. Nothing was changed; please check it.", actorLabel: "Email intake" });
     await notifyAgencyAdmins({ type: "job", href: `/requests/${requestId}`, title: "Form time differs from the job", message: "A state request form lists a different date or time than the job on file. Open the request to check it." });
