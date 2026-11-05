@@ -17,6 +17,11 @@ import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
 import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
 import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
 import { programIdentifiers } from "@/lib/programIdentifiers";
+import { RoomFloorFields } from "@/components/requests/form/RoomFloorFields";
+import { RequestFlagsCard } from "@/components/requests/form/RequestFlagsCard";
+import { PatientInfoCard } from "@/components/requests/form/PatientInfoCard";
+import { EMPTY_EXTRAS, buildExtrasPayload, extrasFromRequest } from "@/lib/requestFormExtras";
+import type { FormExtras } from "@/lib/requestFormExtras";
 
 function LimitedTextarea({ className = "", maxLength = 1000, value, onChange }: { className?: string, maxLength?: number, value?: string, onChange?: (val: string) => void }) {
  const [internalValue, setInternalValue] = useState(value || "");
@@ -98,6 +103,9 @@ export default function EditRequestPage() {
  "Hawaii Time": "Pacific/Honolulu"
  };
 
+ const [extras, setExtras] = useState<FormExtras>(EMPTY_EXTRAS);
+ const [showOtherPatientInfo, setShowOtherPatientInfo] = useState(false);
+ const changeExtras = (field: keyof FormExtras, value: string | boolean) => setExtras((prev) => ({ ...prev, [field]: value }) as FormExtras);
  const [formData, setFormData] = useState({
  client: "New or one-time requester — no saved client",
  requesterOrgOrContact: "New organization or contact",
@@ -142,7 +150,6 @@ export default function EditRequestPage() {
  program: "General",
  odhhSrn: "",
  odhhAccessCode: "",
- providerOneNumber: "",
  platform: "Zoom",
  meetingLink: "",
  meetingId: "",
@@ -152,6 +159,10 @@ export default function EditRequestPage() {
 
  useEffect(() => {
    if (existingRequest) {
+     // The notes box shows what staff wrote; the person's details (Section 5) have their own fields.
+     const loaded = extrasFromRequest(existingRequest?.data, existingRequest?.privateNotes);
+     setExtras(loaded.extras);
+     setShowOtherPatientInfo(loaded.extras.otherPatientInfo !== "");
      setFormData(prev => ({
        ...prev,
        requesterName: existingRequest?.requester?.name || "",
@@ -184,12 +195,11 @@ export default function EditRequestPage() {
        billEmail: existingRequest?.requester?.billEmail || "",
        poNumber: existingRequest?.requester?.poNumber || "",
        prepNotes: existingRequest?.prepNotes || "",
-       privateNotes: existingRequest?.privateNotes || "",
+       privateNotes: loaded.generalNotes,
        positions: (existingRequest?.requiredPositions === 2 || existingRequest?.positions === "Team — two independent positions") ? "Team — two independent positions" : (existingRequest?.positions || "One interpreter"),
        program: existingRequest?.data?.intake?.program || "General",
        odhhSrn: existingRequest?.data?.intake?.odhhSrn || "",
        odhhAccessCode: existingRequest?.data?.intake?.odhhAccessCode || "",
-       providerOneNumber: existingRequest?.data?.intake?.providerOneNumber || "",
        platform: existingRequest?.platform || existingRequest?.details?.platform || "Zoom",
        meetingLink: existingRequest?.meetingLink || existingRequest?.details?.meetingLink || existingRequest?.virtualLink || existingRequest?.details?.virtualLink || "",
        meetingId: existingRequest?.meetingId || existingRequest?.details?.meetingId || "",
@@ -578,6 +588,7 @@ export default function EditRequestPage() {
         timeZone: formData.timeZone,
       });
 
+      const extrasPayload = buildExtrasPayload(extras, formData.privateNotes, String(existingRequest?.privateNotes ?? ""), "edit");
       const updatedRequest = {
         title: formData.appointmentTitle || "Interpreting request",
         client: formData.client,
@@ -637,7 +648,8 @@ export default function EditRequestPage() {
           parking: formData.parking,
           entrance: formData.entrance,
           contact: formData.onsiteContactName,
-          contactMethod: formData.onsiteContactPhone
+          contactMethod: formData.onsiteContactPhone,
+          ...extrasPayload.onsite
         },
         requester: {
           name: formData.requesterName,
@@ -655,7 +667,7 @@ export default function EditRequestPage() {
           ...(existingRequest?.requester?.oneTime ? { oneTime: isNewRequester } : {})
         },
         prepNotes: formData.prepNotes,
-        privateNotes: formData.privateNotes,
+        privateNotes: extrasPayload.privateNotes,
         messageToInterpreter: isScheduleLocked ? messageToInterpreter : undefined,
         messageRecipientId: isScheduleLocked && messageRecipient ? messageRecipient : undefined,
         activity: "updated just now",
@@ -673,10 +685,12 @@ export default function EditRequestPage() {
           slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
           repeats: Boolean(formData.repeats),
           recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
-          // No "brief" here: this form does not edit it, and the server keeps what is saved.
+          // Only the hearing identity (Patient Information card); the server keeps every other saved brief key.
+          brief: extrasPayload.brief,
           intake: {
             program: formData.program,
             ...programIdentifiers(formData),
+            ...extrasPayload.intake,
             positions: formData.positions,
             requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
             slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
@@ -1028,8 +1042,7 @@ export default function EditRequestPage() {
  </div>
  )}
 
- {/* Location details Section (a fully virtual job has no physical location to edit, as in Quick Edit) */}
- {formData.modality !== "Virtual" && (
+ {/* Location details: shown for every format, because a virtual or hybrid job can still have a place to go */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Location details</h2>
  
@@ -1043,7 +1056,7 @@ export default function EditRequestPage() {
  </div>
 
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
- <Field label="Building, floor or room">
+ <Field label="Building">
  <input type="text" className={inputClass} value={formData.building} onChange={(e) => handleChange("building", e.target.value)} />
  </Field>
  <Field label="Onsite contact name">
@@ -1057,8 +1070,12 @@ export default function EditRequestPage() {
  </Field>
  </div>
 
+  <RoomFloorFields floor={extras.floor} room={extras.room} onChange={(field, value) => changeExtras(field, value)} />
+
+ <RoomFloorFields floor={extras.floor} room={extras.room} onChange={(field, value) => changeExtras(field, value)} />
+
  <div className="mt-6">
- <Field label="Parking">
+ <Field label="Direction & Parking Note" subtext="Directions, door or gate codes, where to park. Shared with the booked interpreter.">
  <textarea className={`${textareaClass} min-h-[100px]`} value={formData.parking} onChange={(e) => handleChange("parking", e.target.value)} />
  </Field>
  </div>
@@ -1069,7 +1086,6 @@ export default function EditRequestPage() {
  </Field>
  </div>
  </div>
- )}
 
  {/* Short location label Section */}
  <div className={cardClass}>
@@ -1134,6 +1150,8 @@ export default function EditRequestPage() {
  </div>
  </div>
 
+ <RequestFlagsCard isPublic={extras.isPublic} isMixedGroup={extras.isMixedGroup} requestedInterpreter={extras.requestedInterpreter} onChange={changeExtras} />
+
  {/* Program and state identifiers Section */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Program and state identifiers</h2>
@@ -1144,11 +1162,6 @@ export default function EditRequestPage() {
  {(formData.program === "WA ODHH" || formData.program === "WA Apple Health") && (
  <Field label="Service Request Number (SRN)">
  <input type="text" inputMode="numeric" pattern="\d*" className={inputClass} value={formData.odhhSrn} onChange={(e) => handleChange("odhhSrn", e.target.value.replace(/\D/g, ''))} />
- </Field>
- )}
- {formData.program === "WA Apple Health" && (
- <Field label="ProviderOne client number">
- <input type="text" className={inputClass} value={formData.providerOneNumber} onChange={(e) => handleChange("providerOneNumber", e.target.value)} />
  </Field>
  )}
  </div>
@@ -1164,6 +1177,12 @@ export default function EditRequestPage() {
  )}
 
  </div>
+
+ <PatientInfoCard
+ values={extras}
+ showOther={showOtherPatientInfo}
+ onChange={(field, value) => changeExtras(field, value)}
+ />
 
  {/* Notes Section */}
  <div className={cardClass}>

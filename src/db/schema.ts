@@ -24,6 +24,8 @@ export interface RequestData {
     /** The form's "Public - Yes/No" and "Mixed Group - Yes/No" lines. Staff-only: never sent to interpreters. */
     isPublic?: boolean;
     isMixedGroup?: boolean;
+    /** Section 5 / patient information, entered on the request forms. Staff-only: never sent to interpreters. */
+    clientGender?: string;
   };
   [key: string]: any;
 }

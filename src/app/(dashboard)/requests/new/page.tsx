@@ -15,6 +15,11 @@ import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, ty
 import { isInvalidEmail } from "@/utils/validation";
 import { IconInput } from "@/components/ui/IconInput";
 import { programIdentifiers } from "@/lib/programIdentifiers";
+import { RoomFloorFields } from "@/components/requests/form/RoomFloorFields";
+import { RequestFlagsCard } from "@/components/requests/form/RequestFlagsCard";
+import { PatientInfoCard } from "@/components/requests/form/PatientInfoCard";
+import { EMPTY_EXTRAS, buildExtrasPayload } from "@/lib/requestFormExtras";
+import type { FormExtras } from "@/lib/requestFormExtras";
 import type { RequestData, Program } from "@/db/schema";
 
 function LimitedTextarea({ className = "", maxLength = 1000, value, onChange }: { className?: string, maxLength?: number, value?: string, onChange?: (val: string) => void }) {
@@ -137,7 +142,9 @@ export default function NewRequestPage() {
     return list;
   }, [dbClients]);
 
-  const [formData, setFormData] = useState({
+  const [extras, setExtras] = useState<FormExtras>(EMPTY_EXTRAS);
+ const changeExtras = (field: keyof FormExtras, value: string | boolean) => setExtras((prev) => ({ ...prev, [field]: value }) as FormExtras);
+ const [formData, setFormData] = useState({
  client: targetClient ? targetClient.name : "New or one-time requester — no saved client",
  requesterOrgOrContact: "New organization or contact",
  requesterName: "",
@@ -180,8 +187,7 @@ export default function NewRequestPage() {
  positions: "One interpreter",
  program: "General",
  odhhSrn: "",
- odhhAccessCode: "",
- providerOneNumber: ""
+ odhhAccessCode: ""
  });
 
  const hasPreselectedNewRef = useRef(false);
@@ -461,11 +467,13 @@ export default function NewRequestPage() {
    endsAtIso = new Date(now.getTime() + 3600000).toISOString();
  }
 
+ const extrasPayload = buildExtrasPayload(extras, formData.privateNotes, "", "create");
  const requestData: RequestData = {
-   brief: { hearingIdentity: "deaf" },
+   brief: extras.hearingIdentity ? { hearingIdentity: extras.hearingIdentity } : {},
    intake: {
      program: formData.program as Program,
-     ...programIdentifiers(formData)
+     ...programIdentifiers(formData),
+     ...extrasPayload.intake
    },
    overview: { location: formData.venue || "TBD", status: "Unfilled / draft", startsAt: startsAtIso, endsAt: endsAtIso },
    startsAt: startsAtIso,
@@ -498,10 +506,10 @@ export default function NewRequestPage() {
       requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
       slotCount: formData.positions === "Team — two independent positions" ? 2 : 1
     },
-   onsite: { venue: formData.venue, address: formData.address, building: formData.building, parking: formData.parking, entrance: formData.entrance, contact: formData.onsiteContactName, contactMethod: formData.onsiteContactPhone },
+   onsite: { venue: formData.venue, address: formData.address, building: formData.building, parking: formData.parking, entrance: formData.entrance, contact: formData.onsiteContactName, contactMethod: formData.onsiteContactPhone, ...extrasPayload.onsite },
    requester: { name: formData.requesterName, org: formData.requesterOrg, email: formData.email, phone: formData.phone, prefContact: formData.prefContact, reqInterpreter: formData.prefInterpreter, teamSuggested: formData.teamSuggested, billOrg: formData.billOrg, billContact: formData.billContact, billEmail: formData.billEmail, poNumber: formData.poNumber },
    prepNotes: formData.prepNotes,
-   privateNotes: formData.privateNotes,
+   privateNotes: extrasPayload.privateNotes,
    positions: formData.positions,
    requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
    slotCount: formData.positions === "Team — two independent positions" ? 2 : 1
@@ -782,7 +790,7 @@ export default function NewRequestPage() {
  </div>
 
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mt-6">
- <Field label="Building, floor or room">
+ <Field label="Building">
  <input type="text" className={inputClass} value={formData.building} onChange={(e) => handleChange("building", e.target.value)} />
  </Field>
  <Field label="Onsite contact name">
@@ -796,8 +804,10 @@ export default function NewRequestPage() {
  </Field>
  </div>
 
+  <RoomFloorFields floor={extras.floor} room={extras.room} onChange={(field, value) => changeExtras(field, value)} />
+
  <div className="mt-6">
- <Field label="Parking">
+ <Field label="Direction & Parking Note" subtext="Directions, door or gate codes, where to park. Shared with the booked interpreter.">
  <textarea className={`${textareaClass} min-h-[100px]`} value={formData.parking} onChange={(e) => handleChange("parking", e.target.value)} />
  </Field>
  </div>
@@ -872,6 +882,8 @@ export default function NewRequestPage() {
  </div>
  </div>
 
+ <RequestFlagsCard isPublic={extras.isPublic} isMixedGroup={extras.isMixedGroup} requestedInterpreter={extras.requestedInterpreter} onChange={changeExtras} />
+
  {/* Program and state identifiers Section */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Program and state identifiers</h2>
@@ -882,11 +894,6 @@ export default function NewRequestPage() {
  {(formData.program === "WA ODHH" || formData.program === "WA Apple Health") && (
  <Field label="Service Request Number (SRN)">
  <input type="text" inputMode="numeric" pattern="\d*" className={inputClass} value={formData.odhhSrn} onChange={(e) => handleChange("odhhSrn", e.target.value.replace(/\D/g, ''))} />
- </Field>
- )}
- {formData.program === "WA Apple Health" && (
- <Field label="ProviderOne client number">
- <input type="text" className={inputClass} value={formData.providerOneNumber} onChange={(e) => handleChange("providerOneNumber", e.target.value)} />
  </Field>
  )}
  </div>
@@ -902,6 +909,8 @@ export default function NewRequestPage() {
  )}
 
  </div>
+
+ <PatientInfoCard values={extras} showOther={false} onChange={(field, value) => changeExtras(field, value)} />
 
  {/* Notes Section */}
  <div className={cardClass}>

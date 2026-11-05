@@ -195,8 +195,8 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     slotCount: slotCount,
     repeats: payload.repeats ?? payload.details?.repeats ?? existingData.repeats,
     recurrenceNote: payload.recurrenceNote ?? payload.details?.recurrenceNote ?? existingData.recurrenceNote,
-    // The form does not own the brief: a key already saved is never changed by a save, and a new key is only added.
-    brief: { ...definedOnly(payload.data?.brief), ...(existingData.brief || {}) },
+    // The forms own the hearing identity (the staff-only patient fields); every other saved brief key stays.
+    brief: { ...(existingData.brief || {}), ...definedOnly(payload.data?.brief) },
     details: updatedDetails,
     onsite: updatedOnsite,
     requester: updatedRequester,

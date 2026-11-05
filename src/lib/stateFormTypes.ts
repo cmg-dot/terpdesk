@@ -36,3 +36,6 @@ export const SECTION_TITLES: Record<1 | 2 | 3 | 4, string> = {
 };
 
 export const PRE_AUTHORIZATION_BANNER = "This request requires pre-authorization.";
+
+/** The heading line of section 5 as the app saves it in the private notes. */
+export const SECTION_5_HEADING = /^(?:CLIENT\/EMPLOYEE|PATIENT) INFORMATION$/;

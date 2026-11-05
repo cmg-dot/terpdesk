@@ -1,7 +1,9 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { hasJobAnchor, normalizeEmailText } from "@/lib/odhhEmailParser";
 import { isRealOrganization } from "@/lib/requestSummary";
+import { identityLabel } from "@/lib/hearingIdentity";
 import { rowsFromLines, parseStateFormEmail } from "@/lib/stateFormParse";
+import { splitSection5 } from "@/lib/section5Notes";
 import { PRE_AUTHORIZATION_BANNER } from "@/lib/stateFormTypes";
 import type { FormRow, FormSection, StateFormView } from "@/lib/stateFormTypes";
 import { getIanaZone } from "@/utils/timezone";
@@ -25,7 +27,6 @@ export interface StateFormInput {
   timeZone: string | undefined;
 }
 
-const SECTION_5_HEADING = /^(?:CLIENT\/EMPLOYEE|PATIENT) INFORMATION$/;
 
 /**
  * The agency-private notes without the saved copy of section 5. The request form on the same page already shows that section
@@ -35,23 +36,12 @@ const SECTION_5_HEADING = /^(?:CLIENT\/EMPLOYEE|PATIENT) INFORMATION$/;
  */
 export function notesWithoutFormSection5(privateNotes: string, view: StateFormView): string {
   if (!view.sections.some((section) => section.number === 5 && section.rows.length > 0)) return privateNotes;
-  const lines = privateNotes.split("\n");
-  const at = lines.findIndex((line) => SECTION_5_HEADING.test(line.trim()));
-  if (at < 0) return privateNotes;
-  let end = at + 1;
-  while (end < lines.length && lines[end].trim() !== "") end += 1;
-  return [...lines.slice(0, at), ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n").trim();
+  const { general, block } = splitSection5(privateNotes);
+  return block ? general : privateNotes;
 }
 
-/** "Label: value" lines of section 5 as the app saved them in the private notes ("PATIENT INFORMATION" + lines up to a blank line). */
-const savedSection5 = (privateNotes: string): { title: string; lines: string[] } | null => {
-  const lines = privateNotes.split("\n");
-  const at = lines.findIndex((line) => SECTION_5_HEADING.test(line.trim()));
-  if (at < 0) return null;
-  const rest: string[] = [];
-  for (let i = at + 1; i < lines.length && lines[i].trim() !== ""; i += 1) rest.push(lines[i]);
-  return { title: lines[at].trim(), lines: rest };
-};
+/** "Label: value" lines of section 5 as the app saved them in the private notes (every saved copy merged), or null. */
+const savedSection5 = (privateNotes: string): { title: string; lines: string[] } | null => splitSection5(privateNotes).block;
 
 const clock = (iso: string | null, zone: string, pattern: string): string | null => {
   if (!iso) return null;
@@ -60,6 +50,20 @@ const clock = (iso: string | null, zone: string, pattern: string): string | null
 };
 
 const row = (label: string, value: unknown): FormRow => ({ label, value: orNull(value) });
+
+/** Rows from a saved section 5 block, with the form-saved details filled in where the block has none (or no such row). */
+function withPatientDetails(rows: FormRow[], details: [string, string][]): FormRow[] {
+  const next = rows.map((r) => ({ ...r }));
+  for (const [label, value] of details) {
+    if (!value) continue;
+    const at = next.findIndex((r) => r.label.toLowerCase().replace(/[^a-z0-9#]/g, "") === label.toLowerCase().replace(/[^a-z0-9#]/g, ""));
+    if (at < 0) next.push({ label, value });
+    else if (!next[at].value) next[at].value = value;
+  }
+  return next;
+}
+
+const yesNo = (value: unknown): string | null => (typeof value === "boolean" ? (value ? "Yes" : "No") : null);
 
 function recordsView(input: StateFormInput): StateFormView {
   const data = bag(input.data);
@@ -73,12 +77,19 @@ function recordsView(input: StateFormInput): StateFormView {
   const notes = text(data.privateNotes);
 
   const saved = savedSection5(notes);
+  // The person's details as the request forms save them (staff-only fields), in the form's own row labels.
+  const patient: [string, string][] = [
+    ["Provider One #", text(intake.providerOneNumber)],
+    ["Gender", text(intake.clientGender)],
+    ["Hearing Identity", identityLabel(text(bag(data.brief).hearingIdentity))],
+    ["Specific Interpreter Requested", text(intake.requestedInterpreter)],
+  ];
   const section5Rows: FormRow[] = saved
-    ? rowsFromLines(saved.lines)
+    ? withPatientDetails(rowsFromLines(saved.lines), patient)
     : [
-        ...(isHealthCare ? [row("Provider One #", null)] : []),
-        row("Gender", null),
-        row("Hearing Identity", null),
+        ...(isHealthCare || text(intake.providerOneNumber) ? [row("Provider One #", intake.providerOneNumber)] : []),
+        row("Gender", intake.clientGender),
+        row("Hearing Identity", identityLabel(text(bag(data.brief).hearingIdentity))),
         row("Specific Interpreter Requested", intake.requestedInterpreter),
         row("Interpreter Gender", null),
         row("Comment", null),
@@ -138,6 +149,8 @@ function recordsView(input: StateFormInput): StateFormView {
         row("Direction & Parking Note", onsite.parking),
         row("Virtual Meeting/Platform", platform),
         row("Format", details.format),
+        ...(yesNo(intake.isPublic) ? [row("Public", yesNo(intake.isPublic))] : []),
+        ...(yesNo(intake.isMixedGroup) ? [row("Mixed Group", yesNo(intake.isMixedGroup))] : []),
       ],
     },
     { number: 5, title: saved?.title ?? (isHealthCare ? "PATIENT INFORMATION" : "CLIENT/EMPLOYEE INFORMATION"), tag: null, private: true, rows: section5Rows },
