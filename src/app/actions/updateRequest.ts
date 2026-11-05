@@ -11,6 +11,7 @@ import { buildAppointmentUtcTimes, getIanaZone } from "@/utils/timezone";
 import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
+import { definedOnly } from "@/lib/definedValues";
 
 export interface UpdateRequestPayload {
   title?: string;
@@ -123,7 +124,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
   // 3. Assemble Overwritten Data (both top-level and cached details fields)
   const updatedDetails = {
     ...existingDetails,
-    ...(payload.details || {}),
+    ...definedOnly(payload.details),
     setting: newSetting,
     format: newFormat,
     timeZone: targetTz,
@@ -150,7 +151,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
 
   const updatedOnsite = {
     ...existingOnsite,
-    ...(payload.onsite || {}),
+    ...definedOnly(payload.onsite),
     venue: newVenue,
     address: newAddress,
     building: payload.onsite?.building ?? payload.building ?? existingOnsite.building,
@@ -162,7 +163,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
 
   const updatedRequester = {
     ...existingRequester,
-    ...(payload.requester || {}),
+    ...definedOnly(payload.requester),
     name: payload.requester?.name ?? payload.requesterName ?? existingRequester.name,
     org: payload.requester?.org ?? payload.requesterOrg ?? existingRequester.org,
     email: payload.requester?.email ?? payload.email ?? existingRequester.email,
@@ -178,7 +179,8 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
 
   const updatedData = {
     ...existingData,
-    ...(payload.data || {}),
+    // A value the form did not send (undefined) never replaces what is on file; "brief" and "intake" are merged below.
+    ...definedOnly(payload.data),
     setting: newSetting,
     format: newFormat,
     location: newLocation,
@@ -193,6 +195,8 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     slotCount: slotCount,
     repeats: payload.repeats ?? payload.details?.repeats ?? existingData.repeats,
     recurrenceNote: payload.recurrenceNote ?? payload.details?.recurrenceNote ?? existingData.recurrenceNote,
+    // The form does not own the brief: a key already saved is never changed by a save, and a new key is only added.
+    brief: { ...definedOnly(payload.data?.brief), ...(existingData.brief || {}) },
     details: updatedDetails,
     onsite: updatedOnsite,
     requester: updatedRequester,
@@ -207,7 +211,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     },
     intake: {
       ...(existingData.intake || {}),
-      ...(payload.data?.intake || {}),
+      ...definedOnly(payload.data?.intake),
       repeats: payload.repeats ?? payload.details?.repeats ?? existingData.repeats,
       recurrenceNote: payload.recurrenceNote ?? payload.details?.recurrenceNote ?? existingData.recurrenceNote,
       positions: positionsStr,

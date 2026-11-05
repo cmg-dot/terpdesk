@@ -31,6 +31,11 @@ export interface FormExtras {
   crucialAppointment: boolean;
   /** "Booking Period: 72 Hours". */
   bookingPeriod: string | null;
+  /** "Direction & Parking Note: CODE 793775" under "4. APPOINTMENT LOCATION" (directions, a gate code, where to park). */
+  parking: string | null;
+  /** "Public - Yes/No" and "Mixed Group - Yes/No" under "4. APPOINTMENT LOCATION": null when the form does not say. */
+  isPublic: boolean | null;
+  isMixedGroup: boolean | null;
 }
 
 const APPOINTMENT_SETTING = labelPattern(["Appointment[ \\t]+Setting"]);
@@ -41,6 +46,13 @@ const FLOOR = labelPattern(["Floor"]);
 const ROOM = labelPattern(["Room"]);
 const REQUESTED_INTERPRETER = labelPattern(["Specific[ \\t]+Interpreter[ \\t]+Requested"]);
 const BOOKING_PERIOD = labelPattern(["Booking[ \\t]+Period"]);
+// Only the form's own label ("Direction & Parking Note"): a bare "Parking:" elsewhere in a forwarded email is not this field.
+const PARKING_NOTE = labelPattern(["Directions?[ \\t]*(?:&|&amp;|and)[ \\t]*Parking(?:[ \\t]+Notes?)?", "Parking[ \\t]+(?:&|and)[ \\t]+Directions?"]);
+/** The form prints these two as "Public - No" (a dash, not a colon). */
+const yesNoLine = (label: string): RegExp => new RegExp(String.raw`^[ \t]*${label}[ \t]*[-:–—][ \t]*(Yes|No)\b`, "im");
+const PUBLIC_LINE = yesNoLine("Public");
+const MIXED_GROUP_LINE = yesNoLine("Mixed[ \\t]+Group");
+const yesNo = (match: RegExpMatchArray | null): boolean | null => (match ? match[1].toLowerCase() === "yes" : null);
 const PRE_AUTHORIZATION = /^[ \t]*THIS[ \t]+REQUEST[ \t]+REQUIRES[ \t]+PRE-?[ \t]*AUTHORI[SZ]ATION\b/im;
 const CRUCIAL_APPOINTMENT = /^[ \t]*(?:\d{1,2}[.)][ \t]*)?APPOINTMENT[ \t]+INFORMATION[ \t]*[-:–—][ \t]*Crucial[ \t]+Appointment\b/im;
 const SECTION = String.raw`(?:\d{1,2}[.)][ \t]*)?`;
@@ -97,6 +109,9 @@ export function parseFormExtras(rawContent: string): FormExtras {
     preAuthorizationRequired: PRE_AUTHORIZATION.test(text),
     crucialAppointment: CRUCIAL_APPOINTMENT.test(text),
     bookingPeriod: real(text.match(BOOKING_PERIOD)?.[1]),
+    parking: real(wrappedValue(text, PARKING_NOTE)),
+    isPublic: yesNo(text.match(PUBLIC_LINE)),
+    isMixedGroup: yesNo(text.match(MIXED_GROUP_LINE)),
   };
 }
 

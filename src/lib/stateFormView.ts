@@ -135,6 +135,7 @@ function recordsView(input: StateFormInput): StateFormView {
         row("Building", onsite.building),
         row("Floor", onsite.floor),
         row("Room", onsite.room),
+        row("Direction & Parking Note", onsite.parking),
         row("Virtual Meeting/Platform", platform),
         row("Format", details.format),
       ],

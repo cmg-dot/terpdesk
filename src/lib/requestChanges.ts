@@ -42,6 +42,8 @@ const FIELDS: Field[] = [
   { label: "Venue", emailSafe: false, read: (d) => d.location?.venue ?? "" },
   { label: "Address", emailSafe: false, read: (d) => d.location?.address ?? "" },
   { label: "Building / room", emailSafe: false, read: (d) => d.location?.building ?? "" },
+  { label: "Floor", emailSafe: false, read: (d) => d.location?.floor ?? "" },
+  { label: "Room", emailSafe: false, read: (d) => d.location?.room ?? "" },
   { label: "Entrance", emailSafe: false, read: (d) => d.location?.entrance ?? "" },
   { label: "Parking", emailSafe: false, read: (d) => d.location?.parking ?? "" },
   {

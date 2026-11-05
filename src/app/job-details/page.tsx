@@ -109,10 +109,12 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
               <Card title="Location">
                 <dl>
                   {access.details.location.venue && <Row label="Venue">{access.details.location.venue}</Row>}
-                  <Row label="Address">{access.details.location.address || "Ask the agency"}</Row>
-                  {access.details.location.building && <Row label="Building / room">{access.details.location.building}</Row>}
+                  {(access.details.location.address || !access.details.virtual) && <Row label="Address">{access.details.location.address || "Ask the agency"}</Row>}
+                  {access.details.location.building && <Row label="Building">{access.details.location.building}</Row>}
+                  {access.details.location.floor && <Row label="Floor">{access.details.location.floor}</Row>}
+                  {access.details.location.room && <Row label="Room">{access.details.location.room}</Row>}
                   {access.details.location.entrance && <Row label="Entrance">{access.details.location.entrance}</Row>}
-                  {access.details.location.parking && <Row label="Parking">{access.details.location.parking}</Row>}
+                  {access.details.location.parking && <Row label="Directions & parking">{access.details.location.parking}</Row>}
                   {access.details.location.contact && (
                     <Row label="On-site contact">
                       {access.details.location.contact}

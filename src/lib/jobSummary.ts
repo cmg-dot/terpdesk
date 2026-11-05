@@ -1,4 +1,5 @@
 import { formatInTimeZone } from "date-fns-tz";
+import { hasPhysicalPlace } from "@/lib/jobPlace";
 import { formatReference } from "@/utils/statusEngine";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
@@ -38,7 +39,8 @@ export interface JobSummary {
 
 export interface JobDetails extends JobSummary {
   prepNotes: string;
-  location: { venue: string; address: string; building: string; entrance: string; parking: string; contact: string; contactMethod: string } | null;
+  /** The physical place: always for an in-person job, and for a virtual job too when it has an address, room or parking note. */
+  location: { venue: string; address: string; building: string; floor: string; room: string; entrance: string; parking: string; contact: string; contactMethod: string } | null;
   virtual: { platform: string; meetingLink: string; meetingId: string; passcode: string; instructions: string } | null;
 }
 
@@ -96,12 +98,15 @@ export function jobDetailsFor(request: JobRequestRow, positionNumber?: number): 
   return {
     ...summary,
     prepNotes: text(data.prepNotes),
-    location: summary.isVirtual
+    location: summary.isVirtual && !hasPhysicalPlace(onsite)
       ? null
       : {
-          venue: text(onsite.venue),
-          address: text(onsite.address) || text(data.location),
+          // On a virtual job "Virtual" is not a place name, and the saved one-line location just says "Virtual".
+          venue: summary.isVirtual && /^virtual/i.test(text(onsite.venue)) ? "" : text(onsite.venue),
+          address: summary.isVirtual ? text(onsite.address) : text(onsite.address) || text(data.location),
           building: text(onsite.building),
+          floor: text(onsite.floor),
+          room: text(onsite.room),
           entrance: text(onsite.entrance),
           parking: text(onsite.parking),
           contact: text(onsite.contact),

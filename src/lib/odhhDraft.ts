@@ -51,6 +51,8 @@ export function buildDraftData(input: DraftInput): RequestData {
       ...(extras.preAuthorizationRequired ? { preAuthorizationRequired: true } : {}),
       ...(extras.crucialAppointment ? { crucialAppointment: true } : {}),
       ...(extras.bookingPeriod ? { bookingPeriod: extras.bookingPeriod } : {}),
+      ...(extras.isPublic !== null ? { isPublic: extras.isPublic } : {}),
+      ...(extras.isMixedGroup !== null ? { isMixedGroup: extras.isMixedGroup } : {}),
     },
     details: {
       timeZone: ODHH_TIME_ZONE_LABEL,
@@ -72,6 +74,8 @@ export function buildDraftData(input: DraftInput): RequestData {
       address: parsed.address ?? "",
       ...(extras.building ? { building: extras.building } : {}),
       ...(extras.floor ? { floor: extras.floor } : {}),
+      // Directions and parking ("CODE 793775"): shown to booked interpreters, including on a virtual job that also has a place.
+      ...(extras.parking ? { parking: extras.parking } : {}),
       ...(room ? { room } : {}),
       ...(extras.contactName ? { contact: extras.contactName } : {}),
       ...(contactMethod ? { contactMethod } : {}),

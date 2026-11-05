@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useTransition, useMemo } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Copy, Check, Building2, ExternalLink, Video, Lock } from "lucide-react";
+import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Building2, Video, Lock } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { JobPrepMaterials } from "@/components/prep/JobPrepMaterials";
 import { format } from "date-fns";
@@ -14,6 +14,8 @@ import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
+import { JobPlaceCards } from "@/components/interpreter/JobPlaceCards";
+import { CopyButton } from "@/components/ui/CopyButton";
 import { formatReference } from "@/utils/statusEngine";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
@@ -73,29 +75,6 @@ const formatJobDate = (startStr?: string | Date | null, endStr?: string | Date |
     return "Date TBD";
   }
 };
-
-function CopyButton({ text, label }: { text: string; label?: string }) {
-  const [copied, setCopied] = useState(false);
-  const handleCopy = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (typeof navigator !== 'undefined' && navigator.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    }
-  };
-  return (
-    <button
-      type="button"
-      onClick={handleCopy}
-      title={label ? `Copy ${label}` : "Copy to clipboard"}
-      className="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-700 p-1 rounded hover:bg-gray-100 transition-colors shrink-0"
-    >
-      {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5" />}
-      {copied && <span className="text-[11px] text-green-600 font-medium">Copied</span>}
-    </button>
-  );
-}
 
 function buildAuditLog(serviceRecord: any, job: any, isOdhh: boolean) {
   if (Array.isArray(serviceRecord?.history) && serviceRecord.history.length > 0) {
@@ -1404,156 +1383,17 @@ export default function JobDetailPage() {
             </div>
           </div>
 
-          {/* Location & Virtual Meeting Details Card */}
-          {job.isVirtual ? (() => {
-            const meetingLink = job.meetingLink || (job as any).details?.meetingLink || (job as any).virtualLink || (job as any).details?.virtualLink;
-            const meetingId = job.meetingId || (job as any).details?.meetingId;
-            const passcode = job.passcode || (job as any).details?.passcode || (job as any).accessCode || (job as any).details?.accessCode;
-            const platform = job.platform || (job as any).details?.platform || (meetingLink?.toLowerCase().includes('zoom') ? 'Zoom' : meetingLink?.toLowerCase().includes('teams') ? 'Microsoft Teams' : meetingLink?.toLowerCase().includes('meet.google') ? 'Google Meet' : 'Virtual meeting');
-            const virtualNotes = (job as any).virtualInstructions || (job as any).details?.virtualInstructions || (job as any).details?.instructions;
-            const isOffer = job.status === 'pending';
-            const hasCredentials = Boolean(meetingLink || meetingId || passcode);
-
-            return (
-              <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-                  <div>
-                    <h2 className="text-[16px] font-semibold text-[var(--ink)]">Virtual meeting details</h2>
-                    <p className="text-xs text-[var(--sage)] mt-0.5">Platform: <span className="font-medium text-gray-700">{platform}</span></p>
-                  </div>
-                  {meetingLink && !isOffer && (
-                    <a
-                      href={meetingLink.startsWith('http') ? meetingLink : `https://${meetingLink}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1B433C] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm self-start sm:self-auto"
-                    >
-                      Open meeting link <ExternalLink className="w-3.5 h-3.5" />
-                    </a>
-                  )}
-                </div>
-
-                {isOffer && hasCredentials ? (
-                  <div className="space-y-3">
-                    <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-4 text-xs text-amber-900 flex items-start gap-3">
-                      <Lock className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
-                      <div className="space-y-1">
-                        <p className="font-semibold text-amber-900">Virtual credentials locked</p>
-                        <p className="text-amber-800 leading-relaxed">Exact meeting join URL, passcode, and room credentials are masked until you accept this offer. Accept the offer below to unlock immediate access.</p>
-                      </div>
-                    </div>
-                    <div className="space-y-2 text-sm bg-gray-50 p-4 rounded-xl border border-gray-100">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[var(--sage)] text-xs">Meeting link:</span>
-                        <span className="font-mono text-gray-400 text-xs">https://••••••••••••/j/••••••••</span>
-                      </div>
-                      <div className="flex items-center justify-between">
-                        <span className="text-[var(--sage)] text-xs">Passcode / Access code:</span>
-                        <span className="font-mono text-gray-400 text-xs">••••••••</span>
-                      </div>
-                    </div>
-                  </div>
-                ) : !isOffer && hasCredentials ? (
-                  <div className="space-y-3">
-                    {meetingLink && (
-                      <div className="bg-[#F8FAF9] p-3.5 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Meeting Link</span>
-                          <span className="text-xs font-mono text-[#0B3B32] truncate block break-all">{meetingLink}</span>
-                        </div>
-                        <CopyButton text={meetingLink} label="meeting link" />
-                      </div>
-                    )}
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                      {meetingId && (
-                        <div className="bg-[#F8FAF9] p-3 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Meeting ID</span>
-                            <span className="text-xs font-mono font-medium text-[var(--ink)]">{meetingId}</span>
-                          </div>
-                          <CopyButton text={meetingId} label="meeting ID" />
-                        </div>
-                      )}
-                      {passcode && (
-                        <div className="bg-[#F8FAF9] p-3 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-2">
-                          <div className="min-w-0">
-                            <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Passcode</span>
-                            <span className="text-xs font-mono font-medium text-[var(--ink)]">{passcode}</span>
-                          </div>
-                          <CopyButton text={passcode} label="passcode" />
-                        </div>
-                      )}
-                    </div>
-
-                    {virtualNotes && (
-                      <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-xs text-gray-700">
-                        <span className="font-semibold block text-[11px] text-[var(--sage)] uppercase tracking-wider mb-1">Virtual Instructions</span>
-                        <p className="leading-relaxed whitespace-pre-line">{virtualNotes}</p>
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="bg-gray-50 p-4 rounded-xl border border-gray-200/80 text-sm">
-                    <p className="text-[var(--ink)] font-medium mb-1">Virtual details pending</p>
-                    <p className="text-[var(--sage)] text-xs">Meeting join link and credentials will be posted by the agency prior to appointment start.</p>
-                  </div>
-                )}
-
-                <p className="text-[12px] text-[var(--sage)] pt-1">
-                  Treat meeting links and access codes as restricted assignment information.
-                </p>
-              </div>
-            );
-          })() : (
-            <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-              <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-2">On-site location details</h2>
-              <div className="space-y-3">
-                <div className="flex items-center justify-between p-3.5 bg-gray-50 rounded-xl border border-gray-100">
-                  <div>
-                    <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Venue / Address</span>
-                    <span className="text-xs font-medium text-[var(--ink)]">
-                      {(job.onsite?.venue || job.location) + (job.onsite?.address ? ` · ${job.onsite.address}` : '')}
-                    </span>
-                  </div>
-                  {(job.onsite?.address || job.location) && (
-                    <CopyButton text={`${job.onsite?.venue || ''} ${job.onsite?.address || job.location}`.trim()} label="address" />
-                  )}
-                </div>
-                {job.onsite?.building && (
-                  <div className="flex items-center justify-between py-2 border-b border-gray-50 text-xs">
-                    <span className="text-[var(--sage)]">Building / Room</span>
-                    <span className="font-medium text-[var(--ink)]">{job.onsite.building}</span>
-                  </div>
-                )}
-                {job.onsite?.contact && (
-                  <div className="flex items-center justify-between py-2 border-b border-gray-50 text-xs">
-                    <span className="text-[var(--sage)]">Onsite Contact</span>
-                    <span className="font-medium text-[var(--ink)]">
-                      {job.onsite.contact} {job.onsite.contactMethod ? `(${job.onsite.contactMethod})` : ''}
-                    </span>
-                  </div>
-                )}
-                {job.onsite?.parking && (
-                  <div className="py-2 border-b border-gray-50 text-xs">
-                    <span className="text-[var(--sage)] block mb-1">Parking Instructions</span>
-                    <span className="text-[var(--ink)]">{job.onsite.parking}</span>
-                  </div>
-                )}
-                {job.onsite?.entrance && (
-                  <div className="py-2 text-xs">
-                    <span className="text-[var(--sage)] block mb-1">Entrance & Check-in</span>
-                    <span className="text-[var(--ink)]">{job.onsite.entrance}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {/* Where to go: the virtual meeting, the on-site place, or both (a virtual job can have a place too). */}
+          <JobPlaceCards job={job} />
 
           {/* Card 2 */}
           <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
             <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Preparation notes</h2>
-            <p className="text-[14px] text-[var(--sage)]">No preparation notes yet.</p>
+            {job.prepNotes ? (
+              <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700">{job.prepNotes}</p>
+            ) : (
+              <p className="text-[14px] text-[var(--sage)]">No preparation notes yet.</p>
+            )}
           </div>
 
           {/* Card 3 */}

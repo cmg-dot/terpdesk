@@ -41,6 +41,10 @@ export interface Job {
   accessCode?: string | null;
   platform?: string | null;
   virtualInstructions?: string | null;
+  /** An offer for a virtual job whose link and passcode are withheld until it is accepted. */
+  credentialsLocked?: boolean;
+  /** The agency's preparation notes, once the interpreter is booked. */
+  prepNotes?: string;
   agencyName?: string;
   details?: any;
   onsite?: any;
@@ -92,7 +96,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           travelEndTime: (o as any).travelEndTime,
           serviceCompleted: (o as any).serviceCompleted,
           setting: settingLabel(o.setting, o.details?.setting),
-          format: o.format || o.details?.format || (o.isVirtual ? "Virtual" : "In person"),
+          format: o.format || (o.isVirtual ? "Virtual" : "In person"),
           meetingLink: o.meetingLink || o.virtualLink || null,
           virtualLink: o.meetingLink || o.virtualLink || null,
           meetingId: o.meetingId || null,
@@ -100,6 +104,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           accessCode: o.passcode || o.accessCode || null,
           platform: o.platform || null,
           virtualInstructions: o.virtualInstructions || null,
+          credentialsLocked: o.credentialsLocked,
+          prepNotes: o.prepNotes,
           agencyName: o.agencyName || DEFAULT_AGENCY_NAME,
           details: o.details || {},
           onsite: o.onsite || {},

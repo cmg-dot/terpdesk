@@ -36,6 +36,7 @@ const FILL_ONLY = [
   "onsite.building",
   "onsite.floor",
   "onsite.room",
+  "onsite.parking",
   "onsite.contact",
   "onsite.contactMethod",
   "intake.requestedInterpreter",
@@ -44,6 +45,9 @@ const FILL_ONLY = [
 
 /** Yes/no flags from the form: set when the form says yes and the job has not already got it. */
 const FLAGS = ["intake.preAuthorizationRequired", "intake.crucialAppointment"] as const;
+
+/** Yes/no answers where "No" is a real answer too: filled when the form states one and the job has none yet. */
+const STATED_ANSWERS = ["intake.isPublic", "intake.isMixedGroup"] as const;
 
 export interface EnrichmentPlan {
   data: Bag;
@@ -105,6 +109,15 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
     const [sectionName, field] = path.split(".");
     if (formSection(sectionName)[field] === true && asBag(existing.data[sectionName])[field] !== true) {
       section(sectionName)[field] = true;
+      changed.push(path);
+    }
+  }
+
+  for (const path of STATED_ANSWERS) {
+    const [sectionName, field] = path.split(".");
+    const stated = formSection(sectionName)[field];
+    if (typeof stated === "boolean" && typeof asBag(existing.data[sectionName])[field] !== "boolean") {
+      section(sectionName)[field] = stated;
       changed.push(path);
     }
   }

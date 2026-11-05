@@ -16,6 +16,7 @@ import { IconInput } from "@/components/ui/IconInput";
 import { bookedRecipients, defaultRecipient } from "@/utils/messageRecipients";
 import { MessageRecipientSelect } from "@/components/requests/MessageRecipientSelect";
 import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/VirtualMeetingFields";
+import { programIdentifiers } from "@/lib/programIdentifiers";
 
 function LimitedTextarea({ className = "", maxLength = 1000, value, onChange }: { className?: string, maxLength?: number, value?: string, onChange?: (val: string) => void }) {
  const [internalValue, setInternalValue] = useState(value || "");
@@ -672,12 +673,10 @@ export default function EditRequestPage() {
           slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
           repeats: Boolean(formData.repeats),
           recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
-          brief: { hearingIdentity: "deaf" },
+          // No "brief" here: this form does not edit it, and the server keeps what is saved.
           intake: {
             program: formData.program,
-            odhhSrn: formData.program === "WA ODHH" ? formData.odhhSrn : undefined,
-            odhhAccessCode: formData.program === "WA ODHH" ? formData.odhhAccessCode : undefined,
-            providerOneNumber: formData.program === "WA Apple Health" ? formData.providerOneNumber : undefined,
+            ...programIdentifiers(formData),
             positions: formData.positions,
             requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
             slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
@@ -1142,7 +1141,7 @@ export default function EditRequestPage() {
  <Field label="Funding program" subtext={isScheduleLocked ? "Locked while an interpreter is booked: it decides how the job is reported." : undefined}>
  <CustomSelect disabled={isScheduleLocked} options={["General", "WA ODHH", "WA Apple Health"]} value={formData.program} onChange={(val) => handleChange("program", val)} />
  </Field>
- {formData.program === "WA ODHH" && (
+ {(formData.program === "WA ODHH" || formData.program === "WA Apple Health") && (
  <Field label="Service Request Number (SRN)">
  <input type="text" inputMode="numeric" pattern="\d*" className={inputClass} value={formData.odhhSrn} onChange={(e) => handleChange("odhhSrn", e.target.value.replace(/\D/g, ''))} />
  </Field>

@@ -14,6 +14,7 @@ import { AlertTriangle } from "lucide-react";
 import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, type SavedAgencyRequester } from "@/utils/savedRequesters";
 import { isInvalidEmail } from "@/utils/validation";
 import { IconInput } from "@/components/ui/IconInput";
+import { programIdentifiers } from "@/lib/programIdentifiers";
 import type { RequestData, Program } from "@/db/schema";
 
 function LimitedTextarea({ className = "", maxLength = 1000, value, onChange }: { className?: string, maxLength?: number, value?: string, onChange?: (val: string) => void }) {
@@ -464,9 +465,7 @@ export default function NewRequestPage() {
    brief: { hearingIdentity: "deaf" },
    intake: {
      program: formData.program as Program,
-     odhhSrn: formData.program === "WA ODHH" ? formData.odhhSrn : undefined,
-     odhhAccessCode: formData.program === "WA ODHH" ? formData.odhhAccessCode : undefined,
-     providerOneNumber: formData.program === "WA Apple Health" ? formData.providerOneNumber : undefined
+     ...programIdentifiers(formData)
    },
    overview: { location: formData.venue || "TBD", status: "Unfilled / draft", startsAt: startsAtIso, endsAt: endsAtIso },
    startsAt: startsAtIso,
@@ -880,7 +879,7 @@ export default function NewRequestPage() {
  <Field label="Funding program">
  <CustomSelect options={["General", "WA ODHH", "WA Apple Health"]} value={formData.program} onChange={(val) => handleChange("program", val)} />
  </Field>
- {formData.program === "WA ODHH" && (
+ {(formData.program === "WA ODHH" || formData.program === "WA Apple Health") && (
  <Field label="Service Request Number (SRN)">
  <input type="text" inputMode="numeric" pattern="\d*" className={inputClass} value={formData.odhhSrn} onChange={(e) => handleChange("odhhSrn", e.target.value.replace(/\D/g, ''))} />
  </Field>

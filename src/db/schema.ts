@@ -21,6 +21,9 @@ export interface RequestData {
     crucialAppointment?: boolean;
     /** "72 Hours": the state's booking period for the request. */
     bookingPeriod?: string;
+    /** The form's "Public - Yes/No" and "Mixed Group - Yes/No" lines. Staff-only: never sent to interpreters. */
+    isPublic?: boolean;
+    isMixedGroup?: boolean;
   };
   [key: string]: any;
 }
