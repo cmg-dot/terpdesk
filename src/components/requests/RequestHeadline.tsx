@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import type { RequestWhere } from "@/lib/requestSummary";
 
 interface Props {
@@ -11,41 +12,54 @@ interface Props {
   where: RequestWhere;
   /** Shown as a small chip when the job repeats. */
   repeatsText?: string | null;
+  /** Status pills (Happening now, Cancelled, ...) that sit beside the headline. */
+  badges?: ReactNode;
 }
 
+const LABEL = "text-[12px] font-medium uppercase tracking-wide text-[var(--sage)]";
+const VALUE = "mt-0.5 break-words font-medium text-[var(--ink)]";
+
 /**
- * The top of an appointment: who it is for as the title, then a quick-summary bar with the three things dispatch looks
- * for first: the state SRN, the date and time, and where (or "Virtual · platform").
+ * The top of an appointment, full width: who it is for as the title (with its status pills), then one quick-summary bar
+ * with the three things dispatch looks for first: the state SRN, the date and time, and where (or "Virtual · platform").
+ * The bar gives the location every pixel left over, so a street address reads on one or two lines, not a narrow column;
+ * on a phone the three facts stack, and on a small tablet the location takes its own row.
  */
-export const RequestHeadline = ({ organization, title, idLabel, idValue, whenText, where, repeatsText }: Props) => {
+export const RequestHeadline = ({ organization, title, idLabel, idValue, whenText, where, repeatsText, badges }: Props) => {
   const headline = organization ?? title;
   // The job title is secondary once the organization leads; skip it when it only repeats the SRN ("ODHH SRN #…").
   const showTitle = organization !== null && title.trim() !== "" && title !== organization && !/SRN\s*#/i.test(title);
   return (
-    <div>
-      <h1 className="text-[28px] font-medium tracking-tight text-[var(--ink)]">{headline}</h1>
-      {showTitle && <p className="mt-0.5 text-[14px] text-[var(--sage)]">{title}</p>}
-      <dl aria-label="Appointment summary" className="mt-3 grid grid-cols-1 gap-x-8 gap-y-2 text-sm sm:grid-cols-[auto_auto_1fr]">
+    <div className="w-full min-w-0">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 className="min-w-0 break-words text-[24px] font-medium leading-tight tracking-tight text-[var(--ink)] sm:text-[28px]">{headline}</h1>
+        {badges}
+      </div>
+      {showTitle && <p className="mt-1 text-[14px] text-[var(--sage)]">{title}</p>}
+      <dl
+        aria-label="Appointment summary"
+        className="mt-4 grid grid-cols-1 gap-x-10 gap-y-3 rounded-2xl border border-gray-200 bg-white/70 px-5 py-4 text-sm sm:grid-cols-2 md:grid-cols-[auto_auto_minmax(0,1fr)]"
+      >
         <div>
-          <dt className="text-[12px] font-medium uppercase tracking-wide text-[var(--sage)]">{idLabel}</dt>
-          <dd data-summary="id" className="font-medium text-[var(--ink)]">{idValue}</dd>
+          <dt className={LABEL}>{idLabel}</dt>
+          <dd data-summary="id" className={VALUE}>{idValue}</dd>
         </div>
         <div>
-          <dt className="text-[12px] font-medium uppercase tracking-wide text-[var(--sage)]">Date & time</dt>
-          <dd data-summary="when" className="font-medium text-[var(--ink)]">{whenText}</dd>
+          <dt className={LABEL}>Date & time</dt>
+          <dd data-summary="when" className={VALUE}>{whenText}</dd>
         </div>
-        <div>
-          <dt className="text-[12px] font-medium uppercase tracking-wide text-[var(--sage)]">{where.virtual ? "Format" : "Location"}</dt>
-          <dd data-summary="where" className="font-medium text-[var(--ink)]">
+        <div className="min-w-0 sm:col-span-2 md:col-span-1">
+          <dt className={LABEL}>{where.virtual ? "Format" : "Location"}</dt>
+          <dd data-summary="where" className={VALUE}>
             {where.text}
             {where.missingAddress && !where.virtual && where.text !== "Location pending" && (
-              <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">No street address on file</span>
+              <span className="ml-2 inline-block rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-800">No street address on file</span>
             )}
           </dd>
         </div>
       </dl>
       {repeatsText && (
-        <span className="mt-2 inline-flex items-center rounded-full border border-emerald-200/60 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
+        <span className="mt-3 inline-flex items-center rounded-full border border-emerald-200/60 bg-emerald-50 px-2.5 py-0.5 text-xs font-medium text-emerald-800">
           Repeats: {repeatsText}
         </span>
       )}

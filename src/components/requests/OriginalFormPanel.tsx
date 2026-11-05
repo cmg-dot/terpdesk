@@ -20,7 +20,9 @@ const arrived = (iso: string): string => {
  * (booking, reassignment, ...) collapsed under "Related state emails (not the form)", and sanitizes the HTML before
  * showing it. Read-only.
  */
-export function OriginalFormPanel({ requestId }: { requestId: string }) {
+const DEFAULT_TRIGGER = "inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50";
+
+export function OriginalFormPanel({ requestId, triggerClassName = DEFAULT_TRIGGER }: { requestId: string; triggerClassName?: string }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<OriginalFormsResult | null>(null);
   const [loading, setLoading] = useState(false);
@@ -66,7 +68,7 @@ export function OriginalFormPanel({ requestId }: { requestId: string }) {
         ref={opener}
         type="button"
         onClick={openPanel}
-        className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+        className={triggerClassName}
       >
         <FileText className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
         View original form

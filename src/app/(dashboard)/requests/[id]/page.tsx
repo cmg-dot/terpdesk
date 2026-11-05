@@ -28,7 +28,7 @@ import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
 import { OdhhPortalReminder } from "@/components/requests/OdhhPortalReminder";
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
-import { OriginalFormPanel } from "@/components/requests/OriginalFormPanel";
+import { RequestActionBar } from "@/components/requests/RequestActionBar";
 import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
 import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
 import { OfferBlockedNotice } from "@/components/requests/OfferBlockedNotice";
@@ -836,8 +836,8 @@ export default function AssignmentDetailPage() {
  ← Back to assignments
  </Link>
 
- {/* Header Flex Row */}
- <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+ {/* Header: the headline and summary bar run full width; the actions get their own toolbar row beneath them. */}
+ <header className="mb-8">
  <RequestHeadline
    organization={organizationName}
    title={assignment.title}
@@ -846,86 +846,39 @@ export default function AssignmentDetailPage() {
    whenText={whenText}
    where={where}
    repeatsText={isRepeating ? recurrenceDisplay : null}
+   badges={
+     <>
+       {isAppointmentHappeningNow(assignment, currentTime) && <HappeningNowBadge />}
+       {!isCancelled && isUnfilledPastDue(assignment, currentTime) && (
+         <span className="inline-flex items-center bg-red-50 text-red-700 border border-red-200 text-[13px] font-semibold px-3 py-1 rounded-full">
+           Unfilled - Past Due
+         </span>
+       )}
+       {/* Scheduled end has passed and someone was booked: the job is done. */}
+       {!isCancelled && isAppointmentPassed && hasAcceptedBooking && (
+         <span className="inline-flex items-center bg-gray-100 text-gray-700 border border-gray-200 text-[13px] font-semibold px-3 py-1 rounded-full">
+           Completed
+         </span>
+       )}
+       {isCancelled && (
+         foundRequest?.isVoided
+           ? <span className="bg-slate-200 text-slate-700 text-[13px] font-medium px-3 py-1 rounded-full border border-slate-300">Voided</span>
+           : <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
+       )}
+     </>
+   }
  />
- <div className="flex flex-wrap items-center gap-3">
- {isAppointmentHappeningNow(assignment, currentTime) && (
-   <HappeningNowBadge />
- )}
- {!isCancelled && isUnfilledPastDue(assignment, currentTime) && (
-   <span className="inline-flex items-center bg-red-50 text-red-700 border border-red-200 text-[13px] font-semibold px-3 py-1 rounded-full">
-     Unfilled - Past Due
-   </span>
- )}
- {/* Scheduled end has passed and someone was booked: the job is done. */}
- {!isCancelled && isAppointmentPassed && hasAcceptedBooking && (
-   <span className="inline-flex items-center bg-gray-100 text-gray-700 border border-gray-200 text-[13px] font-semibold px-3 py-1 rounded-full">
-     Completed
-   </span>
- )}
- {isCancelled && (
- foundRequest?.isVoided
- ? <span className="bg-slate-200 text-slate-700 text-[13px] font-medium px-3 py-1 rounded-full border border-slate-300">Voided</span>
- : <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
- )}
- <OriginalFormPanel requestId={id} />
- <button className="rounded-full px-5 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 transition-colors">
- View in calendar
- </button>
- {!isCancelled && (
- isEditLocked ? (
- <button
- disabled
- title={editLockMessage}
- className="rounded-full px-4 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed inline-flex items-center gap-1.5"
- >
- <Lock className="w-3.5 h-3.5 text-gray-400" />
- <span>Quick edit</span>
- </button>
- ) : (
- <button
- onClick={openEditAccessModal}
- className="rounded-full px-4 py-2 text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 border border-gray-200 transition-colors inline-flex items-center gap-1.5"
- >
- <Edit2 className="w-3.5 h-3.5 text-gray-500" />
- <span>Quick edit</span>
- </button>
- )
- )}
- {!isCancelled && (
- isEditLocked ? (
- <button
- disabled
- title={editLockMessage}
- className="rounded-full px-5 py-2 text-sm font-medium text-gray-400 bg-gray-100 border border-gray-200 cursor-not-allowed inline-flex items-center gap-1.5"
- >
- <Lock className="w-3.5 h-3.5 text-gray-400" />
- <span>Edit assignment</span>
- </button>
- ) : (
- <Link href={`/requests/${params.id}/edit`} className="rounded-full px-5 py-2 text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest)]/90 transition-colors">
- Edit assignment
- </Link>
- )
- )}
- {!isCancelled && (
- <button 
- onClick={handleCancelAppointment}
- className="rounded-full px-5 py-2 text-sm font-medium text-white bg-[#C0564B] hover:bg-[#C0564B]/90 transition-colors"
- >
- Cancel appointment
- </button>
- )}
- {!isCancelled && (
- <button
- type="button"
- onClick={() => setShowVoidModal(true)}
- className="rounded-full px-5 py-2 text-sm font-medium text-white bg-slate-600 hover:bg-slate-700 transition-colors"
- >
- Void job
- </button>
- )}
- </div>
- </div>
+ <RequestActionBar
+   requestId={id}
+   editHref={`/requests/${params.id}/edit`}
+   isCancelled={isCancelled}
+   isEditLocked={isEditLocked}
+   editLockMessage={editLockMessage}
+   onQuickEdit={openEditAccessModal}
+   onCancel={handleCancelAppointment}
+   onVoid={() => setShowVoidModal(true)}
+ />
+ </header>
 
  {isEditLocked && !isCancelled && (
  <div className="bg-amber-50/80 border border-amber-200/80 rounded-2xl px-5 py-3.5 text-sm text-amber-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
