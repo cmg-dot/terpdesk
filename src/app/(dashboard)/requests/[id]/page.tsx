@@ -34,7 +34,7 @@ import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { StateFormDocument } from "@/components/requests/StateFormDocument";
 import { StaffingPanel } from "@/components/requests/staffing/StaffingPanel";
 import type { Position, PositionView, StaffBooking, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
-import { buildStateFormView } from "@/lib/stateFormView";
+import { buildStateFormView, notesWithoutFormSection5 } from "@/lib/stateFormView";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { bookedRecipients } from "@/utils/messageRecipients";
@@ -737,7 +737,8 @@ export default function AssignmentDetailPage() {
    endsAt: reqEndsAt,
    timeZone: assignment.details?.timeZone || assignment.timeZone,
  });
- const privateNotesText = textOf(foundRequest?.privateNotes);
+ // Section 5 is on the form above (staff only): the notes card does not repeat it.
+ const privateNotesText = notesWithoutFormSection5(textOf(foundRequest?.privateNotes), stateFormView);
  const prepNotesText = textOf(foundRequest?.prepNotes);
  const requestedInterpreterName = textOf(foundRequest?.data?.intake?.requestedInterpreter) || null;
  const fullRoster = activeRoster.map((person) => ({ id: String(person.id), name: String(person.name ?? '') }));

@@ -25,10 +25,28 @@ export interface StateFormInput {
   timeZone: string | undefined;
 }
 
+const SECTION_5_HEADING = /^(?:CLIENT\/EMPLOYEE|PATIENT) INFORMATION$/;
+
+/**
+ * The agency-private notes without the saved copy of section 5. The request form on the same page already shows that section
+ * (staff only), so repeating it in the notes card would show the person's details twice. It is dropped only when the form
+ * really shows a section 5 with rows in it, so nothing can disappear from the page. What staff wrote, and the state's flags
+ * line, are kept.
+ */
+export function notesWithoutFormSection5(privateNotes: string, view: StateFormView): string {
+  if (!view.sections.some((section) => section.number === 5 && section.rows.length > 0)) return privateNotes;
+  const lines = privateNotes.split("\n");
+  const at = lines.findIndex((line) => SECTION_5_HEADING.test(line.trim()));
+  if (at < 0) return privateNotes;
+  let end = at + 1;
+  while (end < lines.length && lines[end].trim() !== "") end += 1;
+  return [...lines.slice(0, at), ...lines.slice(end)].join("\n").replace(/\n{3,}/g, "\n\n").trim();
+}
+
 /** "Label: value" lines of section 5 as the app saved them in the private notes ("PATIENT INFORMATION" + lines up to a blank line). */
 const savedSection5 = (privateNotes: string): { title: string; lines: string[] } | null => {
   const lines = privateNotes.split("\n");
-  const at = lines.findIndex((line) => /^(?:CLIENT\/EMPLOYEE|PATIENT) INFORMATION$/.test(line.trim()));
+  const at = lines.findIndex((line) => SECTION_5_HEADING.test(line.trim()));
   if (at < 0) return null;
   const rest: string[] = [];
   for (let i = at + 1; i < lines.length && lines[i].trim() !== ""; i += 1) rest.push(lines[i]);

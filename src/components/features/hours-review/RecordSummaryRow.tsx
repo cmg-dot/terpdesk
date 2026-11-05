@@ -15,6 +15,15 @@ interface Props {
 
 const CHIP = "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[12px] font-medium whitespace-nowrap";
 
+/** The title as text, with any "SRN #202786552" kept on one line: it may wrap around the SRN, but never through it. */
+function NoBreakSrn({ text }: { text: string }) {
+  return (
+    <>
+      {text.split(/(SRN #\d+)/).map((part, i) => (/^SRN #\d+$/.test(part) ? <span key={i} className="whitespace-nowrap">{part}</span> : part))}
+    </>
+  );
+}
+
 /**
  * A record folded to one row (about 90px): the job and interpreter, scheduled vs actual time, mileage, signature, status, and a
  * toggle. The whole left side is the toggle button; "Open appointment" sits beside it as its own link.
@@ -25,25 +34,26 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
   const showReference = Boolean(record.title && record.reference && !record.title.includes(record.reference.replace("SRN ", "")));
 
   return (
-    <div className={`flex items-center gap-2 pr-4 transition-colors hover:bg-[#FBFAF7] ${expanded ? "rounded-t-2xl" : "rounded-2xl"}`}>
+    <div className={`flex items-center gap-2 pr-3 transition-colors hover:bg-[#FBFAF7] ${expanded ? "rounded-t-2xl" : "rounded-2xl"}`}>
       <button
         type="button"
         onClick={onToggle}
         aria-expanded={expanded}
         aria-controls={panelId}
-        className="flex min-w-0 flex-1 flex-col gap-3 rounded-2xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 md:grid md:grid-cols-[minmax(0,1fr)_auto_auto] md:items-center md:gap-5"
+        className="flex min-w-0 flex-1 flex-col gap-3 rounded-2xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2"
       >
-        <span className="block min-w-0">
-          <span className="block text-[15px] font-semibold text-[var(--ink)] md:truncate">
-            {heading}
+        {/* Who and when. Never clipped: it keeps room for a whole SRN, and a long name or title wraps instead of being cut. */}
+        <span className="block min-w-0 md:min-w-[10.5rem] md:flex-1">
+          <span className="block break-words text-[15px] font-semibold text-[var(--ink)]">
+            <NoBreakSrn text={heading} />
             {showReference && <span className="font-normal text-[var(--sage)]"> · {record.reference}</span>}
           </span>
-          <span className="block text-sm text-gray-700 md:truncate">
-            {record.interpreterName}{record.positionIndex ? ` · Position ${record.positionIndex}` : ""} · {summary.dateLabel}
+          <span className="block break-words text-sm text-gray-700">
+            {record.interpreterName}{record.positionIndex ? ` · Position ${record.positionIndex}` : ""} · <span className="whitespace-nowrap">{summary.dateLabel}</span>
           </span>
         </span>
 
-        <span className="block whitespace-nowrap text-sm">
+        <span className="block whitespace-nowrap text-sm md:shrink-0">
           <span className="block text-[var(--ink)]">
             <span className="text-[var(--sage)]">Scheduled</span> {summary.scheduledText}
           </span>
@@ -53,7 +63,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
           </span>
         </span>
 
-        <span className="flex flex-wrap items-center gap-2 md:justify-end">
+        <span className="flex flex-wrap items-center gap-2 md:shrink-0 md:flex-nowrap md:justify-end md:gap-1.5">
           <span className={`${CHIP} bg-gray-100 text-gray-700`} title={summary.mileageNote ?? undefined}>
             {summary.mileageText}
           </span>
