@@ -11,6 +11,7 @@ import { resolveIntakeType } from "@/lib/odhhVerificationParser";
 import { buildDraftData, draftTitle } from "@/lib/odhhDraft";
 import { enrichRequestFromForm } from "@/lib/odhhEnrichStore";
 import { parseFormExtras } from "@/lib/odhhFormFields";
+import { seedClientQuietly } from "@/lib/clientUpsert";
 import { revalidatePath } from "next/cache";
 import { fromZonedTime } from "date-fns-tz";
 import { db } from "@/db";
@@ -186,9 +187,10 @@ export async function POST(
 
     const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
     const title = draftTitle({ srn, parsed, subject, fromEmail: email });
+    const extras = parseFormExtras(rawContent);
     const requestData: RequestData = buildDraftData({
       parsed,
-      extras: parseFormExtras(rawContent),
+      extras,
       srn,
       fromEmail: email,
       subject,
@@ -214,6 +216,16 @@ export async function POST(
       },
       { srn, contentHash },
     );
+
+    // The organization the form bills (DVR, Seattle Children's, ...) joins the Clients list, with its billing contact. Never
+    // throws: a Clients problem must not fail an intake whose job is already saved.
+    if (extras.billingOrganization) {
+      const seeded = await seedClientQuietly({
+        organization: extras.billingOrganization,
+        billingContact: { name: extras.billingContactName, email: extras.billingContactEmail, phone: extras.billingContactPhone },
+      });
+      if (seeded && (seeded.created || seeded.contactAdded)) revalidatePath("/clients");
+    }
 
     if (inserted.duplicate) {
       // 200 on purpose: the job is already saved, and a non-2xx would make AWS retry the delivery again.

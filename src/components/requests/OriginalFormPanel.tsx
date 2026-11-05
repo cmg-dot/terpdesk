@@ -16,14 +16,16 @@ const arrived = (iso: string): string => {
 /**
  * "View original form": the state's own email for this job, exactly as it arrived, in a side panel, so staff can check
  * whether the right form was sent without leaving the appointment (or cluttering its dispatch controls). Opens on demand
- * (nothing is loaded until it is clicked), shows the request form first and any later notices as tabs, and sanitizes the
- * HTML before showing it. Read-only.
+ * (nothing is loaded until it is clicked), shows ONLY the request form (hours reports never appear), keeps later notices
+ * (booking, reassignment, ...) collapsed under "Related state emails (not the form)", and sanitizes the HTML before
+ * showing it. Read-only.
  */
 export function OriginalFormPanel({ requestId }: { requestId: string }) {
   const [open, setOpen] = useState(false);
   const [result, setResult] = useState<OriginalFormsResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [active, setActive] = useState(0);
+  const [relatedOpen, setRelatedOpen] = useState<string | null>(null);
   const panel = useRef<HTMLDivElement>(null);
   const opener = useRef<HTMLButtonElement>(null);
 
@@ -36,6 +38,7 @@ export function OriginalFormPanel({ requestId }: { requestId: string }) {
   const openPanel = () => {
     setOpen(true);
     setActive(0);
+    setRelatedOpen(null);
     void load();
   };
   const close = useCallback(() => {
@@ -53,7 +56,8 @@ export function OriginalFormPanel({ requestId }: { requestId: string }) {
     return () => window.removeEventListener("keydown", onKey);
   }, [open, close]);
 
-  const emails: OriginalFormEmail[] = result?.success ? result.emails : [];
+  const emails: OriginalFormEmail[] = result?.success ? result.forms : [];
+  const related: OriginalFormEmail[] = result?.success ? result.related : [];
   const current = emails[Math.min(active, Math.max(emails.length - 1, 0))];
 
   return (
@@ -113,9 +117,9 @@ export function OriginalFormPanel({ requestId }: { requestId: string }) {
                 {!loading && result && !result.success && <p role="alert" className="text-sm text-red-700">{result.error}</p>}
                 {!loading && result?.success && !current && (
                   <div role="status" className="rounded-xl border border-dashed border-gray-200 p-6 text-sm text-[var(--sage)]">
-                    <p className="font-medium text-[var(--ink)]">The original email isn&apos;t in terpDESK.</p>
+                    <p className="font-medium text-[var(--ink)]">No original request form on file.</p>
                     <p className="mt-1">
-                      {result.srn ? "Forward the state's request email to the intake address and it will appear here, and its details will fill in anything missing on this job." : "This job has no state SRN, so there is no state email to show."}
+                      {result.srn ? "Forward the state's “Interpreter Request – date – SRN” email to the intake address and it will appear here, and its details will fill in anything missing on this job." : "This job has no state SRN, so there is no state email to show."}
                     </p>
                   </div>
                 )}
@@ -125,6 +129,27 @@ export function OriginalFormPanel({ requestId }: { requestId: string }) {
                     <p className="mb-4 text-xs text-[var(--sage)]">{current.savedCopy ? "The copy terpDESK saved when it created this job." : `Received ${arrived(current.receivedAt)}`}</p>
                     <InboxEmailBody email={{ bodyHtml: current.bodyHtml, bodyText: current.bodyText }} />
                   </div>
+                )}
+                {!loading && related.length > 0 && (
+                  <details data-related-emails className="mt-6 rounded-xl border border-gray-200">
+                    <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-[var(--ink)]">Related state emails (not the form) · {related.length}</summary>
+                    <ul className="divide-y divide-gray-100 border-t border-gray-100">
+                      {related.map((email) => (
+                        <li key={email.id} className="px-4 py-3">
+                          <button type="button" onClick={() => setRelatedOpen(relatedOpen === email.id ? null : email.id)} aria-expanded={relatedOpen === email.id} className="flex w-full items-center justify-between gap-3 text-left text-[13px]">
+                            <span className="font-medium text-gray-800">{email.label}</span>
+                            <span className="text-xs text-[var(--sage)]">{arrived(email.receivedAt)}</span>
+                          </button>
+                          {relatedOpen === email.id && (
+                            <div className="mt-3">
+                              <p className="mb-2 text-xs text-[var(--sage)]">{email.subject}</p>
+                              <InboxEmailBody email={{ bodyHtml: email.bodyHtml, bodyText: email.bodyText }} />
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
                 )}
               </div>
             </div>

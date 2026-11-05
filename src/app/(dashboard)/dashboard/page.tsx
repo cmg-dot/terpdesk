@@ -1,5 +1,6 @@
 "use client";
 import { settingLabel } from "@/lib/settingLabel";
+import { NEEDS_ATTENTION_HORIZON_DAYS, countStartingLater, sortNeedsAttention } from "@/lib/needsAttention";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import React from "react";
@@ -154,16 +155,8 @@ export default function DashboardPage() {
   const staffFollowUpCount = enrichedRequests.filter(r => getStatusFilters(r as any).staffFollowUp).length;
   const needsReplacementCount = enrichedRequests.filter(r => getStatusFilters(r as any).needsReplacement).length;
 
-  const getNeedsAttentionPriority = (status: string) => {
-    const s = String(status ?? '').toLowerCase();
-    if (s === 'needs replacement') return 1;
-    if (s === 'staff follow-up') return 2;
-    if (s.includes('awaiting') || s.includes('offer') || s.includes('pending')) return 3;
-    if (s.includes('unfilled') || s.includes('draft') || s.includes('partially')) return 4;
-    return 5;
-  };
-
-  const needsAttentionJobs = [...enrichedRequests]
+  // Starting within 7 days first (soonest first), the rest after; see lib/needsAttention.ts.
+  const needsAttentionJobs = sortNeedsAttention([...enrichedRequests]
     .filter(r => {
       const filters = getStatusFilters(r as any);
       if (filters.isCancelled) return false;
@@ -173,8 +166,8 @@ export default function DashboardPage() {
       
       return filters.needsReplacement || filters.needingCoverage || filters.hasPendingOffer || filters.staffFollowUp || filters.partiallyStaffed;
     })
-    .map(r => ({ ...r, displayStatus: getStaffingLabel(r as any) }))
-    .sort((a, b) => getNeedsAttentionPriority(a.displayStatus) - getNeedsAttentionPriority(b.displayStatus));
+    .map(r => ({ ...r, displayStatus: getStaffingLabel(r as any) })), currentTime);
+  const needsAttentionLaterCount = countStartingLater(needsAttentionJobs, currentTime);
 
   const upcomingBookingsJobs = sortUpcomingWithHappeningNow(
     [...enrichedRequests].filter(r => {
@@ -373,6 +366,12 @@ export default function DashboardPage() {
                 );
               }}
               />
+              {needsAttentionLaterCount > 0 && needsAttentionJobs.length > needsAttentionLaterCount && (
+                <p className="px-2 pt-1 text-xs text-[var(--sage)]">{needsAttentionLaterCount} more starting later than {NEEDS_ATTENTION_HORIZON_DAYS} days are listed after the nearer ones.</p>
+              )}
+              {needsAttentionLaterCount > 0 && needsAttentionJobs.length === needsAttentionLaterCount && (
+                <p className="px-2 pt-1 text-xs text-[var(--sage)]">Nothing starts in the next {NEEDS_ATTENTION_HORIZON_DAYS} days; these all start later.</p>
+              )}
             </div>
           </section>
 

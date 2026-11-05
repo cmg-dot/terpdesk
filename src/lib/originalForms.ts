@@ -15,9 +15,6 @@ export const FORM_LABELS: Record<FormKind, string> = {
   other: "Email",
 };
 
-/** The order the tabs appear in: the form first, then what happened to the job. */
-const KIND_ORDER: FormKind[] = ["request_form", "in_process", "booking_notice", "reassignment", "cancellation", "hours_report", "other"];
-
 export interface OriginalFormEmail {
   id: string;
   kind: FormKind;
@@ -32,7 +29,12 @@ export interface OriginalFormEmail {
   savedCopy?: boolean;
 }
 
-export type OriginalFormsResult = { success: true; srn: string | null; emails: OriginalFormEmail[] } | { success: false; error: string };
+/**
+ * The panel's answer: the request form(s) the state sent, and, apart from them, the notices that followed (booking,
+ * reassignment, cancellation, "now in process"). Hours reports (SLICR / service verification) are never included: they
+ * belong to Hours review, and they are not the form.
+ */
+export type OriginalFormsResult = { success: true; srn: string | null; forms: OriginalFormEmail[]; related: OriginalFormEmail[] } | { success: false; error: string };
 
 /** What kind of state email this is, from its subject and text. */
 export function classifyStateEmail(subject: string, text: string): FormKind {
@@ -46,7 +48,18 @@ export function classifyStateEmail(subject: string, text: string): FormKind {
   return "other";
 }
 
-/** Request form first, then by arrival time. */
-export function sortOriginalForms(emails: readonly OriginalFormEmail[]): OriginalFormEmail[] {
-  return [...emails].sort((a, b) => KIND_ORDER.indexOf(a.kind) - KIND_ORDER.indexOf(b.kind) || a.receivedAt.localeCompare(b.receivedAt));
+/** Notices that followed the form: shown under "Related state emails (not the form)". */
+export const RELATED_KINDS: readonly FormKind[] = ["in_process", "booking_notice", "reassignment", "cancellation"];
+
+/** True when `text` holds this exact SRN as a whole number (not part of a longer run of digits). */
+export const mentionsSrn = (text: string, srn: string): boolean => new RegExp(`(^|[^0-9])${srn}([^0-9]|$)`).test(text);
+
+const byArrival = (a: OriginalFormEmail, b: OriginalFormEmail): number => a.receivedAt.localeCompare(b.receivedAt);
+
+/** Request forms (oldest first) and the related notices. Hours reports and anything unrecognised are dropped. */
+export function splitOriginalForms(emails: readonly OriginalFormEmail[]): { forms: OriginalFormEmail[]; related: OriginalFormEmail[] } {
+  return {
+    forms: emails.filter((e) => e.kind === "request_form").sort(byArrival),
+    related: emails.filter((e) => RELATED_KINDS.includes(e.kind)).sort(byArrival),
+  };
 }
