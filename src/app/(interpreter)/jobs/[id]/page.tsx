@@ -15,6 +15,7 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { JobPlaceCards } from "@/components/interpreter/JobPlaceCards";
+import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { formatReference } from "@/utils/statusEngine";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
@@ -1361,8 +1362,7 @@ export default function JobDetailPage() {
           </div>
 
           {/* Assignment Details Card */}
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 ">
-            <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-4">Assignment details</h2>
+          <CollapsibleCard cardId="assignment-details" title="Assignment details">
             <div className="space-y-0">
               <div className="flex items-center justify-between py-3 border-b border-gray-50">
                 <span className="text-[14px] text-gray-400">Program type</span>
@@ -1399,20 +1399,19 @@ export default function JobDetailPage() {
                 </span>
               </div>
             </div>
-          </div>
+          </CollapsibleCard>
 
           {/* Where to go: the virtual meeting, the on-site place, or both (a virtual job can have a place too). */}
           <JobPlaceCards job={job} />
 
           {/* Card 2 */}
-          <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
-            <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Preparation notes</h2>
+          <CollapsibleCard cardId="preparation-notes" title="Preparation notes">
             {job.status === 'booked' && job.prepNotes ? (
               <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700">{job.prepNotes}</p>
             ) : (
               <p className="text-[14px] text-[var(--sage)]">No preparation notes yet.</p>
             )}
-          </div>
+          </CollapsibleCard>
 
           {/* Card 3 */}
           <JobPrepMaterials

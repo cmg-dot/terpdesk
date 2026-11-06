@@ -1,6 +1,7 @@
 "use client";
 
 import { ExternalLink, Lock } from "lucide-react";
+import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
 
@@ -35,23 +36,22 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
   const { meetingLink, meetingId, passcode } = job;
   const hasCredentials = Boolean(meetingLink || meetingId || passcode);
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4" data-place-card="virtual">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-gray-100 pb-4">
-        <div>
-          <h2 className="text-[16px] font-semibold text-[var(--ink)]">Virtual meeting details</h2>
-          <p className="text-xs text-[var(--sage)] mt-0.5">Platform: <span className="font-medium text-gray-700">{job.platform || "Virtual meeting"}</span></p>
-        </div>
-        {meetingLink && !isOffer && (
-          <a
-            href={meetingLink.startsWith("http") ? meetingLink : `https://${meetingLink}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1B433C] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm self-start sm:self-auto"
-          >
-            Open meeting link <ExternalLink className="w-3.5 h-3.5" />
-          </a>
-        )}
-      </div>
+    <CollapsibleCard
+      cardId="virtual-meeting"
+      title="Virtual meeting details"
+      subtitle={<>Platform: <span className="font-medium text-gray-700">{job.platform || "Virtual meeting"}</span></>}
+    >
+    <div className="space-y-4" data-place-card="virtual">
+      {meetingLink && !isOffer && (
+        <a
+          href={meetingLink.startsWith("http") ? meetingLink : `https://${meetingLink}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1B433C] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm"
+        >
+          Open meeting link <ExternalLink className="w-3.5 h-3.5" />
+        </a>
+      )}
 
       {isOffer && job.credentialsLocked ? (
         <div className="bg-amber-50/80 border border-amber-200/90 rounded-xl p-4 text-xs text-amber-900 flex items-start gap-3">
@@ -108,6 +108,7 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
 
       <p className="text-[12px] text-[var(--sage)] pt-1">Treat meeting links and access codes as restricted assignment information.</p>
     </div>
+    </CollapsibleCard>
   );
 }
 
@@ -118,9 +119,8 @@ function OnsiteCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
   const venue = /^virtual/i.test(onsite.venue ?? "") ? "" : onsite.venue ?? "";
   const where = [venue, onsite.address].filter(Boolean).join(" · ") || (isOffer ? venue || "Location shared after you accept" : job.location);
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4" data-place-card="onsite">
-      <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-2">On-site location details</h2>
-      <div className="space-y-3">
+    <CollapsibleCard cardId="onsite-location" title="On-site location details">
+      <div className="space-y-3" data-place-card="onsite">
         <div className="flex items-center justify-between gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
           <div className="min-w-0">
             <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">{onsite.address ? "Venue / Address" : "Venue"}</span>
@@ -148,7 +148,7 @@ function OnsiteCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
           <p className="text-[12px] text-[var(--sage)]">The street address, room and parking details are shared after you accept this offer.</p>
         )}
       </div>
-    </div>
+    </CollapsibleCard>
   );
 }
 

@@ -2,6 +2,7 @@
 
 import { Lock } from "lucide-react";
 import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
+import { InterpreterLinkButtons } from "@/components/requests/InterpreterLinkButtons";
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { CollapsiblePreviousOffers } from "@/components/requests/staffing/CollapsiblePreviousOffers";
 import type { PositionView, StaffBooking, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
@@ -47,6 +48,8 @@ export function BookedPosition({ view, booking, ctx, actions }: Props) {
             )}
             {/* Booked: staff can re-send the booking confirmation (with the secure details link). */}
             {!ctx.isCancelled && <ResendDetailsButton requestId={ctx.requestId} positionIndex={posIdx} />}
+            {/* The same link without sending anything: copy it, or open the interpreter's page. */}
+            {!ctx.isCancelled && <InterpreterLinkButtons requestId={ctx.requestId} positionIndex={posIdx} />}
             {ctx.isBookingLocked ? (
               <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-200/70 text-gray-600 text-xs font-medium">
                 <Lock className="w-3.5 h-3.5 text-gray-500" />

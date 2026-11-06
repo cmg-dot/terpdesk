@@ -8,6 +8,10 @@ import type { FormExtras } from "@/lib/requestFormExtras";
 
 type Field = "providerOneNumber" | "clientGender" | "hearingIdentity" | "otherPatientInfo";
 
+/** Gender is free text on the state's form; the form offers these, and a saved value that is not one of them stays shown. */
+const NOT_SPECIFIED = "Not specified";
+const GENDER_OPTIONS = [NOT_SPECIFIED, "Female", "Male", "Non-binary"];
+
 /**
  * Section 5 of the state form as its own staff-only card: ProviderOne number, gender and hearing identity, and (only when the
  * saved form has lines no field covers) those other lines. None of it is ever sent to an interpreter or put in a link.
@@ -28,13 +32,12 @@ export function PatientInfoCard({ values, showOther, onChange }: { values: FormE
         <FormField label="Provider One #" htmlFor="patient-provider-one">
           <input id="patient-provider-one" type="text" autoComplete="off" maxLength={40} className={inputClass} value={values.providerOneNumber} onChange={(e) => onChange("providerOneNumber", e.target.value)} />
         </FormField>
-        <FormField label="Gender" htmlFor="patient-gender">
-          <input id="patient-gender" type="text" autoComplete="off" maxLength={40} list="patient-gender-options" className={inputClass} value={values.clientGender} onChange={(e) => onChange("clientGender", e.target.value)} />
-          <datalist id="patient-gender-options">
-            <option value="Female" />
-            <option value="Male" />
-            <option value="Non-binary" />
-          </datalist>
+        <FormField label="Gender">
+          <CustomSelect
+            options={GENDER_OPTIONS}
+            value={values.clientGender.trim() || NOT_SPECIFIED}
+            onChange={(label) => onChange("clientGender", label === NOT_SPECIFIED ? "" : label)}
+          />
         </FormField>
         <FormField label="Hearing Identity">
           <CustomSelect
