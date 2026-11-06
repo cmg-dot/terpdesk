@@ -16,6 +16,13 @@ export const SUBJECT_SRN_SQL_PATTERN = String.raw`#\s*([0-9]{6,12})`;
 /** How much of an email's body is searched. A state form puts its number near the top. */
 export const SRN_SEARCH_CHARS = 20000;
 
+/** The SRN an email is about, read in the browser or on the server from its subject and the start of its body (the SQL patterns above, as JavaScript). */
+export function extractSrn(subject: string, bodyText: string): string | null {
+  const head = bodyText.slice(0, SRN_SEARCH_CHARS);
+  const match = (pattern: string, text: string): string | null => new RegExp(pattern.replace("(?i)", "").replace("\\m", "\\b"), pattern.startsWith("(?i)") ? "i" : "").exec(text)?.[1] ?? null;
+  return srnFromCandidates([match(BODY_SERVICE_REQUEST_SQL_PATTERN, head), match(BODY_SRN_SQL_PATTERN, head), match(SUBJECT_SRN_SQL_PATTERN, subject)]);
+}
+
 /** A state request number is 6 to 12 digits; anything else the patterns caught ("not", "pending") is not a number. */
 export function srnFromCandidates(candidates: readonly (string | null | undefined)[]): string | null {
   for (const candidate of candidates) {

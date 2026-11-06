@@ -28,3 +28,12 @@ export const INBOX_LIST_LIMIT = 500;
 
 export type OpenInboxEmailResult = { success: true; email: InboxEmail } | { success: false; error: string };
 export type SetInboxEmailReadResult = { success: true } | { success: false; error: string };
+
+/** What staff see beside an opened email: the job its request number belongs to and that job's timesheets. Read-only, no names. */
+export interface InboxEmailContext {
+  srn: string | null;
+  job: { id: string; title: string; status: string; voidedKind: string | null; voidedAt: string | null } | null;
+  timesheets: { status: string; position: number | null; actualStart: string | null; actualEnd: string | null; miles: number | null; hasSignature: boolean }[];
+}
+
+export type InboxEmailContextResult = { success: true; context: InboxEmailContext } | { success: false; error: string };

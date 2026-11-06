@@ -1,14 +1,15 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, desc, eq, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { agencyInbox } from "@/db/schema";
+import { agencyInbox, requests, timesheets } from "@/db/schema";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { NOT_ALLOWED_MESSAGE, hasRole } from "@/lib/auth/guards";
+import { extractSrn } from "@/lib/inboxSrn";
 import { logError } from "@/lib/logError";
-import type { OpenInboxEmailResult, SetInboxEmailReadResult } from "@/types/inbox";
+import type { InboxEmailContext, InboxEmailContextResult, OpenInboxEmailResult, SetInboxEmailReadResult } from "@/types/inbox";
 
 const emailIdSchema = z.string().uuid();
 const setReadSchema = z.object({ id: z.string().uuid(), isRead: z.boolean() });
@@ -76,6 +77,63 @@ export async function setInboxEmailRead(id: string, isRead: boolean): Promise<Se
     return { success: true };
   } catch (error) {
     logError("setInboxEmailRead", error);
+    return { success: false, error: FAILED };
+  }
+}
+
+/**
+ * What sits beside an opened email in the inbox: the job that has the email's request number (the live one when there are
+ * several) and that job's timesheets (status, actual times, miles, whether a signature is on file, which position). READ ONLY:
+ * nothing is changed, and no names or notes are returned. The request number is worked out here from the stored email, never taken from the browser.
+ */
+export async function getInboxEmailContext(id: string): Promise<InboxEmailContextResult> {
+  if (!(await hasRole("agency"))) return { success: false, error: NOT_ALLOWED_MESSAGE };
+  const parsed = emailIdSchema.safeParse(id);
+  if (!parsed.success) return { success: false, error: NOT_FOUND };
+  try {
+    const [mail] = await db.select({ subject: agencyInbox.subject, bodyText: agencyInbox.bodyText }).from(agencyInbox).where(inMailbox(parsed.data)).limit(1);
+    if (!mail) return { success: false, error: NOT_FOUND };
+    const srn = extractSrn(mail.subject, mail.bodyText);
+    if (!srn) return { success: true, context: { srn: null, job: null, timesheets: [] } };
+
+    const srnOf = sql<string>`${requests.data}->'intake'->>'odhhSrn'`;
+    const found = await db
+      .select({ id: requests.id, title: requests.title, status: requests.status, data: requests.data })
+      .from(requests)
+      .where(eq(srnOf, srn))
+      .orderBy(desc(requests.updatedAt));
+    const job = [...found].sort((a, b) => Number(a.status === "Cancelled") - Number(b.status === "Cancelled"))[0];
+    if (!job) return { success: true, context: { srn, job: null, timesheets: [] } };
+
+    const sheets = await db
+      .select({
+        id: timesheets.id,
+        status: timesheets.status,
+        actualStart: timesheets.actualStartTime,
+        actualEnd: timesheets.actualEndTime,
+        miles: timesheets.mileage,
+        signed: sql<boolean>`${timesheets.signatureDataUrl} is not null`,
+      })
+      .from(timesheets)
+      .where(eq(timesheets.requestId, job.id))
+      .orderBy(timesheets.submittedAt);
+    const data = (job.data ?? {}) as { void?: { kind?: string; at?: string }; hoursSubmissions?: Record<string, { timesheetId?: string }> };
+    const slots = data.hoursSubmissions ?? {};
+    const context: InboxEmailContext = {
+      srn,
+      job: { id: job.id, title: job.title, status: job.status, voidedKind: data.void?.kind ?? null, voidedAt: data.void?.at ?? null },
+      timesheets: sheets.map((t) => ({
+        status: t.status,
+        position: Number(Object.keys(slots).find((p) => slots[p]?.timesheetId === t.id)) || null,
+        actualStart: t.actualStart ? t.actualStart.toISOString() : null,
+        actualEnd: t.actualEnd ? t.actualEnd.toISOString() : null,
+        miles: t.miles === null ? null : Number(t.miles),
+        hasSignature: Boolean(t.signed),
+      })),
+    };
+    return { success: true, context };
+  } catch (error) {
+    logError("getInboxEmailContext", error);
     return { success: false, error: FAILED };
   }
 }

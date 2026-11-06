@@ -1,46 +1,70 @@
 "use client";
 
-import { Inbox } from "lucide-react";
+import { useMemo, useState } from "react";
+import { SearchX } from "lucide-react";
+import { InboxEmptyState } from "@/components/features/inbox/InboxEmptyState";
+import { InboxHeader } from "@/components/features/inbox/InboxHeader";
 import { InboxList } from "@/components/features/inbox/InboxList";
 import { InboxMessage } from "@/components/features/inbox/InboxMessage";
+import { InboxToolbar } from "@/components/features/inbox/InboxToolbar";
 import { useInbox } from "@/hooks/useInbox";
+import { matchesSearch, matchesTab, tabCounts } from "@/lib/inboxCategory";
+import type { InboxTab } from "@/lib/inboxCategory";
 import type { InboxListItem } from "@/types/inbox";
 
 /**
- * Two panes: the list on the left, the selected email on the right. On a phone only one shows at a time (the list, or the
- * email with a Back button). Nothing is selected on arrival, so an email is only marked read when someone opens it.
+ * The inbox: a header with the unread count, a search box and filter tabs, then two panes: the email feed on the left and the
+ * selected email on the right. On a phone only one pane shows at a time (the feed, or the email with a Back button). Nothing is
+ * selected on arrival, so an email is only marked read when someone opens it. Search and tabs only filter what is shown.
  */
 export function InboxView({ emails: serverEmails }: { emails: InboxListItem[] }) {
   const { emails, unreadCount, selectedId, openEmail, isLoading, error, select, markUnread, close } = useInbox(serverEmails);
+  const [query, setQuery] = useState("");
+  const [tab, setTab] = useState<InboxTab>("all");
   const hasSelection = selectedId !== null;
 
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-[var(--sage)]">
-        {emails.length === 0 ? "No emails yet" : unreadCount === 0 ? "All caught up" : `${unreadCount} unread`}
-      </p>
-      <div className="grid overflow-hidden rounded-2xl border border-gray-200 bg-white md:h-[calc(100vh-13rem)] md:min-h-[420px] md:grid-cols-[minmax(280px,360px)_1fr]">
-        <aside
-          aria-label="Emails"
-          className={`h-[calc(100vh-14rem)] min-h-[320px] overflow-y-auto md:h-auto md:border-r md:border-gray-100 ${hasSelection ? "hidden md:block" : ""}`}
-        >
-          {emails.length === 0 ? (
-            <p className="p-6 text-sm text-[var(--sage)]">Emails sent to your intake address will appear here.</p>
-          ) : (
-            <InboxList emails={emails} selectedId={selectedId} onSelect={select} />
-          )}
-        </aside>
+  const counts = useMemo(() => tabCounts(emails), [emails]);
+  const visible = useMemo(() => emails.filter((e) => matchesTab(tab, e) && matchesSearch(query, e)), [emails, tab, query]);
+  const filtering = tab !== "all" || query.trim() !== "";
+  const selectedItem = emails.find((e) => e.id === selectedId);
 
-        <section aria-label="Email" className={`min-w-0 md:block ${hasSelection ? "h-[calc(100vh-14rem)] min-h-[320px] md:h-auto" : "hidden"}`}>
-          {hasSelection ? (
-            <InboxMessage email={openEmail} isLoading={isLoading} error={error} onBack={close} onMarkUnread={markUnread} jobRef={emails.find((e) => e.id === selectedId)} />
-          ) : (
-            <div className="flex h-full flex-col items-center justify-center gap-2 p-8 text-center text-[var(--sage)]">
-              <Inbox className="h-8 w-8" />
-              <p className="text-sm">Select an email to read it.</p>
-            </div>
-          )}
-        </section>
+  return (
+    <div className="space-y-5">
+      <InboxHeader unread={unreadCount} />
+      <div className="flex flex-col overflow-hidden rounded-2xl border border-gray-200 bg-white md:h-[calc(100vh-14rem)] md:min-h-[480px]">
+        <div className={hasSelection ? "hidden md:block" : ""}>
+          <InboxToolbar query={query} onQuery={setQuery} tab={tab} onTab={setTab} counts={counts} />
+        </div>
+        <div className="grid min-h-0 flex-1 md:grid-cols-[minmax(250px,300px)_minmax(0,1fr)] lg:grid-cols-[minmax(320px,400px)_minmax(0,1fr)]">
+          <aside
+            aria-label="Emails"
+            className={`h-[calc(100vh-20rem)] min-h-[320px] overflow-y-auto bg-[#FBFAF7] md:h-auto md:border-r md:border-gray-100 ${hasSelection ? "hidden md:block" : ""}`}
+          >
+            {emails.length === 0 ? (
+              <p className="p-6 text-sm text-[var(--sage)]">Emails sent to your intake address will appear here.</p>
+            ) : visible.length === 0 ? (
+              <div className="flex flex-col items-center gap-3 p-8 text-center" data-inbox-empty="no-match">
+                <SearchX className="h-7 w-7 text-[var(--sage)]" aria-hidden="true" />
+                <p className="text-sm text-[var(--sage)]">No emails match{filtering ? " these filters" : ""}.</p>
+                {filtering && (
+                  <button type="button" onClick={() => { setQuery(""); setTab("all"); }} className="rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--forest)] transition-colors hover:bg-emerald-50">
+                    Clear filters
+                  </button>
+                )}
+              </div>
+            ) : (
+              <InboxList emails={visible} selectedId={selectedId} onSelect={select} />
+            )}
+          </aside>
+
+          <section aria-label="Email" className={`min-h-0 min-w-0 md:block ${hasSelection ? "h-[calc(100vh-14rem)] min-h-[320px] md:h-auto" : "hidden"}`}>
+            {hasSelection ? (
+              <InboxMessage key={selectedId} email={openEmail} isLoading={isLoading} error={error} onBack={close} onMarkUnread={markUnread} jobRef={selectedItem} />
+            ) : (
+              <InboxEmptyState />
+            )}
+          </section>
+        </div>
       </div>
     </div>
   );

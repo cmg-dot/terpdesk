@@ -1,3 +1,4 @@
+import { InboxHeader } from "@/components/features/inbox/InboxHeader";
 import { InboxView } from "@/components/features/inbox/InboxView";
 import { requireRole } from "@/lib/auth/guards";
 import { listInboxEmails } from "@/lib/inbox";
@@ -19,17 +20,16 @@ export default async function InboxPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1200px] space-y-4 p-4 pb-24 antialiased sm:p-6">
-      <div className="space-y-2">
-        <h1 className="text-3xl font-semibold tracking-tight text-[var(--ink)]">Inbox</h1>
-        <p className="max-w-2xl text-[15px] text-[var(--sage)]">Emails sent to your agency&apos;s intake address.</p>
-      </div>
+    <div className="mx-auto w-full max-w-[1280px] space-y-4 p-4 pb-24 antialiased sm:p-6">
       {emails ? (
         <InboxView emails={emails} />
       ) : (
-        <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
-          We couldn&apos;t load your inbox. Please refresh the page.
-        </div>
+        <>
+          <InboxHeader />
+          <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
+            We couldn&apos;t load your inbox. Please refresh the page.
+          </div>
+        </>
       )}
     </div>
   );
