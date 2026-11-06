@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { RefObject } from "react";
 import { MENU_MAX_HEIGHT, NEUTRAL_PLACEMENT, placePanel } from "@/lib/dropdown";
-import type { Anchor, Placement } from "@/lib/dropdown";
+import type { Anchor, PlaceOptions, Placement } from "@/lib/dropdown";
 
 // useLayoutEffect warns when a page is rendered on the server; panels only ever open in the browser, so fall back to useEffect there.
 const useBrowserLayoutEffect = typeof window === "undefined" ? useEffect : useLayoutEffect;
@@ -24,6 +24,9 @@ interface Options {
   onClose: () => void;
   /** The tallest the panel gets before it scrolls inside itself. */
   maxHeight?: number;
+  /** Which edge of the button the panel lines up with, and the gap kept from the screen edges (see placePanel). */
+  align?: PlaceOptions["align"];
+  edge?: number;
 }
 
 /**
@@ -34,9 +37,11 @@ interface Options {
  *    if the button leaves the view.
  * Returns the ref to put on the panel and the placement to apply to it.
  */
-export function useAnchoredPanel<T extends HTMLElement>({ anchor, buttonRef, rootRef, onAnchor, onClose, maxHeight = MENU_MAX_HEIGHT }: Options): { panel: RefObject<T>; placement: Placement } {
+export function useAnchoredPanel<T extends HTMLElement>({ anchor, buttonRef, rootRef, onAnchor, onClose, maxHeight = MENU_MAX_HEIGHT, align, edge }: Options): { panel: RefObject<T>; placement: Placement } {
   const panel = useRef<T>(null);
   const [placement, setPlacement] = useState<Placement>(NEUTRAL_PLACEMENT);
+  // Bumped on a window resize so the panel is placed again for the new size (the anchor alone does not change when only the width does).
+  const [resizes, setResizes] = useState(0);
 
   useBrowserLayoutEffect(() => {
     if (!panel.current) return;
@@ -44,9 +49,17 @@ export function useAnchoredPanel<T extends HTMLElement>({ anchor, buttonRef, roo
     const width = panel.current.offsetWidth || panel.current.getBoundingClientRect().width;
     // scrollHeight is the full content height even while the panel is capped, so capping it cannot flip the answer back.
     const height = Math.min(panel.current.scrollHeight + 2, maxHeight);
-    const next = placePanel(anchor, { width, height }, { width: window.innerWidth, height: window.innerHeight });
+    // The page's width without a vertical scrollbar (innerWidth counts the scrollbar, which would let a panel slide under it).
+    const viewportWidth = document.documentElement.clientWidth || window.innerWidth;
+    const next = placePanel(anchor, { width, height }, { width: viewportWidth, height: window.innerHeight }, { align, edge });
     setPlacement((now) => (now.flipUp === next.flipUp && now.dx === next.dx && now.maxHeight === next.maxHeight ? now : next));
-  }, [anchor, maxHeight]);
+  }, [anchor, maxHeight, align, edge, resizes]);
+
+  useEffect(() => {
+    const onResize = () => setResizes((n) => n + 1);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   useEffect(() => {
     const away = (event: Event) => {

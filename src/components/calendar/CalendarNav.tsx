@@ -20,16 +20,8 @@ interface Props {
   onPick: (key: string) => void;
   /** Sits between "Today" and the next arrow (the interpreter calendar's "Block time"). */
   extra?: ReactNode;
-  /** Lets the arrows step by day, week or month when the view itself is fixed to a day (the Interpreter View). */
-  step?: { value: CalendarView; onChange: (value: CalendarView) => void };
   size?: "md" | "sm";
 }
-
-const STEPS: { value: CalendarView; label: string }[] = [
-  { value: "day", label: "Day" },
-  { value: "week", label: "Week" },
-  { value: "month", label: "Month" },
-];
 
 const SIZES = {
   md: { arrow: "h-10 w-10", arrowIcon: "h-5 w-5", today: "px-5 py-2 text-sm", badge: "text-sm" },
@@ -40,7 +32,7 @@ const SIZES = {
  * Previous / Today / Next and the date badge. The badge is a button: it opens a calendar popover to jump straight to any
  * day, month or year, and its "Today" is the calendar's own today (Los Angeles for the agency), not the browser's.
  */
-export const CalendarNav = ({ dateKey, todayKey, unit, onPrev, onNext, onToday, onPick, extra, step, size = "md" }: Props) => {
+export const CalendarNav = ({ dateKey, todayKey, unit, onPrev, onNext, onToday, onPick, extra, size = "md" }: Props) => {
   const s = SIZES[size];
   const arrow = `flex ${s.arrow} items-center justify-center rounded-full border border-gray-200 text-gray-700 transition-colors duration-100 hover:bg-gray-50 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]`;
   return (
@@ -57,22 +49,7 @@ export const CalendarNav = ({ dateKey, todayKey, unit, onPrev, onNext, onToday, 
           <ChevronRight className={s.arrowIcon} aria-hidden="true" />
         </button>
       </div>
-      <div className="flex flex-wrap items-center gap-3">
-        {step && (
-          <div role="group" aria-label="Arrows step by" className="flex items-center gap-1 rounded-full bg-[#F4F3EF] p-1">
-            {STEPS.map((choice) => (
-              <button
-                key={choice.value}
-                type="button"
-                aria-pressed={step.value === choice.value}
-                onClick={() => step.onChange(choice.value)}
-                className={`rounded-full px-3 py-1 text-xs font-medium transition-colors duration-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] ${step.value === choice.value ? "bg-[#0B3B32] text-white" : "text-gray-600 hover:bg-white"}`}
-              >
-                {choice.label}
-              </button>
-            ))}
-          </div>
-        )}
+      <div>
         <PickerField
           popoverLabel="Jump to a date"
           text={formatBadgeDate(dateKey)}
@@ -83,6 +60,8 @@ export const CalendarNav = ({ dateKey, todayKey, unit, onPrev, onNext, onToday, 
           compact={false}
           ariaLabel="Jump to a date"
           spring
+          align="end"
+          edge={16}
         >
           {(close) => (
             <CalendarGrid

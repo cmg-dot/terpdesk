@@ -15,6 +15,7 @@ import { CalendarTransition } from "@/components/calendar/CalendarTransition";
 import { CalendarViewToggle } from "@/components/calendar/CalendarViewToggle";
 import { CalendarWeekView } from "@/components/calendar/CalendarWeekView";
 import { InterpreterTimeline } from "@/components/calendar/InterpreterTimeline";
+import { useCalendarKeys } from "@/hooks/useCalendarKeys";
 import { useCalendarNavigation } from "@/hooks/useCalendarNavigation";
 import { useDayIndex } from "@/hooks/useDayIndex";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
@@ -27,8 +28,6 @@ export default function CalendarPage() {
   const [requests, setRequests] = useState<CalendarRequest[]>([]);
   // Job View is the original calendar (month / week / day of job cards). Interpreter View is the resource timeline.
   const [mode, setMode] = useState<CalendarMode>("jobs");
-  // The Interpreter View shows one day, so its arrows step by whatever is chosen here (a day unless asked).
-  const [interpreterStep, setInterpreterStep] = useState<CalendarView>("day");
   // Same filter, same default and same rule as Requests & assignments: cancelled jobs stay off the grid until asked for.
   const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
 
@@ -44,7 +43,9 @@ export default function CalendarPage() {
   }, []);
 
   const interpreters = mode === "interpreters";
-  const stepUnit = interpreters ? interpreterStep : nav.view;
+  // The Interpreter View is one day wide, so its arrows (and Left / Right) move one day; Shift + arrow moves a week.
+  const stepUnit: CalendarView = interpreters ? "day" : nav.view;
+  useCalendarKeys(interpreters, (unit, direction) => (direction > 0 ? nav.next(unit) : nav.prev(unit)));
   const label = interpreters || nav.view === "day"
     ? format(nav.date, "EEEE, MMMM d, yyyy")
     : nav.view === "week"
@@ -72,7 +73,6 @@ export default function CalendarPage() {
           onNext={() => nav.next(stepUnit)}
           onToday={nav.goToToday}
           onPick={nav.goToDate}
-          step={interpreters ? { value: interpreterStep, onChange: setInterpreterStep } : undefined}
         />
       </div>
 
@@ -84,7 +84,10 @@ export default function CalendarPage() {
         </div>
       )}
 
-      <p className="text-[13px] text-[var(--sage)] mt-4">{label}</p>
+      <p className="text-[13px] text-[var(--sage)] mt-4">
+        {label}
+        {interpreters && <span className="hidden sm:inline"> · Left / Right arrow: one day, Shift + arrow: one week</span>}
+      </p>
 
       {!interpreters && (
         <div className="mt-6">

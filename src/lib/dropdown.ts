@@ -25,7 +25,7 @@ export interface Anchor {
 export interface Placement {
   /** Open upwards (above the button) because there is more room there. */
   flipUp: boolean;
-  /** Pixels to slide the menu sideways to keep it inside the screen. */
+  /** Pixels to slide the menu sideways: to line its right edge up with the button's (align "end") and to keep it inside the screen. */
   dx: number;
   /** A smaller height cap for when the room is under the usual maximum; null = leave the CSS maximum alone. */
   maxHeight: number | null;
@@ -36,27 +36,35 @@ export const NEUTRAL_PLACEMENT: Placement = { flipUp: false, dx: 0, maxHeight: n
 /** The menu's usual maximum height in pixels (Tailwind max-h-64). */
 export const MENU_MAX_HEIGHT = 256;
 const EDGE = 8;
+
+export interface PlaceOptions {
+  /** "start" (default) lines the menu's left edge up with the button's; "end" lines the right edges up. */
+  align?: "start" | "end";
+  /** The smallest gap kept between the menu and the screen's left / right edge, in pixels. */
+  edge?: number;
+}
 const GAP = 6;
 const MIN_HEIGHT = 96;
 
 /**
  * Where to open a menu of size `panel` (its natural size, as if opened below and left-aligned with the button) so it stays
  * on screen: above the button when below is too short and above has more room, slid sideways off the screen edges, and
- * shortened to the room there is (the menu scrolls inside itself).
+ * shortened to the room there is (the menu scrolls inside itself). `viewport.width` should be the width without a scrollbar.
  */
 export const placePanel = (
-  trigger: Pick<Anchor, "left" | "top" | "bottom">,
+  trigger: Pick<Anchor, "left" | "top" | "bottom" | "width">,
   panel: { width: number; height: number },
   viewport: { width: number; height: number },
+  { align = "start", edge = EDGE }: PlaceOptions = {},
 ): Placement => {
   const below = viewport.height - trigger.bottom - EDGE - GAP;
   const above = trigger.top - EDGE - GAP;
   const flipUp = panel.height > below && above > below;
   const room = flipUp ? above : below;
 
-  let dx = 0;
-  if (trigger.left + panel.width > viewport.width - EDGE) dx = viewport.width - EDGE - (trigger.left + panel.width);
-  if (trigger.left + dx < EDGE) dx = EDGE - trigger.left;
+  let dx = align === "end" ? trigger.width - panel.width : 0;
+  if (trigger.left + dx + panel.width > viewport.width - edge) dx = viewport.width - edge - panel.width - trigger.left;
+  if (trigger.left + dx < edge) dx = edge - trigger.left;
 
   return { flipUp, dx, maxHeight: panel.height > room ? Math.max(Math.floor(room), MIN_HEIGHT) : null };
 };
