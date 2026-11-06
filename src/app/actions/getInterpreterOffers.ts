@@ -144,6 +144,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       virtualInstructions: job.virtualInstructions,
       credentialsLocked: job.credentialsLocked,
       prepNotes: job.prepNotes,
+      groupFlags: job.groupFlags,
       details: job.details,
       onsite: job.onsite,
       // Only the program and SRN: staff-only keys (private notes, the raw email, the client's name, requester, other

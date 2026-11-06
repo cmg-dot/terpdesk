@@ -1,4 +1,5 @@
 import { formatInTimeZone } from "date-fns-tz";
+import { formatHoursMinutes } from "@/lib/durationFormat";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
 import { formatReference } from "@/utils/statusEngine";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
@@ -27,6 +28,8 @@ export interface JobSummary {
   title: string;
   dateLabel: string;
   timeLabel: string;
+  /** "1 hr 30 min", or "Time to be confirmed" when the times are unknown. */
+  durationLabel: string;
   format: string;
   isVirtual: boolean;
   setting: string;
@@ -39,6 +42,8 @@ export interface JobSummary {
 
 export interface JobDetails extends JobSummary {
   prepNotes: string;
+  /** The state form's "Public" and "Mixed Group" answers (null when it did not say). Part of the job brief, not a person's details. */
+  groupFlags: { isPublic: boolean | null; isMixedGroup: boolean | null };
   /** The physical place: always for an in-person job, and for a virtual job too when it has an address, room or parking note. */
   location: { venue: string; address: string; building: string; floor: string; room: string; entrance: string; parking: string; contact: string; contactMethod: string } | null;
   virtual: { platform: string; meetingLink: string; meetingId: string; passcode: string; instructions: string } | null;
@@ -53,12 +58,14 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
 
   let dateLabel = "Date to be confirmed";
   let timeLabel = "Time to be confirmed";
+  let durationLabel = "Time to be confirmed";
   try {
     const { startsAt, endsAt } = resolveRequestTimes(request);
     const start = new Date(startsAt);
     const end = new Date(endsAt);
     if (!Number.isNaN(start.getTime())) {
       dateLabel = formatInTimeZone(start, zone, "EEE, MMM d, yyyy");
+      if (!Number.isNaN(end.getTime()) && end.getTime() > start.getTime()) durationLabel = formatHoursMinutes((end.getTime() - start.getTime()) / 60000);
       timeLabel = Number.isNaN(end.getTime())
         ? formatInTimeZone(start, zone, "h:mm a zzz")
         : `${formatInTimeZone(start, zone, "h:mm a")} – ${formatInTimeZone(end, zone, "h:mm a zzz")}`;
@@ -76,6 +83,7 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     title: text(request.title) || text(details.title) || "Interpreting assignment",
     dateLabel,
     timeLabel,
+    durationLabel,
     format: rawFormat,
     isVirtual: rawFormat.toLowerCase().includes("virtual"),
     // Generic setting only (e.g. Medical, Legal, Educational).
@@ -93,11 +101,16 @@ export function jobDetailsFor(request: JobRequestRow, positionNumber?: number): 
   const data = (request.data ?? {}) as LooseData;
   const details = (data.details ?? {}) as LooseData;
   const onsite = (data.onsite ?? {}) as LooseData;
+  const intake = (data.intake ?? {}) as LooseData;
   const meetingLink = text(details.meetingLink) || text(details.virtualLink) || text(data.meetingLink) || text(data.virtualLink);
 
   return {
     ...summary,
     prepNotes: text(data.prepNotes),
+    groupFlags: {
+      isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,
+      isMixedGroup: typeof intake.isMixedGroup === "boolean" ? intake.isMixedGroup : null,
+    },
     location: summary.isVirtual && !hasPhysicalPlace(onsite)
       ? null
       : {

@@ -45,6 +45,8 @@ export interface Job {
   credentialsLocked?: boolean;
   /** The agency's preparation notes, once the interpreter is booked. */
   prepNotes?: string;
+  /** The state form's Public / Mixed Group answers (null when it did not say). */
+  groupFlags?: { isPublic: boolean | null; isMixedGroup: boolean | null };
   agencyName?: string;
   details?: any;
   onsite?: any;
@@ -106,6 +108,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           virtualInstructions: o.virtualInstructions || null,
           credentialsLocked: o.credentialsLocked,
           prepNotes: o.prepNotes,
+          groupFlags: o.groupFlags,
           agencyName: o.agencyName || DEFAULT_AGENCY_NAME,
           details: o.details || {},
           onsite: o.onsite || {},

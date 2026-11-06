@@ -112,9 +112,11 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
 }
 
 function OnsiteCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
-  const onsite = job.onsite ?? {};
+  // Until the offer is accepted only the place's name is drawn, whatever the job object holds: the server does not send the
+  // rest (see interpreterJobData.ts), and this keeps the page from showing it even if it ever did.
+  const onsite = isOffer ? { venue: job.onsite?.venue ?? "" } : job.onsite ?? {};
   const venue = /^virtual/i.test(onsite.venue ?? "") ? "" : onsite.venue ?? "";
-  const where = [venue, onsite.address].filter(Boolean).join(" · ") || job.location;
+  const where = [venue, onsite.address].filter(Boolean).join(" · ") || (isOffer ? venue || "Location shared after you accept" : job.location);
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4" data-place-card="onsite">
       <h2 className="text-[16px] font-semibold text-[var(--ink)] mb-2">On-site location details</h2>

@@ -41,6 +41,8 @@ export interface InterpreterJobView {
   virtualInstructions: string | null;
   /** The agency's preparation notes for interpreters (never the agency-private notes). Shared once booked. */
   prepNotes: string;
+  /** The state form's "Public" and "Mixed Group" answers (null when it did not say): the job brief, not a person's details. */
+  groupFlags: { isPublic: boolean | null; isMixedGroup: boolean | null };
   /** An offer for a job that has meeting credentials, which stay on the server until the offer is accepted. */
   credentialsLocked: boolean;
   details: Loose;
@@ -101,6 +103,10 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
     passcode: booked ? orNull(passcode) : null,
     virtualInstructions: booked ? orNull(instructions) : null,
     prepNotes: booked ? text(data.prepNotes) : "",
+    groupFlags: {
+      isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,
+      isMixedGroup: typeof intake.isMixedGroup === "boolean" ? intake.isMixedGroup : null,
+    },
     credentialsLocked: !booked && isVirtual && Boolean(link || meetingId || passcode),
     details: { ...schedule, setting, format, timeZone, platform: isVirtual ? platform : orNull(details.platform), ...virtualFields },
     onsite: onsiteView,

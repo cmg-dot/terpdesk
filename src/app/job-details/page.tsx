@@ -98,6 +98,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
               <dl>
                 <Row label="Date">{access.details.dateLabel}</Row>
                 <Row label="Time">{access.details.timeLabel}</Row>
+                <Row label="Duration">{access.details.durationLabel}</Row>
                 <Row label="Format">{access.details.format}</Row>
                 <Row label="Setting">{access.details.setting}</Row>
                 <Row label="Role">{access.details.role}</Row>
@@ -141,6 +142,15 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                   {access.details.virtual.meetingId && <Row label="Meeting ID">{access.details.virtual.meetingId}</Row>}
                   {access.details.virtual.passcode && <Row label="Passcode">{access.details.virtual.passcode}</Row>}
                   {access.details.virtual.instructions && <Row label="Instructions">{access.details.virtual.instructions}</Row>}
+                </dl>
+              </Card>
+            )}
+
+            {(access.details.groupFlags.isPublic !== null || access.details.groupFlags.isMixedGroup !== null) && (
+              <Card title="Group setting">
+                <dl>
+                  {access.details.groupFlags.isPublic !== null && <Row label="Public">{access.details.groupFlags.isPublic ? "Yes" : "No"}</Row>}
+                  {access.details.groupFlags.isMixedGroup !== null && <Row label="Mixed group">{access.details.groupFlags.isMixedGroup ? "Yes" : "No"}</Row>}
                 </dl>
               </Card>
             )}

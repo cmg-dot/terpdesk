@@ -1374,6 +1374,24 @@ export default function JobDetailPage() {
                   {job.isVirtual ? 'Virtual' : 'In person'}
                 </span>
               </div>
+              {job.startsAt && job.endsAt && new Date(job.endsAt).getTime() > new Date(job.startsAt).getTime() && (
+                <div className="flex items-center justify-between py-3 border-b border-gray-50" data-job-row="duration">
+                  <span className="text-[14px] text-gray-400">Duration</span>
+                  <span className="text-[14px] text-[var(--ink)]">{formatHoursMinutes((new Date(job.endsAt).getTime() - new Date(job.startsAt).getTime()) / 60000)}</span>
+                </div>
+              )}
+              {job.groupFlags?.isPublic != null && (
+                <div className="flex items-center justify-between py-3 border-b border-gray-50" data-job-row="public">
+                  <span className="text-[14px] text-gray-400">Public</span>
+                  <span className="text-[14px] text-[var(--ink)]">{job.groupFlags.isPublic ? 'Yes' : 'No'}</span>
+                </div>
+              )}
+              {job.groupFlags?.isMixedGroup != null && (
+                <div className="flex items-center justify-between py-3 border-b border-gray-50" data-job-row="mixed-group">
+                  <span className="text-[14px] text-gray-400">Mixed group</span>
+                  <span className="text-[14px] text-[var(--ink)]">{job.groupFlags.isMixedGroup ? 'Yes' : 'No'}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between py-3">
                 <span className="text-[14px] text-gray-400">Time zone</span>
                 <span className="text-[14px] text-[var(--ink)]">
@@ -1389,7 +1407,7 @@ export default function JobDetailPage() {
           {/* Card 2 */}
           <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
             <h2 className="text-lg font-semibold text-[var(--ink)] mb-4">Preparation notes</h2>
-            {job.prepNotes ? (
+            {job.status === 'booked' && job.prepNotes ? (
               <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700">{job.prepNotes}</p>
             ) : (
               <p className="text-[14px] text-[var(--sage)]">No preparation notes yet.</p>

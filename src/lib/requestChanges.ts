@@ -29,6 +29,10 @@ const positionsLabel = (request: JobRequestRow): string => {
   return team ? "Team (two interpreters)" : "One interpreter";
 };
 
+const yesNo = (v: boolean | null): string => (v === null ? "" : v ? "Yes" : "No");
+const groupFlagsText = (f: { isPublic: boolean | null; isMixedGroup: boolean | null }): string =>
+  f.isPublic === null && f.isMixedGroup === null ? "" : `Public: ${yesNo(f.isPublic) || "not stated"}, mixed group: ${yesNo(f.isMixedGroup) || "not stated"}`;
+
 type Field = { label: string; emailSafe: boolean; read: (d: JobDetails, r: JobRequestRow) => string };
 
 const FIELDS: Field[] = [
@@ -57,6 +61,7 @@ const FIELDS: Field[] = [
   { label: "Passcode", emailSafe: false, read: (d) => d.virtual?.passcode ?? "" },
   { label: "Meeting instructions", emailSafe: false, read: (d) => d.virtual?.instructions ?? "" },
   { label: "Preparation notes", emailSafe: false, read: (d) => d.prepNotes },
+  { label: "Public / mixed group", emailSafe: false, read: (d) => groupFlagsText(d.groupFlags) },
 ];
 
 /** Interpreter-facing changes between two versions of a request. Empty when nothing they see changed. */
