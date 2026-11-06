@@ -20,6 +20,9 @@ const statusTextClass = (status: string | undefined, isHappening: boolean, isPas
   return "text-gray-700";
 };
 
+/** Two slow pulses (2s in all) inside the card's own edge, so a scrolling cell never clips it. Reduced-motion keeps the ring, not the pulse. */
+const PULSE = "ring-2 ring-inset ring-emerald-600 shadow-[0_0_0_3px_rgba(5,150,105,0.35)] motion-safe:animate-[pulse_1s_ease-in-out_2]";
+
 /** Hover that answers at once: a 1px lift and a soft shadow, quick to arrive and quick to leave. */
 const SNAPPY = "transition-[background-color,box-shadow,transform,opacity] duration-100 ease-out hover:-translate-y-px hover:shadow-md active:translate-y-0 active:shadow-sm";
 
@@ -30,6 +33,8 @@ interface Props {
   /** L live now, P finished, U upcoming (see dayPhases). */
   phase: string;
   variant: CardVariant;
+  /** The card a search result or a "View in calendar" link points at: a two-second emerald pulse. */
+  highlighted?: boolean;
 }
 
 const LiveDot = ({ compact }: { compact: boolean }) => (
@@ -43,7 +48,7 @@ const LiveDot = ({ compact }: { compact: boolean }) => (
 );
 
 /** One appointment on the month, week or day grid. Memoized: it only repaints when its card or its live / finished state changes. */
-export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, variant }: Props) {
+export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, variant, highlighted = false }: Props) {
   const { request: req, cancelled: isCancelled, startsAt, endsAt } = card;
   const isHappening = phase === "L";
   const isPast = phase === "P";
@@ -55,7 +60,9 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
     return (
       <Link
         href={href}
-        className={`block rounded-xl p-4 sm:p-5 ${SNAPPY} ${
+        data-job-id={req.id}
+        data-highlighted={highlighted ? "true" : undefined}
+        className={`block rounded-xl p-4 sm:p-5 ${SNAPPY} ${highlighted ? PULSE : ""} ${
           isCancelled ? CANCELLED_CARD.day : isHappening ? "bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 hover:bg-emerald-700" : isPast ? "bg-slate-50 border border-gray-200 text-gray-500 hover:bg-gray-100" : "bg-gray-50 border border-gray-200 hover:bg-gray-100"
         }`}
       >
@@ -87,7 +94,9 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
   return (
     <Link
       href={href}
-      className={`block ${shape} text-xs ${SNAPPY} ${
+      data-job-id={req.id}
+      data-highlighted={highlighted ? "true" : undefined}
+      className={`block ${shape} text-xs ${SNAPPY} ${highlighted ? PULSE : ""} ${
         isCancelled ? CANCELLED_CARD[variant] : isHappening ? live : isPast ? "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200" : "bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]"
       }`}
     >

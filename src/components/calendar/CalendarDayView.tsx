@@ -11,10 +11,11 @@ interface Props {
   todayKey: string;
   index: DayIndex;
   nowMs: number;
+  highlightId: string | null;
 }
 
 /** One day: its appointments in order, live ones first. */
-export const CalendarDayView = ({ dateKey, todayKey, index, nowMs }: Props) => {
+export const CalendarDayView = ({ dateKey, todayKey, index, nowMs, highlightId }: Props) => {
   const cards = index.get(dateKey) ?? NO_CARDS;
   const phases = useDayPhases([dateKey], index, nowMs).get(dateKey) ?? "";
   return (
@@ -35,7 +36,7 @@ export const CalendarDayView = ({ dateKey, todayKey, index, nowMs }: Props) => {
       ) : (
         <div className="space-y-3">
           {orderForDisplay(cards, phases).map(({ card, phase }) => (
-            <CalendarDayCard key={card.request.id} card={card} phase={phase} variant="day" />
+            <CalendarDayCard key={card.request.id} card={card} phase={phase} variant="day" highlighted={card.request.id === highlightId} />
           ))}
         </div>
       )}

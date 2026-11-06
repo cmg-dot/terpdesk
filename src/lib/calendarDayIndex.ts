@@ -76,6 +76,10 @@ export const dayPhases = (cards: readonly DayCard[], nowMs: number): DayPhases =
     })
     .join("");
 
+/** `highlightId` when it is one of these cards, else null: lets a cell take the highlight as a prop without every cell repainting. */
+export const highlightIn = (cards: readonly DayCard[], highlightId: string | null): string | null =>
+  highlightId !== null && cards.some((card) => card.request.id === highlightId) ? highlightId : null;
+
 /** The cards of a day with the live ones first (the order the grid has always used), each paired with its phase. */
 export const orderForDisplay = (cards: readonly DayCard[], phases: DayPhases): { card: DayCard; phase: string }[] => {
   const paired = cards.map((card, i) => ({ card, phase: phases[i] ?? "U" }));

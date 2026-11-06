@@ -2,7 +2,7 @@
 
 import { MonthCell } from "@/components/calendar/MonthCell";
 import { useDayPhases } from "@/hooks/useDayIndex";
-import { NO_CARDS } from "@/lib/calendarDayIndex";
+import { NO_CARDS, highlightIn } from "@/lib/calendarDayIndex";
 import type { DayIndex } from "@/lib/calendarDayIndex";
 import { monthCells } from "@/lib/calendarNav";
 
@@ -12,12 +12,13 @@ interface Props {
   todayKey: string;
   index: DayIndex;
   nowMs: number;
+  highlightId: string | null;
 }
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** The month grid. Each cell is one key lookup in the day index. */
-export const CalendarMonthView = ({ dateKey, todayKey, index, nowMs }: Props) => {
+export const CalendarMonthView = ({ dateKey, todayKey, index, nowMs, highlightId }: Props) => {
   const cells = monthCells(dateKey);
   const phases = useDayPhases(cells, index, nowMs);
   return (
@@ -38,6 +39,7 @@ export const CalendarMonthView = ({ dateKey, todayKey, index, nowMs }: Props) =>
                 isSelected={key === dateKey}
                 cards={(key && index.get(key)) || NO_CARDS}
                 phases={(key && phases.get(key)) || ""}
+                highlightId={highlightIn((key && index.get(key)) || NO_CARDS, highlightId)}
               />
             ))}
           </div>

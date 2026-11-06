@@ -26,6 +26,8 @@ const DIVIDER = <span aria-hidden="true" className="hidden h-6 w-px bg-gray-200 
 
 interface Props {
   requestId: string;
+  /** Where "View in calendar" goes: the calendar on this appointment's day with the job highlighted (see lib/calendarLink). */
+  calendarHref?: string;
   editHref: string;
   /** Cancelled or voided: only the look group is left. */
   isCancelled: boolean;
@@ -37,12 +39,12 @@ interface Props {
   onVoid: () => void;
 }
 
-export function RequestActionBar({ requestId, editHref, isCancelled, isEditLocked, editLockMessage, onQuickEdit, onCancel, onVoid }: Props) {
+export function RequestActionBar({ requestId, calendarHref = "/calendar", editHref, isCancelled, isEditLocked, editLockMessage, onQuickEdit, onCancel, onVoid }: Props) {
   return (
     <div role="toolbar" aria-label="Appointment actions" className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-2">
       <div className={GROUP}>
         <OriginalFormPanel requestId={requestId} triggerClassName={LOOK} />
-        <Link href="/calendar" className={LOOK}>
+        <Link href={calendarHref} className={LOOK}>
           <CalendarDays className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
           View in calendar
         </Link>

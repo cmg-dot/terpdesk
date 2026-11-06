@@ -23,6 +23,7 @@ import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
 import { RequestActionBar } from "@/components/requests/RequestActionBar";
+import { calendarLink } from "@/lib/calendarLink";
 import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
 import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
 import { offerBlock } from "@/lib/offerAvailability";
@@ -871,6 +872,7 @@ export default function AssignmentDetailPage() {
  />
  <RequestActionBar
    requestId={id}
+   calendarHref={calendarLink({ id, startsAt: assignment.startsAt, srn: requestSrnValue })}
    editHref={`/requests/${params.id}/edit`}
    isCancelled={isCancelled}
    isEditLocked={isEditLocked}

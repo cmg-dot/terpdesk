@@ -12,13 +12,15 @@ interface Props {
   isSelected: boolean;
   cards: readonly DayCard[];
   phases: DayPhases;
+  /** The highlighted job's id when it is one of this day's cards (so only that cell repaints), else null. */
+  highlightId: string | null;
 }
 
 const sameCards = (a: readonly DayCard[], b: readonly DayCard[]): boolean => a === b || (a.length === b.length && a.every((card, i) => card === b[i]));
 
 /** One day of the month grid. Memoized on its own day: stepping months or the minute clock repaints only the cells that changed. */
 export const MonthCell = memo(
-  function MonthCell({ dayKey, isToday, isSelected, cards, phases }: Props) {
+  function MonthCell({ dayKey, isToday, isSelected, cards, phases, highlightId }: Props) {
     if (!dayKey) return <div className="min-h-[120px] border-r border-b border-gray-200 bg-[#F9F8F4]" />;
     const shade = isToday ? "bg-[#F1F8F4]" : "bg-white hover:bg-[#F7FAF8]";
     return (
@@ -31,11 +33,11 @@ export const MonthCell = memo(
         <div className={`mb-1 w-fit text-sm font-medium px-1 ${isToday ? "rounded-full bg-[#0B3B32] px-2 text-white" : "text-[var(--ink)]"}`}>{Number(dayKey.slice(8))}</div>
         <div className="flex-1 overflow-y-auto space-y-1 max-h-[160px]">
           {orderForDisplay(cards, phases).map(({ card, phase }) => (
-            <CalendarDayCard key={card.request.id} card={card} phase={phase} variant="month" />
+            <CalendarDayCard key={card.request.id} card={card} phase={phase} variant="month" highlighted={card.request.id === highlightId} />
           ))}
         </div>
       </div>
     );
   },
-  (a, b) => a.dayKey === b.dayKey && a.isToday === b.isToday && a.isSelected === b.isSelected && a.phases === b.phases && sameCards(a.cards, b.cards),
+  (a, b) => a.dayKey === b.dayKey && a.isToday === b.isToday && a.isSelected === b.isSelected && a.phases === b.phases && a.highlightId === b.highlightId && sameCards(a.cards, b.cards),
 );
