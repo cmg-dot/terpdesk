@@ -12,6 +12,8 @@ interface Props {
   min?: string;
   /** Days after this (yyyy-MM-dd) cannot be picked. */
   max?: string;
+  /** Today (yyyy-MM-dd) when it is not this device's today, e.g. the agency calendar's Los Angeles day. */
+  today?: string;
   onPick: (key: string) => void;
   onDone: () => void;
 }
@@ -23,8 +25,8 @@ const navButton = "rounded-full p-1.5 text-[#0B3B32] transition-colors hover:bg-
  * primary emerald, today is ringed, and hovering a day gives it a soft emerald wash. Keyboard: arrows move by a day or a
  * week, PageUp / PageDown by a month (Shift for a year), Home / End to the start / end of the week, Enter picks.
  */
-export const CalendarGrid = ({ value, min, max, onPick, onDone }: Props) => {
-  const today = todayKey();
+export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, onDone }: Props) => {
+  const today = todayOverride ?? todayKey();
   const start = parseDateKey(value) ? value : today;
   // The day the keyboard is on (the only tab stop in the grid); the grid shows the month that contains it.
   const [focusKey, setFocusKey] = useState(start);

@@ -1,457 +1,103 @@
 "use client";
 
 import { motion } from "framer-motion";
-import React, { useState, useEffect, useMemo } from "react";
-import Link from "next/link";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon, Clock } from "lucide-react";
+import { useEffect, useState } from "react";
 import { format } from "date-fns";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
-import { AGENCY_TIME_ZONE, agencyDateKey, agencyToday, civilKey, formatAgencyTimeRange } from "@/lib/agencyTime";
-import { isAppointmentHappeningNow, isAppointmentPast } from "@/utils/happeningNow";
-import { resolveRequestTimes } from "@/utils/timezone";
-import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { agencyDateKey, civilDate } from "@/lib/agencyTime";
+import { CalendarDayView } from "@/components/calendar/CalendarDayView";
 import { CalendarModeToggle } from "@/components/calendar/CalendarModeToggle";
 import type { CalendarMode } from "@/components/calendar/CalendarModeToggle";
+import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
+import { CalendarNav } from "@/components/calendar/CalendarNav";
+import { CalendarStatusFilter } from "@/components/calendar/CalendarStatusFilter";
+import { CalendarTransition } from "@/components/calendar/CalendarTransition";
+import { CalendarViewToggle } from "@/components/calendar/CalendarViewToggle";
+import { CalendarWeekView } from "@/components/calendar/CalendarWeekView";
 import { InterpreterTimeline } from "@/components/calendar/InterpreterTimeline";
-import { CANCELLED_CARD, CANCELLED_TITLE, CalendarStatusFilter, CancelledBadge } from "@/components/calendar/CalendarStatusFilter";
-import { DEFAULT_STATUS_FILTER, isCancelledRequest, matchesStatusFilter } from "@/lib/requestListFilter";
-
-/** Text colour for a request status on the calendar, so state reads at a glance. */
-const statusTextClass = (status: string | undefined, isHappening: boolean, isPast = false): string => {
-  if (isHappening) return "text-emerald-100";
-  if (isPast) return "text-gray-500";
-  const s = (status || "").toLowerCase();
-  if (s.includes("replacement")) return "text-red-700";
-  if (s.includes("awaiting") || s.includes("offer") || s.includes("pending")) return "text-blue-700";
-  if (s.includes("partial")) return "text-amber-700";
-  if (s.includes("cancel")) return "text-gray-500";
-  if (s.includes("staffed") || s.includes("booked") || s.includes("assigned")) return "text-emerald-800";
-  return "text-gray-700";
-};
+import { useCalendarNavigation } from "@/hooks/useCalendarNavigation";
+import { useDayIndex } from "@/hooks/useDayIndex";
+import { useMinuteClock } from "@/hooks/useMinuteClock";
+import type { CalendarRequest } from "@/lib/calendarDayIndex";
+import { rangeKeyFor, weekStartKey } from "@/lib/calendarNav";
+import type { CalendarView } from "@/lib/calendarNav";
+import { DEFAULT_STATUS_FILTER } from "@/lib/requestListFilter";
 
 export default function CalendarPage() {
-  const [requests, setRequests] = useState<any[]>([]);
-  const [view, setView] = useState<'month' | 'week' | 'day'>('month');
+  const [requests, setRequests] = useState<CalendarRequest[]>([]);
   // Job View is the original calendar (month / week / day of job cards). Interpreter View is the resource timeline.
-  const [mode, setMode] = useState<CalendarMode>('jobs');
-  // A civil date (see lib/agencyTime): starts on today in Los Angeles, whatever zone this browser is in.
-  const [currentDate, setCurrentDate] = useState(() => agencyToday());
-  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+  const [mode, setMode] = useState<CalendarMode>("jobs");
+  // The Interpreter View shows one day, so its arrows step by whatever is chosen here (a day unless asked).
+  const [interpreterStep, setInterpreterStep] = useState<CalendarView>("day");
   // Same filter, same default and same rule as Requests & assignments: cancelled jobs stay off the grid until asked for.
   const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
 
-  // 60-second tick for live status engine
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
+  // The minute clock only moves the live / finished styling and the "today" highlight; it never rebuilds the grid's data.
+  const nowMs = useMinuteClock();
+  // Today in Los Angeles, whatever zone this browser is in, so it rolls over at Pacific midnight.
+  const todayKey = agencyDateKey(nowMs);
+  const nav = useCalendarNavigation({ today: todayKey });
+  const index = useDayIndex(requests, statusFilter, nowMs);
 
   useEffect(() => {
     fetchLiveRequests().then(setRequests).catch(() => console.error("[calendar page] request failed"));
   }, []);
 
-  // Today in Los Angeles, re-read every minute with the clock below, so the highlight rolls over at Pacific midnight.
-  const todayKey = agencyDateKey(currentTime);
-  const visibleRequests = useMemo(() => requests.filter((r) => matchesStatusFilter(r, statusFilter, currentTime)), [requests, statusFilter, currentTime]);
-
-  const year = currentDate.getFullYear();
-  const month = currentDate.getMonth();
-
-  const getDaysInMonth = (y: number, m: number) => new Date(y, m + 1, 0).getDate();
-  const getFirstDayOfMonth = (y: number, m: number) => new Date(y, m, 1).getDay();
-
-  const daysInMonth = getDaysInMonth(year, month);
-  const firstDayIndex = getFirstDayOfMonth(year, month);
-
-  const cells: (Date | null)[] = [];
-  for (let i = 0; i < firstDayIndex; i++) cells.push(null);
-  for (let i = 1; i <= daysInMonth; i++) cells.push(new Date(year, month, i, 12));
-
-  // Add trailing empty cells to complete the grid (if 35 or 42)
-  const totalCells = cells.length > 35 ? 42 : 35;
-  while (cells.length < totalCells) cells.push(null);
-
-  const getWeekDays = (date: Date) => {
-    const current = new Date(date);
-    current.setDate(current.getDate() - current.getDay());
-    const week = [];
-    for (let i = 0; i < 7; i++) {
-      week.push(new Date(current));
-      current.setDate(current.getDate() + 1);
-    }
-    return week;
-  };
-
-  const weekDays = getWeekDays(currentDate);
-
-  // The Interpreter View shows one day at a time, so its arrows step by a day whatever the Job View was set to.
-  const stepView = mode === 'interpreters' ? 'day' : view;
-
-  const handlePrev = () => {
-    const d = new Date(currentDate);
-    if (stepView === 'month') d.setMonth(d.getMonth() - 1);
-    else if (stepView === 'week') d.setDate(d.getDate() - 7);
-    else d.setDate(d.getDate() - 1);
-    setCurrentDate(d);
-  };
-
-  const handleNext = () => {
-    const d = new Date(currentDate);
-    if (stepView === 'month') d.setMonth(d.getMonth() + 1);
-    else if (stepView === 'week') d.setDate(d.getDate() + 7);
-    else d.setDate(d.getDate() + 1);
-    setCurrentDate(d);
-  };
-
-  const handleToday = () => {
-    setCurrentDate(agencyToday());
-  };
-
-  const getRequestSchedule = (req: any) => {
-    const safeZone = AGENCY_TIME_ZONE;
-
-    const hasStart = Boolean(
-      req.startsAt || req.data?.startsAt || (req.data?.details?.startDate && req.data?.details?.startTime),
-    );
-    const resolved = hasStart ? resolveRequestTimes(req) : null;
-    const startsAt: string | undefined = resolved?.startsAt ?? undefined;
-    const endsAt: string | undefined = resolved?.endsAt ?? undefined;
-
-    return { safeZone, startsAt, endsAt };
-  };
-
-  // Match request date using its scheduled safeZone to prevent UTC/browser drift
-  const isEventOnDate = (cellDate: Date | null, req: any) => {
-    if (!cellDate || !req) return false;
-    const { safeZone, startsAt } = getRequestSchedule(req);
-    if (!startsAt) return false;
-    try {
-      return agencyDateKey(startsAt) === civilKey(cellDate);
-    } catch (e) {
-      return false;
-    }
-  };
-
-  const formatEventTime = (startsAt?: string, endsAt?: string, _zone?: string) => (startsAt ? formatAgencyTimeRange(startsAt, endsAt) : "Time not specified");
-
-  const sortDayRequests = (reqs: any[]) => {
-    return [...reqs].sort((a, b) => {
-      const aNow = isAppointmentHappeningNow(a, currentTime);
-      const bNow = isAppointmentHappeningNow(b, currentTime);
-      if (aNow && !bNow) return -1;
-      if (!aNow && bNow) return 1;
-      const timeA = a.startsAt ? new Date(a.startsAt).getTime() : 0;
-      const timeB = b.startsAt ? new Date(b.startsAt).getTime() : 0;
-      return timeA - timeB;
-    });
-  };
+  const interpreters = mode === "interpreters";
+  const stepUnit = interpreters ? interpreterStep : nav.view;
+  const label = interpreters || nav.view === "day"
+    ? format(nav.date, "EEEE, MMMM d, yyyy")
+    : nav.view === "week"
+      ? `Week of ${format(civilDate(weekStartKey(nav.dateKey)), "MMMM d, yyyy")}`
+      : format(nav.date, "MMMM yyyy");
+  const viewProps = { dateKey: nav.dateKey, todayKey, index, nowMs };
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-[1200px] mx-auto p-6 space-y-6 pb-24 antialiased">
-      {/* Header */}
       <div className="space-y-2">
         <h1 className="text-[28px] font-semibold tracking-tight text-[var(--ink)]">Agency calendar</h1>
-        <p className="text-[15px] text-[var(--sage)]">
-          One appointment per job, with coverage across its independent slots.
-        </p>
+        <p className="text-[15px] text-[var(--sage)]">One appointment per job, with coverage across its independent slots.</p>
       </div>
 
-      {/* Job View / Interpreter View */}
       <div className="mt-6">
         <CalendarModeToggle mode={mode} onChange={setMode} />
       </div>
 
-      {/* Controls Row */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between mt-8 gap-4">
-        <div className="flex items-center gap-2">
-          <button onClick={handlePrev} className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
-            <ChevronLeft className="w-5 h-5 text-gray-700" />
-          </button>
-          <button onClick={handleToday} className="px-5 py-2 rounded-full border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
-            Today
-          </button>
-          <button onClick={handleNext} className="w-10 h-10 rounded-full border border-gray-200 flex items-center justify-center hover:bg-gray-50 transition-colors">
-            <ChevronRight className="w-5 h-5 text-gray-700" />
-          </button>
-        </div>
-        <div className="flex items-center bg-[#F4F3EF] rounded-full px-4 py-2 text-sm text-gray-700 font-medium w-fit">
-          <CalendarIcon className="w-4 h-4 mr-2" />
-          {format(currentDate, 'MM/dd/yyyy')}
-        </div>
+      <div className="mt-8">
+        <CalendarNav
+          dateKey={nav.dateKey}
+          todayKey={todayKey}
+          unit={stepUnit}
+          onPrev={() => nav.prev(stepUnit)}
+          onNext={() => nav.next(stepUnit)}
+          onToday={nav.goToToday}
+          onPick={nav.goToDate}
+          step={interpreters ? { value: interpreterStep, onChange: setInterpreterStep } : undefined}
+        />
       </div>
 
       {/* View Toggle (Job View only) */}
-      {mode === 'jobs' && (
-      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between relative z-10">
-      <div className="rounded-full p-1 flex w-full max-w-md relative z-10">
-        {(['month', 'week', 'day'] as const).map((v) => (
-          <button 
-            key={v}
-            onClick={() => setView(v)}
-            className={`relative flex-1 text-center py-2 text-sm rounded-full outline-none transition-colors duration-200 ${view === v ? 'text-white font-medium' : 'text-[var(--sage)] hover:text-[var(--ink)]'}`}
-          >
-            {view === v && (
-              <motion.div
-                layoutId="agencyCalendarTogglePill"
-                className="absolute inset-0 bg-[#0B3B32] rounded-full"
-                initial={false}
-                transition={{ type: 'spring', stiffness: 400, damping: 30 }}
-              />
-            )}
-            <span className="relative z-10 capitalize">
-              {v}
-            </span>
-          </button>
-        ))}
-      </div>
-      <CalendarStatusFilter value={statusFilter} onChange={setStatusFilter} />
-      </div>
-      )}
-
-      <p className="text-[13px] text-[var(--sage)] mt-4">
-        {mode === 'interpreters' || view === 'day' 
-          ? format(currentDate, 'EEEE, MMMM d, yyyy') 
-          : view === 'week' 
-            ? `Week of ${format(weekDays[0], 'MMMM d, yyyy')}` 
-            : format(currentDate, 'MMMM yyyy')}
-      </p>
-
-      {/* MONTH VIEW */}
-      {mode === 'jobs' && view === 'month' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 mt-6 overflow-hidden">
-          <div className="overflow-x-auto pb-2">
-            <div className="min-w-[700px]">
-              <div className="grid grid-cols-7 mb-2">
-                {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
-                  <div key={day} className="text-center text-xs font-semibold text-[var(--sage)] uppercase tracking-wider py-2">
-                    {day}
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 border-t border-l border-gray-200">
-                {cells.map((date, idx) => {
-                  const dayRequests = date ? visibleRequests.filter(r => isEventOnDate(date, r)) : [];
-                  const sortedDayRequests = sortDayRequests(dayRequests);
-                  const isToday = date !== null && civilKey(date) === todayKey;
-
-                  return (
-                    <div key={idx} className={`min-h-[120px] border-r border-b border-gray-200 p-2 flex flex-col ${!date ? 'bg-[#F9F8F4]' : isToday ? 'bg-[#F1F8F4]' : 'bg-white'}`} data-today={isToday ? 'true' : undefined}>
-                      {date && (
-                        <div className={`mb-1 w-fit text-sm font-medium px-1 ${isToday ? 'rounded-full bg-[#0B3B32] px-2 text-white' : 'text-[var(--ink)]'}`}>
-                          {date.getDate()}
-                        </div>
-                      )}
-                      <div className="flex-1 overflow-y-auto space-y-1 max-h-[160px]">
-                        {sortedDayRequests.map(req => {
-                          const isCancelled = isCancelledRequest(req);
-                  const isHappening = !isCancelled && isAppointmentHappeningNow(req, currentTime);
-                  const isPast = !isHappening && isAppointmentPast(req, currentTime);
-                          const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
-                          const timeStr = formatEventTime(startsAt, endsAt, safeZone);
-
-                          return (
-                            <Link 
-                              href={`/requests/${req.id}`} 
-                              key={req.id} 
-                              className={`block rounded-md p-1.5 text-xs transition-all ${
-                                isCancelled ? CANCELLED_CARD.month : isHappening 
-                                  ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400 hover:bg-emerald-700' 
-                                  : isPast
-                                    ? 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
-                                    : 'bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]'
-                              }`}
-                            >
-                              {isHappening && (
-                                <div className="flex items-center gap-1 mb-0.5">
-                                  <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                                  </span>
-                                  <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
-                                </div>
-                              )}
-                              <div className="flex flex-col gap-1 p-0.5">
-                                <div className={`font-medium text-sm truncate leading-tight ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</div>
-                                <div className={`text-xs truncate leading-tight ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>
-                                  {timeStr}
-                                </div>
-                                <div className={`text-[11px] font-semibold capitalize truncate leading-tight text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-                                  {isCancelled ? <CancelledBadge voided={Boolean(req.isVoided)} /> : req.status}
-                                </div>
-                              </div>
-                            </Link>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+      {!interpreters && (
+        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between relative z-10">
+          <CalendarViewToggle view={nav.view} onChange={nav.setView} />
+          <CalendarStatusFilter value={statusFilter} onChange={setStatusFilter} />
         </div>
       )}
 
-      {/* WEEK VIEW */}
-      {mode === 'jobs' && view === 'week' && (
-        <div className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6 mt-6 overflow-hidden">
-          <div className="overflow-x-auto pb-2">
-            <div className="min-w-[800px]">
-              <div className="grid grid-cols-7 border-b border-gray-200">
-                {weekDays.map((dayDate, dayIdx) => (
-                  <div key={dayIdx} data-today={civilKey(dayDate) === todayKey ? 'true' : undefined} className={`text-center py-3 border-r border-gray-100 last:border-r-0 ${civilKey(dayDate) === todayKey ? 'bg-[#E5F0EB]' : ''}`}>
-                    <div className="text-[12px] font-semibold text-[var(--ink)] uppercase tracking-wider">
-                      {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][dayDate.getDay()]}
-                    </div>
-                    <div className="text-sm font-semibold text-gray-700 mt-0.5">
-                      {format(dayDate, 'MMM d')}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="grid grid-cols-7 min-h-[500px]">
-                {weekDays.map((dayDate, dayIdx) => {
-                  const dayRequests = visibleRequests.filter(r => isEventOnDate(dayDate, r));
-                  const sortedDayRequests = sortDayRequests(dayRequests);
+      <p className="text-[13px] text-[var(--sage)] mt-4">{label}</p>
 
-                  return (
-                    <div key={dayIdx} className={`border-r border-gray-100 last:border-r-0 p-2 flex flex-col gap-2 ${civilKey(dayDate) === todayKey ? 'bg-[#F1F8F4]' : 'bg-[#FAFAFA]/50'}`}>
-                      {sortedDayRequests.length === 0 ? (
-                        <div className="text-[11px] text-gray-400 text-center py-6">
-                          No bookings
-                        </div>
-                      ) : (
-                        sortedDayRequests.map(req => {
-                          const isCancelled = isCancelledRequest(req);
-                  const isHappening = !isCancelled && isAppointmentHappeningNow(req, currentTime);
-                  const isPast = !isHappening && isAppointmentPast(req, currentTime);
-                          const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
-                          const timeStr = formatEventTime(startsAt, endsAt, safeZone);
-
-                          return (
-                            <Link 
-                              href={`/requests/${req.id}`} 
-                              key={req.id} 
-                              className={`block rounded-lg p-2.5 text-xs transition-all ${
-                                isCancelled ? CANCELLED_CARD.week : isHappening 
-                                  ? 'bg-emerald-600 text-white shadow-md ring-1 ring-emerald-400 hover:bg-emerald-700' 
-                                  : isPast
-                                    ? 'bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200'
-                                    : 'bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]'
-                              }`}
-                            >
-                              {isHappening && (
-                                <div className="flex items-center gap-1 mb-1">
-                                  <span className="relative flex h-1.5 w-1.5 shrink-0">
-                                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-200 opacity-75"></span>
-                                    <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-white"></span>
-                                  </span>
-                                  <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
-                                </div>
-                              )}
-                              <div className="flex flex-col gap-1 p-0.5">
-                                <div className={`font-medium text-sm truncate ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</div>
-                                <div className={`text-xs truncate ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-400' : 'text-gray-600'}`}>{timeStr}</div>
-                                <div className={`text-[11px] font-semibold capitalize truncate text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-                                  {isCancelled ? <CancelledBadge voided={Boolean(req.isVoided)} /> : req.status}
-                                </div>
-                              </div>
-                            </Link>
-                          );
-                        })
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          </div>
+      {!interpreters && (
+        <div className="mt-6">
+          <CalendarTransition transitionKey={`${nav.view}:${rangeKeyFor(nav.dateKey, nav.view)}`} direction={nav.direction}>
+            {nav.view === "month" && <CalendarMonthView {...viewProps} />}
+            {nav.view === "week" && <CalendarWeekView {...viewProps} />}
+            {nav.view === "day" && <CalendarDayView {...viewProps} />}
+          </CalendarTransition>
         </div>
       )}
-
-      {/* DAY VIEW */}
-      {mode === 'jobs' && view === 'day' && (() => {
-        const dayRequests = visibleRequests.filter(r => isEventOnDate(currentDate, r));
-        const sortedDayRequests = sortDayRequests(dayRequests);
-
-        return (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 mt-6 min-h-[400px]">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="flex items-center gap-2 text-xl font-semibold text-[var(--ink)]">
-                {format(currentDate, 'EEEE, MMMM d, yyyy')}
-                {civilKey(currentDate) === todayKey && <span data-today-chip className="rounded-full bg-[#0B3B32] px-2.5 py-0.5 text-xs font-medium text-white">Today</span>}
-              </h2>
-              <span className="text-sm text-[var(--sage)]">
-                {sortedDayRequests.length} {sortedDayRequests.length === 1 ? 'appointment' : 'appointments'}
-              </span>
-            </div>
-            
-            {sortedDayRequests.length === 0 ? (
-              <div className="flex items-center justify-center h-48 border border-dashed border-gray-200 rounded-xl">
-                <p className="text-[var(--sage)]">Nothing scheduled for this day.</p>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {sortedDayRequests.map(req => {
-                  const isCancelled = isCancelledRequest(req);
-                  const isHappening = !isCancelled && isAppointmentHappeningNow(req, currentTime);
-                  const isPast = !isHappening && isAppointmentPast(req, currentTime);
-                  const { safeZone, startsAt, endsAt } = getRequestSchedule(req);
-                  const timeStr = formatEventTime(startsAt, endsAt, safeZone);
-                  const org = req.requester?.org || req.data?.intake?.program || "General";
-
-                  return (
-                    <Link 
-                      href={`/requests/${req.id}`} 
-                      key={req.id} 
-                      className={`block rounded-xl p-4 sm:p-5 transition-all ${
-                        isCancelled ? CANCELLED_CARD.day : isHappening 
-                          ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 hover:bg-emerald-700' 
-                          : isPast
-                            ? 'bg-slate-50 border border-gray-200 text-gray-500 hover:bg-gray-100'
-                            : 'bg-gray-50 border border-gray-200 hover:bg-gray-100'
-                      }`}
-                    >
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {isHappening && <HappeningNowBadge size="sm" />}
-                            <h3 className={`font-semibold text-base ${isCancelled ? CANCELLED_TITLE : ''}`}>{req.title || "Request"}</h3>
-                          </div>
-                          <div className={`text-sm ${isHappening ? 'text-emerald-100' : isPast ? 'text-gray-500' : 'text-[var(--ink)]'}`}>
-                            {timeStr}
-                          </div>
-                          <div className={`text-xs ${isHappening ? 'text-emerald-200' : isPast ? 'text-gray-400' : 'text-[var(--sage)]'}`}>
-                            Organization: <span className="font-medium">{org}</span>
-                          </div>
-                        </div>
-                        <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
-                          <span className={`rounded-full px-3 py-0.5 text-xs font-medium capitalize ${
-                            isCancelled
-                              ? 'bg-gray-200 text-gray-600'
-                              : isHappening 
-                              ? 'bg-emerald-500 text-white' 
-                              : isPast
-                                ? 'bg-gray-200 text-gray-600'
-                                : 'bg-[#E5F0EB] text-[#0A3D31]'
-                          }`}>
-                            {isCancelled && req.isVoided ? 'Void' : req.status}
-                          </span>
-                        </div>
-                      </div>
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        );
-      })()}
 
       {/* INTERPRETER VIEW (resource timeline): its own date-scoped fetch, the Job View's data is not used */}
-      {mode === 'interpreters' && <InterpreterTimeline dateKey={civilKey(currentDate)} nowMs={currentTime} />}
+      {interpreters && <InterpreterTimeline dateKey={nav.dateKey} nowMs={nowMs} />}
     </motion.div>
   );
 }

@@ -1,4 +1,3 @@
-import { formatInTimeZone } from "date-fns-tz";
 import { DEFAULT_AGENCY_TIME_ZONE } from "@/lib/agency";
 
 /**
@@ -26,8 +25,21 @@ export const civilDate = (key: string): Date => {
   return new Date(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12);
 };
 
-/** The agency-zone calendar day (yyyy-MM-dd) that an instant falls on. */
-export const agencyDateKey = (instant: Date | string | number): string => formatInTimeZone(instant, AGENCY_TIME_ZONE, "yyyy-MM-dd");
+// One formatter per shape, built once: constructing an Intl.DateTimeFormat is the expensive part of formatting a date, and the
+// calendar formats hundreds of appointments each time it moves.
+const dayFormat = new Intl.DateTimeFormat("en-US", { timeZone: AGENCY_TIME_ZONE, year: "numeric", month: "2-digit", day: "2-digit" });
+const clockFormat = new Intl.DateTimeFormat("en-US", { timeZone: AGENCY_TIME_ZONE, hour: "numeric", minute: "2-digit", hour12: true });
+const zoneFormat = new Intl.DateTimeFormat("en-US", { timeZone: AGENCY_TIME_ZONE, timeZoneName: "short" });
+
+/** "9:00 AM": newer engines put a narrow no-break space before AM / PM, which is turned back into a plain space. */
+const clock = (date: Date): string => clockFormat.format(date).replace(/\u202f/g, " ");
+
+/** The agency-zone calendar day (yyyy-MM-dd) that an instant falls on. Throws on an instant that is not a real time. */
+export const agencyDateKey = (instant: Date | string | number): string => {
+  const parts = dayFormat.formatToParts(new Date(instant));
+  const part = (type: string): string => parts.find((p) => p.type === type)?.value ?? "";
+  return `${part("year").padStart(4, "0")}-${part("month")}-${part("day")}`;
+};
 
 /** "Today" on the agency's calendar: the Los Angeles date, whatever the browser's clock or zone says. */
 export const agencyToday = (nowMs: number = Date.now()): Date => civilDate(agencyDateKey(nowMs));
@@ -37,5 +49,6 @@ export const formatAgencyTimeRange = (startsAt: string, endsAt?: string): string
   const start = new Date(startsAt);
   const end = endsAt ? new Date(endsAt) : start;
   if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "Time not specified";
-  return `${formatInTimeZone(start, AGENCY_TIME_ZONE, "h:mm a")} – ${formatInTimeZone(end, AGENCY_TIME_ZONE, "h:mm a zzz")}`;
+  const zone = zoneFormat.formatToParts(end).find((p) => p.type === "timeZoneName")?.value ?? "";
+  return `${clock(start)} – ${clock(end)} ${zone}`;
 };

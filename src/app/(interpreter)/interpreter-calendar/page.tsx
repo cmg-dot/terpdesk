@@ -3,18 +3,19 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
-import { ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
 import { format } from "date-fns";
 import { formatInTimeZone } from "date-fns-tz";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { getIanaZone } from "@/utils/timezone";
 import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
+import { CalendarNav } from "@/components/calendar/CalendarNav";
+import { CalendarTransition } from "@/components/calendar/CalendarTransition";
+import { useCalendarNavigation } from "@/hooks/useCalendarNavigation";
+import { formatBadgeDate, rangeKeyFor, weekStartKey, zoneDateKey } from "@/lib/calendarNav";
 import { useGlobalState } from "@/context/GlobalContext";
 import { td_availability_view } from "@/app/actions/availability";
 import ConnectedAvailability from "@/connected/availability";
-
-type ViewType = 'month' | 'week' | 'day';
 
 interface Appointment {
   id: string;
@@ -36,28 +37,24 @@ export default function InterpreterCalendarPage() {
   const { jobs: contextJobs } = useInterpreterJobs();
   const { currentUser } = useGlobalState();
   const interpreterId = currentUser?.id || 'terp-1';
-  const [view, setView] = useState<ViewType>('month');
-
   // UTC provides a hydration-safe initial value. The persisted profile timezone
   // replaces it after mount; the calendar never blocks on that request.
   const [baseTimezone, setBaseTimezone] = useState<string>('UTC');
   const [isTimezoneLoading, setIsTimezoneLoading] = useState(true);
   const safeBaseTimezone = getIanaZone(baseTimezone);
 
-  // Return a Date representing today at 12:00:00 in the interpreter's base timezone
-  const getTodayInBaseTimezone = React.useCallback((tz: string) => {
-    const safeZone = getIanaZone(tz);
-    const dateStr = formatInTimeZone(new Date(), safeZone, 'yyyy-MM-dd');
-    const [y, m, d] = dateStr.split('-').map(Number);
-    return new Date(y, m - 1, d, 12, 0, 0);
-  }, []);
-
-  const [currentDate, setCurrentDate] = useState<Date>(() => new Date());
+  // The selected day, the view and the arrows are shared with the agency calendar (see useCalendarNavigation): month steps
+  // are clamped (Oct 31 back a month is Sep 30), and "today" is today in the interpreter's own zone.
+  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+  const todayKey = zoneDateKey(safeBaseTimezone, currentTime);
+  const nav = useCalendarNavigation({ today: todayKey });
+  const { view, goToDate } = nav;
+  const currentDate = nav.date;
 
   const handleTimezoneChange = React.useCallback((newTz: string) => {
     const resolvedTimezone = getIanaZone(newTz);
     setBaseTimezone(resolvedTimezone);
-    setCurrentDate(getTodayInBaseTimezone(resolvedTimezone));
+    goToDate(zoneDateKey(resolvedTimezone));
     setIsTimezoneLoading(false);
     if (typeof window !== 'undefined') {
       try {
@@ -69,8 +66,7 @@ export default function InterpreterCalendarPage() {
         localStorage.setItem('terpdesk_availability', JSON.stringify(parsed));
       } catch (err) {}
     }
-  }, [getTodayInBaseTimezone, interpreterId]);
-  const [currentTime, setCurrentTime] = useState<number>(() => Date.now());
+  }, [goToDate, interpreterId]);
 
   // 60-second tick for live status engine
   useEffect(() => {
@@ -80,30 +76,10 @@ export default function InterpreterCalendarPage() {
     return () => clearInterval(timer);
   }, []);
 
-  const formatBadge = (d: Date) => format(d, 'MM/dd/yyyy');
   const formatMonthYear = (d: Date) => format(d, 'MMMM yyyy');
   const formatDayViewSubtitle = (d: Date) => format(d, 'EEEE, MMMM d, yyyy');
 
-  const handlePrev = () => {
-    const newDate = new Date(currentDate);
-    if (view === 'month') newDate.setMonth(newDate.getMonth() - 1);
-    if (view === 'week') newDate.setDate(newDate.getDate() - 7);
-    if (view === 'day') newDate.setDate(newDate.getDate() - 1);
-    setCurrentDate(newDate);
-  };
-
-  const handleNext = () => {
-    const newDate = new Date(currentDate);
-    if (view === 'month') newDate.setMonth(newDate.getMonth() + 1);
-    if (view === 'week') newDate.setDate(newDate.getDate() + 7);
-    if (view === 'day') newDate.setDate(newDate.getDate() + 1);
-    setCurrentDate(newDate);
-  };
-
-  const handleToday = () => {
-    setCurrentDate(getTodayInBaseTimezone(safeBaseTimezone));
-  };
-
+  const landedOnToday = React.useRef(false);
   const [busyBlocks, setBusyBlocks] = useState<BusyBlock[]>([]);
   const [acceptedAppointments, setAcceptedAppointments] = useState<Appointment[]>([]);
 
@@ -128,7 +104,11 @@ export default function InterpreterCalendarPage() {
       if (data.profile?.timeZone) {
         const profileTimezone = getIanaZone(data.profile.timeZone);
         setBaseTimezone(profileTimezone);
-        setCurrentDate(getTodayInBaseTimezone(profileTimezone));
+        // Land on today in the profile's zone once; later reloads (after saving hours or busy time) keep the day they chose.
+        if (!landedOnToday.current) {
+          landedOnToday.current = true;
+          goToDate(zoneDateKey(profileTimezone));
+        }
       }
       if (data.busyBlocks) {
         setBusyBlocks(data.busyBlocks.map(b => ({
@@ -145,7 +125,7 @@ export default function InterpreterCalendarPage() {
     } finally {
       setIsTimezoneLoading(false);
     }
-  }, [getTodayInBaseTimezone, interpreterId]);
+  }, [goToDate, interpreterId]);
 
   useEffect(() => {
     void reloadAvailability();
@@ -240,33 +220,28 @@ export default function InterpreterCalendarPage() {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-2">
-          <button onClick={handlePrev} className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <button onClick={handleToday} className="px-4 py-2 rounded-full border border-gray-200 text-gray-700 text-[13px] font-medium hover:bg-gray-50 transition-colors">
-            Today
-          </button>
-          <button onClick={() => document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2 rounded-full bg-[#1B433C] text-white text-[13px] font-medium hover:bg-[#14332D] transition-colors ">
+      <CalendarNav
+        size="sm"
+        dateKey={nav.dateKey}
+        todayKey={todayKey}
+        unit={view}
+        onPrev={() => nav.prev()}
+        onNext={() => nav.next()}
+        onToday={nav.goToToday}
+        onPick={goToDate}
+        extra={
+          <button onClick={() => document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2 rounded-full bg-[#1B433C] text-white text-[13px] font-medium hover:bg-[#14332D] transition-colors">
             Block time
           </button>
-          <button onClick={handleNext} className="flex items-center justify-center w-9 h-9 rounded-full border border-gray-200 text-gray-600 hover:bg-gray-50 transition-colors">
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-        <div className="flex items-center gap-2 bg-[#F3F4F6] px-4 py-2 rounded-full text-gray-600">
-          <span className="text-[13px] font-medium">{formatBadge(currentDate)}</span>
-          <CalendarIcon className="w-4 h-4" />
-        </div>
-      </div>
+        }
+      />
 
       {/* View Toggle */}
       <div className="flex items-center w-fit mx-auto p-1 bg-transparent mt-6 rounded-full relative z-10">
         {(['month', 'week', 'day'] as const).map((v) => (
           <button
             key={v}
-            onClick={() => setView(v)}
+            onClick={() => nav.setView(v)}
             className={`relative px-6 py-2 rounded-full text-sm font-medium whitespace-nowrap outline-none transition-colors duration-200 ${view === v ? 'text-white' : 'text-[var(--sage)] hover:text-[var(--ink)]'}`}
           >
             {view === v && (
@@ -278,9 +253,10 @@ export default function InterpreterCalendarPage() {
       </div>
 
       <p className="text-[13px] text-[var(--sage)] mt-4 mb-4">
-        {view === 'day' ? formatDayViewSubtitle(currentDate) : view === 'week' ? `Week of ${formatBadge(currentDate)}` : formatMonthYear(currentDate)} · {isTimezoneLoading ? 'Loading calendar time zone…' : `Calendar time zone: ${safeBaseTimezone}`}
+        {view === 'day' ? formatDayViewSubtitle(currentDate) : view === 'week' ? `Week of ${formatBadgeDate(weekStartKey(nav.dateKey))}` : formatMonthYear(currentDate)} · {isTimezoneLoading ? 'Loading calendar time zone…' : `Calendar time zone: ${safeBaseTimezone}`}
       </p>
 
+      <CalendarTransition transitionKey={`${view}:${rangeKeyFor(nav.dateKey, view)}`} direction={nav.direction}>
       {/* MONTH VIEW */}
       {view === 'month' && (
         <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-12 w-full overflow-x-auto">
@@ -650,6 +626,8 @@ export default function InterpreterCalendarPage() {
           </div>
         );
       })()}
+
+      </CalendarTransition>
 
       {/* Manage availability & Private busy time Section */}
       <div className="mt-12">

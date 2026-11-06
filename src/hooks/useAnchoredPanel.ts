@@ -40,7 +40,8 @@ export function useAnchoredPanel<T extends HTMLElement>({ anchor, buttonRef, roo
 
   useBrowserLayoutEffect(() => {
     if (!panel.current) return;
-    const width = panel.current.getBoundingClientRect().width;
+    // The layout width, not the drawn one: a panel that opens with a scale animation would otherwise be measured too narrow.
+    const width = panel.current.offsetWidth || panel.current.getBoundingClientRect().width;
     // scrollHeight is the full content height even while the panel is capped, so capping it cannot flip the answer back.
     const height = Math.min(panel.current.scrollHeight + 2, maxHeight);
     const next = placePanel(anchor, { width, height }, { width: window.innerWidth, height: window.innerHeight });

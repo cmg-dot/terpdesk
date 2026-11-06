@@ -3,7 +3,7 @@
 import { useCallback, useRef, useState } from "react";
 import type { KeyboardEvent, ReactNode, RefObject } from "react";
 import { createPortal } from "react-dom";
-import { motion, useReducedMotion } from "framer-motion";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { POPOVER_CLASS, SCROLLBAR_CLASS } from "@/components/ui/popoverStyles";
 import { measureAnchor, useAnchoredPanel } from "@/hooks/useAnchoredPanel";
 import { menuPosition } from "@/lib/dropdown";
@@ -24,11 +24,15 @@ interface PopoverProps {
   onClose: () => void;
   /** Closed from inside (Escape): focus returns to the button. */
   onEscape: () => void;
+  /** Open with a quick spring and leave with a fade (the pickers that opt in; the default is a plain fade-in). */
+  spring: boolean;
   children: ReactNode;
 }
 
+const SPRING = { type: "spring", stiffness: 520, damping: 34, mass: 0.8 } as const;
+
 /** The floating panel: portalled to <body>, fixed to the screen at z-[9999], cream with a border and a deep shadow. */
-const Popover = ({ anchor, label, buttonRef, rootRef, onAnchor, onClose, onEscape, children }: PopoverProps) => {
+const Popover = ({ anchor, label, buttonRef, rootRef, onAnchor, onClose, onEscape, spring, children }: PopoverProps) => {
   const reduceMotion = useReducedMotion();
   const { panel, placement } = useAnchoredPanel<HTMLDivElement>({ anchor, buttonRef, rootRef, onAnchor, onClose, maxHeight: POPOVER_MAX_HEIGHT });
   const drift = reduceMotion ? 0 : placement.flipUp ? 5 : -5;
@@ -55,13 +59,14 @@ const Popover = ({ anchor, label, buttonRef, rootRef, onAnchor, onClose, onEscap
       ref={panel}
       role="dialog"
       aria-label={label}
-      initial={{ opacity: 0, y: drift }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.15, ease: "easeOut" }}
+      initial={spring ? { opacity: 0, y: drift, scale: 0.96 } : { opacity: 0, y: drift }}
+      animate={spring ? { opacity: 1, y: 0, scale: 1 } : { opacity: 1, y: 0 }}
+      exit={spring ? { opacity: 0, y: drift / 2, scale: 0.98, transition: { duration: 0.1, ease: "easeIn" } } : undefined}
+      transition={spring && !reduceMotion ? SPRING : { duration: 0.15, ease: "easeOut" }}
       onKeyDown={onKeyDown}
       // The picker belongs to its field, not to whatever the field sits in: a click on it must not reach a clickable card or modal around it.
       onClick={(e) => e.stopPropagation()}
-      style={menuPosition(anchor, placement)}
+      style={{ ...menuPosition(anchor, placement), transformOrigin: placement.flipUp ? "bottom left" : "top left" }}
       className={`${POPOVER_CLASS} ${SCROLLBAR_CLASS} overflow-y-auto overscroll-contain p-3`}
     >
       {children}
@@ -86,6 +91,8 @@ interface Props {
   ariaLabel?: string;
   invalid?: boolean;
   describedBy?: string;
+  /** Spring open / fade out the popup instead of the plain fade-in. */
+  spring?: boolean;
   /** The picker itself. Call `close` to close it. */
   children: (close: () => void) => ReactNode;
 }
@@ -95,7 +102,7 @@ interface Props {
  * time pickers. Pressing outside, Escape, or choosing closes it; the picker is a true portal on <body>, so a modal's
  * overflow can never clip it.
  */
-export function PickerField({ popoverLabel, text, placeholder, icon, className, wrapperClassName, compact, disabled = false, id, ariaLabel, invalid, describedBy, children }: Props) {
+export function PickerField({ popoverLabel, text, placeholder, icon, className, wrapperClassName, compact, disabled = false, id, ariaLabel, invalid, describedBy, spring = false, children }: Props) {
   const [open, setOpen] = useState(false);
   const [anchor, setAnchor] = useState<Anchor | null>(null);
   const root = useRef<HTMLDivElement>(null);
@@ -132,11 +139,13 @@ export function PickerField({ popoverLabel, text, placeholder, icon, className, 
       >
         {text !== "" ? text : <span className="text-gray-400">{placeholder}</span>}
       </button>
-      {open && anchor && (
-        <Popover anchor={anchor} label={popoverLabel} buttonRef={button} rootRef={root} onAnchor={setAnchor} onClose={close} onEscape={closeAndRefocus}>
-          {children(closeAndRefocus)}
-        </Popover>
-      )}
+      <AnimatePresence>
+        {open && anchor && (
+          <Popover anchor={anchor} label={popoverLabel} buttonRef={button} rootRef={root} onAnchor={setAnchor} onClose={close} onEscape={closeAndRefocus} spring={spring}>
+            {children(closeAndRefocus)}
+          </Popover>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
