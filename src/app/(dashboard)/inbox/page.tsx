@@ -20,7 +20,7 @@ export default async function InboxPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-[1280px] space-y-4 p-4 pb-24 antialiased sm:p-6">
+    <div className="mx-auto w-full max-w-[1680px] space-y-4 p-4 pb-24 antialiased sm:p-6 lg:px-0">
       {emails ? (
         <InboxView emails={emails} />
       ) : (

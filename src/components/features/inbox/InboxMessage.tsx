@@ -25,18 +25,18 @@ interface InboxMessageProps {
 type MessageTab = "parsed" | "raw";
 
 const TABS: readonly (readonly [MessageTab, string])[] = [
-  ["parsed", "Parsed Data"],
   ["raw", "Raw Message"],
+  ["parsed", "Parsed Data"],
 ];
 
-/** The reading pane for the selected email: loading skeleton, error, or a header banner with Parsed Data / Raw Message tabs. */
+/** The reading pane for the selected email: loading skeleton, error, or a header banner with Raw Message / Parsed Data tabs (every email opens on Raw Message). */
 export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jobRef }: InboxMessageProps) {
-  const [tab, setTab] = useState<MessageTab>("parsed");
+  const [tab, setTab] = useState<MessageTab>("raw");
   const category = email ? categorize(email.subject) : "other";
   return (
     <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2.5 sm:px-6">
-        <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--forest)] md:hidden">
+      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-4 py-2.5 sm:px-6 lg:px-8">
+        <button type="button" onClick={onBack} className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--forest)] lg:hidden">
           <ArrowLeft className="h-4 w-4" />
           Inbox
         </button>
@@ -49,7 +49,7 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jo
 
       <div className="min-h-0 flex-1 overflow-y-auto">
         {isLoading && (
-          <div aria-busy="true" aria-label="Loading email" className="space-y-3 px-4 py-5 sm:px-6">
+          <div aria-busy="true" aria-label="Loading email" className="space-y-3 px-4 py-5 sm:px-6 lg:px-8">
             <div className="h-6 w-2/3 animate-pulse rounded bg-gray-200" />
             <div className="h-4 w-1/3 animate-pulse rounded bg-gray-200" />
             <div className="mt-6 h-4 w-full animate-pulse rounded bg-gray-200" />
@@ -57,13 +57,13 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jo
           </div>
         )}
         {error && (
-          <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:m-6">
+          <p role="alert" className="m-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 sm:m-6 lg:m-8">
             {error}
           </p>
         )}
         {email && (
           <article data-inbox-message={email.id}>
-            <header className="space-y-3 border-b border-emerald-100/70 bg-gradient-to-b from-emerald-50/70 to-[#FBFAF7] px-4 py-5 sm:px-6">
+            <header className="space-y-3 border-b border-emerald-100/70 bg-gradient-to-b from-emerald-50/70 to-[#FBFAF7] px-4 py-5 sm:px-6 lg:px-8">
               <div className="flex flex-wrap items-center gap-2">
                 <InboxCategoryBadge category={category} />
                 {jobRef?.srn && <InboxJobLink srn={jobRef.srn} jobId={jobRef.jobId} showQuickLink={false} />}
@@ -86,7 +86,7 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jo
               )}
             </header>
 
-            <div className="px-4 pt-4 sm:px-6">
+            <div className="px-4 pt-4 sm:px-6 lg:px-8">
               <div role="tablist" aria-label="Message view" className="inline-flex gap-1 rounded-full bg-[#F4F3EF] p-1">
                 {TABS.map(([id, label]) => (
                   <button
@@ -105,11 +105,11 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jo
               </div>
             </div>
 
-            <div className="px-4 py-4 sm:px-6 sm:py-5">
+            <div className="px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
               {tab === "parsed" ? (
                 <InboxParsedData key={email.id} email={email} category={category} />
               ) : (
-                <div data-inbox-raw className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
+                <div data-inbox-raw className="rounded-2xl border border-gray-200 bg-white p-4">
                   <InboxEmailBody email={email} />
                 </div>
               )}

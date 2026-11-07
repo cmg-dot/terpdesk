@@ -12,7 +12,8 @@ const HTML_STYLES =
 
 /**
  * The email's content. HTML is shown only after DOMPurify has sanitized it in the browser; when there is no HTML, or it
- * cannot be sanitized, or nothing is left of it, the plain-text version is shown instead (as text, never as markup).
+ * cannot be sanitized, or nothing is left of it, the plain-text version is shown instead (as text, never as markup, capped
+ * at 90 characters a line; the HTML stays full width so wide tables scroll inside their own box).
  */
 export function InboxEmailBody({ email }: { email: Pick<InboxEmail, "bodyHtml" | "bodyText"> }) {
   const safeHtml = useMemo(() => (email.bodyHtml?.trim() ? sanitizeEmailHtml(email.bodyHtml) : null), [email.bodyHtml]);
@@ -20,5 +21,5 @@ export function InboxEmailBody({ email }: { email: Pick<InboxEmail, "bodyHtml" |
   if (safeHtml?.trim()) {
     return <div className={`overflow-x-auto ${HTML_STYLES}`} dangerouslySetInnerHTML={{ __html: safeHtml }} />;
   }
-  return <p className="whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-[var(--ink)]">{email.bodyText}</p>;
+  return <p className="max-w-[90ch] whitespace-pre-wrap break-words font-sans text-sm leading-relaxed text-[var(--ink)]">{email.bodyText}</p>;
 }
