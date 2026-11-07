@@ -5,6 +5,8 @@ interface Props {
   /** "Seattle Children's", "DVR": the headline. Falls back to the job title when the request names no organization. */
   organization: string | null;
   title: string;
+  /** The state's 9-digit SRN, shown after the headline as "· #…" (not repeated when the headline already holds it). */
+  srn?: string | null;
   /** "State SRN" with the 9-digit number, or "Reference" with the APT code when the job has no SRN. */
   idLabel: string;
   idValue: string;
@@ -25,14 +27,19 @@ const VALUE = "mt-0.5 break-words font-medium text-[var(--ink)]";
  * The bar gives the location every pixel left over, so a street address reads on one or two lines, not a narrow column;
  * on a phone the three facts stack, and on a small tablet the location takes its own row.
  */
-export const RequestHeadline = ({ organization, title, idLabel, idValue, whenText, where, repeatsText, badges }: Props) => {
+export const RequestHeadline = ({ organization, title, srn, idLabel, idValue, whenText, where, repeatsText, badges }: Props) => {
   const headline = organization ?? title;
   // The job title is secondary once the organization leads; skip it when it only repeats the SRN ("ODHH SRN #…").
   const showTitle = organization !== null && title.trim() !== "" && title !== organization && !/SRN\s*#/i.test(title);
+  const srnText = srn?.trim() ?? "";
+  const showSrn = srnText !== "" && !headline.includes(srnText);
   return (
     <div className="w-full min-w-0">
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-        <h1 className="min-w-0 break-words text-[24px] font-medium leading-tight tracking-tight text-[var(--ink)] sm:text-[28px]">{headline}</h1>
+        <h1 className="min-w-0 break-words text-[24px] font-medium leading-tight tracking-tight text-[var(--ink)] sm:text-[28px]">
+          {headline}
+          {showSrn && <span data-headline-srn className="whitespace-nowrap font-normal text-[var(--sage)]">{" · #"}{srnText}</span>}
+        </h1>
         {badges}
       </div>
       {showTitle && <p className="mt-1 text-[14px] text-[var(--sage)]">{title}</p>}

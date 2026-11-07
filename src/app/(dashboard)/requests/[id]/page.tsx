@@ -32,6 +32,7 @@ import { formatHoursMinutes } from "@/lib/durationFormat";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { CollapsibleStateForm } from "@/components/requests/CollapsibleStateForm";
+import { OriginalFormCard } from "@/components/requests/OriginalFormCard";
 import { StaffingPanel } from "@/components/requests/staffing/StaffingPanel";
 import type { Position, PositionView, StaffBooking, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
 import { buildStateFormView, notesWithoutFormSection5 } from "@/lib/stateFormView";
@@ -843,6 +844,7 @@ export default function AssignmentDetailPage() {
  <RequestHeadline
    organization={organizationName}
    title={assignment.title}
+   srn={requestSrnValue}
    idLabel={requestSrnValue ? "State SRN" : "Reference"}
    idValue={requestSrnValue ?? assignment.overview.reference}
    whenText={whenText}
@@ -871,7 +873,6 @@ export default function AssignmentDetailPage() {
    }
  />
  <RequestActionBar
-   requestId={id}
    calendarHref={calendarLink({ id, startsAt: assignment.startsAt, srn: requestSrnValue })}
    editHref={`/requests/${params.id}/edit`}
    isCancelled={isCancelled}
@@ -938,6 +939,9 @@ export default function AssignmentDetailPage() {
  <div className="flex flex-col gap-6 w-full">
  {/* The state's request form is the page: its five numbered sections, from the saved email or from what the job has on file. */}
  <CollapsibleStateForm view={stateFormView} summary={{ srn: requestSrnValue, when: whenText, location: where.text }} />
+
+ {/* The state's email as it arrived, folded away and loaded only when opened. */}
+ <OriginalFormCard requestId={String(foundRequest?.id || id)} srn={requestSrnValue} />
 
  {/* Staffing and booking, directly under the form. */}
  {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} />}

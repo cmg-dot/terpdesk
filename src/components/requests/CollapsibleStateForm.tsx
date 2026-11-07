@@ -12,12 +12,12 @@ interface Summary {
 }
 
 /**
- * The state's request form inside a card that folds away, styled like "Job details on file" below it. It starts open. Folded,
- * it shrinks to one row (the SRN, the date and time, the location) so staff reach Staffing, Notes and Activity without
+ * The state's request form inside a card that folds away, styled like "Job details on file" below it. It starts folded
+ * (`defaultOpen` opens it): one row (the SRN, the date and time, the location), so Staffing is on screen without
  * scrolling past all five sections. Whether it is open is plain state of this page; it is not saved anywhere.
  */
-export function CollapsibleStateForm({ view, summary }: { view: StateFormView; summary: Summary }) {
-  const [open, setOpen] = useState(true);
+export function CollapsibleStateForm({ view, summary, defaultOpen = false }: { view: StateFormView; summary: Summary; defaultOpen?: boolean }) {
+  const [open, setOpen] = useState(defaultOpen);
   const bodyId = useId();
   const parts = [summary.srn ? `SRN #${summary.srn}` : "", summary.when, summary.location.split("\n").filter(Boolean).join(", ")].filter(Boolean);
   return (

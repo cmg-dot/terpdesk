@@ -2,12 +2,11 @@
 
 import Link from "next/link";
 import { CalendarDays, Edit2, Lock } from "lucide-react";
-import { OriginalFormPanel } from "@/components/requests/OriginalFormPanel";
 
 /**
  * The appointment's action toolbar, in three groups on one row (desktop) or a two-column grid of full-width tap targets
  * (phone):
- *  - look: View original form, View in calendar (quiet outline pills);
+ *  - look: View in calendar (a quiet outline pill; the original form is its own card on the page);
  *  - dispatch: Quick edit, Edit assignment (accent);
  *  - close-out: Cancel appointment, Void job (muted danger, pushed to the far end so they are never next to the accents).
  * The groups wrap as units, never button by button, so nothing hangs alone on a third line.
@@ -25,7 +24,6 @@ const GROUP = "contents sm:flex sm:items-center sm:gap-2";
 const DIVIDER = <span aria-hidden="true" className="hidden h-6 w-px bg-gray-200 sm:block" />;
 
 interface Props {
-  requestId: string;
   /** Where "View in calendar" goes: the calendar on this appointment's day with the job highlighted (see lib/calendarLink). */
   calendarHref?: string;
   editHref: string;
@@ -39,11 +37,10 @@ interface Props {
   onVoid: () => void;
 }
 
-export function RequestActionBar({ requestId, calendarHref = "/calendar", editHref, isCancelled, isEditLocked, editLockMessage, onQuickEdit, onCancel, onVoid }: Props) {
+export function RequestActionBar({ calendarHref = "/calendar", editHref, isCancelled, isEditLocked, editLockMessage, onQuickEdit, onCancel, onVoid }: Props) {
   return (
     <div role="toolbar" aria-label="Appointment actions" className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-2">
       <div className={GROUP}>
-        <OriginalFormPanel requestId={requestId} triggerClassName={LOOK} />
         <Link href={calendarHref} className={LOOK}>
           <CalendarDays className="h-3.5 w-3.5 text-gray-500" aria-hidden="true" />
           View in calendar
