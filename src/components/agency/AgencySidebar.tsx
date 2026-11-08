@@ -20,15 +20,21 @@ export const AgencySidebar = ({ userName, userEmail }: { userName: string; userE
   const unreadInbox = useInboxUnreadCount();
 
   return (
-    <aside className="sidebar-scroll sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start overflow-y-auto bg-[var(--sidebar)] text-white md:flex">
-      {/* ASL Professionals: a full-bleed header strip, outside the padded block below. Default theme: the terpDESK mark. */}
-      <BrandBanner />
-      <div className="flex flex-col p-6">
-        <TerpdeskBrand tone="dark" />
-        <span className="mt-6 text-[15px] font-medium text-white brand-gap">Agency workspace</span>
+    <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start overflow-hidden bg-[var(--sidebar)] text-white md:flex">
+      {/*
+        Header and footer never scroll: only the navigation does, so a scrollbar can never cut into the header's right edge.
+        ASL Professionals: a full-bleed logo strip, then the label on the plum. Default theme: the terpDESK mark.
+      */}
+      <div className="shrink-0">
+        <BrandBanner />
+        <div className="flex flex-col p-6">
+          <TerpdeskBrand tone="dark" />
+          <span className="mt-6 text-[15px] font-medium text-white brand-gap">Agency workspace</span>
+        </div>
       </div>
 
-      <nav className="flex-1 space-y-1.5 px-4 py-2">
+      {/* The scroll area: a slim scrollbar in a reserved gutter (8px of the right padding), so links do not shift when it appears. */}
+      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto py-2 pl-4 pr-2 [scrollbar-gutter:stable]">
         {AGENCY_NAV.map((item) => (
           <Link
             key={item.href}
@@ -46,7 +52,7 @@ export const AgencySidebar = ({ userName, userEmail }: { userName: string; userE
         ))}
       </nav>
 
-      <div className="p-6">
+      <div className="shrink-0 p-6">
         <div className="mb-4 flex flex-col">
           <span className="text-sm font-medium text-white">{userName}</span>
           <span className="text-xs text-[var(--sidebar-muted)]">{userEmail}</span>

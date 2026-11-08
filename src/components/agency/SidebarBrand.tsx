@@ -17,17 +17,20 @@ const AgencyLogoImage = () => (
   <Image src={AGENCY_LOGO_SRC} alt={DEFAULT_AGENCY_NAME} width={907} height={314} className="h-9 max-h-9 w-auto object-contain" priority />
 );
 
+/** On the cream mobile header. */
 const PoweredBy = () => <span className="mt-1 block text-[9px] font-semibold uppercase tracking-wider text-slate-500">Powered by terpDESK</span>;
 
 /**
- * Desktop sidebar, ASL Professionals theme: an edge-to-edge ivory strip across the very top of the sidebar (outside its
- * padded content), closed by a faint gold rule where the plum navigation begins. The light colours are fixed on purpose:
- * this strip is the logo's backing, so it stays light whatever the page tokens are.
+ * Desktop sidebar, ASL Professionals theme. The ivory strip wraps ONLY the logo, edge to edge across the very top of the
+ * sidebar and closed by a faint gold rule. "Powered by terpDESK" rests beneath it, directly on the plum. The strip's light
+ * colours are fixed on purpose: it is the logo's backing, so it stays light whatever the page tokens are.
  */
 export const BrandBanner = () => (
-  <div className="brand-asl w-full border-b border-[#D4AF37]/25 bg-[#F9F6F0] px-4 py-3">
-    <AgencyLogoImage />
-    <PoweredBy />
+  <div className="brand-asl">
+    <div className="w-full border-b border-[#D4AF37]/25 bg-[#F9F6F0] px-4 py-3">
+      <AgencyLogoImage />
+    </div>
+    <span className="block px-4 pb-3 pt-2 text-[9px] font-semibold uppercase tracking-wider text-white/50">Powered by terpDESK</span>
   </div>
 );
 
