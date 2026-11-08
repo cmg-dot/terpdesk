@@ -4,7 +4,7 @@ import { AGENCY_LOGO_SRC, DEFAULT_AGENCY_NAME } from "@/lib/agency";
 /**
  * The brand at the top of the agency navigation. Both brands are rendered and CSS shows one (see .brand-default /
  * .brand-asl in themes.css), so picking a theme in Settings swaps them instantly, with no flash and no client state.
- *   BrandBanner    ASL Professionals on the desktop sidebar: a full-bleed light header strip the logo sits in
+ *   BrandCard      ASL Professionals on the desktop sidebar: a compact ivory card holding the logo, label beneath
  *   TerpdeskBrand  the default theme's mark and name (desktop sidebar, `dark`, or mobile menu, `light`)
  *   MobileBrand    both, for the cream mobile menu header
  */
@@ -21,16 +21,16 @@ const AgencyLogoImage = () => (
 const PoweredBy = () => <span className="mt-1 block text-[9px] font-semibold uppercase tracking-wider text-slate-500">Powered by terpDESK</span>;
 
 /**
- * Desktop sidebar, ASL Professionals theme. The ivory strip wraps ONLY the logo, edge to edge across the very top of the
- * sidebar and closed by a faint gold rule. "Powered by terpDESK" rests beneath it, directly on the plum. The strip's light
- * colours are fixed on purpose: it is the logo's backing, so it stays light whatever the page tokens are.
+ * Desktop sidebar, ASL Professionals theme. A compact rounded ivory card holds ONLY the logo, inset by the same 16px as the
+ * navigation links so the two line up; "Powered by terpDESK" is centred beneath it, directly on the plum. The card's ivory is
+ * fixed on purpose: it is the logo's backing (the artwork is plum), so it stays light whatever the page tokens are.
  */
-export const BrandBanner = () => (
-  <div className="brand-asl">
-    <div className="w-full border-b border-[#D4AF37]/25 bg-[#F9F6F0] px-4 py-3">
+export const BrandCard = () => (
+  <div className="brand-asl px-4 pt-5">
+    <div className="flex justify-center rounded-lg bg-[#F9F6F0] px-3 py-2">
       <AgencyLogoImage />
     </div>
-    <span className="block px-4 pb-3 pt-2 text-[9px] font-semibold uppercase tracking-wider text-white/50">Powered by terpDESK</span>
+    <span className="block pb-1 pt-2 text-center text-[9px] font-medium uppercase tracking-wider text-white/50">Powered by terpDESK</span>
   </div>
 );
 

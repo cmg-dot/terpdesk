@@ -7,7 +7,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
 import { AGENCY_NAV, isNavActive } from "@/components/agency/agencyNav";
-import { BrandBanner, TerpdeskBrand } from "@/components/agency/SidebarBrand";
+import { BrandCard, TerpdeskBrand } from "@/components/agency/SidebarBrand";
 
 const LINK = "relative flex items-center rounded-full px-4 py-2.5 text-sm font-medium transition-colors";
 // The active item: a soft fill plus a marker bar in the theme's nav colour (invisible in the default theme).
@@ -23,18 +23,18 @@ export const AgencySidebar = ({ userName, userEmail }: { userName: string; userE
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start overflow-hidden bg-[var(--sidebar)] text-white md:flex">
       {/*
         Header and footer never scroll: only the navigation does, so a scrollbar can never cut into the header's right edge.
-        ASL Professionals: a full-bleed logo strip, then the label on the plum. Default theme: the terpDESK mark.
+        ASL Professionals: the logo card, then the label on the plum. Default theme: the terpDESK mark.
       */}
       <div className="shrink-0">
-        <BrandBanner />
+        <BrandCard />
         <div className="flex flex-col p-6">
           <TerpdeskBrand tone="dark" />
           <span className="mt-6 text-[15px] font-medium text-white brand-gap">Agency workspace</span>
         </div>
       </div>
 
-      {/* The scroll area: a slim scrollbar in a reserved gutter (8px of the right padding), so links do not shift when it appears. */}
-      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto py-2 pl-4 pr-2 [scrollbar-gutter:stable]">
+      {/* The scroll area: a 4px scrollbar in a reserved gutter (4px of the right padding), so links do not shift when it appears. */}
+      <nav className="sidebar-scroll min-h-0 flex-1 space-y-1.5 overflow-y-auto py-2 pl-4 pr-3 [scrollbar-gutter:stable]">
         {AGENCY_NAV.map((item) => (
           <Link
             key={item.href}
