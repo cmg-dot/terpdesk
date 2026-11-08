@@ -183,3 +183,8 @@
 :root[data-theme="asl_professionals"] .brand-default {
   display: none;
 }
+
+/* Under the full-bleed ASL banner the workspace label needs no extra gap, only the block's own padding. */
+:root[data-theme="asl_professionals"] .brand-gap {
+  margin-top: 0;
+}

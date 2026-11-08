@@ -23,7 +23,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { CountBadge } from "@/components/ui/CountBadge";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
 import { AgencySidebar } from "@/components/agency/AgencySidebar";
-import { SidebarBrand } from "@/components/agency/SidebarBrand";
+import { MobileBrand } from "@/components/agency/SidebarBrand";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useSession } from "next-auth/react";
@@ -78,7 +78,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 {/* Header (Logo & Close) */}
                 <div className="flex justify-between items-center p-6 border-b border-neutral-100 shrink-0">
                   <div>
-                    <SidebarBrand tone="light" />
+                    <MobileBrand />
                   </div>
                   <button 
                     onClick={() => setIsMenuOpen(false)}

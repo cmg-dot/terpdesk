@@ -7,7 +7,7 @@ import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
 import { AGENCY_NAV, isNavActive } from "@/components/agency/agencyNav";
-import { SidebarBrand } from "@/components/agency/SidebarBrand";
+import { BrandBanner, TerpdeskBrand } from "@/components/agency/SidebarBrand";
 
 const LINK = "relative flex items-center rounded-full px-4 py-2.5 text-sm font-medium transition-colors";
 // The active item: a soft fill plus a marker bar in the theme's nav colour (invisible in the default theme).
@@ -21,9 +21,11 @@ export const AgencySidebar = ({ userName, userEmail }: { userName: string; userE
 
   return (
     <aside className="sidebar-scroll sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start overflow-y-auto bg-[var(--sidebar)] text-white md:flex">
+      {/* ASL Professionals: a full-bleed header strip, outside the padded block below. Default theme: the terpDESK mark. */}
+      <BrandBanner />
       <div className="flex flex-col p-6">
-        <SidebarBrand tone="dark" />
-        <span className="mt-6 text-[15px] font-medium text-white">Agency workspace</span>
+        <TerpdeskBrand tone="dark" />
+        <span className="mt-6 text-[15px] font-medium text-white brand-gap">Agency workspace</span>
       </div>
 
       <nav className="flex-1 space-y-1.5 px-4 py-2">
