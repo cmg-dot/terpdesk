@@ -1,15 +1,15 @@
 import Image from "next/image";
-import { HandHelping } from "lucide-react";
 import { AGENCY_LOGO_SRC, DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 /**
  * The top of the agency navigation. Both brands are rendered and CSS shows one (see .brand-default / .brand-asl in
  * themes.css), so picking a theme in Settings swaps the logo instantly, with no flash and no client state.
- *   dark  = the coloured desktop sidebar        light = the white mobile menu
+ *   dark  = the coloured desktop sidebar        light = the cream mobile menu
  */
 type Tone = "dark" | "light";
 
 const TERPDESK_TEXT: Record<Tone, string> = { dark: "text-white", light: "text-[var(--forest)]" };
+const SUBTITLE: Record<Tone, string> = { dark: "text-[var(--sidebar-muted)]", light: "text-[var(--sage)]" };
 
 export const SidebarBrand = ({ tone }: { tone: Tone }) => (
   <>
@@ -22,21 +22,17 @@ export const SidebarBrand = ({ tone }: { tone: Tone }) => (
     </div>
     <div className="brand-asl">
       <AgencyLogo tone={tone} />
-      {tone === "dark" && <span className="mt-1 block text-[12px] text-[var(--sidebar-muted)]">Powered by terpDESK</span>}
+      <span className={`mt-1.5 block text-[12px] ${SUBTITLE[tone]}`}>Powered by terpDESK</span>
     </div>
   </>
 );
 
-const AgencyLogo = ({ tone }: { tone: Tone }) => {
-  if (AGENCY_LOGO_SRC) {
-    return <Image src={AGENCY_LOGO_SRC} alt={DEFAULT_AGENCY_NAME} width={176} height={40} className="h-10 w-auto object-contain object-left" priority />;
-  }
-  return (
-    <div className="flex items-center gap-3">
-      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--accent)] text-[var(--badge-ink)]">
-        <HandHelping className="h-5 w-5" strokeWidth={1.75} aria-hidden="true" />
-      </span>
-      <span className={`text-[19px] font-semibold leading-tight ${TERPDESK_TEXT[tone]}`}>{DEFAULT_AGENCY_NAME}</span>
-    </div>
-  );
-};
+/**
+ * The official artwork is plum on a transparent background: on the plum sidebar it would disappear, so there it sits on a
+ * small cream plate. On the cream mobile menu it is drawn directly. Height is fixed and width follows the artwork's ratio.
+ */
+const AgencyLogo = ({ tone }: { tone: Tone }) => (
+  <div className={tone === "dark" ? "inline-block rounded-xl bg-[var(--canvas)] px-3 py-2" : ""}>
+    <Image src={AGENCY_LOGO_SRC} alt={DEFAULT_AGENCY_NAME} width={907} height={314} className={`${tone === "dark" ? "h-10" : "h-9"} w-auto object-contain`} priority />
+  </div>
+);
