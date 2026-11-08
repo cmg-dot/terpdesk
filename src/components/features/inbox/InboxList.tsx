@@ -36,7 +36,7 @@ export function InboxList({ emails, selectedId, onSelect }: InboxListProps) {
                 type="button"
                 onClick={() => onSelect(email.id)}
                 aria-current={selected ? "true" : undefined}
-                className="flex w-full items-start gap-2.5 rounded-xl px-3 pb-1.5 pt-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40"
+                className="flex w-full items-start gap-2.5 rounded-xl px-3 pb-1.5 pt-3 text-left outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--forest-rgb)/0.4)]"
               >
                 <span
                   aria-label={email.isRead ? undefined : "Unread"}

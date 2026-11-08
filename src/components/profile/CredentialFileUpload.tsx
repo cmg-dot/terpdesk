@@ -121,11 +121,11 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
       <label
         htmlFor={inputId}
         aria-disabled={busy || atLimit}
-        className={`flex flex-col items-start gap-1 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 transition-colors focus-within:ring-2 focus-within:ring-[#0B3B32]/40 sm:flex-row sm:items-center sm:gap-3 ${
-          busy || atLimit ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-[#0B3B32]"
+        className={`flex flex-col items-start gap-1 rounded-xl border border-dashed border-stone-300 bg-white px-4 py-3 transition-colors focus-within:ring-2 focus-within:ring-[rgb(var(--forest-rgb)/0.4)] sm:flex-row sm:items-center sm:gap-3 ${
+          busy || atLimit ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:border-[var(--forest)]"
         }`}
       >
-        <span className="inline-flex items-center gap-2 text-sm font-medium text-[#0B3B32]">
+        <span className="inline-flex items-center gap-2 text-sm font-medium text-[var(--forest)]">
           <Paperclip className="h-4 w-4" aria-hidden="true" />
           {busy ? status ?? "Working…" : "Add a supporting file"}
         </span>

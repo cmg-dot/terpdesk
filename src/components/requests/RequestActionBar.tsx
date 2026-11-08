@@ -14,7 +14,7 @@ import { CalendarDays, Edit2, Lock } from "lucide-react";
 
 const BASE = "inline-flex min-h-[44px] w-full items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors sm:min-h-0 sm:w-auto sm:px-3.5 sm:text-[13px]";
 const LOOK = `${BASE} border border-gray-200 bg-white text-gray-700 hover:bg-gray-50`;
-const ACCENT_SOFT = `${BASE} border border-emerald-200 bg-emerald-50 text-[#0B3B32] hover:bg-emerald-100`;
+const ACCENT_SOFT = `${BASE} border border-emerald-200 bg-emerald-50 text-[var(--forest)] hover:bg-emerald-100`;
 const ACCENT_SOLID = `${BASE} border border-transparent bg-[var(--forest)] text-white hover:bg-[var(--forest)]/90`;
 const LOCKED = `${BASE} cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400`;
 const DANGER = `${BASE} border border-red-200 bg-white text-[#B4443A] hover:bg-red-50`;

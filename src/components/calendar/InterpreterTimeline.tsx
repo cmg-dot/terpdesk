@@ -69,11 +69,11 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Find an interpreter"
             autoComplete="off"
-            className="w-full rounded-full border-none bg-[#F4F3EF] py-2.5 pl-9 pr-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[#0B3B32]"
+            className="w-full rounded-full border-none bg-[#F4F3EF] py-2.5 pl-9 pr-4 text-sm text-gray-800 outline-none placeholder:text-gray-400 focus:ring-2 focus:ring-[var(--forest)]"
           />
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700">
-          <input type="checkbox" checked={onlyWorking} onChange={(e) => setOnlyWorking(e.target.checked)} className="h-4 w-4 accent-[#0B3B32]" />
+          <input type="checkbox" checked={onlyWorking} onChange={(e) => setOnlyWorking(e.target.checked)} className="h-4 w-4 accent-[var(--forest)]" />
           Only interpreters with a job this day
         </label>
       </div>
@@ -123,7 +123,7 @@ export const InterpreterTimeline = ({ dateKey, nowMs }: Props) => {
                   <p className="font-medium text-[var(--ink)]">No interpreters match these filters</p>
                   <p className="mt-1">Try a different credential or location, or clear the filters to see everyone.</p>
                   {filtersOn && (
-                    <button type="button" onClick={() => setFilters(NO_TIMELINE_FILTERS)} className="mt-4 rounded-full border border-gray-300 bg-white px-4 py-1.5 font-medium text-[#0B3B32] hover:bg-gray-50">
+                    <button type="button" onClick={() => setFilters(NO_TIMELINE_FILTERS)} className="mt-4 rounded-full border border-gray-300 bg-white px-4 py-1.5 font-medium text-[var(--forest)] hover:bg-gray-50">
                       Clear filters
                     </button>
                   )}

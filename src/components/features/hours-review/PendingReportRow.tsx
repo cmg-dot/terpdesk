@@ -101,7 +101,7 @@ export function PendingReportRow({ item, onDone }: { item: PendingVerificationVi
           onClick={() => setOpen((v) => !v)}
           aria-expanded={open}
           aria-controls={panelId}
-          className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-[#0B3B32] hover:bg-emerald-50"
+          className="ml-auto inline-flex items-center gap-1 rounded-lg px-2 py-1 text-sm font-medium text-[var(--forest)] hover:bg-emerald-50"
         >
           {detailsToggleLabel(item)}
           <ChevronDown className={`h-4 w-4 transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />

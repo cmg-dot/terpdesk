@@ -206,7 +206,7 @@ function RequestsPageContent() {
  placeholder="Search title, organization, reference..." 
  value={searchQuery}
  onChange={(e) => setSearchQuery(e.target.value)}
- className="w-full rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[14px] text-slate-700 placeholder:text-[var(--sage)] border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[#0B3B32]/30"
+ className="w-full rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[14px] text-slate-700 placeholder:text-[var(--sage)] border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.3)]"
  />
  </div>
  <CustomSelect size="large" options={orgOptions} value={orgFilter} onChange={setOrgFilter} />

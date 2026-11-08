@@ -79,7 +79,7 @@ export const JoinRequestsTab = ({ requests, onDecided }: JoinRequestsTabProps) =
               className="bg-white rounded-2xl border border-gray-200 p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:shadow-sm transition-shadow list-none"
             >
               <div className="flex min-w-0 items-start gap-4">
-                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-base shrink-0 shadow-sm bg-[#0B3B32]">
+                <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-semibold text-base shrink-0 shadow-sm bg-[var(--forest)]">
                   {initialsOf(request.interpreterName)}
                 </div>
                 <div className="min-w-0 space-y-0.5">
@@ -96,7 +96,7 @@ export const JoinRequestsTab = ({ requests, onDecided }: JoinRequestsTabProps) =
                   type="button"
                   onClick={() => decide(request, "approved")}
                   disabled={busyId !== null}
-                  className="px-6 py-2 rounded-full bg-[#0B3B32] text-white text-[13px] font-medium hover:bg-[#082a23] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+                  className="px-6 py-2 rounded-full bg-[var(--forest)] text-white text-[13px] font-medium hover:bg-[var(--forest-hover)] transition-colors disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busyId === request.id ? "Saving…" : "Approve"}
                 </button>

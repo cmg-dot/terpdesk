@@ -66,7 +66,7 @@ export function IconInput({
       popoverLabel={kind === "date" ? "Choose a date" : "Choose a time"}
       text={kind === "date" ? formatDateLabel(value) : formatTimeLabel(value)}
       placeholder={placeholder ?? (kind === "date" ? "Choose a date" : "Choose a time")}
-      icon={<Icon aria-hidden="true" strokeWidth={1.75} className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[#0B3B32]/70 ${iconClass}`} />}
+      icon={<Icon aria-hidden="true" strokeWidth={1.75} className={`pointer-events-none absolute top-1/2 -translate-y-1/2 text-[rgb(var(--forest-rgb)/0.7)] ${iconClass}`} />}
       className={className}
       wrapperClassName={wrapperClassName}
       compact={compact}

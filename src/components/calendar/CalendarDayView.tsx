@@ -23,7 +23,7 @@ export const CalendarDayView = ({ dateKey, todayKey, index, nowMs, highlightId }
       <div className="flex items-center justify-between mb-6">
         <h2 className="flex items-center gap-2 text-xl font-semibold text-[var(--ink)]">
           {formatDateSpoken(dateKey)}
-          {dateKey === todayKey && <span data-today-chip className="rounded-full bg-[#0B3B32] px-2.5 py-0.5 text-xs font-medium text-white">Today</span>}
+          {dateKey === todayKey && <span data-today-chip className="rounded-full bg-[var(--forest)] px-2.5 py-0.5 text-xs font-medium text-white">Today</span>}
         </h2>
         <span className="text-sm text-[var(--sage)]">
           {cards.length} {cards.length === 1 ? "appointment" : "appointments"}

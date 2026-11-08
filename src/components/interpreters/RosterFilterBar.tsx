@@ -74,7 +74,7 @@ export const RosterFilterBar = ({ filters, onChange, people, shown, total }: Pro
           {active > 0 && ` · ${active} ${active === 1 ? "filter" : "filters"} on`}
         </p>
         {active > 0 && (
-          <button type="button" onClick={() => onChange(NO_ROSTER_FILTERS)} className="font-medium text-[#0B3B32] hover:underline">
+          <button type="button" onClick={() => onChange(NO_ROSTER_FILTERS)} className="font-medium text-[var(--forest)] hover:underline">
             Clear filters
           </button>
         )}

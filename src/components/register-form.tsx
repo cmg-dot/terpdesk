@@ -12,7 +12,7 @@ import { registerInterpreterSchema } from "@/lib/validation/registerInterpreter"
 import type { RegisterInterpreterInput } from "@/lib/validation/registerInterpreter";
 
 const inputClass =
-  "w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[#0B3B32]/20";
+  "w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)]";
 const labelClass = "block text-xs lg:text-sm text-[var(--sage)]";
 
 const FIELDS = [
@@ -91,7 +91,7 @@ export function RegisterForm() {
         <button
           type="submit"
           disabled={isSubmitting}
-          className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#0B3B32]/50 disabled:opacity-50"
+          className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)] disabled:opacity-50"
         >
           {isSubmitting ? "Creating account..." : "Create account"}
         </button>

@@ -34,7 +34,7 @@ function getInterpreterInitials(name: string): string {
 }
 
 function getAvatarBgColor(name: string, isRegistered: boolean): string {
-  if (isRegistered) return "bg-[#0B3B32]"; // Rich forest green for registered users
+  if (isRegistered) return "bg-[var(--forest)]"; // Rich forest green for registered users
   // Deterministic palette for external shadow interpreters
   const colors = [
     "bg-[#5B3E96]", // Royal purple
@@ -62,7 +62,7 @@ export const RosterTab = ({ items, searchQuery, filtersActive = false, onManage,
         <button
           type="button"
           onClick={onAddExternal}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[#0B3B32] text-white text-xs font-medium hover:bg-[#082a23] transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-[var(--forest)] text-white text-xs font-medium hover:bg-[var(--forest-hover)] transition-colors"
         >
           <UserPlus className="w-3.5 h-3.5" />
           <span>Add First External Interpreter</span>

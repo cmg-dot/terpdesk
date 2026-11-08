@@ -11,7 +11,7 @@ import type { InboxEmail, InboxEmailContext } from "@/types/inbox";
 
 const Card = ({ title, children, id }: { title: string; children: ReactNode; id: string }) => (
   <section data-parsed-card={id} className="rounded-2xl border border-gray-200 bg-white">
-    <h3 className="border-b border-gray-100 px-4 py-3 text-[13px] font-semibold uppercase tracking-wide text-[#0B3B32] sm:px-5">{title}</h3>
+    <h3 className="border-b border-gray-100 px-4 py-3 text-[13px] font-semibold uppercase tracking-wide text-[var(--forest)] sm:px-5">{title}</h3>
     <div className="px-4 py-2 sm:px-5">{children}</div>
   </section>
 );

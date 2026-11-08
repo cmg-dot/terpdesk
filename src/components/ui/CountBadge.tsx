@@ -9,7 +9,7 @@ export const CountBadge = ({ count, label }: CountBadgeProps) =>
   count > 0 ? (
     <span
       aria-label={`${count} ${label}`}
-      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#9E3929] px-1.5 text-[11px] font-bold text-white"
+      className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[var(--badge)] px-1.5 text-[11px] font-bold text-[var(--badge-ink)]"
     >
       {count > 99 ? "99+" : count}
     </span>

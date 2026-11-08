@@ -111,7 +111,7 @@ export function AddExternalInterpreterModal({
             {/* Header */}
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-5">
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-[#E5F0EB] text-[#0B3B32] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-[#E5F0EB] text-[var(--forest)] flex items-center justify-center shrink-0">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>
@@ -136,7 +136,7 @@ export function AddExternalInterpreterModal({
 
             {/* Informational Callout */}
             <div className="mt-5 rounded-2xl bg-[#F8FAF9] border border-[#E2ECE7] p-4 text-xs text-slate-600 leading-relaxed flex items-start gap-3">
-              <Info className="w-4 h-4 text-[#0B3B32] shrink-0 mt-0.5" />
+              <Info className="w-4 h-4 text-[var(--forest)] shrink-0 mt-0.5" />
               <span>
                 <strong>Shadow Profile:</strong> External interpreters do not need NextAuth portal credentials. They can accept or decline job offers directly from their email inbox via secure magic links.
               </span>
@@ -171,7 +171,7 @@ export function AddExternalInterpreterModal({
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g., Alex Morgan"
-                    className="w-full bg-[#F4F3EF] border border-transparent rounded-full pl-10 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/20 outline-none transition-all disabled:opacity-60"
+                    className="w-full bg-[#F4F3EF] border border-transparent rounded-full pl-10 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[var(--forest)] focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)] outline-none transition-all disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -196,7 +196,7 @@ export function AddExternalInterpreterModal({
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="e.g., alex.morgan@example.com"
-                    className="w-full bg-[#F4F3EF] border border-transparent rounded-full pl-10 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/20 outline-none transition-all disabled:opacity-60"
+                    className="w-full bg-[#F4F3EF] border border-transparent rounded-full pl-10 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[var(--forest)] focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)] outline-none transition-all disabled:opacity-60"
                   />
                 </div>
                 <p className="text-[11px] text-[var(--sage)] pl-2">
@@ -223,7 +223,7 @@ export function AddExternalInterpreterModal({
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}
                     placeholder="e.g., (206) 555-0142"
-                    className="w-full bg-[#F4F3EF] border border-transparent rounded-full pl-10 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/20 outline-none transition-all disabled:opacity-60"
+                    className="w-full bg-[#F4F3EF] border border-transparent rounded-full pl-10 pr-4 py-2.5 text-sm text-gray-800 placeholder-gray-400 focus:bg-white focus:border-[var(--forest)] focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)] outline-none transition-all disabled:opacity-60"
                   />
                 </div>
               </div>
@@ -241,7 +241,7 @@ export function AddExternalInterpreterModal({
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[#0B3B32] text-sm font-medium text-white hover:bg-[#082a23] transition-colors shadow-sm disabled:opacity-50"
+                  className="inline-flex items-center gap-2 px-6 py-2.5 rounded-full bg-[var(--forest)] text-sm font-medium text-white hover:bg-[var(--forest-hover)] transition-colors shadow-sm disabled:opacity-50"
                 >
                   {isSubmitting ? (
                     <>

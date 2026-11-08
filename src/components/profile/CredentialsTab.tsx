@@ -60,7 +60,7 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, time
     <button
       type="button"
       onClick={() => setFormFor("new")}
-      className="inline-flex items-center gap-2 rounded-full bg-[#0B3B32] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#082a23]"
+      className="inline-flex items-center gap-2 rounded-full bg-[var(--forest)] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[var(--forest-hover)]"
     >
       <Plus className="h-4 w-4" aria-hidden="true" />
       Add a credential

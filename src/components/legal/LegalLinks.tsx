@@ -26,7 +26,7 @@ export function AgreementNotice({ className = "" }: { className?: string }) {
 
 const TONES = {
   // The green desktop sidebar.
-  dark: "text-[#8BA49E]/80 hover:text-white focus-visible:text-white",
+  dark: "text-[var(--sidebar-muted)] opacity-80 hover:text-white hover:opacity-100 focus-visible:text-white",
   // The white mobile menu.
   light: "text-slate-400 hover:text-slate-700 focus-visible:text-slate-700",
 } as const;

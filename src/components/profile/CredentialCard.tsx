@@ -79,7 +79,7 @@ export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onAr
         {confirmingArchive ? (
           <div role="alertdialog" aria-label={`Archive ${c.name}?`} className="flex flex-wrap items-center gap-2">
             <span className="text-[13px] text-gray-700">Archive this credential? Agencies will no longer see it, and its sharing is cleared.</span>
-            <button type="button" onClick={archive} disabled={archiving} className="rounded-full bg-[#0B3B32] px-4 py-1.5 text-xs font-medium text-white hover:bg-[#082a23] disabled:opacity-60">
+            <button type="button" onClick={archive} disabled={archiving} className="rounded-full bg-[var(--forest)] px-4 py-1.5 text-xs font-medium text-white hover:bg-[var(--forest-hover)] disabled:opacity-60">
               {archiving ? "Archiving…" : "Yes, archive"}
             </button>
             <button type="button" onClick={() => setConfirmingArchive(false)} disabled={archiving} className={actionButton}>

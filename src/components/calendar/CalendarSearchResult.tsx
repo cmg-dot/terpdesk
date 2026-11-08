@@ -27,7 +27,7 @@ export const CalendarSearchResult = ({ id, entry, active, onPick, onHover }: Pro
   >
     <div className="flex items-center gap-2">
       {entry.srn ? (
-        <span className="shrink-0 rounded-full bg-[#0B3B32] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white">SRN #{entry.srn}</span>
+        <span className="shrink-0 rounded-full bg-[var(--forest)] px-2 py-0.5 text-[11px] font-semibold tabular-nums text-white">SRN #{entry.srn}</span>
       ) : (
         <span className="shrink-0 rounded-full bg-gray-200 px-2 py-0.5 text-[11px] font-semibold text-gray-600">No SRN</span>
       )}

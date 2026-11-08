@@ -5,7 +5,7 @@ import type { VirtualMeetingField } from "@/components/requests/VirtualMeetingFi
 import type { QuickEditValues } from "@/lib/quickEditAccess";
 
 const labelClass = "mb-1 block text-xs font-medium text-gray-700";
-const inputClass = "w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]";
+const inputClass = "w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[var(--forest)]";
 
 interface Props {
   values: QuickEditValues;

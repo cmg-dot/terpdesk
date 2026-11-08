@@ -15,6 +15,7 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { JobPlaceCards } from "@/components/interpreter/JobPlaceCards";
+import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { formatReference } from "@/utils/statusEngine";
@@ -212,7 +213,7 @@ function VersionHistoryAuditLog({
             ? 'bg-green-600 ring-green-100' 
             : isCorrectionReq 
               ? 'bg-amber-500 ring-amber-100' 
-              : 'bg-[#1B433C] ring-emerald-100';
+              : 'bg-[var(--forest-soft)] ring-emerald-100';
 
           return (
             <div key={evt.id || idx} className="relative">
@@ -706,7 +707,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
             href={buildOdhhPortalUrl((job as any).data?.intake?.odhhSrn)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center justify-center rounded-full bg-[#1B433C] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#14332D]"
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--forest-soft)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#14332D]"
           >
             Open ODHH Portal
           </a>
@@ -722,7 +723,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
 
       {isFormOpen ? (
         <div className="mb-4 relative">
-          <button onClick={() => setIsFormOpen(false)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium mb-6 transition-colors hover:bg-[#14332D]">Close</button>
+          <button onClick={() => setIsFormOpen(false)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium mb-6 transition-colors hover:bg-[#14332D]">Close</button>
           
           <div className="bg-[#F5F4F0] p-6 rounded-xl">
              {isFutureAppointment && (
@@ -862,7 +863,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
               </div>
             </div>
           ) : (
-            <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] transition-colors">
+            <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] transition-colors">
               Submit actual hours
             </button>
           )}
@@ -1079,7 +1080,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
+              <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
                 Edit draft / Submit actual hours
               </button>
             )
@@ -1102,7 +1103,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setIsFormOpen(true)} className="bg-[#1B433C] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
+              <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
                 Submit a correction
               </button>
             )
@@ -1263,7 +1264,7 @@ export default function JobDetailPage() {
         {/* Page Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
           <div>
-            <div className="mb-3">
+            <div className="mb-3 flex flex-wrap items-center gap-2">
               {isOdhh ? (
                 <span className="bg-[#E6F4EA] text-[#137333] border border-[#CEEAD6] text-xs font-bold px-3 py-1 rounded-full uppercase tracking-wide">
                   ODHH State Agency
@@ -1273,6 +1274,7 @@ export default function JobDetailPage() {
                   Private Hospital
                 </span>
               )}
+              <AssignedByBadge agencyName={job.agencyName} />
             </div>
             <h1 className="text-[28px] font-semibold text-[var(--ink)] mb-1 tracking-tight">
               {job.title}
@@ -1300,7 +1302,7 @@ export default function JobDetailPage() {
               </span>
             ) : null}
             {job.status === 'booked' && (
-              <span className="bg-[#E2EBE5] text-[#1B433C] text-[12px] px-3 py-1.5 rounded-full font-medium">
+              <span className="bg-[var(--surface)] text-[var(--forest-soft)] text-[12px] px-3 py-1.5 rounded-full font-medium">
                 Booked
               </span>
             )}
@@ -1441,7 +1443,7 @@ export default function JobDetailPage() {
                   Booking: Unfilled
                 </span>
               ) : (
-                <span className="bg-[#E2EBE5] text-[#1B433C] text-[12px] font-medium px-3 py-1 rounded-full">
+                <span className="bg-[var(--surface)] text-[var(--forest-soft)] text-[12px] font-medium px-3 py-1 rounded-full">
                   Booking: Reserved
                 </span>
               )}
@@ -1601,7 +1603,7 @@ export default function JobDetailPage() {
                 type="text" 
                 value={giveBackReason}
                 onChange={(e) => setGiveBackReason(e.target.value)}
-                className="w-full bg-[#F5F4F0] border border-[#EBE8DF] rounded-xl px-4 py-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-[#0B3B32]/30"
+                className="w-full bg-[#F5F4F0] border border-[#EBE8DF] rounded-xl px-4 py-3 text-[15px] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.3)]"
               />
             </div>
             

@@ -63,7 +63,7 @@ export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview
             setSavedMessage(null);
             setEditing(true);
           }}
-          className="inline-flex items-center gap-2 rounded-full bg-[#0B3B32] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[#082a23]"
+          className="inline-flex items-center gap-2 rounded-full bg-[var(--forest)] px-5 py-2.5 text-sm font-medium text-white shadow-sm transition-colors hover:bg-[var(--forest-hover)]"
         >
           <Pencil className="h-4 w-4" aria-hidden="true" />
           Edit profile

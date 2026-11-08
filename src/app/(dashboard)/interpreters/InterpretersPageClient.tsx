@@ -34,7 +34,7 @@ interface InterpretersPageClientProps {
 const tabButtonClass = (active: boolean): string =>
   `px-5 py-2 text-sm font-medium rounded-full transition-colors ${
     active
-      ? "bg-[var(--forest)] text-[var(--canvas)] border border-[#0B3B32]"
+      ? "bg-[var(--forest)] text-[var(--canvas)] border border-[var(--forest)]"
       : "bg-white text-gray-700 border border-gray-200 hover:bg-gray-50"
   }`;
 
@@ -166,7 +166,7 @@ export function InterpretersPageClient({
             initial={{ opacity: 0, y: -20, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -20, scale: 0.95 }}
-            className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-[#0B3B32] text-white px-5 py-3 rounded-2xl shadow-xl border border-[#145347]"
+            className="fixed top-6 right-6 z-50 flex items-center gap-3 bg-[var(--forest)] text-white px-5 py-3 rounded-2xl shadow-xl border border-[#145347]"
           >
             <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
             <span className="text-sm font-medium">{toastMessage}</span>
@@ -203,7 +203,7 @@ export function InterpretersPageClient({
           <button
             type="button"
             onClick={() => setIsAddModalOpen(true)}
-            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[#0B3B32] text-white text-sm font-medium hover:bg-[#082a23] transition-all shadow-sm active:scale-95 cursor-pointer"
+            className="inline-flex w-full sm:w-auto items-center justify-center gap-2 px-5 py-2.5 rounded-full bg-[var(--forest)] text-white text-sm font-medium hover:bg-[var(--forest-hover)] transition-all shadow-sm active:scale-95 cursor-pointer"
           >
             <UserPlus className="w-4 h-4" />
             <span>Add External Interpreter</span>
@@ -239,7 +239,7 @@ export function InterpretersPageClient({
             placeholder="Start typing a name, email address, or phone..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-[#F4F3EF] border-none rounded-full pl-11 pr-5 py-3 text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow"
+            className="w-full bg-[#F4F3EF] border-none rounded-full pl-11 pr-5 py-3 text-sm text-gray-800 placeholder-gray-400 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow"
           />
           {searchQuery && (
             <button

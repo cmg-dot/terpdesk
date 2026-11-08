@@ -713,7 +713,7 @@ export default function AssignmentDetailPage() {
    },
  ].filter((row) => row.value !== '');
 
- const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow";
+ const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow";
 
  const { startsAt: reqStartsAt, endsAt: reqEndsAt } = resolveRequestTimes({
    createdAt: foundRequest?.createdAt,
@@ -950,7 +950,7 @@ export default function AssignmentDetailPage() {
  <details data-job-details className="group rounded-2xl border border-gray-200 bg-white">
  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 text-[16px] font-medium text-[var(--ink)] sm:px-8 [&::-webkit-details-marker]:hidden">
  <span>Job details on file <span className="ml-1 text-sm font-normal text-[var(--sage)]">overview, format, location, preparation notes, requester</span></span>
- <ChevronDown className="h-5 w-5 flex-none text-[#0B3B32] transition-transform group-open:rotate-180" aria-hidden="true" />
+ <ChevronDown className="h-5 w-5 flex-none text-[var(--forest)] transition-transform group-open:rotate-180" aria-hidden="true" />
  </summary>
  <div className="flex flex-col gap-6 border-t border-gray-100 p-4 sm:p-6">
  
@@ -1194,7 +1194,7 @@ export default function AssignmentDetailPage() {
  href={`https://fortress.wa.gov/dshs/odhhapps/interpreters/servicerequest.aspx?id=${foundRequest.data.intake.odhhSrn}`}
  target="_blank"
  rel="noopener noreferrer"
- className="inline-block mt-4 rounded-full px-5 py-2.5 text-sm font-medium text-white bg-[#0B3B32] hover:bg-[#0f4037] transition-colors"
+ className="inline-block mt-4 rounded-full px-5 py-2.5 text-sm font-medium text-white bg-[var(--forest)] hover:bg-[#0f4037] transition-colors"
  >
  Acknowledge on ODHH
  </a>
@@ -1225,7 +1225,7 @@ export default function AssignmentDetailPage() {
  <div className={cardClass}>
  <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Service verification</h2>
  <label className="flex items-start gap-3 cursor-pointer mt-2">
- <input type="checkbox" className="mt-0.5 h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" />
+ <input type="checkbox" className="mt-0.5 h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" />
  <span className="text-sm text-gray-800 leading-snug">Ask each interpreter for a service-verification signature</span>
  </label>
  </div>
@@ -1521,7 +1521,7 @@ export default function AssignmentDetailPage() {
  type="text" 
  value={cancelReasonInput}
  onChange={(e) => setCancelReasonInput(e.target.value)}
- className="w-full bg-[#F5F4F0] border-none rounded-2xl px-4 py-3.5 text-sm text-[var(--ink)] focus:ring-2 focus:ring-[#0B3B32] outline-none" 
+ className="w-full bg-[#F5F4F0] border-none rounded-2xl px-4 py-3.5 text-sm text-[var(--ink)] focus:ring-2 focus:ring-[var(--forest)] outline-none" 
  />
  </div>
  
@@ -1530,7 +1530,7 @@ export default function AssignmentDetailPage() {
  type="checkbox" 
  checked={clientRequested}
  onChange={(e) => setClientRequested(e.target.checked)}
- className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
+ className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" 
  />
  <span className="text-[15px] text-gray-800">The client requested this cancellation</span>
  </label>

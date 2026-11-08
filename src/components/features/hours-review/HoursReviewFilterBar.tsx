@@ -98,7 +98,7 @@ function SearchBox({ value, onSearch }: { value: string; onSearch: (q: string) =
             flush();
           }}
           placeholder="SRN, interpreter or title"
-          className="w-full rounded-full border border-stone-200 bg-[#F4F3EF] py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-colors placeholder:text-gray-400 hover:border-[#0B3B32]/40 hover:bg-emerald-50 focus:border-[#0B3B32] focus:bg-emerald-50 focus:ring-2 focus:ring-[#0B3B32]/40"
+          className="w-full rounded-full border border-stone-200 bg-[#F4F3EF] py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-colors placeholder:text-gray-400 hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-emerald-50 focus:border-[var(--forest)] focus:bg-emerald-50 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.4)]"
         />
       </div>
     </div>
@@ -135,7 +135,7 @@ export const HoursReviewFilterBar = ({ filters, onChange, statusCounts, shown, t
           {active > 0 && ` · ${active} ${active === 1 ? "filter" : "filters"} on`}
         </p>
         {active > 0 && (
-          <button type="button" onClick={() => onChange(DEFAULT_FILTERS)} className="font-medium text-[#0B3B32] hover:underline">
+          <button type="button" onClick={() => onChange(DEFAULT_FILTERS)} className="font-medium text-[var(--forest)] hover:underline">
             Clear filters
           </button>
         )}

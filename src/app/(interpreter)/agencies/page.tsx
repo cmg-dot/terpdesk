@@ -69,12 +69,12 @@ export default function AgenciesPage() {
                 value={inputCode}
                 onChange={(e) => { setInputCode(e.target.value); setErrorMsg(""); setSuccessMsg(""); }}
                 placeholder="For example ASLPRO-2026"
-                className="w-full sm:w-[320px] rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-700 placeholder:text-slate-400 border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[#0B3B32]/30"
+                className="w-full sm:w-[320px] rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-700 placeholder:text-slate-400 border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.3)]"
               />
               <button 
                 onClick={handleSendRequest}
                 disabled={!inputCode.trim()}
-                className="h-[52px] rounded-full bg-[#0B3B32] px-8 text-[15px] font-medium text-white transition-colors hover:bg-[#0a2e27] disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed whitespace-nowrap"
+                className="h-[52px] rounded-full bg-[var(--forest)] px-8 text-[15px] font-medium text-white transition-colors hover:bg-[#0a2e27] disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed whitespace-nowrap"
               >
                 Send request
               </button>
@@ -106,7 +106,7 @@ export default function AgenciesPage() {
               return (
                 <div key={membership.key} className={`flex flex-col sm:flex-row sm:items-center gap-4 py-4 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <span className="text-[15px] font-medium text-[var(--ink)]">{agency?.name || 'Unknown Agency'}</span>
-                  <span className="rounded-full bg-[#E6EFEA] px-3 py-1 text-[11px] font-semibold text-[#385B52]">Active</span>
+                  <span className="rounded-full bg-[var(--tint)] px-3 py-1 text-[11px] font-semibold text-[var(--tint-ink)]">Active</span>
                 </div>
               );
             })}
@@ -132,7 +132,7 @@ export default function AgenciesPage() {
               return (
                 <div key={membership.key} className={`flex flex-col sm:flex-row sm:items-center gap-4 py-5 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <span className="text-[15px] font-medium text-[var(--ink)] w-full sm:w-[280px]">{agency?.name || 'Unknown Agency'}</span>
-                  <span className={`rounded-full px-3 py-1 text-[11px] font-semibold shrink-0 ${perm.sharesAvailability ? 'bg-[#E6EFEA] text-[#385B52]' : 'bg-[#F3F2EE] text-slate-500'}`}>
+                  <span className={`rounded-full px-3 py-1 text-[11px] font-semibold shrink-0 ${perm.sharesAvailability ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'bg-[#F3F2EE] text-slate-500'}`}>
                     {perm.sharesAvailability ? 'Sharing' : 'Not sharing'}
                   </span>
                   <button
@@ -185,7 +185,7 @@ export default function AgenciesPage() {
                 <div key={membership.key} className={`flex flex-col py-6 ${i !== 0 ? 'border-t border-gray-100' : ''}`}>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-3">
                     <span className="text-[15px] font-medium text-[var(--ink)] w-full sm:w-[280px]">{agencyName}</span>
-                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold shrink-0 ${perm.allowsAutoBook ? 'bg-[#E6EFEA] text-[#385B52]' : 'bg-[#F3F2EE] text-slate-500'}`}>
+                    <span className={`rounded-full px-3 py-1 text-[11px] font-semibold shrink-0 ${perm.allowsAutoBook ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'bg-[#F3F2EE] text-slate-500'}`}>
                       {perm.allowsAutoBook ? 'Auto Fill on' : 'Auto Fill off'}
                     </span>
                     <button
@@ -221,7 +221,7 @@ export default function AgenciesPage() {
                 let stateColor = "bg-[#F3F2EE] text-slate-500";
                 let stateText = "Pending";
                 if (req.state === 'approved') {
-                  stateColor = "bg-[#E6EFEA] text-[#385B52]";
+                  stateColor = "bg-[var(--tint)] text-[var(--tint-ink)]";
                   stateText = "Approved";
                 } else if (req.state === 'declined') {
                   stateColor = "bg-red-50 text-red-600";

@@ -96,7 +96,7 @@ export default function ClientsPage() {
  value={searchQuery}
  onChange={(e) => setSearchQuery(e.target.value)}
  placeholder="Name, contact or address"
- className="w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
+ className="w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none"
  />
  </div>
  <div className="md:w-[250px]">
@@ -127,7 +127,7 @@ export default function ClientsPage() {
  onKeyDown={(e) => {
  if (e.key === "Enter") handleCreate();
  }}
- className="w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none"
+ className="w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none"
  />
  </div>
  <div>

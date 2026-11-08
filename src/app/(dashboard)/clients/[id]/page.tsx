@@ -127,8 +127,8 @@ export default function ClientDetailsPage() {
  );
  }
 
- const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-5 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow";
- const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow resize-none";
+ const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-5 py-3 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow";
+ const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow resize-none";
 
  return (
  <div className="max-w-[1200px] mx-auto p-6 space-y-6 pb-24 antialiased">
@@ -151,7 +151,7 @@ export default function ClientDetailsPage() {
  <div className="flex flex-wrap items-center gap-3 mb-8">
  {client.isArchived ? (
  <>
- <button className="bg-[#8BA49E] text-white/80 px-6 py-2.5 rounded-full text-sm font-medium cursor-not-allowed">
+ <button className="bg-[var(--sidebar-muted)] text-white/80 px-6 py-2.5 rounded-full text-sm font-medium cursor-not-allowed">
  New request for this organization
  </button>
  <button onClick={() => restoreClient(client.id)} className="bg-white text-gray-700 border border-gray-200 px-6 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors">
@@ -240,7 +240,7 @@ export default function ClientDetailsPage() {
  setTimeout(() => setIsSaving(false), 2000);
  }}
  className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-medium transition-opacity flex items-center justify-center sm:justify-start gap-2 ${
-   isGeneralEmailInvalid ? "bg-[#8BA49E] text-white/70 opacity-60 cursor-not-allowed" : "bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90"
+   isGeneralEmailInvalid ? "bg-[var(--sidebar-muted)] text-white/70 opacity-60 cursor-not-allowed" : "bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90"
  }`}
  >
  {isSaving ? "Saved!" : "Save organization details"}
@@ -361,7 +361,7 @@ export default function ClientDetailsPage() {
  type="checkbox" 
  checked={newContactForm.isDefault}
  onChange={e => setNewContactForm({ ...newContactForm, isDefault: e.target.checked })}
- className="h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
+ className="h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" 
  />
  <span className="text-[14px] text-gray-600">Use as the default for this organization</span>
  </div>
@@ -384,7 +384,7 @@ export default function ClientDetailsPage() {
  className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
  newContactForm.name.trim() && !isContactEmailInvalid
  ? 'bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90' 
- : 'bg-[#8BA49E] text-white/70 opacity-60 cursor-not-allowed'
+ : 'bg-[var(--sidebar-muted)] text-white/70 opacity-60 cursor-not-allowed'
  }`}
  >
  Add contact
@@ -460,7 +460,7 @@ export default function ClientDetailsPage() {
  type="checkbox" 
  checked={newLocationForm.isDefault}
  onChange={e => setNewLocationForm({...newLocationForm, isDefault: e.target.checked})}
- className="h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
+ className="h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" 
  />
  <span className="text-[14px] text-gray-600">Use as the default location for this organization</span>
  </div>
@@ -483,7 +483,7 @@ export default function ClientDetailsPage() {
  className={`w-full md:w-auto px-6 py-2.5 rounded-full text-sm font-medium transition-all ${
  newLocationForm.name.trim() 
  ? 'bg-[var(--forest)] text-[var(--canvas)] hover:opacity-90' 
- : 'bg-[#8BA49E] text-white/70 opacity-60 cursor-not-allowed'
+ : 'bg-[var(--sidebar-muted)] text-white/70 opacity-60 cursor-not-allowed'
  }`}
  >
  Add location

@@ -10,7 +10,7 @@ export default function AdminImportPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6 p-6 md:p-10">
       <div>
-        <Link href="/interpreters" className="text-[13px] font-medium text-[#0B3B32] hover:underline">← Interpreters</Link>
+        <Link href="/interpreters" className="text-[13px] font-medium text-[var(--forest)] hover:underline">← Interpreters</Link>
         <h1 className="mt-2 text-2xl font-semibold text-[var(--ink)]">Import from Excel</h1>
         <p className="mt-1 text-sm text-gray-600">
           Upload the agency&apos;s master workbook. Each import shows you what will happen before anything is saved.

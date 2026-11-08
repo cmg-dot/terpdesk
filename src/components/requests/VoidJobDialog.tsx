@@ -77,7 +77,7 @@ export function VoidJobDialog({ open, onOpenChange, requestId, hasInterpreters, 
               maxLength={300}
               onChange={(e) => setNote(e.target.value)}
               rows={3}
-              className="w-full rounded-2xl border-none bg-[#F4F3EF] px-4 py-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]"
+              className="w-full rounded-2xl border-none bg-[#F4F3EF] px-4 py-3 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[var(--forest)]"
             />
           </div>
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}

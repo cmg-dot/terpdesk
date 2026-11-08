@@ -78,7 +78,7 @@ export function ClarificationButton({ target }: { target: ClarificationTarget })
             maxLength={MAX}
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
-            className="w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40"
+            className="w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[var(--forest)] focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.4)]"
           />
           <p className="mt-1 text-right text-xs text-gray-500">{question.length}/{MAX}</p>
           {error && <p role="alert" className="mt-2 text-sm font-medium text-red-700">{error}</p>}
@@ -86,7 +86,7 @@ export function ClarificationButton({ target }: { target: ClarificationTarget })
             <button type="button" onClick={() => setOpen(false)} disabled={busy} className="rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50">
               Cancel
             </button>
-            <button type="button" onClick={submit} disabled={busy} className="rounded-full bg-[#0B3B32] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:opacity-60">
+            <button type="button" onClick={submit} disabled={busy} className="rounded-full bg-[var(--forest)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:opacity-60">
               {busy ? "Sending…" : "Send question"}
             </button>
           </DialogFooter>

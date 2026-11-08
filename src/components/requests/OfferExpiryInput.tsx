@@ -17,7 +17,7 @@ interface OfferExpiryInputProps {
 }
 
 const BOX =
-  "w-full rounded-full border-none bg-[#F5F4F0] px-4 py-3 text-sm text-gray-800 outline-none transition-shadow focus:ring-2 focus:ring-[#0B3B32] disabled:cursor-not-allowed";
+  "w-full rounded-full border-none bg-[#F5F4F0] px-4 py-3 text-sm text-gray-800 outline-none transition-shadow focus:ring-2 focus:ring-[var(--forest)] disabled:cursor-not-allowed";
 
 /** "Respond within N hours M minutes", with the resulting deadline previewed in the job's time zone. */
 export const OfferExpiryInput = ({ hours, minutes, onChange, nowMs, timeZone, startsAt, disabled }: OfferExpiryInputProps) => {

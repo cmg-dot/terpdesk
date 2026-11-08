@@ -110,7 +110,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  autoComplete="email"
  disabled={isSubmitting}
  {...register("email")}
- className="w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[#0B3B32]/20"
+ className="w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)]"
  />
  {errors.email && (
  <p className="text-xs text-red-500">{errors.email.message}</p>
@@ -129,7 +129,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  autoComplete="current-password"
  disabled={isSubmitting}
  {...register("password")}
- className="w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[#0B3B32]/20"
+ className="w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)]"
  />
  {errors.password && (
  <p className="text-xs text-red-500">{errors.password.message}</p>
@@ -151,7 +151,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  <button
  type="submit"
  disabled={isSubmitting}
- className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#0B3B32]/50 disabled:opacity-50"
+ className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)] disabled:opacity-50"
  >
  {isSubmitting ? "Signing in..." : "Sign in"}
  </button>

@@ -34,14 +34,14 @@ const SIZES = {
  */
 export const CalendarNav = ({ dateKey, todayKey, unit, onPrev, onNext, onToday, onPick, extra, size = "md" }: Props) => {
   const s = SIZES[size];
-  const arrow = `flex ${s.arrow} items-center justify-center rounded-full border border-gray-200 text-gray-700 transition-colors duration-100 hover:bg-gray-50 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]`;
+  const arrow = `flex ${s.arrow} items-center justify-center rounded-full border border-gray-200 text-gray-700 transition-colors duration-100 hover:bg-gray-50 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]`;
   return (
     <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
       <div className="flex items-center gap-2">
         <button type="button" onClick={onPrev} aria-label={`Previous ${unit}`} className={arrow}>
           <ChevronLeft className={s.arrowIcon} aria-hidden="true" />
         </button>
-        <button type="button" onClick={onToday} className={`rounded-full border border-gray-200 font-medium text-gray-700 transition-colors duration-100 hover:bg-gray-50 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] ${s.today}`}>
+        <button type="button" onClick={onToday} className={`rounded-full border border-gray-200 font-medium text-gray-700 transition-colors duration-100 hover:bg-gray-50 active:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] ${s.today}`}>
           Today
         </button>
         {extra}
@@ -55,7 +55,7 @@ export const CalendarNav = ({ dateKey, todayKey, unit, onPrev, onNext, onToday, 
           text={formatBadgeDate(dateKey)}
           placeholder="Choose a date"
           icon={<CalendarIcon aria-hidden="true" className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-600" />}
-          className={`rounded-full bg-[#F4F3EF] py-2 pr-4 font-medium tabular-nums text-gray-700 transition-colors duration-100 hover:bg-[#E9E7DF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] ${s.badge}`}
+          className={`rounded-full bg-[#F4F3EF] py-2 pr-4 font-medium tabular-nums text-gray-700 transition-colors duration-100 hover:bg-[#E9E7DF] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] ${s.badge}`}
           wrapperClassName="relative w-fit"
           compact={false}
           ariaLabel="Jump to a date"

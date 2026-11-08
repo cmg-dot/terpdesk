@@ -47,7 +47,7 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
           href={meetingLink.startsWith("http") ? meetingLink : `https://${meetingLink}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1B433C] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm"
         >
           Open meeting link <ExternalLink className="w-3.5 h-3.5" />
         </a>
@@ -67,7 +67,7 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
             <div className="bg-[#F8FAF9] p-3.5 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Meeting Link</span>
-                <span className="text-xs font-mono text-[#0B3B32] truncate block break-all">{meetingLink}</span>
+                <span className="text-xs font-mono text-[var(--forest)] truncate block break-all">{meetingLink}</span>
               </div>
               <CopyButton text={meetingLink} label="meeting link" />
             </div>

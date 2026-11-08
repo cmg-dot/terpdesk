@@ -10,7 +10,7 @@ import { formatDetailsDate } from "@/lib/requestDetailsFormat";
 const TIME_ZONES = plainOptions(["Pacific Time — Seattle, Los Angeles", "Mountain Time — Denver", "Arizona (no daylight saving)", "Central Time — Chicago", "Eastern Time — New York", "Alaska Time", "Hawaii Time"]);
 
 const labelClass = "mb-1 block text-xs font-medium text-gray-700";
-const inputClass = "w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]";
+const inputClass = "w-full rounded-xl border border-gray-200 bg-white px-3.5 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[var(--forest)]";
 
 const asInstant = (value: unknown): string | Date | null => (typeof value === "string" || value instanceof Date ? value : null);
 

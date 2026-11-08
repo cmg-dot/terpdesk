@@ -97,7 +97,7 @@ export function NotificationBell() {
           <div className="px-4 py-3 border-b border-gray-100 flex items-center justify-between bg-gray-50/50">
             <h3 className="font-semibold text-[15px] text-gray-800 tracking-tight">Notifications</h3>
             {unreadCount > 0 && (
-              <button type="button" onClick={handleMarkAll} className="text-xs font-medium text-[#0B3B32] hover:underline">
+              <button type="button" onClick={handleMarkAll} className="text-xs font-medium text-[var(--forest)] hover:underline">
                 Mark all as read
               </button>
             )}
@@ -112,11 +112,11 @@ export function NotificationBell() {
                     key={notif.id}
                     onClick={() => handleClick(notif)}
                     className={`text-left px-4 py-4 border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors ${
-                      notif.isRead ? "bg-white" : "bg-[#F9F8F4]"
+                      notif.isRead ? "bg-white" : "bg-[var(--canvas)]"
                     }`}
                   >
                     <div className="flex items-start gap-3">
-                      {!notif.isRead && <div className="mt-1.5 w-2 h-2 rounded-full bg-[#0B3B32] shrink-0" />}
+                      {!notif.isRead && <div className="mt-1.5 w-2 h-2 rounded-full bg-[var(--forest)] shrink-0" />}
                       <div className={`flex min-w-0 flex-col gap-1 break-words ${notif.isRead ? "ml-5" : ""}`}>
                         <span className={`text-sm ${notif.isRead ? "font-medium text-gray-700" : "font-semibold text-gray-900"}`}>
                           {notif.title}

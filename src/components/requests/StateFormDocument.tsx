@@ -25,7 +25,7 @@ function Section({ section, missing }: { section: FormSection; missing: string }
   return (
     <section aria-labelledby={headingId} data-form-section={section.number} className="px-6 py-5 sm:px-8">
       <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1">
-        <h3 id={headingId} className="text-[13px] font-semibold uppercase tracking-wide text-[#0B3B32]">
+        <h3 id={headingId} className="text-[13px] font-semibold uppercase tracking-wide text-[var(--forest)]">
           {section.number}. {section.title}
         </h3>
         {section.tag && <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[11px] font-semibold text-amber-900">{section.tag}</span>}

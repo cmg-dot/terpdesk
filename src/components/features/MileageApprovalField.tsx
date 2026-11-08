@@ -20,7 +20,7 @@ interface MileageApprovalFieldProps {
 }
 
 const inputClass =
-  "bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow";
+  "bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow";
 
 /** The agency's "mileage to approve" input. Changing it from the reported figure asks for the reason. */
 export function MileageApprovalField({

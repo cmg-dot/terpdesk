@@ -80,7 +80,7 @@ export const VisibilitySharingTab = ({ profile, sharing, onSharingChange }: Visi
                       checked={s.status !== "not_shared"}
                       disabled={busyAgencyId !== null}
                       onChange={(e) => toggle(s.agencyId, e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-[#0B3B32]"
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-[var(--forest)]"
                     />
                     <span>
                       <span className="block font-medium">{nameOf(s.agencyId)}</span>

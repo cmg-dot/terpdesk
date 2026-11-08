@@ -132,7 +132,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                   {access.details.virtual.platform && <Row label="Platform">{access.details.virtual.platform}</Row>}
                   <Row label="Meeting link">
                     {safeHref(access.details.virtual.meetingLink) ? (
-                      <a href={access.details.virtual.meetingLink} target="_blank" rel="noopener noreferrer" className="text-[#0B3B32] underline">
+                      <a href={access.details.virtual.meetingLink} target="_blank" rel="noopener noreferrer" className="text-[var(--forest)] underline">
                         Join meeting
                       </a>
                     ) : (
@@ -172,7 +172,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                         href={`/api/job-details/files/${f.id}?token=${encodeURIComponent(token)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="min-w-0 truncate text-[14px] font-medium text-[#0B3B32] underline-offset-4 hover:underline"
+                        className="min-w-0 truncate text-[14px] font-medium text-[var(--forest)] underline-offset-4 hover:underline"
                       >
                         {f.fileName}
                       </a>

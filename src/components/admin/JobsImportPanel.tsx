@@ -6,7 +6,7 @@ import { useJobsImport } from "@/hooks/useJobsImport";
 import { JOBS_SHEET_LABEL } from "@/lib/jobImport/types";
 
 const secondaryButton = "rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60";
-const primaryButton = "rounded-full bg-[#0B3B32] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60";
+const primaryButton = "rounded-full bg-[var(--forest)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:cursor-not-allowed disabled:opacity-60";
 
 /** Upload, check, confirm: the whole historical-jobs import. Reads only the jobs sheet of the same workbook. */
 export const JobsImportPanel = () => {
@@ -20,7 +20,7 @@ export const JobsImportPanel = () => {
         <>
           <WorkbookDropZone fileName={fileName} disabled={busy} onFile={chooseFile} />
           <label className="flex items-start gap-3 text-sm text-gray-700">
-            <input type="checkbox" checked={allowPartial} disabled={busy} onChange={(e) => setAllowPartial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[#0B3B32]" />
+            <input type="checkbox" checked={allowPartial} disabled={busy} onChange={(e) => setAllowPartial(e.target.checked)} className="mt-0.5 h-4 w-4 accent-[var(--forest)]" />
             <span>
               Link a name that is only the first part of one person&apos;s name (“Karen” → Karen Ames, “Kelly B” → Kelly Brown). Names that could be more
               than one person are never linked. Every such match is listed in the preview.

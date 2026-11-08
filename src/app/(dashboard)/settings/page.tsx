@@ -2,12 +2,12 @@
 
 import { motion } from "framer-motion";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
-import React, { useState } from "react";
+import React from "react";
 import { useSession } from "next-auth/react";
 import { ChangePasswordDialog } from "@/components/features/ChangePasswordDialog";
+import { ThemePicker } from "@/components/settings/ThemePicker";
 
 export default function SettingsPage() {
- const [theme, setTheme] = useState("default");
  const { data: session } = useSession();
 
  const notifications = [
@@ -86,11 +86,11 @@ export default function SettingsPage() {
  </div>
  <div className="flex items-center gap-6 shrink-0">
  <label className="flex items-center gap-2 cursor-pointer">
- <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32] accent-[#0B3B32] cursor-pointer" />
+ <input type="checkbox" defaultChecked className="w-4 h-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)] accent-[var(--forest)] cursor-pointer" />
  <span className="text-[13px] text-gray-700 font-medium">In-app</span>
  </label>
  <label className="flex items-center gap-2 cursor-pointer">
- <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32] accent-[#0B3B32] cursor-pointer" />
+ <input type="checkbox" className="w-4 h-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)] accent-[var(--forest)] cursor-pointer" />
  <span className="text-[13px] text-gray-700 font-medium">Email</span>
  </label>
  </div>
@@ -108,43 +108,7 @@ export default function SettingsPage() {
  <h2 className="text-lg font-semibold text-[var(--ink)] mb-1">Appearance</h2>
  <p className="text-[14px] text-[var(--sage)] mb-6">Customize your workspace theme and colors.</p>
 
- <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
- {/* Default */}
- <div className="flex flex-col items-center">
- <div
- onClick={() => setTheme("default")}
- className={`w-full max-w-[200px] h-24 rounded-xl flex overflow-hidden cursor-pointer transition-all ${theme === 'default' ? 'border-2 border-[#0B3B32] ring-2 ring-[#0B3B32]/20 ' : 'border border-gray-200 hover:border-gray-300 '}`}
- >
- <div className="w-1/4 h-full bg-[var(--forest)]" />
- <div className="w-3/4 h-full bg-[var(--canvas)]" />
- </div>
- <span className={`mt-3 text-[13px] font-medium ${theme === 'default' ? 'text-[var(--ink)]' : 'text-[var(--sage)]'}`}>Agency Default</span>
- </div>
-
- {/* Ocean */}
- <div className="flex flex-col items-center">
- <div
- onClick={() => setTheme("ocean")}
- className={`w-full max-w-[200px] h-24 rounded-xl flex overflow-hidden cursor-pointer transition-all ${theme === 'ocean' ? 'border-2 border-[#1E3A8A] ring-2 ring-[#1E3A8A]/20 ' : 'border border-gray-200 hover:border-gray-300 '}`}
- >
- <div className="w-1/4 h-full bg-[#1E3A8A]" />
- <div className="w-3/4 h-full bg-slate-50" />
- </div>
- <span className={`mt-3 text-[13px] font-medium ${theme === 'ocean' ? 'text-[var(--ink)]' : 'text-[var(--sage)]'}`}>Ocean Blue</span>
- </div>
-
- {/* Dark Mode */}
- <div className="flex flex-col items-center">
- <div
- onClick={() => setTheme("dark")}
- className={`w-full max-w-[200px] h-24 rounded-xl flex overflow-hidden cursor-pointer transition-all ${theme === 'dark' ? 'border-2 border-gray-700 ring-2 ring-gray-700/20 ' : 'border border-gray-200 hover:border-gray-300 '}`}
- >
- <div className="w-1/4 h-full bg-[#1F2937]" />
- <div className="w-3/4 h-full bg-[#111827]" />
- </div>
- <span className={`mt-3 text-[13px] font-medium ${theme === 'dark' ? 'text-[var(--ink)]' : 'text-[var(--sage)]'}`}>Dark Mode</span>
- </div>
- </div>
+ <ThemePicker />
  </div>
  </motion.div>
  );

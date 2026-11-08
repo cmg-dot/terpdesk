@@ -13,7 +13,7 @@ export function AgencyMessageList({ messages, timeZone }: { messages: AgencyMess
   return (
     <ul className="space-y-3">
       {messages.map((m) => (
-        <li key={m.id} className="rounded-xl border-l-4 border-[#0B3B32] bg-gray-50 px-4 py-3">
+        <li key={m.id} className="rounded-xl border-l-4 border-[var(--forest)] bg-gray-50 px-4 py-3">
           <p className="whitespace-pre-line text-[14px] text-gray-800">{m.text}</p>
           <p className="mt-1 text-xs text-gray-500">
             {when(m.sentAt)}

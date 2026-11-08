@@ -88,7 +88,7 @@ export const TimelineGrid = ({ view, people, nowMs, busy }: Props) => {
       tabIndex={0}
       aria-busy={busy}
       data-timeline-date={view.date}
-      className={`max-h-[70dvh] w-full max-w-full overflow-auto overscroll-x-contain rounded-2xl border border-gray-200 bg-white transition-opacity [-webkit-overflow-scrolling:touch] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] ${busy ? "opacity-60" : ""}`}
+      className={`max-h-[70dvh] w-full max-w-full overflow-auto overscroll-x-contain rounded-2xl border border-gray-200 bg-white transition-opacity [-webkit-overflow-scrolling:touch] focus:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] ${busy ? "opacity-60" : ""}`}
     >
       <div data-timeline-canvas className="[--label-w:7.5rem] sm:[--label-w:12rem]" style={{ width: `calc(var(--label-w) + ${trackWidth}px)` }}>
         <div className="sticky top-0 z-20 flex border-b border-gray-200 bg-white">

@@ -96,7 +96,7 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jo
                     aria-selected={tab === id}
                     data-message-tab={id}
                     onClick={() => setTab(id)}
-                    className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 ${tab === id ? "bg-white text-[var(--forest)] shadow-sm" : "text-[var(--sage)] hover:text-[var(--ink)]"}`}
+                    className={`inline-flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-[rgb(var(--forest-rgb)/0.4)] ${tab === id ? "bg-white text-[var(--forest)] shadow-sm" : "text-[var(--sage)] hover:text-[var(--ink)]"}`}
                   >
                     {id === "raw" && <Mail className="h-3.5 w-3.5" aria-hidden="true" />}
                     {label}

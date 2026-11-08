@@ -122,7 +122,7 @@ const ModalBody = memo(function ModalBody({ requestId, request, scheduleLocked, 
                   maxLength={1000}
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[#0B3B32]"
+                  className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[var(--forest)]"
                 />
                 <p className="mt-1 text-[11px] text-gray-500">
                   Added to the “Job details updated” email the booked interpreter gets when you save, e.g. to answer their question, and kept on their job page. It is emailed, so don't include client names or health information. ({message.length}/1000)

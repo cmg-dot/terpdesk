@@ -20,7 +20,7 @@ export function ReviewActions({ record, review }: { record: ServiceRecord; revie
         <label className="flex items-start gap-3 cursor-pointer mb-6">
           <input
             type="checkbox"
-            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]"
+            className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]"
             checked={review.hasException}
             onChange={(e) => {
               review.setHasException(e.target.checked);
@@ -54,7 +54,7 @@ export function ReviewActions({ record, review }: { record: ServiceRecord; revie
               review.setCorrectionText(e.target.value);
               review.setShowCorrectionError(false);
             }}
-            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow resize-none"
+            className="w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow resize-none"
           ></textarea>
           {review.showCorrectionError && <p className="text-[#C23B22] text-xs mt-1">Say what needs correcting so the interpreter can fix it</p>}
         </div>

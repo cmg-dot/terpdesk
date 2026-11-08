@@ -18,7 +18,7 @@ interface Props {
   onDone: () => void;
 }
 
-const navButton = "rounded-full p-1.5 text-[#0B3B32] transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]";
+const navButton = "rounded-full p-1.5 text-[var(--forest)] transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]";
 
 /**
  * A month calendar: previous / next month and year, the days of six weeks, "Today" and "Done". The chosen day is solid
@@ -77,7 +77,7 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
           <button type="button" className={navButton} onClick={() => jump(-12)} aria-label="Previous year"><ChevronsLeft className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" className={navButton} onClick={() => jump(-1)} aria-label="Previous month"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>
         </div>
-        <p className="text-sm font-semibold tracking-tight text-[#0B3B32]" aria-live="polite">{monthLabel(shown.year, shown.month)}</p>
+        <p className="text-sm font-semibold tracking-tight text-[var(--forest)]" aria-live="polite">{monthLabel(shown.year, shown.month)}</p>
         <div className="flex">
           <button type="button" className={navButton} onClick={() => jump(1)} aria-label="Next month"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" className={navButton} onClick={() => jump(12)} aria-label="Next year"><ChevronsRight className="h-4 w-4" aria-hidden="true" /></button>
@@ -105,10 +105,10 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
                 aria-current={cell.key === today ? "date" : undefined}
                 aria-label={formatDateSpoken(cell.key)}
                 onClick={() => onPick(cell.key)}
-                className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] disabled:cursor-not-allowed disabled:opacity-35 ${
+                className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-35 ${
                   selected
-                    ? "bg-[#0B3B32] font-semibold text-white"
-                    : `${cell.inMonth ? "text-slate-800" : "text-gray-400"} hover:bg-emerald-50 hover:text-[#0B3B32] ${cell.key === today ? "ring-1 ring-[#0B3B32]" : ""}`
+                    ? "bg-[var(--forest)] font-semibold text-white"
+                    : `${cell.inMonth ? "text-slate-800" : "text-gray-400"} hover:bg-emerald-50 hover:text-[var(--forest)] ${cell.key === today ? "ring-1 ring-[var(--forest)]" : ""}`
                 }`}
               >
                 {cell.day}
@@ -123,11 +123,11 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
           type="button"
           disabled={outOfRange(today)}
           onClick={() => onPick(today)}
-          className="rounded-full px-3 py-1 text-[13px] font-medium text-[#0B3B32] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full px-3 py-1 text-[13px] font-medium text-[var(--forest)] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Today
         </button>
-        <button type="button" onClick={onDone} className="rounded-full bg-[#0B3B32] px-4 py-1 text-[13px] font-medium text-white hover:bg-[#082a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] focus-visible:ring-offset-1">
+        <button type="button" onClick={onDone} className="rounded-full bg-[var(--forest)] px-4 py-1 text-[13px] font-medium text-white hover:bg-[var(--forest-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] focus-visible:ring-offset-1">
           Done
         </button>
       </div>

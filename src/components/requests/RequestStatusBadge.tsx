@@ -16,10 +16,10 @@ export function RequestStatusBadge({ status }: { status: string }) {
     return <span className={`${PILL} border border-slate-300 bg-slate-200 text-slate-700`}>Voided</span>;
   }
   if (status === "Completed") {
-    return <span className={`${PILL} bg-[#DDEBE5] text-[#0B3B32]`}>Completed</span>;
+    return <span className={`${PILL} bg-[#DDEBE5] text-[var(--forest)]`}>Completed</span>;
   }
   if (status === "Fully staffed" || status === "Booked" || status === "Assigned") {
-    return <span className={`${PILL} bg-[#E6EFEA] text-[#385B52]`}>{status}</span>;
+    return <span className={`${PILL} bg-[var(--tint)] text-[var(--tint-ink)]`}>{status}</span>;
   }
   if (status === "Needs replacement") {
     return <span className={`${PILL} border border-[#FDE68A]/60 bg-[#FEF3C7] text-[#92400E]`}>Needs replacement</span>;

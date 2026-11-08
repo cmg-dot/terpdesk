@@ -12,6 +12,8 @@ import { ensureValidAuthUrl } from "@/lib/baseUrl";
 import { LOCKED_MESSAGE, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
+import { themeForRole } from "@/lib/theme";
+import { readSavedTheme } from "@/lib/themeStore";
 
 // Runs before NextAuth ever reads NEXTAUTH_URL, so a missing/malformed value cannot throw "Invalid URL".
 ensureValidAuthUrl();
@@ -130,9 +132,14 @@ export const authOptions: NextAuthOptions = {
         }
       }
       // The client calls update() after the profile is saved: read the name again instead of trusting the cookie.
-      if (trigger === "update") token.displayName = undefined;
+      if (trigger === "update") {
+        token.displayName = undefined;
+        token.theme = undefined;
+      }
       // Looked up once, then carried in the token, so the very first paint already has the right name.
       if (token.displayName === undefined) token.displayName = await resolveDisplayName(token);
+      // The saved workspace theme (agency staff only), carried the same way so the root layout needs no query of its own.
+      if (token.theme === undefined && token.role === "agency") token.theme = await readSavedTheme(token.id);
       return token;
     },
     async session({ session, token }) {
@@ -141,6 +148,7 @@ export const authOptions: NextAuthOptions = {
         session.user.role = token.role;
         session.user.interpreterId = token.interpreterId ?? null;
         session.user.displayName = token.displayName ?? token.name ?? "";
+        session.user.theme = themeForRole(token.role, token.theme);
       }
       return session;
     },

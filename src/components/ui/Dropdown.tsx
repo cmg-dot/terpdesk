@@ -179,10 +179,10 @@ const DropdownField = memo(function DropdownField({
           onKeyDown={onKeyDown}
           // Space activates a button on key-up in some browsers: stop it re-opening the menu we just closed.
           onKeyUp={(e) => { if (e.key === " ") e.preventDefault(); }}
-          className={`flex w-full min-w-0 items-center justify-between gap-2 border border-stone-200 bg-[#F4F3EF] text-left leading-5 tracking-tight text-slate-800 outline-none transition-colors hover:border-[#0B3B32]/40 hover:bg-emerald-50 aria-expanded:border-[#0B3B32]/40 aria-expanded:bg-emerald-50 focus-visible:border-[#0B3B32] focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-red-400 ${TRIGGER_SHAPE[variant]}`}
+          className={`flex w-full min-w-0 items-center justify-between gap-2 border border-stone-200 bg-[#F4F3EF] text-left leading-5 tracking-tight text-slate-800 outline-none transition-colors hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-emerald-50 aria-expanded:border-[rgb(var(--forest-rgb)/0.4)] aria-expanded:bg-emerald-50 focus-visible:border-[var(--forest)] focus-visible:ring-2 focus-visible:ring-[rgb(var(--forest-rgb)/0.4)] disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-red-400 ${TRIGGER_SHAPE[variant]}`}
         >
           <span className="min-w-0 truncate">{selected?.label ?? placeholder}</span>
-          <ChevronDown className={`h-4 w-4 flex-none text-[#0B3B32] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+          <ChevronDown className={`h-4 w-4 flex-none text-[var(--forest)] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>
         {open && anchor && (
           <DropdownMenu

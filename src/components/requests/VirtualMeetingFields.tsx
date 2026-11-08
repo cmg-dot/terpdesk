@@ -40,7 +40,7 @@ export function VirtualMeetingFields({
   className?: string;
 }) {
   const input =
-    "w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none disabled:opacity-60";
+    "w-full bg-white border border-gray-200 rounded-xl px-3.5 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none disabled:opacity-60";
   // A stored platform that isn't one of the choices (e.g. typed in by an intake) stays selectable instead of vanishing.
   const knownPlatform = VIRTUAL_PLATFORM_OPTIONS.some((o) => o.value === values.platform);
 

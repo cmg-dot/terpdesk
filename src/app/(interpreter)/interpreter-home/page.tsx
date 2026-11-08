@@ -228,7 +228,7 @@ export default function InterpreterHomePage() {
  <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-[1200px] mx-auto p-4 md:p-8 w-full space-y-8 pb-24 antialiased">
   {/* Persistent Live Appointment Status Banner */}
   {happeningNowJobs.length > 0 ? (
-    <div className="bg-gradient-to-r from-[#0F3830] via-[#1B433C] to-[#24544B] border border-emerald-500/50 text-white rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+    <div className="bg-gradient-to-r from-[#0F3830] via-[var(--forest-soft)] to-[#24544B] border border-emerald-500/50 text-white rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
       <div className="flex items-center gap-3.5">
         <span className="relative flex h-3 w-3 shrink-0">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -259,7 +259,7 @@ export default function InterpreterHomePage() {
       <div className="flex items-center gap-2.5 w-full sm:w-auto">
         <Link
           href={`/jobs/${happeningNowJobs[0].id}`}
-          className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[#1B433C] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
+          className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[var(--forest-soft)] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
         >
           Open active booking &rarr;
         </Link>
@@ -303,14 +303,14 @@ export default function InterpreterHomePage() {
  </div>
 
  {/* Stats Card */}
- <div className="bg-[#1B433C] rounded-2xl border border-gray-200 p-6 text-white mt-8">
- <h2 className="text-[12px] font-medium text-[#8BA49E] mb-6">
+ <div className="bg-[var(--forest-soft)] rounded-2xl border border-gray-200 p-6 text-white mt-8">
+ <h2 className="text-[12px] font-medium text-[var(--sidebar-muted)] mb-6">
  Current connected work
  </h2>
 
  <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6">
  <div className="flex flex-col">
- <span className="text-[10px] font-semibold tracking-wider text-[#8BA49E] mb-2 uppercase">
+ <span className="text-[10px] font-semibold tracking-wider text-[var(--sidebar-muted)] mb-2 uppercase">
  Visible appointments
  </span>
  <span className="text-[28px] font-medium tracking-tight text-white leading-none">
@@ -319,7 +319,7 @@ export default function InterpreterHomePage() {
  </div>
 
  <div className="flex flex-col border-l border-white/10 pl-4 md:border-l md:border-white/10 md:pl-4">
- <span className="text-[10px] font-semibold tracking-wider text-[#8BA49E] mb-2 uppercase">
+ <span className="text-[10px] font-semibold tracking-wider text-[var(--sidebar-muted)] mb-2 uppercase">
  Upcoming bookings
  </span>
  <span className="text-[28px] font-medium tracking-tight text-white leading-none">
@@ -328,7 +328,7 @@ export default function InterpreterHomePage() {
  </div>
 
  <div className="flex flex-col md:border-l border-white/10 md:pl-4 pt-4 md:pt-0">
- <span className="text-[10px] font-semibold tracking-wider text-[#8BA49E] mb-2 uppercase">
+ <span className="text-[10px] font-semibold tracking-wider text-[var(--sidebar-muted)] mb-2 uppercase">
  Pending offers
  </span>
  <span className="text-[28px] font-medium tracking-tight text-white leading-none">
@@ -337,7 +337,7 @@ export default function InterpreterHomePage() {
  </div>
 
  <div className="flex flex-col border-l border-white/10 pl-4 md:border-l md:border-white/10 md:pl-4 pt-4 md:pt-0">
- <span className="text-[10px] font-semibold tracking-wider text-[#8BA49E] mb-2 uppercase">
+ <span className="text-[10px] font-semibold tracking-wider text-[var(--sidebar-muted)] mb-2 uppercase">
  Connected agencies
  </span>
  <span className="text-[28px] font-medium tracking-tight text-white leading-none">
@@ -350,7 +350,7 @@ export default function InterpreterHomePage() {
     title="View past jobs needing hours"
   >
     <div className="flex items-center gap-1.5 mb-2">
-      <span className="text-[10px] font-semibold tracking-wider text-[#8BA49E] group-hover:text-white transition-colors uppercase">
+      <span className="text-[10px] font-semibold tracking-wider text-[var(--sidebar-muted)] group-hover:text-white transition-colors uppercase">
         Hours to submit
       </span>
       {hoursToSubmit > 0 && (
@@ -555,7 +555,7 @@ export default function InterpreterHomePage() {
  {isHappening && (
    <HappeningNowBadge size="sm" className="h-6" />
  )}
- <div className="inline-flex h-6 items-center bg-[#E2EBE5] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
+ <div className="inline-flex h-6 items-center bg-[var(--surface)] text-[var(--forest-soft)] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
  Booked
  </div>
  <UpdatedBadge update={job.detailsUpdated} endsAt={job.endsAt} />
@@ -591,7 +591,7 @@ export default function InterpreterHomePage() {
  {job.isVirtual ? "Virtual" : (job.format || (job as any).details?.format || "In person")}
  </span>
  {job.positionIndex && (
- <span className="text-xs font-medium text-[#1B433C] bg-[#E2EBE5] px-2.5 py-0.5 rounded-full">
+ <span className="text-xs font-medium text-[var(--forest-soft)] bg-[var(--surface)] px-2.5 py-0.5 rounded-full">
  Position {job.positionIndex}
  </span>
  )}
@@ -694,7 +694,7 @@ export default function InterpreterHomePage() {
  className={`w-full md:w-auto text-xs font-semibold px-4 py-2 rounded-full transition-colors inline-flex items-center justify-center gap-1.5 shadow-sm ${
  isCorrection
  ? 'bg-amber-600 hover:bg-amber-700 text-white'
- : 'bg-[#1B433C] hover:bg-[#14332D] text-white'
+ : 'bg-[var(--forest-soft)] hover:bg-[#14332D] text-white'
  }`}
  >
  {isCorrection

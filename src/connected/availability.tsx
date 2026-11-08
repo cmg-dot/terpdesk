@@ -503,7 +503,7 @@ export default function ConnectedAvailability({
             type="button"
             onClick={handleSaveAvailability}
             disabled={isSaving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[#1B433C] text-white text-xs font-medium hover:bg-[#14332D] transition-colors disabled:opacity-60 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-medium hover:bg-[#14332D] transition-colors disabled:opacity-60 cursor-pointer"
           >
             {isSaving ? "Saving..." : "Save hours"}
           </button>
@@ -520,7 +520,7 @@ export default function ConnectedAvailability({
           {DAYS_OF_WEEK.map((day, idx) => {
             const rule = rules.find((r) => r.weekday === idx);
             const timeInput =
-              "w-full rounded-lg border border-gray-200 bg-white py-1 pr-2 text-xs outline-none focus:ring-1 focus:ring-[#1B433C]";
+              "w-full rounded-lg border border-gray-200 bg-white py-1 pr-2 text-xs outline-none focus:ring-1 focus:ring-[var(--forest-soft)]";
             return (
               // One line per day on phones (the day name is abbreviated, with the full name kept for screen readers);
               // it only wraps when the width really runs out.
@@ -679,7 +679,7 @@ export default function ConnectedAvailability({
       <div id="private-busy-time" className="bg-white rounded-2xl border border-gray-200 p-4 sm:p-6">
         <div className="flex items-center justify-between mb-1">
           <div className="flex items-center gap-2">
-            <Lock className="w-4 h-4 text-[#1B433C]" />
+            <Lock className="w-4 h-4 text-[var(--forest-soft)]" />
             <h3 className="font-semibold text-[var(--ink)] text-base">
               Private busy time
             </h3>
@@ -716,7 +716,7 @@ export default function ConnectedAvailability({
               id="busy-all-day"
               checked={busyAllDay}
               onChange={(e) => setBusyAllDay(e.target.checked)}
-              className="w-4 h-4 rounded border-gray-300 text-[#1B433C] focus:ring-[#1B433C] cursor-pointer"
+              className="w-4 h-4 rounded border-gray-300 text-[var(--forest-soft)] focus:ring-[var(--forest-soft)] cursor-pointer"
             />
             <label htmlFor="busy-all-day" className="text-xs text-[var(--ink)] select-none cursor-pointer font-medium">
               All day
@@ -789,7 +789,7 @@ export default function ConnectedAvailability({
               type="button"
               onClick={handleSaveBusyBlock}
               disabled={isSaving}
-              className="bg-[#1B433C] text-white rounded-full px-6 py-2.5 text-xs font-medium hover:bg-[#14332D] transition-colors disabled:opacity-60 cursor-pointer"
+              className="bg-[var(--forest-soft)] text-white rounded-full px-6 py-2.5 text-xs font-medium hover:bg-[#14332D] transition-colors disabled:opacity-60 cursor-pointer"
             >
               {isSaving
                 ? "Saving..."

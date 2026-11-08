@@ -15,7 +15,7 @@ interface WebsiteProfilesTabProps {
 type Decision = "approve" | "decline" | "remove";
 
 const primaryButton =
-  "rounded-full bg-[#0B3B32] px-5 py-2 text-[13px] font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-full bg-[var(--forest)] px-5 py-2 text-[13px] font-medium text-white hover:bg-[var(--forest-hover)] disabled:cursor-not-allowed disabled:opacity-60";
 const secondaryButton =
   "rounded-full border border-gray-200 bg-white px-5 py-2 text-[13px] font-medium text-gray-700 hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60";
 

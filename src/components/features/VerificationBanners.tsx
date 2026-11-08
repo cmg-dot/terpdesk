@@ -62,7 +62,7 @@ export const VerificationBanners = () => {
         type="button"
         onClick={onResend}
         disabled={isPending || sent}
-        className="font-medium text-[#0B3B32] hover:underline disabled:cursor-default disabled:no-underline disabled:opacity-70"
+        className="font-medium text-[var(--forest)] hover:underline disabled:cursor-default disabled:no-underline disabled:opacity-70"
       >
         {isPending ? "Sending…" : sent ? (IS_DEV ? "Link printed in the server terminal" : "Sent. Check your email") : "Resend link"}
       </button>

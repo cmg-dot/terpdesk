@@ -33,11 +33,11 @@ export const WorkbookDropZone = ({ fileName, disabled, onFile }: Props) => {
       }}
       onDragLeave={() => setDragging(false)}
       onDrop={onDrop}
-      className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center text-sm focus-within:ring-2 focus-within:ring-[#0B3B32] ${
-        dragging ? "border-[#0B3B32] bg-emerald-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
+      className={`flex cursor-pointer flex-col items-center gap-2 rounded-2xl border-2 border-dashed px-6 py-10 text-center text-sm focus-within:ring-2 focus-within:ring-[var(--forest)] ${
+        dragging ? "border-[var(--forest)] bg-emerald-50" : "border-gray-300 bg-gray-50 hover:bg-gray-100"
       } ${disabled ? "cursor-not-allowed opacity-60" : ""}`}
     >
-      <FileSpreadsheet className="h-8 w-8 text-[#0B3B32]" aria-hidden="true" />
+      <FileSpreadsheet className="h-8 w-8 text-[var(--forest)]" aria-hidden="true" />
       <span className="max-w-full break-words font-medium text-gray-800">{fileName ?? "Drop the Excel file here, or click to choose it"}</span>
       <span className="text-[13px] text-gray-500">.xlsx only, up to {MAX_WORKBOOK_BYTES / 1_000_000} MB</span>
       <input

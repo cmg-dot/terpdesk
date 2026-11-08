@@ -12,7 +12,7 @@ interface CredentialSharingProps {
   onSharesChange: (shares: CredentialShare[]) => void;
 }
 
-const checkboxClass = "h-4 w-4 rounded border-gray-300 accent-[#0B3B32]";
+const checkboxClass = "h-4 w-4 rounded border-gray-300 accent-[var(--forest)]";
 
 /**
  * "Who can see this credential": one checkbox per connected agency, plus "Include supporting files" once shared.

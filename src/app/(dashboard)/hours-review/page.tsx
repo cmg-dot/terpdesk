@@ -60,7 +60,7 @@ function HoursReviewContent() {
             {countActiveFilters(filters) > 0 ? (
               <>
                 <p className="text-sm text-[var(--sage)] mb-4">No records match your search and filters.</p>
-                <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="text-sm font-medium text-[#0B3B32] hover:underline">
+                <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="text-sm font-medium text-[var(--forest)] hover:underline">
                   Clear filters
                 </button>
               </>

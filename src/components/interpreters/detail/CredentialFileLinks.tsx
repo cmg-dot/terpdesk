@@ -22,7 +22,7 @@ export const CredentialFileLinks = ({ files }: { files: CredentialFile[] }) => {
       <ul className="space-y-1">
         {files.map((f) => (
           <li key={f.id}>
-            <button type="button" onClick={() => open(f.id)} className="inline-flex max-w-full items-center gap-2 text-left text-[13px] font-medium text-[#0B3B32] hover:underline">
+            <button type="button" onClick={() => open(f.id)} className="inline-flex max-w-full items-center gap-2 text-left text-[13px] font-medium text-[var(--forest)] hover:underline">
               <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
               <span className="truncate">{f.fileName}</span>
               <span className="shrink-0 text-xs font-normal text-gray-500">{formatFileSize(f.sizeBytes)}</span>

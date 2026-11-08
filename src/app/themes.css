@@ -1,0 +1,149 @@
+/*
+ * Workspace themes (Settings → Appearance). Each block overrides the colour tokens declared in globals.css; <html data-theme>
+ * is set by the root layout, and only for agency staff. "default" is the :root palette, so it needs no block.
+ */
+
+/* ASL Professionals: deep plum and warm gold on warm cream. */
+:root[data-theme="asl_professionals"] {
+  --canvas: #F9F6F0;
+  --surface: #EDE4EE;
+  --forest: #4A2E4B;
+  --forest-hover: #35203A;
+  --forest-soft: #5E3F60;
+  --forest-rgb: 74 46 75;
+  --sidebar: #4A2E4B;
+  --sidebar-muted: #CDB9CE;
+  --tint: #EFE6EF;
+  --tint-ink: #4A2E4B;
+  --accent: #D4AF37;
+  --nav-bar: #D4AF37;
+  --badge: #D4AF37;
+  --badge-ink: #2B1A2C;
+}
+
+/* Ocean Blue */
+:root[data-theme="ocean"] {
+  --canvas: #F8FAFC;
+  --surface: #E2E8F0;
+  --forest: #1E3A8A;
+  --forest-hover: #172C6B;
+  --forest-soft: #2B4BA8;
+  --forest-rgb: 30 58 138;
+  --sidebar: #1E3A8A;
+  --sidebar-muted: #A9B8E0;
+  --tint: #E3EAF8;
+  --tint-ink: #1E3A8A;
+  --accent: #60A5FA;
+  --nav-bar: #60A5FA;
+}
+
+/*
+ * Dark Mode. Pages are written with Tailwind's light neutrals (bg-white, text-slate-*, border-gray-*), so those few
+ * utilities are re-pointed here rather than adding a dark: variant to every component. Specificity (two classes) beats the
+ * single-class utilities without !important.
+ */
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --canvas: #111827;
+  --surface: #1F2937;
+  --forest: #2F7F6F;
+  --forest-hover: #3A9482;
+  --forest-soft: #3A9482;
+  --forest-rgb: 47 127 111;
+  --sidebar: #1F2937;
+  --sidebar-muted: #9CA3AF;
+  --tint: #1E3A34;
+  --tint-ink: #A7E3D2;
+  --accent: #5FC4AC;
+  --nav-bar: #5FC4AC;
+  --ink: #F3F4F6;
+  --sage: #9CA3AF;
+  --foreground: #E5E7EB;
+}
+
+:root[data-theme="dark"] .bg-white,
+:root[data-theme="dark"] .bg-gray-50,
+:root[data-theme="dark"] .bg-slate-50,
+:root[data-theme="dark"] .bg-neutral-50,
+:root[data-theme="dark"] [class*="bg-[#F9F9F8]"],
+:root[data-theme="dark"] [class*="bg-[#FBFAF7]"],
+:root[data-theme="dark"] [class*="bg-[#FBFAF6]"] {
+  background-color: #1F2937;
+}
+:root[data-theme="dark"] .bg-gray-100,
+:root[data-theme="dark"] .bg-slate-100,
+:root[data-theme="dark"] .bg-neutral-100,
+:root[data-theme="dark"] .bg-stone-100,
+:root[data-theme="dark"] [class*="bg-[#F4F3EF]"],
+:root[data-theme="dark"] [class*="bg-[#F5F4F0]"],
+:root[data-theme="dark"] [class*="bg-[#F3F2EE]"],
+:root[data-theme="dark"] [class*="bg-[#EBE8DF]"] {
+  background-color: #374151;
+}
+:root[data-theme="dark"] .hover\:bg-gray-50:hover,
+:root[data-theme="dark"] .hover\:bg-slate-50:hover,
+:root[data-theme="dark"] .hover\:bg-neutral-100:hover,
+:root[data-theme="dark"] .hover\:bg-gray-100:hover {
+  background-color: #374151;
+}
+
+:root[data-theme="dark"] .text-slate-900,
+:root[data-theme="dark"] .text-slate-800,
+:root[data-theme="dark"] .text-gray-900,
+:root[data-theme="dark"] .text-gray-800,
+:root[data-theme="dark"] .text-neutral-900 {
+  color: #F3F4F6;
+}
+:root[data-theme="dark"] .text-slate-700,
+:root[data-theme="dark"] .text-slate-600,
+:root[data-theme="dark"] .text-gray-700,
+:root[data-theme="dark"] .text-gray-600,
+:root[data-theme="dark"] .text-neutral-700,
+:root[data-theme="dark"] .text-neutral-600 {
+  color: #D1D5DB;
+}
+:root[data-theme="dark"] .text-slate-500,
+:root[data-theme="dark"] .text-slate-400,
+:root[data-theme="dark"] .text-gray-500,
+:root[data-theme="dark"] .text-gray-400,
+:root[data-theme="dark"] .text-neutral-500 {
+  color: #9CA3AF;
+}
+
+:root[data-theme="dark"] .border-gray-100,
+:root[data-theme="dark"] .border-gray-200,
+:root[data-theme="dark"] .border-gray-300,
+:root[data-theme="dark"] .border-slate-100,
+:root[data-theme="dark"] .border-slate-200,
+:root[data-theme="dark"] .border-slate-300,
+:root[data-theme="dark"] .border-neutral-100,
+:root[data-theme="dark"] .border-neutral-200,
+:root[data-theme="dark"] .border-neutral-200\/50,
+:root[data-theme="dark"] .border-stone-200,
+:root[data-theme="dark"] .divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: #374151;
+}
+
+:root[data-theme="dark"] input,
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] textarea {
+  color: #F3F4F6;
+}
+:root[data-theme="dark"] input::placeholder,
+:root[data-theme="dark"] textarea::placeholder {
+  color: #9CA3AF;
+}
+
+/*
+ * Sidebar brand swap. Both logos are in the page; the ASL Professionals one only shows while that theme is active
+ * (components/agency/SidebarBrand.tsx).
+ */
+.brand-asl {
+  display: none;
+}
+:root[data-theme="asl_professionals"] .brand-asl {
+  display: block;
+}
+:root[data-theme="asl_professionals"] .brand-default {
+  display: none;
+}

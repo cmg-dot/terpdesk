@@ -30,7 +30,7 @@ export function ErrorScreen({ error, reset, area }: ErrorScreenProps) {
         <button
           type="button"
           onClick={reset}
-          className="rounded-full bg-[#0B3B32] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#082a23]"
+          className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)]"
         >
           Try again
         </button>

@@ -44,7 +44,7 @@ export function OfferComposer({ view, ctx, actions }: Props) {
         </p>
       )}
       <label className="flex items-start gap-3 cursor-pointer mb-6">
-        <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" />
+        <input type="checkbox" className="mt-0.5 h-4 w-4 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" />
         <span className="text-sm text-gray-700">Deliberately offer this slot to multiple interpreters</span>
       </label>
 
@@ -106,7 +106,7 @@ export function OfferComposer({ view, ctx, actions }: Props) {
           title={recBlock?.message}
           className={`rounded-full px-6 py-2 text-sm font-medium transition-colors mt-2 w-auto flex items-center gap-2 ${
             offerDisabled
-              ? 'bg-[#8BA49E] text-white opacity-50 cursor-not-allowed'
+              ? 'bg-[var(--sidebar-muted)] text-white opacity-50 cursor-not-allowed'
               : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
           }`}
         >

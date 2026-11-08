@@ -230,7 +230,7 @@ export default function InterpreterCalendarPage() {
         onToday={nav.goToToday}
         onPick={goToDate}
         extra={
-          <button onClick={() => document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2 rounded-full bg-[#1B433C] text-white text-[13px] font-medium hover:bg-[#14332D] transition-colors">
+          <button onClick={() => document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-[13px] font-medium hover:bg-[#14332D] transition-colors">
             Block time
           </button>
         }
@@ -328,7 +328,7 @@ export default function InterpreterCalendarPage() {
                                   className={`px-2 py-1.5 rounded-md cursor-pointer transition-all ${
                                     isHappening
                                       ? 'bg-emerald-600 text-white shadow-sm ring-1 ring-emerald-400 hover:bg-emerald-700'
-                                      : 'bg-[#E8EFEA] text-[#0B3B32] border border-[#D5E3DB] hover:opacity-85'
+                                      : 'bg-[#E8EFEA] text-[var(--forest)] border border-[#D5E3DB] hover:opacity-85'
                                   }`}
                                 >
                                   {isHappening && (
@@ -495,7 +495,7 @@ export default function InterpreterCalendarPage() {
                                     <span className="text-[9px] font-bold uppercase tracking-wider text-emerald-100">Live now</span>
                                   </div>
                                 )}
-                                <div className={`text-[11px] font-semibold truncate ${isHappening ? 'text-white' : 'text-[#0B3B32]'}`}>{appt.title}</div>
+                                <div className={`text-[11px] font-semibold truncate ${isHappening ? 'text-white' : 'text-[var(--forest)]'}`}>{appt.title}</div>
                                 <div className={`text-[10px] mt-0.5 truncate ${isHappening ? 'text-emerald-100' : 'text-[#14332D]'}`}>{timeLabel}</div>
                               </div>
                             );
@@ -584,7 +584,7 @@ export default function InterpreterCalendarPage() {
                       className={`p-4 rounded-xl cursor-pointer transition-all ${
                         isHappening 
                           ? 'bg-emerald-600 text-white shadow-md ring-2 ring-emerald-400 hover:bg-emerald-700' 
-                          : 'bg-[#E8EFEA] text-[#0B3B32] border border-[#D5E3DB] hover:opacity-90'
+                          : 'bg-[#E8EFEA] text-[var(--forest)] border border-[#D5E3DB] hover:opacity-90'
                       }`}
                     >
                       <div className="space-y-1">
@@ -592,7 +592,7 @@ export default function InterpreterCalendarPage() {
                           {isHappening && <HappeningNowBadge size="sm" />}
                           <span className="text-[14px] font-semibold">{appt.title}</span>
                         </div>
-                        <div className={`text-[13px] ${isHappening ? 'text-emerald-100' : 'text-[#0B3B32]'}`}>
+                        <div className={`text-[13px] ${isHappening ? 'text-emerald-100' : 'text-[var(--forest)]'}`}>
                           {timeStr}
                         </div>
                       </div>

@@ -96,7 +96,7 @@ export const CalendarSearch = ({ entries, value, onChange, onSelect, onClear, no
         onFocus={() => setOpen(true)}
         onKeyDown={onInputKeyDown}
         placeholder="Search SRN, organization, or venue... (Press / or ⌘K)"
-        className="w-full truncate rounded-full border-none bg-[#F4F3EF] py-2.5 pl-10 pr-10 text-sm text-gray-800 outline-none transition-shadow placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-[#0B3B32]"
+        className="w-full truncate rounded-full border-none bg-[#F4F3EF] py-2.5 pl-10 pr-10 text-sm text-gray-800 outline-none transition-shadow placeholder:text-gray-400 focus:bg-white focus:ring-2 focus:ring-[var(--forest)]"
       />
       {value !== "" && (
         <button
@@ -106,7 +106,7 @@ export const CalendarSearch = ({ entries, value, onChange, onSelect, onClear, no
             onClear();
             input.current?.focus();
           }}
-          className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]"
+          className="absolute right-2.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full text-gray-500 transition-colors hover:bg-gray-200 hover:text-gray-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]"
         >
           <X className="h-3.5 w-3.5" aria-hidden="true" />
         </button>

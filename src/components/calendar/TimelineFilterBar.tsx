@@ -38,7 +38,7 @@ export const TimelineFilterBar = ({ people, filters, onChange }: Props) => {
         className="flex-1 sm:w-52 sm:flex-none"
       />
       {active > 0 && (
-        <button type="button" onClick={() => onChange(NO_TIMELINE_FILTERS)} className="self-start text-sm font-medium text-[#0B3B32] hover:underline">
+        <button type="button" onClick={() => onChange(NO_TIMELINE_FILTERS)} className="self-start text-sm font-medium text-[var(--forest)] hover:underline">
           Clear filters
         </button>
       )}

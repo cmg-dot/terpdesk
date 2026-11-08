@@ -33,7 +33,7 @@ function LimitedTextarea({ className = "", maxLength = 1000, value, onChange }: 
  return (
  <div className="flex flex-col w-full">
  <textarea
- className={`w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] resize-none outline-none transition-shadow ${className}`}
+ className={`w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] resize-none outline-none transition-shadow ${className}`}
  maxLength={maxLength}
  value={internalValue}
  onChange={(e) => {
@@ -537,8 +537,8 @@ export default function NewRequestPage() {
  }
  };
 
- const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none transition-shadow appearance-none";
- const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] resize-none outline-none transition-shadow";
+ const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow appearance-none";
+ const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] resize-none outline-none transition-shadow";
  const cardClass = "bg-white rounded-2xl border border-gray-200 p-6 border border-gray-200/50 shadow-none space-y-6";
  const sectionTitleClass = "text-[18px] font-medium text-[var(--ink)] mb-4";
 
@@ -623,7 +623,7 @@ export default function NewRequestPage() {
  <input 
  type="checkbox" 
  id="new-save-org-checkbox"
- className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
+ className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" 
  checked={formData.saveOrg as boolean}
  onChange={(e) => handleChange("saveOrg", e.target.checked)}
  />
@@ -752,7 +752,7 @@ export default function NewRequestPage() {
  <div className="flex items-center gap-3 mt-6">
  <input 
  type="checkbox" 
- className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" 
+ className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" 
  checked={formData.repeats as boolean}
  onChange={(e) => handleChange("repeats", e.target.checked)}
  />

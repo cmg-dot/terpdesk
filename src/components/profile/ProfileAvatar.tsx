@@ -34,7 +34,7 @@ export const ProfileAvatar = ({ photoUrl, name, size = 96 }: { photoUrl: string;
   return (
     <div
       aria-hidden="true"
-      className="flex shrink-0 items-center justify-center rounded-full bg-[#0B3B32] font-semibold text-white"
+      className="flex shrink-0 items-center justify-center rounded-full bg-[var(--forest)] font-semibold text-white"
       style={{ width: size, height: size, fontSize: Math.round(size / 3) }}
     >
       {initialsOf(name)}

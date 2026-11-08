@@ -117,7 +117,7 @@ export const InterpreterRatesCard = ({ interpreterId, initial }: { interpreterId
           <button
             type="submit"
             disabled={saving}
-            className="rounded-full bg-[#0B3B32] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60"
+            className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:cursor-not-allowed disabled:opacity-60"
           >
             {saving ? "Saving…" : "Save rates"}
           </button>

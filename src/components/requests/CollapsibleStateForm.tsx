@@ -40,7 +40,7 @@ export function CollapsibleStateForm({ view, summary, defaultOpen = false }: { v
           </span>
           <span className="flex flex-none items-center gap-2 text-sm font-normal text-[var(--sage)]">
             {open ? "Hide" : "Show"}
-            <ChevronDown className={`h-5 w-5 text-[#0B3B32] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+            <ChevronDown className={`h-5 w-5 text-[var(--forest)] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
           </span>
         </button>
       </h2>

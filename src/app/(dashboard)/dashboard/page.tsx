@@ -195,7 +195,7 @@ export default function DashboardPage() {
   
       {/* Persistent Live Appointment Status Banner */}
       {happeningNowJobs.length > 0 ? (
-        <div className="bg-gradient-to-r from-[#0F3830] via-[#1B433C] to-[#24544B] border border-emerald-500/50 text-white rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="bg-gradient-to-r from-[#0F3830] via-[var(--forest-soft)] to-[#24544B] border border-emerald-500/50 text-white rounded-2xl p-5 shadow-lg flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <div className="flex items-center gap-3.5">
             <span className="relative flex h-3 w-3 shrink-0">
               <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -230,7 +230,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <Link
               href={happeningNowJobs.length === 1 ? `/requests/${happeningNowJobs[0].id}` : `/requests?filter=happening-now`}
-              className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[#1B433C] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
+              className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[var(--forest-soft)] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
             >
               {happeningNowJobs.length === 1 ? 'Open active booking →' : 'View live requests →'}
             </Link>
@@ -270,40 +270,40 @@ export default function DashboardPage() {
             Your scheduling desk. Appointments and coverage saved across authorized accounts.
           </p>
         </div>
-        <Link href="/requests/new" className="inline-block rounded-full bg-[var(--forest)] px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[#0B3B32]/50">
+        <Link href="/requests/new" className="inline-block rounded-full bg-[var(--forest)] px-6 py-3 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)]">
           New request
         </Link>
       </div>
 
       {/* Dark Stats Card */}
       <div className="rounded-2xl border border-gray-200 bg-[var(--forest)] p-8 text-white ">
-        <p className="mb-8 text-xs font-medium text-[#8BA49E]">
+        <p className="mb-8 text-xs font-medium text-[var(--sidebar-muted)]">
           Upcoming appointments and unresolved past appointments
         </p>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
           <Link href="/requests" className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-            <span className="text-[11px] font-semibold tracking-widest text-[#8BA49E]">APPOINTMENTS</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">APPOINTMENTS</span>
             <span className="text-[28px] font-medium leading-none">{totalAppointments}</span>
           </Link>
           <Link href="/requests?filter=needing-coverage" className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-            <span className="text-[11px] font-semibold tracking-widest text-[#8BA49E]">NEEDING COVERAGE</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">NEEDING COVERAGE</span>
             <span className="text-[28px] font-medium leading-none">{needingCoverage}</span>
           </Link>
           <Link href="/requests?filter=pending-offers" className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-            <span className="text-[11px] font-semibold tracking-widest text-[#8BA49E]">PENDING OFFERS</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">PENDING OFFERS</span>
             <span className="text-[28px] font-medium leading-none">{pendingOffersCount}</span>
           </Link>
           <Link href="/requests?filter=staff-follow-up" className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-            <span className="text-[11px] font-semibold tracking-widest text-[#8BA49E]">STAFF FOLLOW-UP</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">STAFF FOLLOW-UP</span>
             <span className="text-[28px] font-medium leading-none">{staffFollowUpCount}</span>
           </Link>
           
           <Link href="/requests?filter=needs-replacement" className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-            <span className="text-[11px] font-semibold tracking-widest text-[#8BA49E]">NEEDS REPLACEMENT</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">NEEDS REPLACEMENT</span>
             <span className="text-[28px] font-medium leading-none">{needsReplacementCount}</span>
           </Link>
           <Link href="/hours-review" className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-            <span className="text-[11px] font-semibold tracking-widest text-[#8BA49E]">HOURS AWAITING REVIEW</span>
+            <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">HOURS AWAITING REVIEW</span>
             <span className="text-[28px] font-medium leading-none">{awaitingReviewCount}</span>
           </Link>
         </div>
@@ -339,7 +339,7 @@ export default function DashboardPage() {
                   dotColor = "bg-[#AF4A3F]";
                   btnLabel = "View";
                 } else if (statusLower.includes('partially')) {
-                  dotColor = "bg-[#385B52]";
+                  dotColor = "bg-[var(--tint-ink)]";
                   btnLabel = "Manage slots";
                 } else if (statusLower.includes('unfilled') || statusLower.includes('draft')) {
                   btnLabel = "Open";
@@ -445,7 +445,7 @@ export default function DashboardPage() {
                           <div className={`inline-flex h-6 items-center text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0 ${
                             formattedBadge.toLowerCase().includes('partially') 
                               ? 'bg-[#E8F3EE] text-[#466960]' 
-                              : 'bg-[#E2EBE5] text-[#1B433C]'
+                              : 'bg-[var(--surface)] text-[var(--forest-soft)]'
                           }`}>
                             {formattedBadge}
                           </div>

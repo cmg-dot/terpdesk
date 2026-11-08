@@ -40,7 +40,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
         onClick={onToggle}
         aria-expanded={expanded}
         aria-controls={panelId}
-        className="flex min-w-0 flex-1 flex-col gap-3 rounded-2xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32]/40 md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2"
+        className="flex min-w-0 flex-1 flex-col gap-3 rounded-2xl p-4 text-left outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--forest-rgb)/0.4)] md:flex-row md:flex-wrap md:items-center md:gap-x-4 md:gap-y-2"
       >
         {/* Who and when. Never clipped: it keeps room for a whole SRN, and a long name or title wraps instead of being cut. */}
         <span className="block min-w-0 md:min-w-[10.5rem] md:flex-1">
@@ -79,7 +79,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
             </span>
           )}
           <RecordStatusBadge state={record.state} />
-          <ChevronDown className={`h-5 w-5 flex-none text-[#0B3B32] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
+          <ChevronDown className={`h-5 w-5 flex-none text-[var(--forest)] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
           <span className="sr-only">{expanded ? "Hide details" : "Show details"}</span>
         </span>
       </button>

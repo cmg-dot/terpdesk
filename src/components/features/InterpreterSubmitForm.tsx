@@ -71,9 +71,9 @@ interface InterpreterSubmitFormProps {
 }
 
 const input =
-  "w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
+  "w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--forest)] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
 const legInput =
-  "min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#0B3B32] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
+  "min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--forest)] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
 const LEG_TYPE_OPTIONS = [
   { value: "total", label: "Total distance already travelled" },
   { value: "round_trip", label: "One-way distance + return on same route" },
@@ -138,7 +138,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
                     value={value}
                     checked={p.serviceCompleted === value}
                     onChange={(e) => p.onServiceCompletedChange(e.target.value)}
-                    className="text-[var(--forest)] focus:ring-[#0B3B32] disabled:opacity-50"
+                    className="text-[var(--forest)] focus:ring-[var(--forest)] disabled:opacity-50"
                   />
                   {value === "yes" ? "Yes" : "No"}
                 </label>
@@ -242,7 +242,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature} className="bg-[#1B433C] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           {p.isSubmitting ? (p.submittingLabel ?? "Submitting...") : (p.submitLabel ?? "Submit actual hours")}
         </button>
         {p.onSaveDraft && (

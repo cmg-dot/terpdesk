@@ -74,7 +74,7 @@ export function GiveBackButton({ token }: { token: string }) {
             maxLength={MAX}
             value={reason}
             onChange={(e) => setReason(e.target.value)}
-            className="w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40"
+            className="w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 outline-none focus:border-[var(--forest)] focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.4)]"
           />
           {error && <p role="alert" className="mt-2 text-sm font-medium text-red-700">{error}</p>}
           <DialogFooter>

@@ -260,7 +260,7 @@ export default function InterpreterJobsPage() {
                         </div>
                       )}
                       {job.status === 'booked' && (
-                        <div className="inline-flex h-6 items-center bg-[#E2EBE5] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
+                        <div className="inline-flex h-6 items-center bg-[var(--surface)] text-[var(--forest-soft)] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                           Booked
                         </div>
                       )}
@@ -375,7 +375,7 @@ export default function InterpreterJobsPage() {
                           })()}
                         </div>
                         <div className="flex flex-row flex-wrap items-center justify-end gap-2">
-                          <div className="inline-flex h-6 items-center bg-[#DCEAE3] text-[#1B433C] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
+                          <div className="inline-flex h-6 items-center bg-[#DCEAE3] text-[var(--forest-soft)] text-[11px] font-medium px-2.5 rounded-full whitespace-nowrap shrink-0">
                             Booked
                           </div>
                           {usesStatePortal ? (

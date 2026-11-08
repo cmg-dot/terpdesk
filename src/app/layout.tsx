@@ -4,7 +4,9 @@ import { getServerSession } from "next-auth";
 import { GlobalProvider } from "@/context/GlobalContext";
 import { SessionProvider } from "@/components/providers/SessionProvider";
 import { authOptions } from "@/lib/auth/options";
+import { themeForRole } from "@/lib/theme";
 import "./globals.css";
+import "./themes.css";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -30,7 +32,7 @@ export default async function RootLayout({
   const session = await getServerSession(authOptions);
 
   return (
-    <html lang="en">
+    <html lang="en" data-theme={themeForRole(session?.user?.role, session?.user?.theme)}>
       <body className={inter.className}>
         <SessionProvider session={session}>
           <GlobalProvider>{children}</GlobalProvider>

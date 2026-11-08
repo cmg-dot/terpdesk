@@ -37,7 +37,7 @@ export const ImportWorkspace = () => {
             aria-selected={tab === t.id}
             aria-controls={`import-panel-${t.id}`}
             onClick={() => setTab(t.id)}
-            className={`w-full rounded-xl px-4 py-2.5 text-center text-[13px] font-medium transition-colors sm:w-auto sm:rounded-full sm:px-5 sm:py-2 sm:text-sm ${tab === t.id ? "bg-[#0B3B32] text-white" : "text-gray-700 hover:bg-gray-50"}`}
+            className={`w-full rounded-xl px-4 py-2.5 text-center text-[13px] font-medium transition-colors sm:w-auto sm:rounded-full sm:px-5 sm:py-2 sm:text-sm ${tab === t.id ? "bg-[var(--forest)] text-white" : "text-gray-700 hover:bg-gray-50"}`}
           >
             {t.label}
           </button>

@@ -6,7 +6,7 @@ import { useWorkbookImport } from "@/hooks/useWorkbookImport";
 import { NON_STATE_SHEET, STATE_SHEET } from "@/lib/workbookImport/types";
 
 const secondaryButton = "rounded-full border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60";
-const primaryButton = "rounded-full bg-[#0B3B32] px-5 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60";
+const primaryButton = "rounded-full bg-[var(--forest)] px-5 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:cursor-not-allowed disabled:opacity-60";
 
 /** Upload, check, confirm: the whole bulk-import flow for the interpreter master workbook. */
 export const WorkbookImportPanel = () => {

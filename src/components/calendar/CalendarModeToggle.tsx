@@ -17,7 +17,7 @@ export const CalendarModeToggle = ({ mode, onChange }: { mode: CalendarMode; onC
         aria-pressed={mode === option.id}
         onClick={() => onChange(option.id)}
         className={`w-full rounded-xl px-5 py-2 text-center text-sm font-medium transition-colors sm:w-auto sm:rounded-full ${
-          mode === option.id ? "bg-[#0B3B32] text-white" : "text-gray-700 hover:bg-gray-50"
+          mode === option.id ? "bg-[var(--forest)] text-white" : "text-gray-700 hover:bg-gray-50"
         }`}
       >
         {option.label}

@@ -19,7 +19,7 @@ import {
 } from "@/components/ui/dialog";
 
 const inputClass =
-  "w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[#0B3B32] outline-none disabled:opacity-60";
+  "w-full bg-[#F4F3EF] border-none rounded-full px-5 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none disabled:opacity-60";
 const labelClass = "block text-[12px] font-medium text-[var(--sage)] mb-2 ml-2";
 
 const hoursBetween = (start: string, end: string): string => {

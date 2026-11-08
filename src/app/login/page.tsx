@@ -33,7 +33,7 @@ export default function LoginChooserPage({ searchParams }: { searchParams: Searc
     <LoginShell title="Sign in" subtitle="Choose how you use terpDESK.">
       <nav aria-label="Sign-in portals" className="space-y-3">
         <Link href={loginPathForRole("agency")} className={option}>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E6EFEA] text-[var(--forest)]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--tint)] text-[var(--forest)]">
             <Building2 className="h-5 w-5" aria-hidden="true" />
           </span>
           <span>
@@ -42,7 +42,7 @@ export default function LoginChooserPage({ searchParams }: { searchParams: Searc
           </span>
         </Link>
         <Link href={loginPathForRole("interpreter")} className={option}>
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#E6EFEA] text-[var(--forest)]">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--tint)] text-[var(--forest)]">
             <UserRound className="h-5 w-5" aria-hidden="true" />
           </span>
           <span>

@@ -173,7 +173,7 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
                 type="checkbox"
                 checked={values[field]}
                 onChange={(e) => setValues((v) => ({ ...v, [field]: e.target.checked }))}
-                className="h-4 w-4 rounded border-gray-300 accent-[#0B3B32]"
+                className="h-4 w-4 rounded border-gray-300 accent-[var(--forest)]"
               />
               {field === "takesInPerson" ? "I take in-person work" : "I take virtual work"}
             </label>
@@ -226,7 +226,7 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
         <button
           type="submit"
           disabled={saving}
-          className="rounded-full bg-[#0B3B32] px-6 py-2.5 text-sm font-medium text-white hover:bg-[#082a23] disabled:cursor-not-allowed disabled:opacity-60"
+          className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Saving…" : "Save profile"}
         </button>

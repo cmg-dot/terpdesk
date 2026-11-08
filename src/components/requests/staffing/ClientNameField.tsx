@@ -56,7 +56,7 @@ export function ClientNameField({ requestId, value, onSaved }: Props) {
           onChange={(event) => { setDraft(event.target.value); setMessage(null); }}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void save(); } }}
           placeholder="Client's name"
-          className="min-w-0 flex-1 rounded-full border-none bg-white px-4 py-2.5 text-sm text-gray-800 outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-[#0B3B32]"
+          className="min-w-0 flex-1 rounded-full border-none bg-white px-4 py-2.5 text-sm text-gray-800 outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-[var(--forest)]"
         />
         <button
           type="button"

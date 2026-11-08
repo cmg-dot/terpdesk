@@ -48,9 +48,9 @@ const Row = memo(function Row({ id, index, size, option, showGroup, isActive, is
         title={option.label}
         onClick={() => onPick(option)}
         onMouseEnter={() => onHover(index)}
-        className={`flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2.5 leading-5 tracking-tight ${rowText} ${isActive ? "bg-emerald-50 text-[#0B3B32] shadow-[inset_3px_0_0_#0B3B32]" : "text-slate-800"} ${isSelected ? "font-medium" : ""}`}
+        className={`flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2.5 leading-5 tracking-tight ${rowText} ${isActive ? "bg-emerald-50 text-[var(--forest)] shadow-[inset_3px_0_0_#0B3B32]" : "text-slate-800"} ${isSelected ? "font-medium" : ""}`}
       >
-        <Check className={`h-3.5 w-3.5 flex-none text-[#0B3B32] ${isSelected ? "" : "invisible"}`} aria-hidden="true" />
+        <Check className={`h-3.5 w-3.5 flex-none text-[var(--forest)] ${isSelected ? "" : "invisible"}`} aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{option.label}</span>
         {option.count !== undefined && <span className="flex-none text-[12px] tabular-nums text-slate-500">{option.count}</span>}
       </div>

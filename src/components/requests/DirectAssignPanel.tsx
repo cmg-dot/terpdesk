@@ -161,7 +161,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
           type="button"
           onClick={() => setConfirming(true)}
           disabled={!person}
-          className="mt-4 w-full rounded-full bg-[#145347] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f4037] disabled:cursor-not-allowed disabled:bg-[#8BA49E] disabled:opacity-50 sm:w-auto"
+          className="mt-4 w-full rounded-full bg-[#145347] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f4037] disabled:cursor-not-allowed disabled:bg-[var(--sidebar-muted)] disabled:opacity-50 sm:w-auto"
         >
           Assign directly
         </button>

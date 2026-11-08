@@ -23,7 +23,7 @@ const VARIANT_STYLES: Record<SearchableSelectVariant, { input: string; list: str
     active: "bg-[#F5F4F0]",
   },
   cream: {
-    input: "border border-stone-200 bg-[#F4F3EF] hover:border-[#0B3B32]/40 hover:bg-emerald-50 focus:bg-emerald-50",
+    input: "border border-stone-200 bg-[#F4F3EF] hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-emerald-50 focus:bg-emerald-50",
     list: "border border-stone-200 bg-[#F4F3EF]",
     active: "bg-emerald-50",
   },
@@ -114,7 +114,7 @@ export const SearchableSelect = ({ id, variant = "default", labelClassName = DEF
           onClick={() => setOpen(true)}
           onChange={(e) => { setQuery(e.target.value); setActive(0); setOpen(true); }}
           onKeyDown={onKeyDown}
-          className={`w-full rounded-full py-2.5 pl-10 pr-10 text-sm text-gray-800 outline-none transition-shadow focus:ring-2 focus:ring-[#0B3B32] disabled:opacity-60 ${styles.input}`}
+          className={`w-full rounded-full py-2.5 pl-10 pr-10 text-sm text-gray-800 outline-none transition-shadow focus:ring-2 focus:ring-[var(--forest)] disabled:opacity-60 ${styles.input}`}
         />
         {selected && !disabled && (
           <button

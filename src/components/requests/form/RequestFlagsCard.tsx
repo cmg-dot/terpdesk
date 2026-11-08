@@ -11,7 +11,7 @@ interface Props {
 
 const Toggle = ({ id, label, checked, onChange }: { id: string; label: string; checked: boolean; onChange: (next: boolean) => void }) => (
   <div className="flex items-center gap-3">
-    <input id={id} type="checkbox" className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[#0B3B32]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
+    <input id={id} type="checkbox" className="h-5 w-5 rounded border-gray-300 text-[var(--forest)] focus:ring-[var(--forest)]" checked={checked} onChange={(e) => onChange(e.target.checked)} />
     <label htmlFor={id} className="text-[15px] text-gray-700 font-medium cursor-pointer">{label}</label>
   </div>
 );

@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 
 /** Off-white fill so inputs stand out on the white cards; a dark green border and ring show focus. */
 export const inputClass =
-  "w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-colors focus:border-[#0B3B32] focus:ring-2 focus:ring-[#0B3B32]/40 aria-[invalid=true]:border-red-400";
+  "w-full rounded-xl border border-stone-200 bg-stone-100 px-4 py-2.5 text-sm text-gray-900 placeholder:text-gray-400 outline-none transition-colors focus:border-[var(--forest)] focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.4)] aria-[invalid=true]:border-red-400";
 
 /** A label, one control, and its hint or error. `id` must match the control's id. */
 export const Field = ({

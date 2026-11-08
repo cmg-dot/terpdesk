@@ -2,14 +2,34 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+ * Workspace colour tokens. This is the "Agency Default" palette; the other workspace themes (themes.css) override these
+ * same names under <html data-theme="...">. Components use the tokens (bg-[var(--forest)]), never the hex, so a theme
+ * recolours the sidebar, active nav, primary buttons and badges together.
+ *   forest       primary brand colour (primary buttons, headings, links)      forest-hover / forest-soft: its darker / lighter shade
+ *   sidebar      the navigation rail                                          sidebar-muted: inactive nav text on it
+ *   tint         soft selected / booked fill                                  tint-ink: text on a tint
+ *   accent       highlight colour (active nav indicator, badges when themed)  nav-bar: the active item's marker on the rail
+ */
 :root {
   --canvas: #F9F8F4;
   --surface: #E2EBE5;
   --forest: #0B3B32;
+  --forest-hover: #082A23;
+  --forest-soft: #1B433C;
+  --forest-rgb: 11 59 50;
+  --sidebar: #0B3B32;
+  --sidebar-muted: #8BA49E;
+  --tint: #E6EFEA;
+  --tint-ink: #385B52;
+  --accent: #8BA49E;
+  --nav-bar: transparent;
+  --badge: #9E3929;
+  --badge-ink: #FFFFFF;
   --ink: #0f172a;
   --sage: #64748b;
 
-  --background: #F9F8F4;
+  --background: var(--canvas);
   --foreground: #0f172a;
 }
 

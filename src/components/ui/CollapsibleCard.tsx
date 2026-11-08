@@ -37,7 +37,7 @@ export function CollapsibleCard({ cardId, title, subtitle, defaultOpen = true, c
             {title}
             {subtitle && <span className="mt-0.5 block text-xs font-normal text-[var(--sage)]">{subtitle}</span>}
           </span>
-          <ChevronDown className={`h-5 w-5 flex-none text-[#0B3B32] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
+          <ChevronDown className={`h-5 w-5 flex-none text-[var(--forest)] transition-transform ${open ? "rotate-180" : ""}`} aria-hidden="true" />
         </button>
       </h2>
       {open && (

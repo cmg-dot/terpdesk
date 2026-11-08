@@ -94,7 +94,7 @@ export const ProfilePhotoPicker = ({ currentPhotoUrl, name, onUploaded, onRemove
           <label
             htmlFor="profile-photo-file"
             aria-disabled={busy}
-            className={`inline-flex items-center gap-2 rounded-full border border-gray-300 bg-stone-100 px-5 py-2 text-sm font-medium text-gray-800 transition-colors focus-within:ring-2 focus-within:ring-[#0B3B32] ${
+            className={`inline-flex items-center gap-2 rounded-full border border-gray-300 bg-stone-100 px-5 py-2 text-sm font-medium text-gray-800 transition-colors focus-within:ring-2 focus-within:ring-[var(--forest)] ${
               busy ? "cursor-not-allowed opacity-60" : "cursor-pointer hover:bg-stone-200"
             }`}
           >

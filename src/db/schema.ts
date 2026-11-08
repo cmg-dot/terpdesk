@@ -91,6 +91,15 @@ export const users = pgTable('users', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Per-login display preferences (Settings → Appearance). A table of its own, not columns on `users`, so every query that
+// reads `users` is untouched and a deploy that runs before the SQL is applied cannot break sign-in.
+export const userPreferences = pgTable('user_preferences', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  // One of THEME_IDS (src/lib/theme.ts); validated on write, and anything unknown reads as the default.
+  theme: varchar('theme', { length: 32 }).notNull().default('default'),
+  updatedAt: timestamp('updated_at').defaultNow().notNull(),
+});
+
 // Security audit trail (logins, approvals, ...). `details` must never contain PHI.
 export const auditLogs = pgTable('audit_logs', {
   id: uuid('id').defaultRandom().primaryKey(),

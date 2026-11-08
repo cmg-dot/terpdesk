@@ -13,8 +13,8 @@ interface Props {
 }
 
 const optionClass = (selected: boolean): string =>
-  `flex h-8 w-full items-center justify-center rounded-lg text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] ${
-    selected ? "bg-[#0B3B32] font-semibold text-white" : "text-slate-800 hover:bg-emerald-50 hover:text-[#0B3B32]"
+  `flex h-8 w-full items-center justify-center rounded-lg text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] ${
+    selected ? "bg-[var(--forest)] font-semibold text-white" : "text-slate-800 hover:bg-emerald-50 hover:text-[var(--forest)]"
   }`;
 
 /** Nothing chosen yet: the first click on any column starts from 9:00 AM. */
@@ -72,7 +72,7 @@ export const TimeSelector = ({ value, onPick, onDone }: Props) => {
         </div>
       </div>
       <div className="mt-2 flex justify-end border-t border-gray-200 pt-2">
-        <button type="button" onClick={onDone} className="rounded-full bg-[#0B3B32] px-4 py-1 text-[13px] font-medium text-white hover:bg-[#082a23] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0B3B32] focus-visible:ring-offset-1">
+        <button type="button" onClick={onDone} className="rounded-full bg-[var(--forest)] px-4 py-1 text-[13px] font-medium text-white hover:bg-[var(--forest-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] focus-visible:ring-offset-1">
           Done
         </button>
       </div>
