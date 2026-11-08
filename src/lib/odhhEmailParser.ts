@@ -67,9 +67,13 @@ export interface ParsedIntakeEmail {
 
 export const TIME_FRAGMENT = String.raw`\d{1,2}(?::\d{2})?\s*[AaPp]\.?\s*[Mm]\.?`;
 
+// The number itself: digits (with "-" groups), optionally led by a short letter prefix ("SRN-12345"). It stops where the digits do,
+// so "202786989Requestor Name" (a flattened email runs the next label straight after the number) reads as 202786989, and a
+// word such as "pending" is not taken for a number.
+const SRN_TOKEN = String.raw`((?:[A-Za-z]{1,5}-?)?\d+(?:-\d+)*)`;
 export const SRN_PATTERNS: readonly RegExp[] = [
-  /Service\s+Request\s*(?:#|No\.?|Number)\s*:?\s*#?\s*([A-Za-z0-9-]+)/i,
-  /\bSRN\s*[:#]?\s*#?\s*([A-Za-z0-9-]+)/i,
+  new RegExp(String.raw`Service\s+Request\s*(?:#|No\.?|Number)\s*:?\s*#?\s*${SRN_TOKEN}`, "i"),
+  new RegExp(String.raw`\bSRN\s*[:#]?\s*#?\s*${SRN_TOKEN}`, "i"),
 ];
 // Only the appointment's own date. A bare "Date:" line is the forwarded message's header ("Date: 11/02/2026 11:45 AM PST",
 // the day it was SENT), and "Date of Interpreter Request - ..." is the day it was requested: neither is the appointment.

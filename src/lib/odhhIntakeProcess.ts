@@ -4,6 +4,7 @@ import { buildDraftData, draftTitle } from "@/lib/odhhDraft";
 import { jobSchedule, normalizeEmailText, parseIntakeEmail, parseWarnings, sanitizeSrn } from "@/lib/odhhEmailParser";
 import type { ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { enrichRequestFromForm } from "@/lib/odhhEnrichStore";
+import { stateNoticeKind } from "@/lib/odhhNotice";
 import { parseFormExtras } from "@/lib/odhhFormFields";
 import { seedClientQuietly } from "@/lib/clientUpsert";
 import { logActivity } from "@/lib/requestActivity";
@@ -50,6 +51,11 @@ export async function processJobOfferEmail(input: JobEmailInput): Promise<JobEma
   const parsed = parseIntakeEmail(rawContent, subject);
   const srn = parsed.srn ?? sanitizeSrn(input.hintedSrn?.trim() || undefined);
   const warnings = parseWarnings(parsed);
+
+  // A state NOTICE (booking confirmation, "now in process", reassignment, cancellation, hours report) names the request but is not
+  // the form: it states no appointment date or times, so it never creates a job and never fills one in.
+  const notice = stateNoticeKind(subject, rawContent, Boolean(parsed.isoDate));
+  if (notice) return { outcome: "not_a_job", warnings: [...warnings, "A state notice, not a request form"] };
 
   if (input.strict && (!srn || !carriesStatePortalLink(rawContent, srn))) {
     return { outcome: "not_a_job", warnings: [...warnings, "Not recognised as the state's request form"] };

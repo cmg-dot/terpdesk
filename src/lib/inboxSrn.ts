@@ -7,9 +7,9 @@ import { sanitizeSrn } from "@/lib/odhhEmailParser";
  */
 
 /** "Service Request # 202786930", "Service Request Number: 202786930". Capture group 1 is the number. */
-export const BODY_SERVICE_REQUEST_SQL_PATTERN = String.raw`(?i)service\s+request\s*(?:#|no\.?|number)\s*:?\s*#?\s*([a-z0-9-]+)`;
+export const BODY_SERVICE_REQUEST_SQL_PATTERN = String.raw`(?i)service\s+request\s*(?:#|no\.?|number)\s*:?\s*#?\s*((?:[a-z]{1,5}-?)?[0-9]+(?:-[0-9]+)*)`;
 /** "SRN: 202786930", "SRN #202786930". */
-export const BODY_SRN_SQL_PATTERN = String.raw`(?i)\msrn\s*[:#]?\s*#?\s*([a-z0-9-]+)`;
+export const BODY_SRN_SQL_PATTERN = String.raw`(?i)\msrn\s*[:#]?\s*#?\s*((?:[a-z]{1,5}-?)?[0-9]+(?:-[0-9]+)*)`;
 /** "Interpreter Request - 12/7/2026 - #202786930". */
 export const SUBJECT_SRN_SQL_PATTERN = String.raw`#\s*([0-9]{6,12})`;
 
