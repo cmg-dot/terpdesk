@@ -47,7 +47,7 @@ export function InboxView({ emails: serverEmails }: { emails: InboxListItem[] })
                 <SearchX className="h-7 w-7 text-[var(--sage)]" aria-hidden="true" />
                 <p className="text-sm text-[var(--sage)]">No emails match{filtering ? " these filters" : ""}.</p>
                 {filtering && (
-                  <button type="button" onClick={() => { setQuery(""); setTab("all"); }} className="rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--forest)] transition-colors hover:bg-emerald-50">
+                  <button type="button" onClick={() => { setQuery(""); setTab("all"); }} className="rounded-full border border-gray-200 bg-white px-3.5 py-1.5 text-xs font-medium text-[var(--forest)] transition-colors hover:bg-[var(--mint)]">
                     Clear filters
                   </button>
                 )}

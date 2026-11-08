@@ -23,9 +23,9 @@ const VARIANT_STYLES: Record<SearchableSelectVariant, { input: string; list: str
     active: "bg-[#F5F4F0]",
   },
   cream: {
-    input: "border border-stone-200 bg-[#F4F3EF] hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-emerald-50 focus:bg-emerald-50",
+    input: "border border-stone-200 bg-[#F4F3EF] hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-[var(--mint)] focus:bg-[var(--mint)]",
     list: "border border-stone-200 bg-[#F4F3EF]",
-    active: "bg-emerald-50",
+    active: "bg-[var(--mint)]",
   },
 };
 

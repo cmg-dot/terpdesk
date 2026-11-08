@@ -148,7 +148,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
             {person.name} is booked immediately and emailed the booking details.
           </p>
           <div className="mt-3 flex flex-wrap gap-3">
-            <button type="button" onClick={assign} disabled={assigning} className="rounded-full bg-[#145347] px-5 py-2 text-sm font-medium text-white hover:bg-[#0f4037] disabled:cursor-not-allowed disabled:opacity-60">
+            <button type="button" onClick={assign} disabled={assigning} className="rounded-full bg-[var(--forest-bright)] px-5 py-2 text-sm font-medium text-white hover:bg-[var(--forest-bright-hover)] disabled:cursor-not-allowed disabled:opacity-60">
               {assigning ? "Assigning…" : "Yes, assign now"}
             </button>
             <button type="button" onClick={() => setConfirming(false)} disabled={assigning} className="rounded-full border border-gray-300 bg-white px-5 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60">
@@ -161,7 +161,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
           type="button"
           onClick={() => setConfirming(true)}
           disabled={!person}
-          className="mt-4 w-full rounded-full bg-[#145347] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[#0f4037] disabled:cursor-not-allowed disabled:bg-[var(--sidebar-muted)] disabled:opacity-50 sm:w-auto"
+          className="mt-4 w-full rounded-full bg-[var(--forest-bright)] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-bright-hover)] disabled:cursor-not-allowed disabled:bg-[var(--sidebar-muted)] disabled:opacity-50 sm:w-auto"
         >
           Assign directly
         </button>

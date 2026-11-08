@@ -10,7 +10,7 @@ const TONE_CLASS: Record<ReturnType<typeof jobTone>, string> = {
   live: "bg-emerald-600 text-white ring-1 ring-emerald-400 hover:bg-emerald-700",
   past: "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200",
   attention: "bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100",
-  booked: "bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]",
+  booked: "bg-[var(--mint-pale)] text-[var(--mint-pale-ink)] border border-[#CDE0D8] hover:bg-[#D5E6DF]",
 };
 
 interface Props {

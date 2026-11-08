@@ -107,7 +107,7 @@ export function OfferComposer({ view, ctx, actions }: Props) {
           className={`rounded-full px-6 py-2 text-sm font-medium transition-colors mt-2 w-auto flex items-center gap-2 ${
             offerDisabled
               ? 'bg-[var(--sidebar-muted)] text-white opacity-50 cursor-not-allowed'
-              : 'bg-[#145347] text-white hover:bg-[#0f4037] cursor-pointer'
+              : 'bg-[var(--forest-bright)] text-white hover:bg-[var(--forest-bright-hover)] cursor-pointer'
           }`}
         >
           {isSending ? (

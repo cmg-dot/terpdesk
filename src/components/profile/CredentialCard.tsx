@@ -67,7 +67,7 @@ export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onAr
               Only me
             </span>
           ) : (
-            <span className={`${badgeBase} border-[#BCE1D1] bg-[#E5F0EB] text-[#0A3D31]`}>
+            <span className={`${badgeBase} border-[#BCE1D1] bg-[var(--mint-pale)] text-[var(--mint-pale-ink)]`}>
               <Share2 className="h-3 w-3" aria-hidden="true" />
               Shared with {sharedCount} {sharedCount === 1 ? "agency" : "agencies"}
             </span>

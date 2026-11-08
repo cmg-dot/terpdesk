@@ -63,7 +63,7 @@ export function InboxMessage({ email, isLoading, error, onBack, onMarkUnread, jo
         )}
         {email && (
           <article data-inbox-message={email.id}>
-            <header className="space-y-3 border-b border-emerald-100/70 bg-gradient-to-b from-emerald-50/70 to-[#FBFAF7] px-4 py-5 sm:px-6 lg:px-8">
+            <header className="space-y-3 border-b border-[rgb(var(--mint-strong-rgb)/0.7)] bg-gradient-to-b from-[rgb(var(--mint-rgb)/0.7)] to-[#FBFAF7] px-4 py-5 sm:px-6 lg:px-8">
               <div className="flex flex-wrap items-center gap-2">
                 <InboxCategoryBadge category={category} />
                 {jobRef?.srn && <InboxJobLink srn={jobRef.srn} jobId={jobRef.jobId} showQuickLink={false} />}

@@ -14,7 +14,7 @@ interface Props {
 
 const optionClass = (selected: boolean): string =>
   `flex h-8 w-full items-center justify-center rounded-lg text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] ${
-    selected ? "bg-[var(--forest)] font-semibold text-white" : "text-slate-800 hover:bg-emerald-50 hover:text-[var(--forest)]"
+    selected ? "bg-[var(--forest)] font-semibold text-white" : "text-slate-800 hover:bg-[var(--mint)] hover:text-[var(--forest)]"
   }`;
 
 /** Nothing chosen yet: the first click on any column starts from 9:00 AM. */
@@ -43,7 +43,7 @@ export const TimeSelector = ({ value, onPick, onDone }: Props) => {
 
   return (
     <div ref={root} className="w-[15rem] max-w-full select-none">
-      <div className="mb-1 grid grid-cols-3 gap-2 text-center text-[11px] font-semibold uppercase tracking-wider text-emerald-800/70" aria-hidden="true">
+      <div className="mb-1 grid grid-cols-3 gap-2 text-center text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--mint-ink-rgb)/0.7)]" aria-hidden="true">
         <span>Hour</span>
         <span>Min</span>
         <span>AM / PM</span>

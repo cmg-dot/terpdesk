@@ -37,7 +37,7 @@ interface RowProps {
 const Row = memo(function Row({ id, index, size, option, showGroup, isActive, isSelected, rowText, onPick, onHover }: RowProps) {
   return (
     <li role="presentation">
-      {showGroup && <div className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-emerald-800/70">{option.group}</div>}
+      {showGroup && <div className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--mint-ink-rgb)/0.7)]">{option.group}</div>}
       <div
         id={`${id}-opt-${index}`}
         role="option"
@@ -48,7 +48,7 @@ const Row = memo(function Row({ id, index, size, option, showGroup, isActive, is
         title={option.label}
         onClick={() => onPick(option)}
         onMouseEnter={() => onHover(index)}
-        className={`flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2.5 leading-5 tracking-tight ${rowText} ${isActive ? "bg-emerald-50 text-[var(--forest)] shadow-[inset_3px_0_0_#0B3B32]" : "text-slate-800"} ${isSelected ? "font-medium" : ""}`}
+        className={`flex h-8 cursor-pointer items-center gap-2 rounded-lg px-2.5 leading-5 tracking-tight ${rowText} ${isActive ? "bg-[var(--mint)] text-[var(--forest)] shadow-[inset_3px_0_0_var(--forest)]" : "text-slate-800"} ${isSelected ? "font-medium" : ""}`}
       >
         <Check className={`h-3.5 w-3.5 flex-none text-[var(--forest)] ${isSelected ? "" : "invisible"}`} aria-hidden="true" />
         <span className="min-w-0 flex-1 truncate">{option.label}</span>

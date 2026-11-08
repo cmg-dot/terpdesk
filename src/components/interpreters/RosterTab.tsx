@@ -118,8 +118,8 @@ export const RosterTab = ({ items, searchQuery, filtersActive = false, onManage,
 
                   {/* UI Badging: Registered App User vs Shadow / External */}
                   {isRegistered ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-semibold bg-[#E5F0EB] text-[#0A3D31] border border-[#BCE1D1]">
-                      <ShieldCheck className="w-3 h-3 text-[#0A3D31]" />
+                    <span className="inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] font-semibold bg-[var(--mint-pale)] text-[var(--mint-pale-ink)] border border-[#BCE1D1]">
+                      <ShieldCheck className="w-3 h-3 text-[var(--mint-pale-ink)]" />
                       <span>Registered App User</span>
                     </span>
                   ) : (

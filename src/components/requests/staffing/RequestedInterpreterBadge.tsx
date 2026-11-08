@@ -43,7 +43,7 @@ export function RequestedInterpreterBadge({ requestedName, match, alreadyBooked,
         <button
           type="button"
           onClick={() => onSelect(openPosition, match.id)}
-          className="rounded-full bg-[#145347] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[#0f4037]"
+          className="rounded-full bg-[var(--forest-bright)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-bright-hover)]"
         >
           Select {match.name}{showPosition ? ` for Position ${openPosition}` : ""}
         </button>

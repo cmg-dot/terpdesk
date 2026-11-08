@@ -111,7 +111,7 @@ export function AddExternalInterpreterModal({
             {/* Header */}
             <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-5">
               <div className="flex items-center gap-3.5">
-                <div className="w-11 h-11 rounded-2xl bg-[#E5F0EB] text-[var(--forest)] flex items-center justify-center shrink-0">
+                <div className="w-11 h-11 rounded-2xl bg-[var(--mint-pale)] text-[var(--forest)] flex items-center justify-center shrink-0">
                   <UserPlus className="w-5 h-5" />
                 </div>
                 <div>

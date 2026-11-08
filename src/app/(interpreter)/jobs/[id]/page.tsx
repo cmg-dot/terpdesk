@@ -707,7 +707,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
             href={buildOdhhPortalUrl((job as any).data?.intake?.odhhSrn)}
             target="_blank"
             rel="noopener noreferrer"
-            className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--forest-soft)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#14332D]"
+            className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--forest-soft)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-deep)]"
           >
             Open ODHH Portal
           </a>
@@ -723,7 +723,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
 
       {isFormOpen ? (
         <div className="mb-4 relative">
-          <button onClick={() => setIsFormOpen(false)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium mb-6 transition-colors hover:bg-[#14332D]">Close</button>
+          <button onClick={() => setIsFormOpen(false)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium mb-6 transition-colors hover:bg-[var(--forest-deep)]">Close</button>
           
           <div className="bg-[#F5F4F0] p-6 rounded-xl">
              {isFutureAppointment && (
@@ -863,7 +863,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
               </div>
             </div>
           ) : (
-            <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] transition-colors">
+            <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] transition-colors">
               Submit actual hours
             </button>
           )}
@@ -1080,7 +1080,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
+              <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white hover:bg-[var(--forest-deep)] rounded-full px-5 py-2 text-sm font-medium transition-colors">
                 Edit draft / Submit actual hours
               </button>
             )
@@ -1103,7 +1103,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
                 </div>
               </div>
             ) : (
-              <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white hover:bg-[#14332D] rounded-full px-5 py-2 text-sm font-medium transition-colors">
+              <button onClick={() => setIsFormOpen(true)} className="bg-[var(--forest-soft)] text-white hover:bg-[var(--forest-deep)] rounded-full px-5 py-2 text-sm font-medium transition-colors">
                 Submit a correction
               </button>
             )
@@ -1506,7 +1506,7 @@ export default function JobDetailPage() {
                     <button 
                       onClick={handleAccept}
                       disabled={isPending && actingAction === 'accept'}
-                      className="bg-[var(--forest)] hover:bg-[#145347] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-white text-[13px] font-medium px-5 py-2 rounded-full transition-colors w-full sm:w-auto flex justify-center items-center gap-2"
+                      className="bg-[var(--forest)] hover:bg-[var(--forest-bright)] disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer text-white text-[13px] font-medium px-5 py-2 rounded-full transition-colors w-full sm:w-auto flex justify-center items-center gap-2"
                     >
                       {isPending && actingAction === 'accept' ? (
                         <>

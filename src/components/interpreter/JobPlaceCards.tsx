@@ -47,7 +47,7 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
           href={meetingLink.startsWith("http") ? meetingLink : `https://${meetingLink}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-semibold hover:bg-[#14332D] transition-colors shadow-sm"
+          className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-semibold hover:bg-[var(--forest-deep)] transition-colors shadow-sm"
         >
           Open meeting link <ExternalLink className="w-3.5 h-3.5" />
         </a>

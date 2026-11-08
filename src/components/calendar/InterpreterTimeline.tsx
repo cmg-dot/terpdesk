@@ -16,7 +16,7 @@ interface Props {
 }
 
 const LEGEND: { swatch: string; label: string }[] = [
-  { swatch: "bg-[#E5F0EB] border-[#CDE0D8]", label: "Booked" },
+  { swatch: "bg-[var(--mint-pale)] border-[#CDE0D8]", label: "Booked" },
   { swatch: "bg-emerald-600 border-emerald-600", label: "Happening now" },
   { swatch: "bg-amber-50 border-amber-300", label: "Needs attention" },
   { swatch: "bg-gray-100 border-gray-200", label: "Finished" },

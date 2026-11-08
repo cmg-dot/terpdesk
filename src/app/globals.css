@@ -26,6 +26,31 @@
   --nav-bar: transparent;
   --badge: #9E3929;
   --badge-ink: #FFFFFF;
+
+  /* Second-tier brand shades. forest-bright / -hover: secondary solid buttons; forest-deep: the darkest hover;
+     pill: the active segment of a segmented control and the current page in a pager;
+     mint-pale / -ink: soft chips on the calendar and roster. */
+  --forest-bright: #145347;
+  --forest-bright-hover: #0F4037;
+  --forest-deep: #14332D;
+  --pill: #163C3A;
+  --mint-pale: #E5F0EB;
+  --mint-pale-ink: #0A3D31;
+  /* The mint family: soft washes and edges for dropdown hover and selection, the Inbox's unread pill, dots and selected
+     card. Defined as r g b triplets so a component can also ask for a transparency (rgb(var(--mint-rgb)/0.5)); the
+     plain colours below are built from them. Here they are exactly the emerald-50/100/200/500/600/800 shades. */
+  --mint-rgb: 236 253 245;
+  --mint-strong-rgb: 209 250 229;
+  --mint-edge-rgb: 167 243 208;
+  --mint-dot-rgb: 16 185 129;
+  --mint-line-rgb: 5 150 105;
+  --mint-ink-rgb: 6 95 70;
+  --mint: rgb(var(--mint-rgb));
+  --mint-strong: rgb(var(--mint-strong-rgb));
+  --mint-edge: rgb(var(--mint-edge-rgb));
+  --mint-dot: rgb(var(--mint-dot-rgb));
+  --mint-line: rgb(var(--mint-line-rgb));
+  --mint-ink: rgb(var(--mint-ink-rgb));
   --ink: #0f172a;
   --sage: #64748b;
 

@@ -488,7 +488,7 @@ export default function InterpreterHomePage() {
       <button
         onClick={() => handleAcceptOffer(job)}
         disabled={isPending && actingOfferId === job.id}
-        className="text-[13px] font-medium text-white bg-[var(--forest)] hover:bg-[#145347] disabled:opacity-50 disabled:cursor-not-allowed rounded-full px-4 py-2 text-center transition-colors flex-1 md:flex-none cursor-pointer flex justify-center items-center gap-2"
+        className="text-[13px] font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest-bright)] disabled:opacity-50 disabled:cursor-not-allowed rounded-full px-4 py-2 text-center transition-colors flex-1 md:flex-none cursor-pointer flex justify-center items-center gap-2"
       >
         {isPending && actingOfferId === job.id ? (
           <>
@@ -694,7 +694,7 @@ export default function InterpreterHomePage() {
  className={`w-full md:w-auto text-xs font-semibold px-4 py-2 rounded-full transition-colors inline-flex items-center justify-center gap-1.5 shadow-sm ${
  isCorrection
  ? 'bg-amber-600 hover:bg-amber-700 text-white'
- : 'bg-[var(--forest-soft)] hover:bg-[#14332D] text-white'
+ : 'bg-[var(--forest-soft)] hover:bg-[var(--forest-deep)] text-white'
  }`}
  >
  {isCorrection

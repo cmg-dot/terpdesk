@@ -84,7 +84,7 @@ export function PendingReportRow({ item, onDone }: { item: PendingVerificationVi
             onClick={assign}
             disabled={busy}
             title="If they are not booked on this job yet, they will be booked. The hours then wait under Awaiting review like any other report."
-            className="rounded-full bg-[#145347] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#0f4037] disabled:opacity-60"
+            className="rounded-full bg-[var(--forest-bright)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-bright-hover)] disabled:opacity-60"
           >
             {busy ? "Recording…" : "Assign"}
           </button>

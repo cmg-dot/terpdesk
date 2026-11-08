@@ -78,7 +78,7 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
             </div>
           </div>
           <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
-            <span className={`rounded-full px-3 py-0.5 text-xs font-medium capitalize ${isCancelled || isPast ? "bg-gray-200 text-gray-600" : isHappening ? "bg-emerald-500 text-white" : "bg-[#E5F0EB] text-[#0A3D31]"}`}>
+            <span className={`rounded-full px-3 py-0.5 text-xs font-medium capitalize ${isCancelled || isPast ? "bg-gray-200 text-gray-600" : isHappening ? "bg-emerald-500 text-white" : "bg-[var(--mint-pale)] text-[var(--mint-pale-ink)]"}`}>
               {isCancelled && req.isVoided ? "Void" : req.status}
             </span>
           </div>
@@ -97,7 +97,7 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
       data-job-id={req.id}
       data-highlighted={highlighted ? "true" : undefined}
       className={`block ${shape} text-xs ${SNAPPY} ${highlighted ? PULSE : ""} ${
-        isCancelled ? CANCELLED_CARD[variant] : isHappening ? live : isPast ? "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200" : "bg-[#E5F0EB] text-[#0A3D31] border border-[#CDE0D8] hover:bg-[#D5E6DF]"
+        isCancelled ? CANCELLED_CARD[variant] : isHappening ? live : isPast ? "bg-gray-100 text-gray-500 border border-gray-200 hover:bg-gray-200" : "bg-[var(--mint-pale)] text-[var(--mint-pale-ink)] border border-[#CDE0D8] hover:bg-[#D5E6DF]"
       }`}
     >
       {isHappening && <LiveDot compact={month} />}

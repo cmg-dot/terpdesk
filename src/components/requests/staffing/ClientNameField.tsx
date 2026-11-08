@@ -62,7 +62,7 @@ export function ClientNameField({ requestId, value, onSaved }: Props) {
           type="button"
           onClick={() => void save()}
           disabled={!dirty || saving}
-          className="rounded-full bg-[#145347] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[#0f4037] disabled:cursor-not-allowed disabled:opacity-50"
+          className="rounded-full bg-[var(--forest-bright)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-bright-hover)] disabled:cursor-not-allowed disabled:opacity-50"
         >
           {saving ? "Saving…" : "Save"}
         </button>

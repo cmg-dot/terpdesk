@@ -19,6 +19,18 @@
   --nav-bar: #D4AF37;
   --badge: #D4AF37;
   --badge-ink: #2B1A2C;
+  --forest-bright: #5A3A5C;
+  --forest-bright-hover: #4A2E4B;
+  --forest-deep: #35203A;
+  --pill: #4A2E4B;
+  --mint-pale: #EFE6EF;
+  --mint-pale-ink: #4A2E4B;
+  --mint-rgb: 243 234 243;
+  --mint-strong-rgb: 230 213 231;
+  --mint-edge-rgb: 212 187 214;
+  --mint-dot-rgb: 212 175 55;
+  --mint-line-rgb: 94 63 96;
+  --mint-ink-rgb: 74 46 75;
 }
 
 /* Ocean Blue */
@@ -35,6 +47,18 @@
   --tint-ink: #1E3A8A;
   --accent: #60A5FA;
   --nav-bar: #60A5FA;
+  --forest-bright: #2B4BA8;
+  --forest-bright-hover: #1E3A8A;
+  --forest-deep: #172C6B;
+  --pill: #1E3A8A;
+  --mint-pale: #E3EAF8;
+  --mint-pale-ink: #1E3A8A;
+  --mint-rgb: 239 244 255;
+  --mint-strong-rgb: 219 230 252;
+  --mint-edge-rgb: 186 203 240;
+  --mint-dot-rgb: 59 130 246;
+  --mint-line-rgb: 43 75 168;
+  --mint-ink-rgb: 30 58 138;
 }
 
 /*
@@ -59,6 +83,18 @@
   --ink: #F3F4F6;
   --sage: #9CA3AF;
   --foreground: #E5E7EB;
+  --forest-bright: #2F7F6F;
+  --forest-bright-hover: #3A9482;
+  --forest-deep: #3A9482;
+  --pill: #2F7F6F;
+  --mint-pale: #1E3A34;
+  --mint-pale-ink: #A7E3D2;
+  --mint-rgb: 30 58 52;
+  --mint-strong-rgb: 38 74 66;
+  --mint-edge-rgb: 58 122 106;
+  --mint-dot-rgb: 95 196 172;
+  --mint-line-rgb: 47 127 111;
+  --mint-ink-rgb: 167 227 210;
 }
 
 :root[data-theme="dark"] .bg-white,

@@ -49,7 +49,7 @@ export const AvailabilitySection = ({ days, sharesAvailability, timeZoneLabel }:
                   <Link
                     key={`b-${s.requestId}-${s.start}`}
                     href={`/requests/${s.requestId}`}
-                    className="rounded-full border border-[#BCE1D1] bg-[#E5F0EB] px-2.5 py-0.5 text-[12px] text-[#0A3D31] hover:underline"
+                    className="rounded-full border border-[#BCE1D1] bg-[var(--mint-pale)] px-2.5 py-0.5 text-[12px] text-[var(--mint-pale-ink)] hover:underline"
                   >
                     {label("Booked with you", s, d)}
                   </Link>
@@ -78,7 +78,7 @@ export const AvailabilitySection = ({ days, sharesAvailability, timeZoneLabel }:
                   <Link
                     key={`b-${s.requestId}-${s.start}`}
                     href={`/requests/${s.requestId}`}
-                    className="rounded-full border border-[#BCE1D1] bg-[#E5F0EB] px-2.5 py-0.5 text-[12px] text-[#0A3D31] hover:underline"
+                    className="rounded-full border border-[#BCE1D1] bg-[var(--mint-pale)] px-2.5 py-0.5 text-[12px] text-[var(--mint-pale-ink)] hover:underline"
                   >
                     {label("Booked with you", s, d)}
                   </Link>

@@ -38,7 +38,7 @@ export function HoursPager({ page, totalPages, hrefFor, position = "bottom" }: P
             aria-current={token === page ? 'page' : undefined}
             className={`${pagerBase} ${
               token === page
-                ? 'bg-[#163C3A] text-white border-transparent'
+                ? 'bg-[var(--pill)] text-white border-transparent'
                 : 'bg-white text-slate-700 hover:bg-slate-50'
             }`}
           >

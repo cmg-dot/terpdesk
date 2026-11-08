@@ -1194,7 +1194,7 @@ export default function AssignmentDetailPage() {
  href={`https://fortress.wa.gov/dshs/odhhapps/interpreters/servicerequest.aspx?id=${foundRequest.data.intake.odhhSrn}`}
  target="_blank"
  rel="noopener noreferrer"
- className="inline-block mt-4 rounded-full px-5 py-2.5 text-sm font-medium text-white bg-[var(--forest)] hover:bg-[#0f4037] transition-colors"
+ className="inline-block mt-4 rounded-full px-5 py-2.5 text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest-bright-hover)] transition-colors"
  >
  Acknowledge on ODHH
  </a>
@@ -1629,7 +1629,7 @@ export default function AssignmentDetailPage() {
 
   {/* Global Toast Notification */}
   {toastMessage && (
-    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[#0A3D31] text-white px-5 py-3.5 rounded-2xl shadow-xl border border-[#145347] transition-all duration-300">
+    <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 bg-[var(--mint-pale-ink)] text-white px-5 py-3.5 rounded-2xl shadow-xl border border-[var(--forest-bright)] transition-all duration-300">
       <div className="w-6 h-6 rounded-full bg-[#10b981] flex items-center justify-center text-white shrink-0">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
           <polyline points="20 6 9 17 4 12"/>

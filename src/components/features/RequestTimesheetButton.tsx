@@ -42,9 +42,9 @@ const getPhase = (nowMs: number, startMs: number, endMs: number): Phase => {
 };
 
 const primaryButton =
-  "rounded-lg bg-[#163C3A] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#122f2d] disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-lg bg-[var(--pill)] px-3 py-1.5 text-sm font-medium text-white hover:bg-[#122f2d] disabled:cursor-not-allowed disabled:opacity-60";
 const outlineButton =
-  "rounded-lg border border-[#163C3A] bg-white px-3 py-1.5 text-sm font-medium text-[#163C3A] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60";
+  "rounded-lg border border-[var(--pill)] bg-white px-3 py-1.5 text-sm font-medium text-[var(--pill)] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-60";
 
 interface ConfirmDialogProps {
   title: string;

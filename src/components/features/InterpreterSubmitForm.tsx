@@ -242,7 +242,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[#14332D] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           {p.isSubmitting ? (p.submittingLabel ?? "Submitting...") : (p.submitLabel ?? "Submit actual hours")}
         </button>
         {p.onSaveDraft && (

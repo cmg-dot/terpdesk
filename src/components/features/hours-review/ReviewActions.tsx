@@ -4,7 +4,7 @@ import type { ReviewActionsState } from "@/hooks/useReviewActions";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 const ERROR_BANNER = "mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700";
-const PRIMARY = "w-full sm:w-auto bg-[#145347] text-white hover:bg-[#0f4037] rounded-full px-6 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
+const PRIMARY = "w-full sm:w-auto bg-[var(--forest-bright)] text-white hover:bg-[var(--forest-bright-hover)] rounded-full px-6 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 const SECONDARY = "w-full sm:w-auto bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 rounded-full px-6 py-2.5 text-sm font-medium transition-colors disabled:opacity-60 disabled:cursor-not-allowed";
 
 /**

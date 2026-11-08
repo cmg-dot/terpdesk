@@ -38,7 +38,7 @@ export function OriginalFormBody({ loading, result }: Props) {
               role="tab"
               aria-selected={index === active}
               onClick={() => setActive(index)}
-              className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${index === active ? "bg-[#145347] text-white" : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
+              className={`shrink-0 rounded-full px-4 py-1.5 text-[13px] font-medium transition-colors ${index === active ? "bg-[var(--forest-bright)] text-white" : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"}`}
             >
               {email.label}
               {arrived(email.receivedAt) && <span className="ml-1.5 font-normal opacity-80">{arrived(email.receivedAt)}</span>}

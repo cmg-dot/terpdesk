@@ -19,7 +19,7 @@ const formatWhen = (iso: string, timeZone: string): string =>
 const Shell = ({ children }: { children: React.ReactNode }) => (
   <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center py-12 px-4 sm:px-6">
     <div className="w-full max-w-md mx-auto bg-white rounded-2xl shadow-xl overflow-hidden border border-gray-100">
-      <div className="bg-[#163C3A] px-6 py-4 flex justify-between items-center">
+      <div className="bg-[var(--pill)] px-6 py-4 flex justify-between items-center">
         <span className="text-white font-bold tracking-wide">TerpDESK</span>
       </div>
       <div className="p-6 sm:p-8">{children}</div>

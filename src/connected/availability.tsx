@@ -503,7 +503,7 @@ export default function ConnectedAvailability({
             type="button"
             onClick={handleSaveAvailability}
             disabled={isSaving}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-medium hover:bg-[#14332D] transition-colors disabled:opacity-60 cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-medium hover:bg-[var(--forest-deep)] transition-colors disabled:opacity-60 cursor-pointer"
           >
             {isSaving ? "Saving..." : "Save hours"}
           </button>
@@ -789,7 +789,7 @@ export default function ConnectedAvailability({
               type="button"
               onClick={handleSaveBusyBlock}
               disabled={isSaving}
-              className="bg-[var(--forest-soft)] text-white rounded-full px-6 py-2.5 text-xs font-medium hover:bg-[#14332D] transition-colors disabled:opacity-60 cursor-pointer"
+              className="bg-[var(--forest-soft)] text-white rounded-full px-6 py-2.5 text-xs font-medium hover:bg-[var(--forest-deep)] transition-colors disabled:opacity-60 cursor-pointer"
             >
               {isSaving
                 ? "Saving..."

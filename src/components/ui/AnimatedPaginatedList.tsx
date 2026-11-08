@@ -104,7 +104,7 @@ export const AnimatedPaginatedList = <T,>({
                 aria-current={token === current ? "page" : undefined}
                 className={`${buttonBase} ${
                   token === current
-                    ? "bg-[#163C3A] text-white"
+                    ? "bg-[var(--pill)] text-white"
                     : "border border-gray-200 bg-white text-gray-700 hover:bg-gray-50"
                 }`}
               >

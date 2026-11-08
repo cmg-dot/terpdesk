@@ -18,7 +18,7 @@ interface Props {
   onDone: () => void;
 }
 
-const navButton = "rounded-full p-1.5 text-[var(--forest)] transition-colors hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]";
+const navButton = "rounded-full p-1.5 text-[var(--forest)] transition-colors hover:bg-[var(--mint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]";
 
 /**
  * A month calendar: previous / next month and year, the days of six weeks, "Today" and "Done". The chosen day is solid
@@ -85,7 +85,7 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
       </div>
 
       <div ref={grid} role="group" aria-label={monthLabel(shown.year, shown.month)} onKeyDown={onKeyDown}>
-        <div aria-hidden="true" className="mb-1 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wider text-emerald-800/70">
+        <div aria-hidden="true" className="mb-1 grid grid-cols-7 text-center text-[11px] font-semibold uppercase tracking-wider text-[rgb(var(--mint-ink-rgb)/0.7)]">
           {WEEKDAY_LABELS.map((label) => (
             <span key={label} className="py-1">{label}</span>
           ))}
@@ -108,7 +108,7 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
                 className={`mx-auto flex h-9 w-9 items-center justify-center rounded-full text-[13px] tabular-nums transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-35 ${
                   selected
                     ? "bg-[var(--forest)] font-semibold text-white"
-                    : `${cell.inMonth ? "text-slate-800" : "text-gray-400"} hover:bg-emerald-50 hover:text-[var(--forest)] ${cell.key === today ? "ring-1 ring-[var(--forest)]" : ""}`
+                    : `${cell.inMonth ? "text-slate-800" : "text-gray-400"} hover:bg-[var(--mint)] hover:text-[var(--forest)] ${cell.key === today ? "ring-1 ring-[var(--forest)]" : ""}`
                 }`}
               >
                 {cell.day}
@@ -123,7 +123,7 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
           type="button"
           disabled={outOfRange(today)}
           onClick={() => onPick(today)}
-          className="rounded-full px-3 py-1 text-[13px] font-medium text-[var(--forest)] hover:bg-emerald-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-40"
+          className="rounded-full px-3 py-1 text-[13px] font-medium text-[var(--forest)] hover:bg-[var(--mint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-40"
         >
           Today
         </button>

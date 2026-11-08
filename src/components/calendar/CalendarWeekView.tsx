@@ -41,7 +41,7 @@ export const CalendarWeekView = ({ dateKey, todayKey, index, nowMs, highlightId 
         <div className="min-w-[800px]">
           <div className="grid grid-cols-7 border-b border-gray-200">
             {days.map((key, i) => (
-              <div key={key} data-today={key === todayKey ? "true" : undefined} className={`text-center py-3 border-r border-gray-100 last:border-r-0 ${key === todayKey ? "bg-[#E5F0EB]" : ""}`}>
+              <div key={key} data-today={key === todayKey ? "true" : undefined} className={`text-center py-3 border-r border-gray-100 last:border-r-0 ${key === todayKey ? "bg-[var(--mint-pale)]" : ""}`}>
                 <div className="text-[12px] font-semibold text-[var(--ink)] uppercase tracking-wider">{WEEKDAYS[i]}</div>
                 <div className="text-sm font-semibold text-gray-700 mt-0.5">{formatDateLabel(key).replace(/, \d{4}$/, "")}</div>
               </div>

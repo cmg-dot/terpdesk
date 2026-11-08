@@ -222,14 +222,14 @@ function RequestsPageContent() {
  <button
  type="button"
  onClick={() => setActiveTab("upcoming")}
- className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "upcoming" ? "bg-[#163C3A] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
+ className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "upcoming" ? "bg-[var(--pill)] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
  >
  Upcoming <span className="font-normal opacity-80">{upcomingRequests.length}</span>
  </button>
  <button
  type="button"
  onClick={() => setActiveTab("past")}
- className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "past" ? "bg-[#163C3A] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
+ className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "past" ? "bg-[var(--pill)] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
  >
  Past <span className="font-normal opacity-80">{pastRequests.length}</span>
  </button>

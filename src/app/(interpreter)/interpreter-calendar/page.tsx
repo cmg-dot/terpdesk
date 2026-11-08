@@ -230,7 +230,7 @@ export default function InterpreterCalendarPage() {
         onToday={nav.goToToday}
         onPick={goToDate}
         extra={
-          <button onClick={() => document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-[13px] font-medium hover:bg-[#14332D] transition-colors">
+          <button onClick={() => document.getElementById('private-busy-time')?.scrollIntoView({ behavior: 'smooth', block: 'start' })} className="px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-[13px] font-medium hover:bg-[var(--forest-deep)] transition-colors">
             Block time
           </button>
         }
@@ -496,7 +496,7 @@ export default function InterpreterCalendarPage() {
                                   </div>
                                 )}
                                 <div className={`text-[11px] font-semibold truncate ${isHappening ? 'text-white' : 'text-[var(--forest)]'}`}>{appt.title}</div>
-                                <div className={`text-[10px] mt-0.5 truncate ${isHappening ? 'text-emerald-100' : 'text-[#14332D]'}`}>{timeLabel}</div>
+                                <div className={`text-[10px] mt-0.5 truncate ${isHappening ? 'text-emerald-100' : 'text-[var(--forest-deep)]'}`}>{timeLabel}</div>
                               </div>
                             );
                           })}

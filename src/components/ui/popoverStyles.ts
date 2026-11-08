@@ -11,7 +11,7 @@
  * scrollbar-width cover Firefox and current Chrome (which uses them instead of ::-webkit once they are set).
  */
 export const SCROLLBAR_CLASS =
-  "[scrollbar-width:thin] [scrollbar-color:#0b3b32_#fbfaf6] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#fbfaf6] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-[#fbfaf6] [&::-webkit-scrollbar-thumb]:bg-[var(--forest)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--forest-hover)]";
+  "[scrollbar-width:thin] [scrollbar-color:var(--forest)_#fbfaf6] [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[#fbfaf6] [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:border-2 [&::-webkit-scrollbar-thumb]:border-solid [&::-webkit-scrollbar-thumb]:border-[#fbfaf6] [&::-webkit-scrollbar-thumb]:bg-[var(--forest)] [&::-webkit-scrollbar-thumb:hover]:bg-[var(--forest-hover)]";
 
 /** A floating panel: fixed to the screen (so no overflow rule on a parent can clip it), cream, bordered, shadowed. */
 export const POPOVER_CLASS =

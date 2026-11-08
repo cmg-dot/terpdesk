@@ -30,7 +30,7 @@ export function InboxList({ emails, selectedId, onSelect }: InboxListProps) {
             <div
               data-inbox-row={email.id}
               data-selected={selected ? "true" : "false"}
-              className={`rounded-xl border transition-colors ${selected ? "border-emerald-600 bg-emerald-50 shadow-sm" : "border-transparent hover:border-emerald-100 hover:bg-emerald-50/50"}`}
+              className={`rounded-xl border transition-colors ${selected ? "border-[var(--mint-line)] bg-[var(--mint)] shadow-sm" : "border-transparent hover:border-[var(--mint-strong)] hover:bg-[rgb(var(--mint-rgb)/0.5)]"}`}
             >
               <button
                 type="button"
@@ -41,7 +41,7 @@ export function InboxList({ emails, selectedId, onSelect }: InboxListProps) {
                 <span
                   aria-label={email.isRead ? undefined : "Unread"}
                   data-unread-dot={email.isRead ? "false" : "true"}
-                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${email.isRead ? "bg-transparent" : "bg-emerald-500"}`}
+                  className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${email.isRead ? "bg-transparent" : "bg-[var(--mint-dot)]"}`}
                 />
                 <span className="min-w-0 flex-1">
                   <span className="flex items-baseline justify-between gap-2">
