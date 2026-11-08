@@ -134,6 +134,13 @@ export function resolveRequestTimes(row: { createdAt?: Date | string | null; dat
     } catch (e) {}
   }
 
+  // A job made from the state's email keeps the email's own times in data.schedule (the intake record). They count before
+  // the row's createdAt and the one-hour default, which are only fallbacks for jobs that have no times at all.
+  const intake = (rowData.schedule && typeof rowData.schedule === "object" ? rowData.schedule : {}) as { startsAt?: unknown; endsAt?: unknown };
+  const intakeStart = typeof intake.startsAt === "string" && !isNaN(Date.parse(intake.startsAt)) ? intake.startsAt : undefined;
+  const intakeEnd = typeof intake.endsAt === "string" && !isNaN(Date.parse(intake.endsAt)) ? intake.endsAt : undefined;
+  if (!startsAt && intakeStart) startsAt = intakeStart;
+
   if (!startsAt) {
     startsAt = row.createdAt
       ? (row.createdAt instanceof Date ? row.createdAt.toISOString() : new Date(row.createdAt).toISOString())
@@ -155,6 +162,8 @@ export function resolveRequestTimes(row: { createdAt?: Date | string | null; dat
       endsAt = fromZonedTime(`${reqEndDate}T${cleanTime}`, ianaZone).toISOString();
     } catch (e) {}
   }
+
+  if (!endsAt && intakeEnd && Date.parse(intakeEnd) > Date.parse(startsAt)) endsAt = intakeEnd;
 
   if (!endsAt) {
     endsAt = new Date(new Date(startsAt).getTime() + 3600000).toISOString();

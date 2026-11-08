@@ -39,6 +39,7 @@ const FIELDS: Field[] = [
   { label: "Assignment", emailSafe: true, read: (d) => d.title },
   { label: "Date", emailSafe: true, read: (d) => d.dateLabel },
   { label: "Time", emailSafe: true, read: (d) => d.timeLabel },
+  { label: "Time zone", emailSafe: true, read: (d) => d.timeZone },
   { label: "Format", emailSafe: true, read: (d) => d.format },
   { label: "Setting", emailSafe: true, read: (d) => d.setting },
   { label: "Program", emailSafe: true, read: (d) => d.program },

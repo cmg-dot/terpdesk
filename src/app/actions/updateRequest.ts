@@ -7,7 +7,10 @@ import { requests } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { isStateProgram } from "@/lib/stateJob";
-import { buildAppointmentUtcTimes, getIanaZone } from "@/utils/timezone";
+import { getIanaZone } from "@/utils/timezone";
+import { resolveEditedTimes } from "@/lib/editTimes";
+import { timeChangeOf } from "@/lib/timeChange";
+import { recordTimeChange } from "@/lib/timeChangeLog";
 import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
@@ -77,29 +80,8 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
   const endDate = payload.endDate || payload.details?.endDate || existingDetails.endDate || startDate;
   const endTime = payload.endTime || payload.details?.endTime || existingDetails.endTime;
 
-  let startsAtIso: string;
-  let endsAtIso: string;
-
-  if (startDate && startTime && endTime) {
-    const times = buildAppointmentUtcTimes({
-      date: startDate,
-      startTime,
-      endDate,
-      endTime,
-      timeZone: targetTz,
-    });
-    startsAtIso = times.startsAt;
-    endsAtIso = times.endsAt;
-  } else if (payload.startsAt && payload.endsAt) {
-    startsAtIso = typeof payload.startsAt === 'string' ? payload.startsAt : payload.startsAt.toISOString();
-    endsAtIso = typeof payload.endsAt === 'string' ? payload.endsAt : payload.endsAt.toISOString();
-  } else if (payload.startsAt) {
-    startsAtIso = typeof payload.startsAt === 'string' ? payload.startsAt : payload.startsAt.toISOString();
-    endsAtIso = existingData.endsAt || existingDetails.endsAt || new Date(new Date(startsAtIso).getTime() + 3600000).toISOString();
-  } else {
-    startsAtIso = existingData.startsAt || existingDetails.startsAt || existing.createdAt.toISOString();
-    endsAtIso = existingData.endsAt || existingDetails.endsAt || new Date(new Date(startsAtIso).getTime() + 3600000).toISOString();
-  }
+  // The job's current times come from the one resolver every screen uses, so a save that leaves the times alone writes back exactly what was shown.
+  const { startsAt: startsAtIso, endsAt: endsAtIso } = resolveEditedTimes(existing, { startDate, startTime, endDate, endTime, startsAt: payload.startsAt, endsAt: payload.endsAt }, targetTz);
 
   if (new Date(endsAtIso).getTime() <= new Date(startsAtIso).getTime()) {
     return { success: false, error: "The end time must be after the start time." };
@@ -242,6 +224,12 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     })
     .where(eq(requests.id, requestId))
     .returning();
+
+  // Any move of the start or end is recorded from the stored instants (old and new, Pacific Time), apart from the label diff above.
+  const timeChange = timeChangeOf(existing, { startsAt: startsAtIso, endsAt: endsAtIso });
+  if (timeChange) {
+    await recordTimeChange({ requestId, srn: existingData.intake?.odhhSrn ?? null, change: timeChange, userId: session.user.id ?? null, userEmail: session.user.email ?? null, actorLabel: session.user.name ?? "Agency staff" });
+  }
 
   const { notified } = await announceEdit(updated, notice, session.user.name ?? "Agency staff", recipient.message);
 
