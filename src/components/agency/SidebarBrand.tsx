@@ -9,7 +9,7 @@ import { AGENCY_LOGO_SRC, DEFAULT_AGENCY_NAME } from "@/lib/agency";
 type Tone = "dark" | "light";
 
 const TERPDESK_TEXT: Record<Tone, string> = { dark: "text-white", light: "text-[var(--forest)]" };
-const SUBTITLE: Record<Tone, string> = { dark: "text-[var(--sidebar-muted)]", light: "text-[var(--sage)]" };
+const SUBTITLE: Record<Tone, string> = { dark: "text-white/50", light: "text-[var(--sage)]" };
 
 export const SidebarBrand = ({ tone }: { tone: Tone }) => (
   <>
@@ -22,17 +22,19 @@ export const SidebarBrand = ({ tone }: { tone: Tone }) => (
     </div>
     <div className="brand-asl">
       <AgencyLogo tone={tone} />
-      <span className={`mt-1.5 block text-[12px] ${SUBTITLE[tone]}`}>Powered by terpDESK</span>
+      <span className={`mt-2 block text-[10px] uppercase tracking-wider ${SUBTITLE[tone]}`}>Powered by terpDESK</span>
     </div>
   </>
 );
 
 /**
  * The official artwork is plum on a transparent background: on the plum sidebar it would disappear, so there it sits on a
- * small cream plate. On the cream mobile menu it is drawn directly. Height is fixed and width follows the artwork's ratio.
+ * snug ivory card (the theme's cream) with a faint gold edge and a soft shadow, rather than a stark white sticker. On the
+ * cream mobile menu it is drawn directly. Height is fixed and width follows the artwork's ratio.
  */
+const DARK_CARD = "inline-block rounded-lg border border-amber-200/40 bg-[var(--canvas)] px-2.5 py-1.5 shadow-[0_1px_3px_rgba(0,0,0,0.25)]";
 const AgencyLogo = ({ tone }: { tone: Tone }) => (
-  <div className={tone === "dark" ? "inline-block rounded-xl bg-[var(--canvas)] px-3 py-2" : ""}>
-    <Image src={AGENCY_LOGO_SRC} alt={DEFAULT_AGENCY_NAME} width={907} height={314} className={`${tone === "dark" ? "h-10" : "h-9"} w-auto object-contain`} priority />
+  <div className={tone === "dark" ? DARK_CARD : ""}>
+    <Image src={AGENCY_LOGO_SRC} alt={DEFAULT_AGENCY_NAME} width={907} height={314} className="h-9 w-auto object-contain" priority />
   </div>
 );
