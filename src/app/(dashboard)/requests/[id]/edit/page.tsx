@@ -922,15 +922,15 @@ export default function EditRequestPage() {
  </div>
  )}
 
- {/* Participants and setting Section */}
+ {/* Client and setting Section */}
  <div className={cardClass}>
- <h2 className={sectionTitleClass}>Participants and setting</h2>
+ <h2 className={sectionTitleClass}>Client and setting</h2>
  
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
- <Field label="Deaf or hard of hearing participant">
+ <Field label="Deaf or hard of hearing client">
  <input type="text" className={inputClass} value={formData.deafParticipant} onChange={(e) => handleChange("deafParticipant", e.target.value)} />
  </Field>
- <Field label="Number of participants needing interpreting">
+ <Field label="Number of clients needing interpreting">
  <input type="text" className={inputClass} value={formData.peopleNeeding} onChange={(e) => handleChange("peopleNeeding", e.target.value)} />
  </Field>
  </div>
@@ -998,7 +998,7 @@ export default function EditRequestPage() {
  <div className="mt-6">
  <Field 
  label="Appointment title (optional)" 
- subtext="Left blank, the title becomes “Interpreting request”. Participant names are not added to titles."
+ subtext="Left blank, the title becomes “Interpreting request”. Client names are not added to titles."
  >
  <input type="text" className={inputClass} value={formData.appointmentTitle} onChange={(e) => handleChange("appointmentTitle", e.target.value)} />
  </Field>

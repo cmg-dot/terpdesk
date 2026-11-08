@@ -5,7 +5,8 @@ import { STATUS_FILTER_OPTIONS } from "@/lib/requestListFilter";
 
 /**
  * The calendar's status filter: the very same dropdown and options as Requests & assignments, so "Active Appointments"
- * means the same thing in both places. Cancelled jobs only appear once "All appointments" or "Cancelled" is chosen.
+ * means the same thing in both places. Cancelled jobs on today and later days only appear once "All appointments" or
+ * "Cancelled" is chosen; on earlier days they stay as muted cards, so past days read as they happened.
  */
 export const CalendarStatusFilter = ({ value, onChange }: { value: string; onChange: (value: string) => void }) => (
   <div className="w-full sm:w-64">

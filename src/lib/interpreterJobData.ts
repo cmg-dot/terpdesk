@@ -1,4 +1,5 @@
 import { settingLabel } from "@/lib/settingLabel";
+import { hasPhysicalPlace } from "@/lib/jobPlace";
 
 /**
  * What an interpreter's browser may receive about a job. The raw `requests.data` holds staff-only material (the client's
@@ -58,14 +59,18 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
   const intake = asObject(data.intake);
   const booked = access === "booked";
 
+  const link = text(details.meetingLink) || text(details.virtualLink) || text(data.meetingLink) || text(data.virtualLink);
   const rawFormat = text(details.format) || text(data.format);
   const venue = text(onsite.venue);
-  const format = rawFormat || (venue && !venue.toLowerCase().includes("virtual") ? "In person" : "Virtual");
-  const isVirtual = format.toLowerCase().includes("virtual");
+  const statedFormat = rawFormat || (venue && !venue.toLowerCase().includes("virtual") ? "In person" : "Virtual");
+  const formatSaysVirtual = statedFormat.toLowerCase().includes("virtual");
+  // A job that carries a meeting link is online whatever its format says (a form read as "In person" before its link was found
+  // must not hide the link): it is shown as Hybrid when it also has a physical place, else as Virtual.
+  const isVirtual = formatSaysVirtual || Boolean(link);
+  const format = formatSaysVirtual || !link ? statedFormat : hasPhysicalPlace(onsite) ? "Hybrid — in person and virtual" : "Virtual";
   const setting = settingLabel(data.setting, details.setting);
   const timeZone = text(details.timeZone) || "America/Los_Angeles";
 
-  const link = text(details.meetingLink) || text(details.virtualLink) || text(data.meetingLink) || text(data.virtualLink);
   const meetingId = text(details.meetingId) || text(data.meetingId);
   const passcode = text(details.passcode) || text(details.accessCode) || text(data.passcode) || text(data.accessCode);
   const instructions = text(details.virtualInstructions) || text(details.instructions) || text(data.virtualInstructions);

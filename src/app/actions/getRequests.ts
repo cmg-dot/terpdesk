@@ -19,9 +19,9 @@ function mapRequestRow(row: any, requestOffers: any[]) {
   const setting = settingLabel(rowData.setting, details.setting);
 
   const format = details.format || rowData.format || (onsite.venue && !onsite.venue.toLowerCase().includes('virtual') ? "In person" : "Virtual");
-  const isVirtual = format.toLowerCase().includes('virtual');
-
   const meetingLink = details.meetingLink || details.virtualLink || rowData.meetingLink || rowData.virtualLink || null;
+  // A meeting link means the job is online, whatever its saved format says.
+  const isVirtual = format.toLowerCase().includes('virtual') || Boolean(meetingLink);
   const meetingId = details.meetingId || rowData.meetingId || null;
   const passcode = details.passcode || details.accessCode || rowData.passcode || rowData.accessCode || null;
   const platform = details.platform || rowData.platform || (meetingLink?.includes('zoom') ? 'Zoom' : meetingLink?.includes('teams') ? 'Microsoft Teams' : meetingLink?.includes('meet.google') ? 'Google Meet' : 'Virtual');

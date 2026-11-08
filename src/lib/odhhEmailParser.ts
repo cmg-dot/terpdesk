@@ -1,6 +1,7 @@
 import { fromZonedTime } from "date-fns-tz";
 import { type Program } from "@/db/schema";
-import { resolveLocation } from "@/lib/odhhLocationParse";
+import { labelValue } from "@/lib/odhhLabelValue";
+import { platformFrom, resolveLocation, splitLink } from "@/lib/odhhLocationParse";
 import { MAX_FIELD_LENGTH, cleanValue, EMPTY_VALUE } from "@/lib/odhhText";
 
 // Kept importable from here: other parsers read these helpers from this module.
@@ -108,7 +109,7 @@ export function labelPattern(labels: readonly string[]): RegExp {
 }
 
 const VENUE_PATTERN = labelPattern(["Location", "Location[ \\t]+Name", "Venue", "Facility"]);
-const ADDRESS_PATTERN = labelPattern(["Address", "Location[ \\t]+Address", "Street[ \\t]+Address"]);
+const ADDRESS_LABELS = ["Address", "Location[ \\t]+Address", "Street[ \\t]+Address"] as const;
 const FORMAT_PATTERN = labelPattern([
   "Format",
   "Service[ \\t]+Format",
@@ -133,14 +134,18 @@ const PURPOSE_PATTERN = labelPattern([
   "Reason[ \\t]+for[ \\t]+(?:Appointment|Visit)",
 ]);
 
-const MEETING_PATTERN = labelPattern([
+const MEETING_LABELS = [
   "Virtual[ \t]+Meeting[ \t]*/[ \t]*Platform",
   "Virtual[ \t]+Meeting(?:[ \t]+(?:Platform|Link|URL|Information|Info))?",
   "Virtual[ \t]+(?:Platform|Link)",
   "Meeting[ \t]+(?:Platform|Link|URL)",
   "Video[ \t]+(?:Platform|Link)",
   "Platform",
-]);
+] as const;
+// When the meeting label is empty, the line below counts as its value only if it holds a link or names a video platform
+// (a form's blank "Virtual Meeting/Platform:" is followed by other text, which must never become the platform).
+const holdsMeeting = (line: string): boolean => /https?:\/\//i.test(line) || platformFrom(line) !== null;
+const holdsLink = (line: string): boolean => /https?:\/\//i.test(line);
 const GENDER_PATTERN = labelPattern(["Client[ \t]+Gender", "Consumer[ \t]+Gender", "Patient[ \t]+Gender", "Gender"]);
 const NOTE_START_PATTERN =
   /^[ \t]*(?:Appointment[ \t]+Notes?|Special[ \t]+Instructions|Additional[ \t]+(?:Notes?|Information)|Notes?|Comments?)[ \t]*:[ \t]*(.*)$/im;
@@ -351,10 +356,21 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
   }
 
   // Location / Address / Virtual Meeting lines, sorted into a place name, a room code, a physical address and a meeting link.
+  // A forward often breaks the line after the label: the link under "Virtual Meeting/Platform:", or a link-only "Address:"
+  // with the city on the line below it. Both are read here; the location parser then sorts link, platform and place.
+  const meetingLine = labelValue(text, MEETING_LABELS, holdsMeeting);
+  // "Virtual Meeting/Platform: TEAMS, Join:" with the link on the next line is the same thing as a link on the label's line.
+  const linkBelow = meetingLine.value !== null && !holdsLink(meetingLine.value) && meetingLine.continuation !== null && holdsLink(meetingLine.continuation);
+  const meeting = { value: linkBelow ? `${meetingLine.value} ${meetingLine.continuation}` : meetingLine.value };
+  const addressLine = labelValue(text, ADDRESS_LABELS, holdsLink);
+  const addressSplit = addressLine.value === null ? null : splitLink(addressLine.value);
+  // The line below belongs to the address when the label's line holds only a link (the city follows) or only the invitation's
+  // words ("Microsoft Teams meeting Join:") with the link on the next line.
+  const addressContinues = addressLine.continuation !== null && addressSplit !== null && ((addressSplit.link !== null && addressSplit.rest === null) || (addressSplit.link === null && holdsLink(addressLine.continuation)));
   const where = resolveLocation({
     location: cleanValue(text.match(VENUE_PATTERN)?.[1]),
-    address: cleanValue(text.match(ADDRESS_PATTERN)?.[1]),
-    meetingValue: cleanValue(text.match(MEETING_PATTERN)?.[1]),
+    address: addressContinues ? `${addressLine.value} ${addressLine.continuation}` : addressLine.value,
+    meetingValue: meeting.value,
   });
   const { venue, locationCode, address } = where;
 

@@ -51,7 +51,9 @@ export function initialQuickEditValues(request: unknown): QuickEditValues {
   const detail = (key: string): unknown => child(details, key);
 
   const formatText = firstText(detail("format")).toLowerCase();
-  const isVirtual = typeof field("isVirtual") === "boolean" ? (field("isVirtual") as boolean) : formatText ? formatText.includes("virtual") : true;
+  const hasMeetingLink = firstText(field("meetingLink"), detail("meetingLink"), field("virtualLink"), detail("virtualLink")) !== "";
+  // A meeting link means the job is online whatever its saved format says.
+  const isVirtual = hasMeetingLink || (typeof field("isVirtual") === "boolean" ? (field("isVirtual") as boolean) : formatText ? formatText.includes("virtual") : true);
   const timeZone = firstText(detail("timeZone"), field("timeZone")) || DEFAULT_QUICK_EDIT_ZONE;
   const zone = getIanaZone(timeZone);
   const start = parseSafeDate(field("startsAt")) ?? new Date();
@@ -128,7 +130,7 @@ export function syncStoredJob(requestId: string, values: QuickEditValues, update
     const current = stored[index];
     if (index < 0 || !isRecord(current)) return;
 
-    const isVirtual = values.format.toLowerCase().includes("virtual");
+    const isVirtual = values.format.toLowerCase().includes("virtual") || values.meetingLink.trim() !== "";
     const startsAt = child(updated, "startsAt") || child(savedData, "startsAt");
     const endsAt = child(updated, "endsAt") || child(savedData, "endsAt");
     stored[index] = {

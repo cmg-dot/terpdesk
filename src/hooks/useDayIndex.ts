@@ -1,7 +1,9 @@
 "use client";
 
 import { useMemo } from "react";
+import { agencyDateKey } from "@/lib/agencyTime";
 import { buildDayIndex, dayPhases, scheduleRequests } from "@/lib/calendarDayIndex";
+import { DEFAULT_STATUS_FILTER } from "@/lib/requestListFilter";
 import type { CalendarRequest, DayCard, DayIndex, DayPhases } from "@/lib/calendarDayIndex";
 
 /** Each request's day and times, worked out once when the requests arrive (shared by the day index and the search). */
@@ -14,8 +16,10 @@ export const useScheduledCards = (requests: readonly CalendarRequest[]): DayCard
  */
 export const useDayIndex = (cards: readonly DayCard[], statusFilter: string, nowMs: number): DayIndex => {
   const clock = statusFilter === "Happening now" ? nowMs : 0;
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- `clock` is `nowMs` only for the one clock-dependent filter
-  return useMemo(() => buildDayIndex(cards, statusFilter, nowMs), [cards, statusFilter, clock]);
+  // Under the default filter, past cancelled jobs show, so the index also follows the agency's day (one rebuild at midnight).
+  const today = statusFilter === DEFAULT_STATUS_FILTER ? agencyDateKey(nowMs) : "";
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- `clock` and `today` stand for `nowMs` for the filters that depend on it
+  return useMemo(() => buildDayIndex(cards, statusFilter, nowMs), [cards, statusFilter, clock, today]);
 };
 
 /** The live / finished / upcoming letters for each given day, refreshed on the clock without touching the index. */

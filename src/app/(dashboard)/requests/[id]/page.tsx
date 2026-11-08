@@ -944,7 +944,7 @@ export default function AssignmentDetailPage() {
  <OriginalFormCard requestId={String(foundRequest?.id || id)} srn={requestSrnValue} />
 
  {/* Staffing and booking, directly under the form. */}
- {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} />}
+ {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} />}
 
  {/* The older detail cards (still editable from here) are folded away so the form stays the focus. */}
  <details data-job-details className="group rounded-2xl border border-gray-200 bg-white">

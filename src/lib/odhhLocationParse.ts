@@ -47,7 +47,7 @@ export const isLocationCode = (value: string): boolean => /^(?:[A-Za-z]{1,3}[ -]
 export const mentionsVirtual = (value: string): boolean => /\b(?:virtual(?:ly)?|zoom|teams|webex|google\s*meet|telehealth|online|vri)\b/i.test(value);
 
 // Words that, besides the platform name, can fill a location line that only says "online".
-const FILLER_WORDS = /\b(?:virtual(?:ly)?|zoom|teams|webex|google|meet|telehealth|online|vri|video|remote|meeting|call|link|room|session)\b/gi;
+const FILLER_WORDS = /\b(?:virtual(?:ly)?|zoom|teams|webex|google|meet|telehealth|online|vri|video|remote|meeting|call|link|room|session|microsoft|join)\b/gi;
 
 /** The location line only says it is online ("Virtual", "Virtual-Zoom", "Zoom meeting"): it names no place. */
 export const isVirtualDescriptor = (value: string): boolean => mentionsVirtual(value) && value.replace(FILLER_WORDS, "").replace(/[\s_/:.()-]+/g, "") === "";
@@ -86,5 +86,7 @@ export function resolveLocation({ location, address, meetingValue }: LocationLin
   const platform = platformLine.platform ?? (meetingLink ? platformFrom(meetingLink) : null) ?? (place ? platformFrom(place) : null) ?? (meetingLink ? "Virtual" : null);
   const virtual = Boolean(meetingLink) || platformLine.platform !== null || (place !== null && mentionsVirtual(place));
 
-  return { venue, locationCode: code, address: fromAddress.rest, platform, meetingLink, virtual };
+  // An Address line that only holds the meeting invitation's words ("Microsoft Teams meeting Join:") is not a street address.
+  const street = fromAddress.rest !== null && isVirtualDescriptor(fromAddress.rest) ? null : fromAddress.rest;
+  return { venue, locationCode: code, address: street, platform, meetingLink, virtual };
 }

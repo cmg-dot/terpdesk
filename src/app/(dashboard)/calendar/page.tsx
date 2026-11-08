@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { fetchLiveRequests } from "@/app/actions/getRequests";
 import { agencyDateKey, civilDate } from "@/lib/agencyTime";
 import { CalendarDayView } from "@/components/calendar/CalendarDayView";
+import { CalendarHistoryNotice } from "@/components/calendar/CalendarHistoryNotice";
 import { CalendarModeToggle } from "@/components/calendar/CalendarModeToggle";
 import type { CalendarMode } from "@/components/calendar/CalendarModeToggle";
 import { CalendarMonthView } from "@/components/calendar/CalendarMonthView";
@@ -22,6 +23,7 @@ import { useCalendarNavigation } from "@/hooks/useCalendarNavigation";
 import { useDayIndex, useScheduledCards } from "@/hooks/useDayIndex";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
 import type { CalendarRequest } from "@/lib/calendarDayIndex";
+import { rangeBeforeHistory } from "@/lib/calendarHistory";
 import { buildSearchEntries } from "@/lib/calendarSearch";
 import { rangeKeyFor, weekStartKey } from "@/lib/calendarNav";
 import type { CalendarView } from "@/lib/calendarNav";
@@ -41,7 +43,7 @@ function CalendarScreen() {
   const [loaded, setLoaded] = useState(false);
   // Job View is the original calendar (month / week / day of job cards). Interpreter View is the resource timeline.
   const [mode, setMode] = useState<CalendarMode>("jobs");
-  // Same filter, same default and same rule as Requests & assignments: cancelled jobs stay off the grid until asked for.
+  // Same filter and default as Requests & assignments. Cancelled jobs stay off today and the days ahead until asked for; on past days they show muted.
   const [statusFilter, setStatusFilter] = useState<string>(DEFAULT_STATUS_FILTER);
 
   // The minute clock only moves the live / finished styling and the "today" highlight; it never rebuilds the grid's data.
@@ -112,6 +114,8 @@ function CalendarScreen() {
         {label}
         {interpreters && <span className="hidden sm:inline"> · Left / Right arrow: one day, Shift + arrow: one week</span>}
       </p>
+
+      {rangeBeforeHistory(nav.dateKey, interpreters ? "day" : nav.view) && <CalendarHistoryNotice />}
 
       {!interpreters && (
         <div className="mt-6">

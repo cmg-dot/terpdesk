@@ -78,6 +78,7 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
   const rawSetting = text(details.setting) || text(data.setting);
   const intake = (data.intake ?? {}) as LooseData;
   const rawProgram = text(intake.program) || text(data.program);
+  const hasMeetingLink = [details.meetingLink, details.virtualLink, data.meetingLink, data.virtualLink].some((value) => text(value) !== "");
   return {
     reference: formatReference(request.id),
     title: text(request.title) || text(details.title) || "Interpreting assignment",
@@ -85,7 +86,8 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     timeLabel,
     durationLabel,
     format: rawFormat,
-    isVirtual: rawFormat.toLowerCase().includes("virtual"),
+    // A meeting link means the job is online, whatever its saved format says.
+    isVirtual: rawFormat.toLowerCase().includes("virtual") || hasMeetingLink,
     // Generic setting only (e.g. Medical, Legal, Educational).
     setting: rawSetting && rawSetting !== "Choose a setting" ? rawSetting : "General interpreting",
     role: positionNumber === 2 ? "Position 2 (team)" : positionNumber === 1 ? "Position 1" : "Interpreter",

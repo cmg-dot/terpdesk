@@ -1,6 +1,6 @@
 import type { fetchLiveRequests } from "@/app/actions/getRequests";
 import { agencyDateKey } from "@/lib/agencyTime";
-import { isCancelledRequest, matchesStatusFilter } from "@/lib/requestListFilter";
+import { DEFAULT_STATUS_FILTER, isCancelledRequest, matchesStatusFilter } from "@/lib/requestListFilter";
 import type { ListedRequest } from "@/lib/requestListFilter";
 import { isAppointmentHappeningNow, isAppointmentPast } from "@/utils/happeningNow";
 import { resolveRequestTimes } from "@/utils/timezone";
@@ -53,12 +53,17 @@ export const scheduleRequests = (requests: readonly CalendarRequest[]): DayCard[
 
 /**
  * Step two: the cards the status filter lets through, grouped by day and sorted by start time (ties keep list order).
- * `nowMs` only matters to the "Happening now" filter; every other filter ignores the clock.
+ * `nowMs` matters to the "Happening now" filter and, under the default filter, to which days are past: a cancelled job on an
+ * earlier day than today stays on the grid (its card is drawn muted and dashed) so that day reads whole; on today and later
+ * days it stays off until "All appointments" or "Cancelled" is chosen. Every other filter ignores the clock.
  */
 export const buildDayIndex = (cards: readonly DayCard[], statusFilter: string, nowMs: number): DayIndex => {
   const byDay = new Map<string, DayCard[]>();
+  const keepPastCancelled = statusFilter === DEFAULT_STATUS_FILTER;
+  const todayKey = keepPastCancelled ? agencyDateKey(nowMs) : "";
   for (const card of cards) {
-    if (!matchesStatusFilter(listed(card.request), statusFilter, nowMs)) continue;
+    const pastCancelled = keepPastCancelled && card.cancelled && card.dayKey < todayKey;
+    if (!pastCancelled && !matchesStatusFilter(listed(card.request), statusFilter, nowMs)) continue;
     const day = byDay.get(card.dayKey);
     if (day) day.push(card);
     else byDay.set(card.dayKey, [card]);

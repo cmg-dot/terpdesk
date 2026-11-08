@@ -86,7 +86,7 @@ const AGENCY_ONLY: { label: string; read: (data: LooseData) => unknown }[] = [
   { label: "Program reference numbers", read: (d) => { const i = obj(d.intake); return [i.odhhSrn, i.odhhAccessCode, i.providerOneNumber]; } },
   { label: "Patient information", read: (d) => { const i = obj(d.intake); return [i.clientGender, obj(d.brief).hearingIdentity, i.requestedInterpreter]; } },
   { label: "Request flags", read: (d) => { const i = obj(d.intake); return [i.isPublic, i.isMixedGroup]; } },
-  { label: "Participant details", read: (d) => { const x = obj(d.details); return [x.deafParticipant, x.peopleNeeding, x.commPreferences, x.purpose, x.qualifications]; } },
+  { label: "Client details", read: (d) => { const x = obj(d.details); return [x.deafParticipant, x.peopleNeeding, x.commPreferences, x.purpose, x.qualifications]; } },
 ];
 
 export function agencyOnlyChangedSections(before: JobRequestRow, after: JobRequestRow): string[] {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { ClientNameField } from "@/components/requests/staffing/ClientNameField";
 import { PositionStaffing } from "@/components/requests/staffing/PositionStaffing";
 import { RequestedInterpreterBadge } from "@/components/requests/staffing/RequestedInterpreterBadge";
 import type { Position, PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
@@ -15,6 +16,9 @@ interface Props {
   requestedInterpreter?: string | null;
   /** The whole roster, to find that person. */
   fullRoster: { id: string; name: string }[];
+  /** The client's name saved on the job (agency-only), and what to do once a new one is saved. */
+  clientName: string;
+  onClientSaved: (clientName: string) => void;
 }
 
 /**
@@ -22,7 +26,7 @@ interface Props {
  * one (send an offer, or book directly). When the state asked for a particular interpreter, that request sits above the controls
  * with a one-click way to choose them.
  */
-export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster }: Props) {
+export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved }: Props) {
   const requested = requestedInterpreter?.trim() || null;
   const match = useMemo(() => {
     if (!requested) return null;
@@ -40,6 +44,8 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
       <h2 className="text-[18px] font-medium text-[var(--ink)] mb-4">Staffing</h2>
       <p className="text-sm text-[var(--sage)] mb-1">Pending offers do not reserve time.</p>
       <p className="text-sm text-[var(--sage)] mb-6">Back-to-back appointments are allowed. Travel time is not checked.</p>
+
+      <ClientNameField requestId={ctx.requestId} value={clientName} onSaved={onClientSaved} />
 
       {requested && (
         <RequestedInterpreterBadge
