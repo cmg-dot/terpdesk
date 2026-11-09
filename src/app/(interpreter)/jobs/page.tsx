@@ -15,7 +15,7 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord, showsStatePortal } from "@/utils/hoursState";
-import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
+import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 type Tab = "upcoming" | "past";
@@ -437,7 +437,7 @@ export default function InterpreterJobsPage() {
                     {/* Bottom Action Button */}
                     {usesStatePortal ? (
                       <a
-                        href={buildOdhhPortalUrl()}
+                        href={ODHH_VERIFICATION_FORM_URL}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="w-full mt-1 py-2 rounded-full text-center text-sm font-semibold text-[#1C3F36] border border-[#1C3F36] bg-white hover:bg-gray-50 transition-colors block"

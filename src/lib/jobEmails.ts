@@ -6,6 +6,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, emailHeroButton, emailSecondaryButton, escapeHtml } from "@/lib/emailTemplate";
 import { createJobDetailsToken } from "@/lib/jobDetailsToken";
+import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { JobSummary } from "@/lib/jobSummary";
 import { sendEmail } from "@/lib/timesheetEmail";
@@ -109,7 +110,7 @@ export function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: 
 }
 
 /** The external portal where ODHH interpreters report the assignment (kept exactly as the state publishes it). */
-export const ODHH_ASSIGNMENT_REPORT_URL = "https://fortress.wa.gov/dshs/odhhapps/Interpreters/AssignmentReport.aspx/";
+export const ODHH_ASSIGNMENT_REPORT_URL = ODHH_VERIFICATION_FORM_URL;
 
 /**
  * "Post-Job Action Required" for an ODHH job that has ended: submit the hours in the state portal.

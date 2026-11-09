@@ -22,8 +22,9 @@ import { CopyButton } from "@/components/ui/CopyButton";
 import { formatReference } from "@/utils/statusEngine";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
-import { buildOdhhPortalUrl } from "@/lib/odhhPortal";
+import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
+import { useGlobalState } from "@/context/GlobalContext";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
@@ -79,7 +80,10 @@ const formatJobDate = (startStr?: string | Date | null, endStr?: string | Date |
   }
 };
 
-function buildAuditLog(serviceRecord: any, job: any, isOdhh: boolean) {
+/** Who the history attributes the interpreter's own entries to: their real name, or just "Interpreter" when none is known. */
+const interpreterActor = (interpreterName: string) => (interpreterName ? `${interpreterName} (Interpreter)` : 'Interpreter');
+
+function buildAuditLog(serviceRecord: any, job: any, isOdhh: boolean, interpreterName: string) {
   if (Array.isArray(serviceRecord?.history) && serviceRecord.history.length > 0) {
     return serviceRecord.history;
   }
@@ -98,7 +102,7 @@ function buildAuditLog(serviceRecord: any, job: any, isOdhh: boolean) {
     id: 'evt-init',
     type: 'initial_submission',
     title: 'Initial hours submitted',
-    actor: 'Jamie Fictional (Interpreter)',
+    actor: interpreterActor(interpreterName),
     timestamp: serviceRecord.submittedAt || serviceRecord.scheduledEnd || job?.startsAt || new Date().toISOString(),
     version: 1,
     details: {
@@ -133,7 +137,7 @@ function buildAuditLog(serviceRecord: any, job: any, isOdhh: boolean) {
       id: 'evt-corr-sub',
       type: 'correction_submitted',
       title: `Correction submitted (v${version})`,
-      actor: 'Jamie Fictional (Interpreter)',
+      actor: interpreterActor(interpreterName),
       timestamp: serviceRecord.updatedAt || new Date().toISOString(),
       version: version,
       details: {
@@ -323,6 +327,9 @@ function VersionHistoryAuditLog({
 }
 
 function ServiceTimeBlock({ job }: { job: any }) {
+  // The signed-in interpreter's own name (from their session), used on the hours record and its history.
+  const { currentUser } = useGlobalState();
+  const interpreterName = currentUser.name?.trim() ?? '';
   const [serviceRecord, setServiceRecord] = useState<any>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
@@ -388,7 +395,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
         found = {
           id: (job as any).requestId || job.id,
           appointmentId: (job as any).requestId || job.id,
-          interpreterName: "Jamie Fictional",
+          interpreterName,
           state: serverState === 'not_submitted' ? 'awaiting_review' : serverState,
           scheduledStart: job.startsAt,
           scheduledEnd: job.endsAt,
@@ -458,7 +465,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
       appointmentId: job.requestId || job.id,
       // Ties the cached record to THIS booking, so it never shows on another interpreter's job.
       offerId: job.id,
-      interpreterName: "Jamie Fictional",
+      interpreterName,
       state: 'draft',
       scheduledStart: job.startsAt,
       scheduledEnd: job.endsAt,
@@ -525,13 +532,13 @@ function ServiceTimeBlock({ job }: { job: any }) {
 
     const currentHistory = Array.isArray(serviceRecord?.history) && serviceRecord.history.length > 0
       ? serviceRecord.history
-      : buildAuditLog(serviceRecord, job, isOdhh);
+      : buildAuditLog(serviceRecord, job, isOdhh, interpreterName);
 
     const submissionEvent = {
       id: Math.random().toString(36).substring(7),
       type: isCorrection ? 'correction_submitted' : 'initial_submission',
       title: isCorrection ? `Correction submitted (v${nextVersion})` : 'Initial hours submitted',
-      actor: 'Jamie Fictional (Interpreter)',
+      actor: interpreterActor(interpreterName),
       timestamp: new Date().toISOString(),
       version: nextVersion,
       details: {
@@ -554,7 +561,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
       appointmentId: job.requestId || job.id,
       // Ties the cached record to THIS booking, so it never shows on another interpreter's job.
       offerId: job.id,
-      interpreterName: "Jamie Fictional",
+      interpreterName,
       state: 'awaiting_review',
       scheduledStart: job.startsAt,
       scheduledEnd: job.endsAt,
@@ -692,8 +699,8 @@ function ServiceTimeBlock({ job }: { job: any }) {
   })();
 
   const auditLogEvents = useMemo(() => {
-    return buildAuditLog(serviceRecord, job, isOdhh);
-  }, [serviceRecord, job, isOdhh]);
+    return buildAuditLog(serviceRecord, job, isOdhh, interpreterName);
+  }, [serviceRecord, job, isOdhh, interpreterName]);
 
   // State jobs: the whole TerpDesk hours form is replaced by a pointer to the state portal.
   if (showsStatePortal(job, currentState)) {
@@ -705,13 +712,14 @@ function ServiceTimeBlock({ job }: { job: any }) {
             State Job: Timesheets for this assignment must be submitted directly through the ODHH portal.
           </p>
           <a
-            href={buildOdhhPortalUrl((job as any).data?.intake?.odhhSrn)}
+            href={ODHH_VERIFICATION_FORM_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-4 inline-flex items-center justify-center rounded-full bg-[var(--forest-soft)] px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-deep)]"
           >
-            Open ODHH Portal
+            Submit ODHH Verification Form
           </a>
+          <p className="mt-2 text-[13px]">Submit after assignment is completed.</p>
         </div>
       </div>
     );
@@ -741,7 +749,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
                isSubmitting={isSubmitting}
                isOdhh={isOdhh}
                timeZoneLabel={String((job as any).details?.timeZone || job.timeZone || "the appointment time zone")}
-               odhhPortalUrl={buildOdhhPortalUrl((job as any).data?.intake?.odhhSrn)}
+               odhhPortalUrl={ODHH_VERIFICATION_FORM_URL}
                actualStart={actualStart}
                actualEnd={actualEnd}
                onActualStartChange={(v) => {

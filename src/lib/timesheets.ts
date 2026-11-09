@@ -3,7 +3,7 @@ import { db } from '@/db';
 import { requests, timesheets } from '@/db/schema';
 import { getIanaZone, resolveRequestTimes, utcToWallClock } from '@/utils/timezone';
 import { hashToken, TOKEN_PATTERN } from '@/lib/timesheetToken';
-import { buildOdhhPortalUrl } from '@/lib/odhhPortal';
+import { ODHH_VERIFICATION_FORM_URL } from '@/lib/odhhPortal';
 import { isStateJobRequest } from '@/lib/stateJob';
 
 export interface TimesheetAppointment {
@@ -68,7 +68,6 @@ export async function getPendingTimesheetByToken(token: string): Promise<Timeshe
   const data = row.data as unknown as { details?: LooseDetails; intake?: { program?: string; odhhSrn?: string } } & LooseDetails;
   const details: LooseDetails = data.details ?? {};
   const isOdhh = data.intake?.program === "WA ODHH" || data.intake?.program === "wa_odhh";
-  const srn = asText(data.intake?.odhhSrn);
   const ianaZone = getIanaZone(details.timeZone ?? details.timezone ?? data.timeZone ?? data.timezone);
 
   return {
@@ -83,7 +82,7 @@ export async function getPendingTimesheetByToken(token: string): Promise<Timeshe
     format: asText(details.format) ?? asText(data.format) ?? 'In person',
     location: asText(details.location) ?? asText(details.address) ?? asText(data.location),
     isOdhh,
-    odhhPortalUrl: isOdhh ? buildOdhhPortalUrl(srn) : null,
+    odhhPortalUrl: isOdhh ? ODHH_VERIFICATION_FORM_URL : null,
   };
 }
 
