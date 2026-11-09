@@ -42,6 +42,8 @@ export interface JobSummary {
 
 export interface JobDetails extends JobSummary {
   prepNotes: string;
+  /** The client's name. Only on this secure page for a booked interpreter (summarizeJob, which feeds every email, never has it). */
+  clientName: string;
   /** The state form's "Public" and "Mixed Group" answers (null when it did not say). Part of the job brief, not a person's details. */
   groupFlags: { isPublic: boolean | null; isMixedGroup: boolean | null };
   /** The physical place: always for an in-person job, and for a virtual job too when it has an address, room or parking note. */
@@ -109,6 +111,7 @@ export function jobDetailsFor(request: JobRequestRow, positionNumber?: number): 
   return {
     ...summary,
     prepNotes: text(data.prepNotes),
+    clientName: text(details.deafParticipant),
     groupFlags: {
       isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,
       isMixedGroup: typeof intake.isMixedGroup === "boolean" ? intake.isMixedGroup : null,

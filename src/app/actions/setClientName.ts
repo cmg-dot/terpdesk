@@ -15,7 +15,7 @@ import { CLIENT_NAME_MAX, setClientNameSchema } from "@/lib/validation/clientNam
 export type SetClientNameResult = { success: true; clientName: string } | { success: false; error: string };
 
 /**
- * Saves the client's name on a job (details.deafParticipant, agency-only: it is never sent to interpreters or put in an email)
+ * Saves the client's name on a job (details.deafParticipant: shared with an interpreter only once they are booked, never on an unaccepted offer and never in an email)
  * straight from the Staffing box, so a dispatcher can add it while an offer is out or an interpreter is booked, when the edit
  * flow is locked. Only that one field changes; nothing else on the job is touched. Agency staff only. The name itself is
  * never written to a log: the audit and activity entries record only that it was set, changed or cleared.

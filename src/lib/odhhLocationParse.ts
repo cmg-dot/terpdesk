@@ -40,6 +40,42 @@ export function splitLink(value: string | null): { rest: string | null; link: st
   return { rest: rest && !EMPTY_VALUE.test(rest) ? rest : null, link: found.replace(TRAILING_PUNCTUATION, "") };
 }
 
+// A second address line is only joined when it clearly belongs to the street: a unit ("Suite 240", "Apt 5", "#12"), or the city
+// line ("Vancouver, Washington 98683", "Vancouver, WA"), which ends in a ZIP code or names a state after a comma.
+const UNIT_LINE = /^(?:suite|ste\.?|unit|apt\.?|apartment|rm\.?|room|floor|fl\.?|bldg\.?|building|#)[ \t]*#?[ \t]*[A-Za-z0-9-]+\b/i;
+const CITY_STATE = /^[A-Za-z][A-Za-z .'-]*,[ \t]*(?:[A-Z]{2}|Washington|Oregon|Idaho|California|Alaska)\b/;
+
+const ZIP_ANY = /\b\d{5}(?:-\d{4})?\b/g;
+// A state (or its name) followed by a ZIP: the address already ends with its city / state / ZIP.
+const STATE_ZIP = /\b(?:[A-Z]{2}|Washington|Oregon|Idaho|California|Alaska)[ ,\t]*\d{5}(?:-\d{4})?\b/;
+
+/** True when the line is, by itself, the rest of an address: a unit, or the city / state / ZIP. */
+export const continuesAddress = (line: string): boolean => {
+  const text = line.trim();
+  return text.length > 0 && text.length <= 100 && (UNIT_LINE.test(text) || /\b\d{5}(?:-\d{4})?$/.test(text) || CITY_STATE.test(text));
+};
+
+/**
+ * The state's form often breaks the Address line: "601 SE 117th Ave" then "Suite 240 Vancouver, Washington 98683", or a street,
+ * an entrance note and then the city. Returns the whole address when the lines under the first one are recognisably the rest of
+ * it, else null (the first line stands alone, as before). It never joins:
+ *  - when the first line already ends with its state and ZIP (the next line then only repeats the city);
+ *  - a line that is not a unit or a city / state / ZIP (a note, a phone number, a link).
+ * A city line that repeats its own ZIP ("Arlington, WA 98223 Arlington, Washington 98223") is cut after the first ZIP.
+ */
+export function joinAddressLines(first: string, next: string | null, afterNext: string | null = null): string | null {
+  if (next === null || STATE_ZIP.test(first)) return null;
+  const clean = (line: string): string => {
+    const zips = line.match(ZIP_ANY) ?? [];
+    return zips.length > 1 && zips[0] === zips[1] ? line.slice(0, line.indexOf(zips[0]) + zips[0].length) : line;
+  };
+  if (continuesAddress(next)) return `${first} ${clean(next.trim())}`;
+  // A short plain line (an entrance note) between the street and its city line: street, note, city.
+  const note = next.trim();
+  if (afterNext !== null && note.length <= 40 && !/[:@]|https?:/i.test(note) && STATE_ZIP.test(afterNext.trim()) && continuesAddress(afterNext)) return `${first} ${note} ${clean(afterNext.trim())}`;
+  return null;
+}
+
 /** A short room / unit code ("E1", "A-12", "5B") rather than the name of a place. */
 export const isLocationCode = (value: string): boolean => /^(?:[A-Za-z]{1,3}[ -]?\d{1,4}[A-Za-z]?|\d{1,4}[A-Za-z]{1,2})$/.test(value.trim());
 
@@ -51,6 +87,36 @@ const FILLER_WORDS = /\b(?:virtual(?:ly)?|zoom|teams|webex|google|meet|telehealt
 
 /** The location line only says it is online ("Virtual", "Virtual-Zoom", "Zoom meeting"): it names no place. */
 export const isVirtualDescriptor = (value: string): boolean => mentionsVirtual(value) && value.replace(FILLER_WORDS, "").replace(/[\s_/:.()-]+/g, "") === "";
+
+const MEETING_ID_IN_NOTE = /\bMeeting[ \t]*ID[ \t]*:?[ \t]*([0-9][0-9 ]{5,}[0-9])/i;
+const PASSCODE_IN_NOTE = /\b(?:Pass[ \t]*code|Password)[ \t]*:?[ \t]*([A-Za-z0-9]{3,})/i;
+
+export interface LiftedMeeting {
+  meetingLink: string;
+  meetingId: string | null;
+  passcode: string | null;
+  /** What is left of the note once the link, id and passcode are taken out; null when that is only a label or filler ("ELT:", "Zoom info: Join Zoom Meeting"). */
+  rest: string | null;
+}
+
+/**
+ * A video-meeting invitation pasted into the "Direction & Parking Note" of a VIRTUAL job ("Zoom info: Join Zoom Meeting https://... Meeting ID: 819 3761
+ * 8991 Passcode ...", or a Teams link behind a mail-security wrapper): the link (and id / passcode when the note spells them out) belong in the
+ * meeting fields, where they are shown as a button, not in the parking text. Only an http(s) link is ever lifted. Pure.
+ */
+export function liftMeetingFromNote(note: string | null): LiftedMeeting | null {
+  if (!note) return null;
+  const url = note.match(URL_PATTERN)?.[0].replace(TRAILING_PUNCTUATION, "");
+  if (!url) return null;
+  const meetingId = note.match(MEETING_ID_IN_NOTE)?.[1]?.replace(/[ ]+/g, " ").trim() ?? null;
+  const passcode = note.match(PASSCODE_IN_NOTE)?.[1] ?? null;
+  let rest = note.replace(url, " ");
+  if (meetingId) rest = rest.replace(MEETING_ID_IN_NOTE, " ");
+  if (passcode) rest = rest.replace(PASSCODE_IN_NOTE, " ");
+  const residue = rest.replace(FILLER_WORDS, "").replace(/\b(?:info|information|details)\b/gi, "").replace(/[\s:;,.\-–—]+/g, "");
+  const tidy = rest.replace(/\s+/g, " ").replace(/^[\s,;:\-–—]+|[\s,;:\-–—]+$/g, "");
+  return { meetingLink: url, meetingId, passcode, rest: residue.length <= 4 || EMPTY_VALUE.test(tidy) ? null : tidy };
+}
 
 export interface ResolvedLocation {
   /** The name of the place ("Family Solutions"); null for a room code, a "Virtual" descriptor, or no location line. */

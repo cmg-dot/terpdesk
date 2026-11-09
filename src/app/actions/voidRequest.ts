@@ -4,11 +4,12 @@ import { z } from "zod";
 import { requireRole } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 import { afterVoid, manualVoidMessage, voidJobCore } from "@/lib/voidJob";
-import { VOID_KINDS } from "@/lib/voidReasons";
+import { MANUAL_VOID_KINDS } from "@/lib/voidReasons";
 
 const voidSchema = z.object({
   id: z.string().uuid(),
-  kind: z.enum(VOID_KINDS),
+  // "Unable to fill" is deliberately not accepted here: it has its own action (returnUnfilledJob) with its own checks.
+  kind: z.enum(MANUAL_VOID_KINDS),
   note: z.string().trim().max(300).optional(),
 });
 
@@ -45,6 +46,10 @@ export async function voidRequest(input: unknown): Promise<VoidResult> {
         return { success: false, error: "Hours were already reported for this job, so it can't be voided. Review or cancel it instead." };
       case "already_voided":
         return { success: true, alreadyVoided: true };
+      case "booked":
+      case "portal_unconfirmed":
+        // Only reachable for "unable to fill", which this action does not accept.
+        return { success: false, error: "We could not void this job. Nothing was changed." };
       case "voided":
         await afterVoid(id, kind, result.interpreterIds, {
           message: manualVoidMessage(kind),

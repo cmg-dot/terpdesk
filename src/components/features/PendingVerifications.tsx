@@ -8,7 +8,7 @@ import { previewItems, showAllLabel } from "@/lib/pendingVerificationView";
 import type { PendingVerificationView } from "@/lib/verificationPending";
 
 /**
- * Hours review > "Needs an interpreter": service-verification reports that could not be tied to one booked interpreter.
+ * Hours review > "Needs matching to an interpreter": service-verification reports that could not be tied to one booked interpreter.
  * Renders nothing when there are none. Each is a compact row (the first few show, "Show all" opens the rest); the page's search
  * box filters them by SRN, title or the interpreter the report names. After an assignment it asks the page to reload (`onAssigned`).
  */
@@ -35,11 +35,11 @@ export function PendingVerifications({ onAssigned, query = "" }: { onAssigned: (
   const visible = previewItems(shown, showAll);
   const toggleLabel = showAllLabel(shown.length, showAll);
   return (
-    <section aria-label="Reports that need an interpreter" className="space-y-3">
+    <section aria-label="Reports that need matching to an interpreter" className="space-y-3">
       <div>
-        <h2 className="text-xl font-semibold text-[var(--ink)]">Needs an interpreter ({shown.length === items.length ? items.length : `${shown.length} of ${items.length}`})</h2>
+        <h2 className="text-xl font-semibold text-[var(--ink)]">Needs matching to an interpreter ({shown.length === items.length ? items.length : `${shown.length} of ${items.length}`})</h2>
         <p className="text-sm text-[var(--sage)]">
-          These ODHH reports arrived for a job where nobody is booked, or where the report does not say which of two interpreters it is for. Choosing an interpreter books them on the job if they are not booked yet, and the hours then wait under Awaiting review.
+          These ODHH reports arrived for a job where nobody is booked, or where the report does not say which of two interpreters it is for. Match each one to the interpreter who worked it. This does not approve the hours: it links the report to that interpreter (and books them on the job if they are not booked yet), and the hours then wait under Awaiting review, where you approve them.
         </p>
         {shown.length === 0 && <p role="status" className="mt-2 text-sm text-[var(--sage)]">None of these match your search.</p>}
       </div>

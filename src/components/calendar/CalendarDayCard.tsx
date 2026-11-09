@@ -79,7 +79,7 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
           </div>
           <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 shrink-0">
             <span className={`rounded-full px-3 py-0.5 text-xs font-medium capitalize ${isCancelled || isPast ? "bg-gray-200 text-gray-600" : isHappening ? "bg-emerald-500 text-white" : "bg-[var(--mint-pale)] text-[var(--mint-pale-ink)]"}`}>
-              {isCancelled && req.isVoided ? "Void" : req.status}
+              {isCancelled && req.isReturned ? "Returned" : isCancelled && req.isVoided ? "Void" : req.status}
             </span>
           </div>
         </div>
@@ -105,7 +105,7 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
         <div className={`font-medium text-sm truncate${tight} ${isCancelled ? CANCELLED_TITLE : ""}`}>{req.title || "Request"}</div>
         <div className={`text-xs truncate${tight} ${isHappening ? "text-emerald-100" : isPast ? "text-gray-400" : "text-gray-600"}`}>{timeStr}</div>
         <div className={`text-[11px] font-semibold capitalize truncate${tight} text-left ${statusTextClass(req.status, isHappening, isPast)}`}>
-          {isCancelled ? <CancelledBadge voided={Boolean(req.isVoided)} /> : req.status}
+          {isCancelled ? <CancelledBadge voided={Boolean(req.isVoided)} returned={Boolean(req.isReturned)} /> : req.status}
         </div>
       </div>
     </Link>

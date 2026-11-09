@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { ClientNameField } from "@/components/requests/staffing/ClientNameField";
+import { PriorAuthField } from "@/components/requests/staffing/PriorAuthField";
 import { PositionStaffing } from "@/components/requests/staffing/PositionStaffing";
 import { RequestedInterpreterBadge } from "@/components/requests/staffing/RequestedInterpreterBadge";
 import type { Position, PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
@@ -19,6 +20,9 @@ interface Props {
   /** The client's name saved on the job (agency-only), and what to do once a new one is saved. */
   clientName: string;
   onClientSaved: (clientName: string) => void;
+  /** The prior-authorization number saved on the job (agency-only), and what to do once a new one is saved. */
+  priorAuth: string;
+  onPriorAuthSaved: (priorAuth: string) => void;
 }
 
 /**
@@ -26,7 +30,7 @@ interface Props {
  * one (send an offer, or book directly). When the state asked for a particular interpreter, that request sits above the controls
  * with a one-click way to choose them.
  */
-export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved }: Props) {
+export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved }: Props) {
   const requested = requestedInterpreter?.trim() || null;
   const match = useMemo(() => {
     if (!requested) return null;
@@ -45,7 +49,10 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
       <p className="text-sm text-[var(--sage)] mb-1">Pending offers do not reserve time.</p>
       <p className="text-sm text-[var(--sage)] mb-6">Back-to-back appointments are allowed. Travel time is not checked.</p>
 
-      <ClientNameField requestId={ctx.requestId} value={clientName} onSaved={onClientSaved} />
+      <div className="mb-6 grid gap-4 md:grid-cols-2">
+        <ClientNameField requestId={ctx.requestId} value={clientName} onSaved={onClientSaved} />
+        <PriorAuthField requestId={ctx.requestId} value={priorAuth} onSaved={onPriorAuthSaved} />
+      </div>
 
       {requested && (
         <RequestedInterpreterBadge

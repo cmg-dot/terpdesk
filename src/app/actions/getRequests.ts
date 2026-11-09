@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
 import { desc, eq } from "drizzle-orm";
 import { formatReference, isCompletedRequest, isNeedsReplacementStatus } from "@/utils/statusEngine";
-import { isVoidedData } from "@/lib/voidReasons";
+import { isPlainVoidData, isReturnedData, returnedInPortal } from "@/lib/voidReasons";
 import { rawJobZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 
@@ -214,7 +214,10 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     billingStatus: row.billingStatus ?? null,
     isCompleted: isCompletedRequest(row.status, row.billingStatus),
     // A voided job is closed like a cancelled one (status Cancelled) and also carries data.void: its own badge and filter.
-    isVoided: isVoidedData(rowData),
+    isVoided: isPlainVoidData(rowData),
+    // "Unable to fill / returned to state": closed the same way, but its own badge and "Returned" filter (not a void).
+    isReturned: isReturnedData(rowData),
+    returnedInPortal: returnedInPortal(rowData),
     canceledAt: row.canceledAt ? row.canceledAt.toISOString() : null,
     cancelReason: row.cancelReason,
     clientRequestedCancellation: row.clientRequestedCancellation,

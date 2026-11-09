@@ -5,7 +5,8 @@ import { getStaffingLabel, getStatusFilters } from "@/utils/statusEngine";
  * The status filter on the Requests & assignments page. Pure functions, no I/O.
  *  - "Active Appointments" (the default) lists everything except cancelled jobs.
  *  - "All appointments" bypasses every status rule: upcoming, past, completed and cancelled.
- *  - "Completed" is a closed job (request status or billing status "completed"); "Cancelled" is a cancelled one.
+ *  - "Completed" is a closed job (request status or billing status "completed"); "Cancelled" is a cancelled one;
+ *    "Voided" and "Returned" (unable to fill) are closed jobs of their own, listed apart from real cancellations.
  */
 
 export const DEFAULT_STATUS_FILTER = "Active Appointments";
@@ -23,6 +24,7 @@ export const STATUS_FILTER_OPTIONS = [
   "Completed",
   "Cancelled",
   "Voided",
+  "Returned",
 ] as const;
 
 export type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number];
@@ -30,15 +32,17 @@ export type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number];
 type StatusFilterInput = Parameters<typeof getStatusFilters>[0];
 
 /** A request as the list receives it from fetchLiveRequests. */
-export type ListedRequest = StatusFilterInput & { isCompleted?: boolean; isVoided?: boolean };
+export type ListedRequest = StatusFilterInput & { isCompleted?: boolean; isVoided?: boolean; isReturned?: boolean };
 
 export function matchesStatusFilter(req: ListedRequest, filter: string, currentTime: number): boolean {
   if (filter === "All appointments") return true;
 
   const flags = getStatusFilters(req);
   // A voided job is closed like a cancelled one, but it has its own filter: "Cancelled" is the real cancellations only.
-  if (filter === "Cancelled") return flags.isCancelled && !req.isVoided;
+  if (filter === "Cancelled") return flags.isCancelled && !req.isVoided && !req.isReturned;
   if (filter === "Voided") return flags.isCancelled && Boolean(req.isVoided);
+  // A job the agency could not fill and returned to the state: closed, kept for the record, never counted as a cancellation.
+  if (filter === "Returned") return flags.isCancelled && Boolean(req.isReturned);
   if (flags.isCancelled) return false;
 
   switch (filter) {
@@ -71,6 +75,7 @@ export const isCancelledRequest = (req: ListedRequest): boolean => getStatusFilt
 /** The badge text on a list card: "Completed" for a closed job, else the usual staffing label. */
 export function requestStatusLabel(req: ListedRequest): string {
   if (req.isVoided) return "Voided";
+  if (req.isReturned) return "Returned";
   return req.isCompleted ? "Completed" : getStaffingLabel(req);
 }
 
@@ -79,7 +84,7 @@ export function requestStatusLabel(req: ListedRequest): string {
  * leaving the person on an empty Upcoming tab. Other filters keep whichever tab is open.
  */
 export function tabForFilter(filter: string): "past" | null {
-  return filter === "Completed" || filter === "Cancelled" || filter === "Voided" ? "past" : null;
+  return filter === "Completed" || filter === "Cancelled" || filter === "Voided" || filter === "Returned" ? "past" : null;
 }
 
 export interface ListCopy {
@@ -102,6 +107,8 @@ export function listCopy(filter: string): ListCopy {
       return { subtitle: "Cancelled appointments", pastHeading: "Cancelled", pastNote: "Appointments that were cancelled. They are kept here for the record." };
     case "Voided":
       return { subtitle: "Voided appointments", pastHeading: "Voided", pastNote: "Jobs that should never have existed (wrong form, duplicates). They are kept for the record and are not billed." };
+    case "Returned":
+      return { subtitle: "Returned appointments", pastHeading: "Returned", pastNote: "Jobs the agency was unable to fill and returned to the state or requester. They are kept for the record and are not billed." };
     case "All appointments":
       return { subtitle: "Every appointment: upcoming, past, completed and cancelled", pastHeading: "Past and cancelled", pastNote: "Every appointment that has already ended or was cancelled." };
     default:

@@ -24,6 +24,7 @@ import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
 import { RequestActionBar } from "@/components/requests/RequestActionBar";
 import { calendarLink } from "@/lib/calendarLink";
+import { ReturnUnfilledDialog } from "@/components/requests/ReturnUnfilledDialog";
 import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
 import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
 import { offerBlock } from "@/lib/offerAvailability";
@@ -331,6 +332,7 @@ export default function AssignmentDetailPage() {
 
  const [showCancelModal, setShowCancelModal] = useState(false);
  const [showVoidModal, setShowVoidModal] = useState(false);
+ const [showReturnModal, setShowReturnModal] = useState(false);
  const [cancelReasonInput, setCancelReasonInput] = useState('');
  const [clientRequested, setClientRequested] = useState(false);
  const cancelReason = foundRequest?.cancelReason || cancelReasonInput;
@@ -865,7 +867,9 @@ export default function AssignmentDetailPage() {
          </span>
        )}
        {isCancelled && (
-         foundRequest?.isVoided
+         foundRequest?.isReturned
+           ? <span className="bg-amber-50 text-amber-800 text-[13px] font-medium px-3 py-1 rounded-full border border-amber-200">Returned</span>
+         : foundRequest?.isVoided
            ? <span className="bg-slate-200 text-slate-700 text-[13px] font-medium px-3 py-1 rounded-full border border-slate-300">Voided</span>
            : <span className="bg-[#FEF2F2] text-[#991B1B] text-[13px] font-medium px-3 py-1 rounded-full border border-[#FCA5A5]/30">Cancelled</span>
        )}
@@ -881,6 +885,8 @@ export default function AssignmentDetailPage() {
    onQuickEdit={openEditAccessModal}
    onCancel={handleCancelAppointment}
    onVoid={() => setShowVoidModal(true)}
+   canReturnUnfilled={!isCancelled && !hasAcceptedBooking}
+   onReturnUnfilled={() => setShowReturnModal(true)}
  />
  </header>
 
@@ -917,7 +923,18 @@ export default function AssignmentDetailPage() {
  </div>
  </div>
  )}
- {isCancelled && !foundRequest?.isVoided && (
+ {isCancelled && foundRequest?.isReturned && (
+ <div className="space-y-4 mb-6" data-returned-banner>
+ <div className="bg-amber-50 border border-amber-200 text-amber-900 px-6 py-4 rounded-2xl text-[14px] leading-relaxed">
+ This appointment was marked unable to fill and returned. It is closed, off billing and kept for the record. Nobody is expected to work it.
+ {isStateRequest && (foundRequest?.returnedInPortal ? " It was also returned in the ODHH portal." : " It was not recorded as returned in the ODHH portal.")}
+ </div>
+ <div className="bg-[#F5F4F0] text-gray-600 px-6 py-4 rounded-2xl border border-gray-200 text-sm">
+ Internal note (agency only): {foundRequest?.cancelReason || "No reason provided"}
+ </div>
+ </div>
+ )}
+ {isCancelled && !foundRequest?.isVoided && !foundRequest?.isReturned && (
  <div className="space-y-4 mb-6">
  <div className="bg-[#FEF2F2] border border-[#FCA5A5]/30 text-[#991B1B] px-6 py-4 rounded-2xl border border-gray-200 text-[14px] leading-relaxed">
  This appointment was cancelled {cancelDate ? (() => {
@@ -944,7 +961,7 @@ export default function AssignmentDetailPage() {
  <OriginalFormCard requestId={String(foundRequest?.id || id)} srn={requestSrnValue} />
 
  {/* Staffing and booking, directly under the form. */}
- {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} />}
+ {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} />}
 
  {/* The older detail cards (still editable from here) are folded away so the form stays the focus. */}
  <details data-job-details className="group rounded-2xl border border-gray-200 bg-white">
@@ -1470,6 +1487,15 @@ export default function AssignmentDetailPage() {
 
  </div>
 
+ <ReturnUnfilledDialog
+ open={showReturnModal}
+ onOpenChange={setShowReturnModal}
+ requestId={id}
+ isStateJob={isStateRequest}
+ srn={requestSrnValue}
+ hasOpenOffer={hasLivePendingOffer}
+ onReturned={async () => { try { setFoundRequest(await fetchLiveRequestById(id)); } catch { console.error("[requests/[id] page] request failed"); } }}
+ />
  <VoidJobDialog
  open={showVoidModal}
  onOpenChange={setShowVoidModal}

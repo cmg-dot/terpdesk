@@ -15,6 +15,7 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadge";
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { JobPlaceCards } from "@/components/interpreter/JobPlaceCards";
+import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -1376,6 +1377,12 @@ export default function JobDetailPage() {
                   {job.isVirtual ? 'Virtual' : 'In person'}
                 </span>
               </div>
+              {job.status === 'booked' && job.clientName && (
+                <div className="flex items-center justify-between gap-4 py-3 border-b border-gray-50" data-job-row="client">
+                  <span className="text-[14px] text-gray-400">Client</span>
+                  <span className="text-[14px] font-medium text-[var(--ink)] text-right break-words">{job.clientName}</span>
+                </div>
+              )}
               {job.startsAt && job.endsAt && new Date(job.endsAt).getTime() > new Date(job.startsAt).getTime() && (
                 <div className="flex items-center justify-between py-3 border-b border-gray-50" data-job-row="duration">
                   <span className="text-[14px] text-gray-400">Duration</span>
@@ -1409,7 +1416,7 @@ export default function JobDetailPage() {
           {/* Card 2 */}
           <CollapsibleCard cardId="preparation-notes" title="Preparation notes">
             {job.status === 'booked' && job.prepNotes ? (
-              <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700">{job.prepNotes}</p>
+              <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700"><LinkifiedText text={job.prepNotes} /></p>
             ) : (
               <p className="text-[14px] text-[var(--sage)]">No preparation notes yet.</p>
             )}

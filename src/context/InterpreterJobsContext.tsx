@@ -41,6 +41,8 @@ export interface Job {
   accessCode?: string | null;
   platform?: string | null;
   virtualInstructions?: string | null;
+  /** The client's name: only present once the interpreter is booked on the job. */
+  clientName?: string | null;
   /** An offer for a virtual job whose link and passcode are withheld until it is accepted. */
   credentialsLocked?: boolean;
   /** The agency's preparation notes, once the interpreter is booked. */
@@ -106,6 +108,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           accessCode: o.passcode || o.accessCode || null,
           platform: o.platform || null,
           virtualInstructions: o.virtualInstructions || null,
+          clientName: o.clientName || null,
           credentialsLocked: o.credentialsLocked,
           prepNotes: o.prepNotes,
           groupFlags: o.groupFlags,

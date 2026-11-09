@@ -1,14 +1,15 @@
 "use client";
 
 import Link from "next/link";
-import { CalendarDays, Edit2, Lock } from "lucide-react";
+import { CalendarDays, Edit2, Lock, Undo2 } from "lucide-react";
 
 /**
  * The appointment's action toolbar, in three groups on one row (desktop) or a two-column grid of full-width tap targets
  * (phone):
  *  - look: View in calendar (a quiet outline pill; the original form is its own card on the page);
  *  - dispatch: Quick edit, Edit assignment (accent);
- *  - close-out: Cancel appointment, Void job (muted danger, pushed to the far end so they are never next to the accents).
+ *  - close-out: Unable to fill (only while nobody is booked), Cancel appointment, Void job (muted, pushed to the far end so they
+ *    are never next to the accents).
  * The groups wrap as units, never button by button, so nothing hangs alone on a third line.
  */
 
@@ -18,6 +19,7 @@ const ACCENT_SOFT = `${BASE} border border-emerald-200 bg-emerald-50 text-[var(-
 const ACCENT_SOLID = `${BASE} border border-transparent bg-[var(--forest)] text-white hover:bg-[var(--forest)]/90`;
 const LOCKED = `${BASE} cursor-not-allowed border border-gray-200 bg-gray-100 text-gray-400`;
 const DANGER = `${BASE} border border-red-200 bg-white text-[#B4443A] hover:bg-red-50`;
+const RETURN = `${BASE} border border-amber-200 bg-white text-amber-800 hover:bg-amber-50`;
 const NEUTRAL = `${BASE} border border-slate-200 bg-white text-slate-600 hover:bg-slate-50`;
 
 const GROUP = "contents sm:flex sm:items-center sm:gap-2";
@@ -32,12 +34,15 @@ interface Props {
   /** A booked interpreter locks the whole edit flow; the buttons stay visible but disabled. */
   isEditLocked: boolean;
   editLockMessage?: string;
+  /** Nobody is booked: the job can be marked unable to fill and returned to the state. */
+  canReturnUnfilled?: boolean;
+  onReturnUnfilled?: () => void;
   onQuickEdit: () => void;
   onCancel: () => void;
   onVoid: () => void;
 }
 
-export function RequestActionBar({ calendarHref = "/calendar", editHref, isCancelled, isEditLocked, editLockMessage, onQuickEdit, onCancel, onVoid }: Props) {
+export function RequestActionBar({ calendarHref = "/calendar", editHref, isCancelled, isEditLocked, editLockMessage, canReturnUnfilled = false, onReturnUnfilled, onQuickEdit, onCancel, onVoid }: Props) {
   return (
     <div role="toolbar" aria-label="Appointment actions" className="mt-5 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-x-2 sm:gap-y-2">
       <div className={GROUP}>
@@ -76,6 +81,12 @@ export function RequestActionBar({ calendarHref = "/calendar", editHref, isCance
           </div>
 
           <div className={`${GROUP} sm:ml-auto`}>
+            {canReturnUnfilled && onReturnUnfilled && (
+              <button type="button" onClick={onReturnUnfilled} className={RETURN}>
+                <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+                Unable to fill
+              </button>
+            )}
             <button type="button" onClick={onCancel} className={DANGER}>
               Cancel appointment
             </button>

@@ -1,7 +1,7 @@
 import type { PendingVerificationView } from "@/lib/verificationPending";
 
 /**
- * How a "Needs an interpreter" report reads on its compact row. Pure, so the row, the section and the tests share one set of rules.
+ * How a "Needs matching to an interpreter" report reads on its compact row. Pure, so the row, the section and the tests share one set of rules.
  */
 
 /** How many reports show before "Show all (N)". */

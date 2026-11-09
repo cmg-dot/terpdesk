@@ -13,6 +13,8 @@ export interface RequestData {
     odhhSrn?: string;
     odhhAccessCode?: string;
     providerOneNumber?: string;
+    /** The prior-authorization number, typed in Staffing. AGENCY ONLY: interpreter views are built from an allowlist that excludes it. */
+    priorAuthNumber?: string;
     /** The interpreter the state's form asks for by name ("Specific Interpreter Requested"): a preference, not a booking. */
     requestedInterpreter?: string;
     /** The state's form says the request needs pre-authorization. */

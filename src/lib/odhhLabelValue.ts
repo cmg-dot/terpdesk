@@ -20,6 +20,8 @@ export interface LabelValue {
   value: string | null;
   /** The line right after the value's line when it is plain text (not a label or heading): a continuation such as a city. */
   continuation: string | null;
+  /** The plain line right after the continuation (an address can run over three lines), or null. */
+  secondContinuation: string | null;
 }
 
 const nonBlankAfter = (lines: string[], index: number): { line: string; at: number } | null => {
@@ -52,7 +54,9 @@ export function labelValue(text: string, labels: readonly string[], acceptNext: 
     if (!value) continue;
     const after = nonBlankAfter(lines, at);
     const continuation = after && after.at === at + 1 && !isStructureLine(after.line) ? cleanValue(after.line) : null;
-    return { value, continuation };
+    const afterContinuation = continuation !== null && after ? nonBlankAfter(lines, after.at) : null;
+    const secondContinuation = afterContinuation && afterContinuation.at === (after?.at ?? -1) + 1 && !isStructureLine(afterContinuation.line) ? cleanValue(afterContinuation.line) : null;
+    return { value, continuation, secondContinuation };
   }
-  return { value: null, continuation: null };
+  return { value: null, continuation: null, secondContinuation: null };
 }

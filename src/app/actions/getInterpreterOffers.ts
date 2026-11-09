@@ -144,10 +144,12 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       virtualInstructions: job.virtualInstructions,
       credentialsLocked: job.credentialsLocked,
       prepNotes: job.prepNotes,
+      // The client's name reaches only an interpreter who is booked (null on an offer); see interpreterJobData.ts.
+      clientName: job.clientName,
       groupFlags: job.groupFlags,
       details: job.details,
       onsite: job.onsite,
-      // Only the program and SRN: staff-only keys (private notes, the raw email, the client's name, requester, other
+      // Only the program and SRN: staff-only keys (private notes, the raw email, the prior-authorization number, requester, other
       // interpreters' data) are never copied, because the view is built from an allowlist.
       data: job.data
     };

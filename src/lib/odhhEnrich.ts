@@ -24,6 +24,8 @@ const FILL_ONLY = [
   "details.platform",
   "details.meetingLink",
   "details.virtualLink",
+  "details.meetingId",
+  "details.passcode",
   "details.deafParticipant",
   "requester.name",
   "requester.phone",

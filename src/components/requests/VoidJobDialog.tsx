@@ -4,10 +4,11 @@ import { useEffect, useState } from "react";
 import { voidRequest } from "@/app/actions/voidRequest";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Dropdown } from "@/components/ui/Dropdown";
-import { VOID_KINDS, VOID_LABELS } from "@/lib/voidReasons";
+import { MANUAL_VOID_KINDS, VOID_LABELS } from "@/lib/voidReasons";
 import type { VoidKind } from "@/lib/voidReasons";
 
-const OPTIONS = VOID_KINDS.map((kind) => ({ value: kind, label: VOID_LABELS[kind] }));
+// "Unable to fill" is not a void: it has its own button and dialog.
+const OPTIONS = MANUAL_VOID_KINDS.map((kind) => ({ value: kind, label: VOID_LABELS[kind] }));
 
 interface Props {
   open: boolean;

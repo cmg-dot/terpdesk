@@ -15,6 +15,9 @@ export function RequestStatusBadge({ status }: { status: string }) {
   if (status === "Voided") {
     return <span className={`${PILL} border border-slate-300 bg-slate-200 text-slate-700`}>Voided</span>;
   }
+  if (status === "Returned") {
+    return <span className={`${PILL} border border-amber-200 bg-amber-50 text-amber-800`}>Returned</span>;
+  }
   if (status === "Completed") {
     return <span className={`${PILL} bg-[#DDEBE5] text-[var(--forest)]`}>Completed</span>;
   }

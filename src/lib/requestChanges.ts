@@ -44,6 +44,7 @@ const FIELDS: Field[] = [
   { label: "Setting", emailSafe: true, read: (d) => d.setting },
   { label: "Program", emailSafe: true, read: (d) => d.program },
   { label: "Positions", emailSafe: true, read: (_d, r) => positionsLabel(r) },
+  { label: "Client name", emailSafe: false, read: (d) => d.clientName },
   { label: "Venue", emailSafe: false, read: (d) => d.location?.venue ?? "" },
   { label: "Address", emailSafe: false, read: (d) => d.location?.address ?? "" },
   { label: "Building / room", emailSafe: false, read: (d) => d.location?.building ?? "" },
@@ -84,10 +85,10 @@ const AGENCY_ONLY: { label: string; read: (data: LooseData) => unknown }[] = [
   { label: "Billing", read: (d) => { const r = obj(d.requester); return [r.billOrg, r.billContact, r.billEmail, r.poNumber]; } },
   { label: "Client", read: (d) => d.client },
   { label: "Agency-private notes", read: (d) => d.privateNotes },
-  { label: "Program reference numbers", read: (d) => { const i = obj(d.intake); return [i.odhhSrn, i.odhhAccessCode, i.providerOneNumber]; } },
+  { label: "Program reference numbers", read: (d) => { const i = obj(d.intake); return [i.odhhSrn, i.odhhAccessCode, i.providerOneNumber, i.priorAuthNumber]; } },
   { label: "Patient information", read: (d) => { const i = obj(d.intake); return [i.clientGender, obj(d.brief).hearingIdentity, i.requestedInterpreter]; } },
   { label: "Request flags", read: (d) => { const i = obj(d.intake); return [i.isPublic, i.isMixedGroup]; } },
-  { label: "Client details", read: (d) => { const x = obj(d.details); return [x.deafParticipant, x.peopleNeeding, x.commPreferences, x.purpose, x.qualifications]; } },
+  { label: "Client details", read: (d) => { const x = obj(d.details); return [x.peopleNeeding, x.commPreferences, x.purpose, x.qualifications]; } },
 ];
 
 export function agencyOnlyChangedSections(before: JobRequestRow, after: JobRequestRow): string[] {

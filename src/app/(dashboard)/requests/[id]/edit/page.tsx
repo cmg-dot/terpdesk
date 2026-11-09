@@ -927,7 +927,7 @@ export default function EditRequestPage() {
  <h2 className={sectionTitleClass}>Client and setting</h2>
  
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
- <Field label="Deaf or hard of hearing client">
+ <Field label="Deaf or hard of hearing client" subtext="Shared with the interpreter once they are booked on the job (never on an offer, never in an email).">
  <input type="text" className={inputClass} value={formData.deafParticipant} onChange={(e) => handleChange("deafParticipant", e.target.value)} />
  </Field>
  <Field label="Number of clients needing interpreting">

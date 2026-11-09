@@ -3,7 +3,9 @@
 import { ExternalLink, Lock } from "lucide-react";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
+import { LinkifiedText, MeetingLinkAnchor } from "@/components/ui/LinkifiedText";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
+import { normalizeUrl } from "@/lib/linkify";
 
 /**
  * Where an interpreter goes, on the app's job page: the virtual meeting card, the on-site card, or both. A virtual job that
@@ -42,9 +44,9 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
       subtitle={<>Platform: <span className="font-medium text-gray-700">{job.platform || "Virtual meeting"}</span></>}
     >
     <div className="space-y-4" data-place-card="virtual">
-      {meetingLink && !isOffer && (
+      {meetingLink && !isOffer && normalizeUrl(meetingLink) !== null && (
         <a
-          href={meetingLink.startsWith("http") ? meetingLink : `https://${meetingLink}`}
+          href={normalizeUrl(meetingLink) ?? undefined}
           target="_blank"
           rel="noopener noreferrer"
           className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-xs font-semibold hover:bg-[var(--forest-deep)] transition-colors shadow-sm"
@@ -67,7 +69,7 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
             <div className="bg-[#F8FAF9] p-3.5 rounded-xl border border-[#E3EBE7] flex items-center justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">Meeting Link</span>
-                <span className="text-xs font-mono text-[var(--forest)] truncate block break-all">{meetingLink}</span>
+                <MeetingLinkAnchor url={meetingLink} className="text-xs font-mono text-[var(--forest)] underline underline-offset-2 block break-all hover:opacity-80" />
               </div>
               <CopyButton text={meetingLink} label="meeting link" />
             </div>
@@ -95,7 +97,7 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
           {job.virtualInstructions && (
             <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-100 text-xs text-gray-700">
               <span className="font-semibold block text-[11px] text-[var(--sage)] uppercase tracking-wider mb-1">Virtual Instructions</span>
-              <p className="leading-relaxed whitespace-pre-line">{job.virtualInstructions}</p>
+              <p className="leading-relaxed whitespace-pre-line"><LinkifiedText text={job.virtualInstructions} /></p>
             </div>
           )}
         </div>
@@ -135,7 +137,7 @@ function OnsiteCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
         {onsite.parking && (
           <div className="py-2 border-b border-gray-50 text-xs">
             <span className="text-[var(--sage)] block mb-1">Directions &amp; Parking</span>
-            <span className="text-[var(--ink)] whitespace-pre-line">{onsite.parking}</span>
+            <span className="text-[var(--ink)] whitespace-pre-line"><LinkifiedText text={onsite.parking} /></span>
           </div>
         )}
         {onsite.entrance && (

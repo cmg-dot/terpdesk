@@ -2,12 +2,14 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { Logo } from "@/components/logo";
+import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { ClarificationButton } from "@/components/jobDetails/ClarificationButton";
 import { ActivityLog } from "@/components/requests/ActivityLog";
 import { AgencyMessageList } from "@/components/jobDetails/AgencyMessageList";
 import { GiveBackButton } from "@/components/jobDetails/GiveBackButton";
 import { writeAuditLog } from "@/lib/audit";
 import { resolveJobDetailsLink } from "@/lib/jobDetailsAccess";
+import { normalizeUrl } from "@/lib/linkify";
 import { logError } from "@/lib/logError";
 import { listActivityForInterpreter, listAgencyMessages } from "@/lib/requestActivity";
 import type { ActivityItem, AgencyMessage } from "@/lib/requestActivity";
@@ -36,8 +38,8 @@ const MESSAGES = {
   not_booked: "This job is no longer booked to you, so its details aren't available. Contact the agency if this is a mistake.",
 } as const;
 
-/** Only http(s) meeting links become clickable, so a stored "javascript:" value can never run. */
-const safeHref = (url: string): string | null => (/^https?:\/\//i.test(url) ? url : null);
+/** Only http(s) links (a bare Zoom / Teams address gets https://) become clickable, so a stored "javascript:" value can never run. */
+const safeHref = normalizeUrl;
 
 /**
  * Full job details for a booked interpreter, opened from the booking confirmation email. No sign-in is needed (shadow
@@ -101,6 +103,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                 <Row label="Duration">{access.details.durationLabel}</Row>
                 <Row label="Format">{access.details.format}</Row>
                 <Row label="Setting">{access.details.setting}</Row>
+                {access.details.clientName && <Row label="Client">{access.details.clientName}</Row>}
                 <Row label="Role">{access.details.role}</Row>
                 <Row label="Program">{access.details.program}</Row>
               </dl>
@@ -115,7 +118,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                   {access.details.location.floor && <Row label="Floor">{access.details.location.floor}</Row>}
                   {access.details.location.room && <Row label="Room">{access.details.location.room}</Row>}
                   {access.details.location.entrance && <Row label="Entrance">{access.details.location.entrance}</Row>}
-                  {access.details.location.parking && <Row label="Directions & parking">{access.details.location.parking}</Row>}
+                  {access.details.location.parking && <Row label="Directions & parking"><LinkifiedText text={access.details.location.parking} /></Row>}
                   {access.details.location.contact && (
                     <Row label="On-site contact">
                       {access.details.location.contact}
@@ -132,7 +135,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                   {access.details.virtual.platform && <Row label="Platform">{access.details.virtual.platform}</Row>}
                   <Row label="Meeting link">
                     {safeHref(access.details.virtual.meetingLink) ? (
-                      <a href={access.details.virtual.meetingLink} target="_blank" rel="noopener noreferrer" className="text-[var(--forest)] underline">
+                      <a href={safeHref(access.details.virtual.meetingLink) ?? undefined} target="_blank" rel="noopener noreferrer" className="text-[var(--forest)] underline">
                         Join meeting
                       </a>
                     ) : (
@@ -141,7 +144,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
                   </Row>
                   {access.details.virtual.meetingId && <Row label="Meeting ID">{access.details.virtual.meetingId}</Row>}
                   {access.details.virtual.passcode && <Row label="Passcode">{access.details.virtual.passcode}</Row>}
-                  {access.details.virtual.instructions && <Row label="Instructions">{access.details.virtual.instructions}</Row>}
+                  {access.details.virtual.instructions && <Row label="Instructions"><LinkifiedText text={access.details.virtual.instructions} /></Row>}
                 </dl>
               </Card>
             )}
@@ -157,7 +160,7 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
 
             <Card title="Preparation notes">
               <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700">
-                {access.details.prepNotes || "No preparation notes for this job."}
+                {access.details.prepNotes ? <LinkifiedText text={access.details.prepNotes} /> : "No preparation notes for this job."}
               </p>
             </Card>
 

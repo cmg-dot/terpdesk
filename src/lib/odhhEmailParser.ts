@@ -1,7 +1,7 @@
 import { fromZonedTime } from "date-fns-tz";
 import { type Program } from "@/db/schema";
 import { labelValue } from "@/lib/odhhLabelValue";
-import { platformFrom, resolveLocation, splitLink } from "@/lib/odhhLocationParse";
+import { joinAddressLines, platformFrom, resolveLocation, splitLink } from "@/lib/odhhLocationParse";
 import { MAX_FIELD_LENGTH, cleanValue, EMPTY_VALUE } from "@/lib/odhhText";
 
 // Kept importable from here: other parsers read these helpers from this module.
@@ -370,10 +370,16 @@ export function parseIntakeEmail(rawContent: string, subject: string): ParsedInt
   const addressSplit = addressLine.value === null ? null : splitLink(addressLine.value);
   // The line below belongs to the address when the label's line holds only a link (the city follows) or only the invitation's
   // words ("Microsoft Teams meeting Join:") with the link on the next line.
-  const addressContinues = addressLine.continuation !== null && addressSplit !== null && ((addressSplit.link !== null && addressSplit.rest === null) || (addressSplit.link === null && holdsLink(addressLine.continuation)));
+  // A street broken across lines ("601 SE 117th Ave" / "Suite 240 Vancouver, Washington 98683") is one address: the unit or city
+  // line is joined when it is recognisably the rest of an address and the first line is not already complete (joinAddressLines).
+  const physicalJoin = addressSplit !== null && addressSplit.link === null && addressLine.value !== null ? joinAddressLines(addressLine.value, addressLine.continuation, addressLine.secondContinuation) : null;
+  const addressContinues =
+    addressLine.continuation !== null &&
+    addressSplit !== null &&
+    ((addressSplit.link !== null && addressSplit.rest === null) || (addressSplit.link === null && holdsLink(addressLine.continuation)));
   const where = resolveLocation({
     location: cleanValue(text.match(VENUE_PATTERN)?.[1]),
-    address: addressContinues ? `${addressLine.value} ${addressLine.continuation}` : addressLine.value,
+    address: physicalJoin ?? (addressContinues ? `${addressLine.value} ${addressLine.continuation}` : addressLine.value),
     meetingValue: meeting.value,
   });
   const { venue, locationCode, address } = where;

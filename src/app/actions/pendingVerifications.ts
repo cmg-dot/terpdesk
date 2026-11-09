@@ -16,7 +16,7 @@ import { requestReference } from "@/utils/statusEngine";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
 /**
- * Hours review's "Needs an interpreter" list: service-verification reports that arrived for a job with nobody booked, or
+ * Hours review's "Needs matching to an interpreter" list: service-verification reports that arrived for a job with nobody booked, or
  * with two interpreters and no name that fits. Agency staff only. Reading changes nothing.
  */
 export async function getPendingVerifications(): Promise<PendingVerificationView[]> {

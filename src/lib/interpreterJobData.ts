@@ -3,7 +3,7 @@ import { hasPhysicalPlace } from "@/lib/jobPlace";
 
 /**
  * What an interpreter's browser may receive about a job. The raw `requests.data` holds staff-only material (the client's
- * name, agency-private notes with the state's section 5, the original forwarded email, the requester and billing
+ * name (shared only with a booked interpreter, below), agency-private notes with the state's section 5, the original forwarded email, the requester and billing
  * contacts, ProviderOne and ODHH access codes, the requested interpreter, the state's flags, other interpreters' questions
  * and hours), so nothing is copied from it wholesale.
  *
@@ -14,7 +14,8 @@ import { hasPhysicalPlace } from "@/lib/jobPlace";
  *  - "offer"  (a pending offer, or anything that is not a live booking): the schedule, format, a generic setting, the
  *    platform's name and the place's name only. No street address, building, room, floor, parking, entrance, contact,
  *    meeting link, meeting id, passcode or instructions: those are shared after the interpreter accepts.
- *  - "booked" (an accepted booking): the above plus the full place, the virtual meeting details and the preparation notes.
+ *  - "booked" (an accepted booking): the above plus the full place, the virtual meeting details, the preparation notes and the
+ *    client's name (details.deafParticipant). The prior-authorization number and every other staff-only key stay out.
  */
 
 type Loose = Record<string, unknown>;
@@ -44,6 +45,8 @@ export interface InterpreterJobView {
   prepNotes: string;
   /** The state form's "Public" and "Mixed Group" answers (null when it did not say): the job brief, not a person's details. */
   groupFlags: { isPublic: boolean | null; isMixedGroup: boolean | null };
+  /** The client's name (details.deafParticipant). Shared ONLY with an interpreter who is booked on the job: null on an offer. */
+  clientName: string | null;
   /** An offer for a job that has meeting credentials, which stay on the server until the offer is accepted. */
   credentialsLocked: boolean;
   details: Loose;
@@ -108,6 +111,7 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
     passcode: booked ? orNull(passcode) : null,
     virtualInstructions: booked ? orNull(instructions) : null,
     prepNotes: booked ? text(data.prepNotes) : "",
+    clientName: booked ? orNull(details.deafParticipant) : null,
     groupFlags: {
       isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,
       isMixedGroup: typeof intake.isMixedGroup === "boolean" ? intake.isMixedGroup : null,

@@ -1,6 +1,7 @@
 import type { RequestData } from "@/db/schema";
 import { FORMAT_LABELS, ODHH_PROGRAM, ODHH_TIME_ZONE_LABEL, type ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { contactMethodText, stateFlagsLine, type FormExtras } from "@/lib/odhhFormFields";
+import { liftMeetingFromNote } from "@/lib/odhhLocationParse";
 
 /**
  * What a state request email says, as the app's request data. Used twice: to make the draft request when the email is
@@ -41,6 +42,11 @@ export function buildDraftData(input: DraftInput): RequestData {
   const privateNotes = [stateFlagsLine(extras), parsed.clientInfoBlock ?? ""].filter(Boolean).join("\n\n");
   // The room: the form's own Room line, else a short code the Location line held ("E1"). It is never the place's name.
   const room = extras.room ?? parsed.locationCode;
+  // A virtual job whose meeting invitation was pasted into the Directions & Parking note (no link on the meeting line): the link
+  // goes to the meeting fields, so it is a button for the interpreter and not plain text in the parking card.
+  const lifted = !parsed.meetingLink && parsed.format === "virtual" ? liftMeetingFromNote(extras.parking) : null;
+  const meetingLink = parsed.meetingLink ?? lifted?.meetingLink ?? null;
+  const parking = lifted ? lifted.rest : extras.parking;
 
   return {
     brief: {},
@@ -61,7 +67,9 @@ export function buildDraftData(input: DraftInput): RequestData {
       ...(parsed.purpose ? { purpose: parsed.purpose } : {}),
       ...(extras.setting ? { setting: extras.setting } : {}),
       ...(parsed.platform ? { platform: parsed.platform } : {}),
-      ...(parsed.meetingLink ? { meetingLink: parsed.meetingLink, virtualLink: parsed.meetingLink } : {}),
+      ...(meetingLink ? { meetingLink, virtualLink: meetingLink } : {}),
+      ...(lifted?.meetingId ? { meetingId: lifted.meetingId } : {}),
+      ...(lifted?.passcode ? { passcode: lifted.passcode } : {}),
     },
     // The ODHH "Appointment Note" lands in the agency's Preparation notes field, so staff review it before booking.
     // Preparation notes are shared with booked interpreters, so they hold ONLY the appointment note from the email.
@@ -75,7 +83,7 @@ export function buildDraftData(input: DraftInput): RequestData {
       ...(extras.building ? { building: extras.building } : {}),
       ...(extras.floor ? { floor: extras.floor } : {}),
       // Directions and parking ("CODE 793775"): shown to booked interpreters, including on a virtual job that also has a place.
-      ...(extras.parking ? { parking: extras.parking } : {}),
+      ...(parking ? { parking } : {}),
       ...(room ? { room } : {}),
       ...(extras.contactName ? { contact: extras.contactName } : {}),
       ...(contactMethod ? { contactMethod } : {}),

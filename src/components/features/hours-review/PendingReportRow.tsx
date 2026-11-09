@@ -13,7 +13,7 @@ import { formatDateTimeRangeInZone } from "@/utils/timezone";
 const CHIP = "inline-flex items-center rounded-full px-2.5 py-1 text-[12px] font-medium whitespace-nowrap";
 const TAG = "rounded-full px-2 py-0.5 text-[11px] font-medium";
 
-/** One report, folded to a row: who it is for, the job, the picker and Assign inline, and the signature behind a toggle. */
+/** One report, folded to a row: who it is for, the job, the picker and "Match to interpreter" inline, and the signature behind a toggle. */
 export function PendingReportRow({ item, onDone }: { item: PendingVerificationView; onDone: () => void }) {
   const [chosen, setChosen] = useState(item.preselectedId ?? "");
   const [busy, setBusy] = useState(false);
@@ -83,10 +83,10 @@ export function PendingReportRow({ item, onDone }: { item: PendingVerificationVi
             type="button"
             onClick={assign}
             disabled={busy}
-            title="If they are not booked on this job yet, they will be booked. The hours then wait under Awaiting review like any other report."
+            title="This does not approve the hours. It links this report to the interpreter (booking them on the job if they are not booked yet). The hours then wait under Awaiting review, where you approve them."
             className="rounded-full bg-[var(--forest-bright)] px-6 py-2.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-bright-hover)] disabled:opacity-60"
           >
-            {busy ? "Recording…" : "Assign"}
+            {busy ? "Matching…" : "Match to interpreter"}
           </button>
         </div>
       </div>
