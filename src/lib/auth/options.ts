@@ -13,6 +13,7 @@ import { LOCKED_MESSAGE, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
 import { isIdleExpired, isTouchUpdate } from "@/lib/auth/idle";
+import { enforceSecondFactor } from "@/lib/mfa/loginGate";
 import { themeForRole } from "@/lib/theme";
 import { readSavedTheme } from "@/lib/themeStore";
 
@@ -24,6 +25,8 @@ const credentialsSchema = z.object({
   password: z.string().min(1).max(200),
   // Which sign-in portal was used. Required: every sign-in goes through the agency or the interpreter portal.
   portal: z.enum(["agency", "interpreter"]),
+  // The two-step verification code (or a recovery code), sent on the second submit of the sign-in form.
+  code: z.string().trim().max(40).optional(),
 });
 
 const MAX_FAILED_ATTEMPTS = 5;
@@ -65,11 +68,12 @@ export const authOptions: NextAuthOptions = {
         email: { label: "Email", type: "email" },
         password: { label: "Password", type: "password" },
         portal: { label: "Portal", type: "text" },
+        code: { label: "Code", type: "text" },
       },
       async authorize(credentials) {
         const parsed = credentialsSchema.safeParse(credentials);
         if (!parsed.success) return null;
-        const { email, password, portal } = parsed.data;
+        const { email, password, portal, code } = parsed.data;
 
         // Brute-force protection: checked before any password work, and by submitted email, so an
         // unknown address is locked exactly like a real one (no way to tell them apart).
@@ -100,6 +104,10 @@ export const authOptions: NextAuthOptions = {
           throw new Error(WRONG_PORTAL_MESSAGES[portal]);
         }
 
+        // Two-step verification (agency staff who turned it on in Settings): asked for after the password was right.
+        // Throws a displayable message to ask for the code or to refuse a wrong one; a login that never enrolled is unaffected.
+        const second = user.role === "agency" ? await enforceSecondFactor({ id: user.id, email }, code) : { method: null };
+
         // Link an interpreter login to its interpreters row (matched by email) so actions can scope data to it.
         let interpreterId: string | null = null;
         if (user.role === "interpreter") {
@@ -109,7 +117,7 @@ export const authOptions: NextAuthOptions = {
           interpreterId = linked?.id ?? null;
         }
 
-        await writeAuditLog({ userId: user.id, userEmail: email, action: "login_success", details: `role=${user.role}` });
+        await writeAuditLog({ userId: user.id, userEmail: email, action: "login_success", details: `role=${user.role}${second.method ? `; mfa=${second.method}` : ""}` });
 
         return { id: user.id, email: user.email, name: user.name, role: user.role, interpreterId };
       },

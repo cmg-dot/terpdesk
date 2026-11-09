@@ -16,7 +16,15 @@ export const WRONG_PORTAL_MESSAGES: Readonly<Record<AppRole, string>> = {
   interpreter: "This sign-in is for interpreters. Your account is an agency account: use the agency sign-in.",
 };
 
-export const DISPLAYABLE_AUTH_MESSAGES: readonly string[] = [LOCKED_MESSAGE, ...Object.values(WRONG_PORTAL_MESSAGES)];
+/**
+ * Two-step verification. Only ever thrown after the correct password, so none of them reveals anything about other accounts.
+ * REQUIRED is not an error: it is the sign-in asking for the code (the form then shows its code field).
+ */
+export const MFA_REQUIRED_MESSAGE = "Enter the 6-digit code from your authenticator app to finish signing in.";
+export const MFA_INVALID_MESSAGE = "That code didn't work. Check your authenticator app and try again, or use a recovery code.";
+export const MFA_UNAVAILABLE_MESSAGE = "Two-step verification is temporarily unavailable. Please try again shortly or contact your administrator.";
+
+export const DISPLAYABLE_AUTH_MESSAGES: readonly string[] = [LOCKED_MESSAGE, MFA_INVALID_MESSAGE, MFA_UNAVAILABLE_MESSAGE, ...Object.values(WRONG_PORTAL_MESSAGES)];
 
 /** Shown on the sign-in pages after an agency login was signed out for inactivity (?reason=idle). */
 export const IDLE_SIGNED_OUT_MESSAGE = "You were signed out after 30 minutes of inactivity for HIPAA security.";

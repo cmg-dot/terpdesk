@@ -1,5 +1,5 @@
 import { relations, sql } from 'drizzle-orm';
-import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index, date } from 'drizzle-orm/pg-core';
+import { pgTable, text, timestamp, jsonb, uuid, boolean, pgEnum, integer, smallint, numeric, uniqueIndex, varchar, index, date, bigint } from 'drizzle-orm/pg-core';
 
 export type HearingIdentity = 'deaf' | 'hard of hearing' | 'deafblind' | 'late_deafened' | 'other';
 export type Program = 'General' | 'WA ODHH' | 'WA Apple Health';
@@ -99,6 +99,32 @@ export const userPreferences = pgTable('user_preferences', {
   theme: varchar('theme', { length: 32 }).notNull().default('default'),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
+
+// Two-step verification (TOTP authenticator app), opt-in per agency login. Created by hand with
+// src/db/migrations/manual/0007_user_mfa.sql; a table of its own so nothing that reads `users` is affected.
+export const userMfa = pgTable('user_mfa', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  method: text('method').notNull().default('totp'),
+  // The shared secret, AES-256-GCM sealed by src/lib/mfa/secretCrypto.ts. Never plain text, never returned to a browser after enrolment.
+  secretEnc: text('secret_enc').notNull(),
+  // NULL while enrolment is started but unconfirmed: sign-in asks for a code only once this is set.
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  // The last accepted 30-second time step: a code works once.
+  lastUsedStep: bigint('last_used_step', { mode: 'number' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+});
+
+// One-time recovery codes for a lost phone. Only the SHA-256 hash is kept (the codes are 80 random bits).
+export const userRecoveryCodes = pgTable('user_recovery_codes', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  codeHash: text('code_hash').notNull(),
+  usedAt: timestamp('used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  userIdx: index('idx_user_recovery_codes_user_id').on(t.userId),
+}));
 
 // Security audit trail (logins, approvals, ...). `details` must never contain PHI.
 export const auditLogs = pgTable('audit_logs', {

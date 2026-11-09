@@ -12,11 +12,14 @@ import type { AppRole } from "@/lib/auth/routes";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { AgreementNotice } from "@/components/legal/LegalLinks";
 import { IdleNotice } from "@/components/auth/IdleNotice";
-import { DISPLAYABLE_AUTH_MESSAGES, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
+import { MfaCodeField } from "@/components/auth/MfaCodeField";
+import { DISPLAYABLE_AUTH_MESSAGES, MFA_REQUIRED_MESSAGE, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 
 const loginSchema = z.object({
  email: z.string().email({ message: "Please enter a valid email address" }),
  password: z.string().min(1, { message: "Password is required" }),
+ // Only used on the second step, for accounts with two-step verification on.
+ code: z.string().optional(),
 });
 
 type LoginFormValues = z.infer<typeof loginSchema>;
@@ -33,6 +36,9 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  setJustRegistered(params.get("registered") === "true");
  setVerifySent(params.get("verify") === "sent");
  }, []);
+ // Two-step verification: the form shows the code field once the server says this account needs one.
+ const [needsCode, setNeedsCode] = React.useState(false);
+ const [useRecovery, setUseRecovery] = React.useState(false);
  const [formError, setFormError] = React.useState<string | null>(() => {
  if (typeof window === "undefined") return null;
  return new URLSearchParams(window.location.search).get("error") === "forbidden"
@@ -42,19 +48,34 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  const {
  register,
  handleSubmit,
+ setValue,
+ setFocus,
  formState: { errors, isSubmitting },
  } = useForm<LoginFormValues>({
  resolver: zodResolver(loginSchema),
  defaultValues: {
  email: "",
  password: "",
+ code: "",
  },
  });
 
  const onSubmit = async (data: LoginFormValues) => {
  setFormError(null);
- const result = await signIn("credentials", { email: data.email, password: data.password, portal, redirect: false });
+ const code = needsCode ? data.code?.trim() : undefined;
+ if (needsCode && !code) {
+ setFormError("Enter your code to finish signing in.");
+ return;
+ }
+ const result = await signIn("credentials", { email: data.email, password: data.password, portal, code, redirect: false });
+ if (result?.error === MFA_REQUIRED_MESSAGE) {
+ // Right password, and this account has two-step verification on: ask for the code (the password stays in the form).
+ setNeedsCode(true);
+ setTimeout(() => setFocus("code"), 0);
+ return;
+ }
  if (!result || result.error) {
+ if (needsCode) setValue("code", "");
  // Only the lockout notice is shown verbatim; every other failure is one generic message
  // so the form never reveals whether an email exists.
  setFormError(
@@ -138,6 +159,19 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  )}
  </div>
 
+ {needsCode && (
+ <MfaCodeField
+ registration={register("code")}
+ recovery={useRecovery}
+ onToggleRecovery={() => {
+ setUseRecovery((v) => !v);
+ setValue("code", "");
+ setFormError(null);
+ }}
+ disabled={isSubmitting}
+ />
+ )}
+
  {formError && (
  <div role="alert" className="rounded-xl bg-red-50 px-4 py-2.5 text-xs text-red-700">
  <p>{formError}</p>
@@ -155,7 +189,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  disabled={isSubmitting}
  className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white transition-opacity hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)] disabled:opacity-50"
  >
- {isSubmitting ? "Signing in..." : "Sign in"}
+ {isSubmitting ? "Signing in..." : needsCode ? "Verify and sign in" : "Sign in"}
  </button>
  <AgreementNotice className="mt-3" />
  </div>

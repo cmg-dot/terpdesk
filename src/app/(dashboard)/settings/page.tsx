@@ -6,6 +6,7 @@ import React from "react";
 import { useSession } from "next-auth/react";
 import { ChangePasswordDialog } from "@/components/features/ChangePasswordDialog";
 import { ThemePicker } from "@/components/settings/ThemePicker";
+import { SecurityCard } from "@/components/settings/SecurityCard";
 
 export default function SettingsPage() {
  const { data: session } = useSession();
@@ -69,6 +70,9 @@ export default function SettingsPage() {
 
  <ChangePasswordDialog triggerClassName="bg-white border border-gray-200 text-gray-700 px-5 py-2.5 rounded-full text-sm font-medium hover:bg-gray-50 transition-colors" />
  </div>
+
+ {/* Two-step verification (opt-in; hidden when the server has MFA_ENABLED=false) */}
+ <SecurityCard />
 
  {/* Card 2: Notifications */}
  <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-6 border border-gray-200">

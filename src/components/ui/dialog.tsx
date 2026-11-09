@@ -62,7 +62,7 @@ export const DialogTrigger = ({ children, onClick, ...props }: ButtonHTMLAttribu
 /** Keeps a tall dialog inside a small laptop window: it scrolls instead of running off the screen. */
 const SCROLL_CLASSES = "max-h-[85vh] overflow-y-auto";
 
-export const DialogContent = ({ children, className = "" }: { children: ReactNode; className?: string }) => {
+export const DialogContent = ({ children, className = "", hideClose = false }: { children: ReactNode; className?: string; hideClose?: boolean }) => {
   const { open, setOpen, titleId, descriptionId } = useDialog();
   // A dialog that sets its own overflow (for example overflow-visible, so a popover can hang outside it) keeps it.
   const scrolls = !/(^|\s)overflow-/.test(className);
@@ -109,18 +109,21 @@ export const DialogContent = ({ children, className = "" }: { children: ReactNod
         aria-describedby={descriptionId}
         className={`relative w-full max-w-lg rounded-2xl border border-gray-100 bg-white p-6 shadow-xl sm:p-8 ${scrolls ? SCROLL_CLASSES : ""} ${className}`}
       >
-        <button
-          type="button"
-          data-dialog-close
-          onClick={() => setOpen(false)}
-          aria-label="Close"
-          className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
-        >
-          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M18 6 6 18" />
-            <path d="m6 6 12 12" />
-          </svg>
-        </button>
+        {/* `hideClose`: a dialog that must not be dismissed by accident (for example one-time recovery codes) has no X. */}
+        {!hideClose && (
+          <button
+            type="button"
+            data-dialog-close
+            onClick={() => setOpen(false)}
+            aria-label="Close"
+            className="absolute right-4 top-4 rounded-full p-1.5 text-gray-400 transition-colors hover:bg-gray-100 hover:text-gray-600"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M18 6 6 18" />
+              <path d="m6 6 12 12" />
+            </svg>
+          </button>
+        )}
         {children}
       </div>
     </div>,
