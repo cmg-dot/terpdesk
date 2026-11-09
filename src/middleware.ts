@@ -2,6 +2,7 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getAuthSecret } from "@/lib/auth/secret";
+import { idleLoginPath, isIdleExpired } from "@/lib/auth/idle";
 import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 
 /** Public entry pages a signed-in user has no reason to see (the portal chooser and both sign-in portals). */
@@ -14,7 +15,9 @@ export async function middleware(req: NextRequest) {
   if (!requiredRole && !isEntryPage) return NextResponse.next();
 
   const token = await getToken({ req, secret: getAuthSecret() });
-  const role = isAppRole(token?.role) ? token.role : null;
+  // An agency login idle past the limit counts as signed out everywhere, so the entry pages below do not bounce it back in.
+  const idle = isIdleExpired(token);
+  const role = !idle && isAppRole(token?.role) ? token.role : null;
 
   if (isEntryPage) {
     if (!role) return NextResponse.next();
@@ -34,6 +37,9 @@ export async function middleware(req: NextRequest) {
     // to their own workspace, never into the other one.
     return NextResponse.redirect(new URL(homePathForRole(role), req.url));
   }
+
+  // Idle sign-out: the agency sign-in with the reason, remembering where they were.
+  if (idle && requiredRole === "agency") return NextResponse.redirect(new URL(idleLoginPath(`${pathname}${search}`), req.url));
 
   // Not signed in: the sign-in portal for the area they were headed to, remembering where that was.
   const loginUrl = new URL(loginPathForRole(requiredRole), req.url);

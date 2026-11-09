@@ -12,6 +12,7 @@ import { ensureValidAuthUrl } from "@/lib/baseUrl";
 import { LOCKED_MESSAGE, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
+import { isIdleExpired, isTouchUpdate } from "@/lib/auth/idle";
 import { themeForRole } from "@/lib/theme";
 import { readSavedTheme } from "@/lib/themeStore";
 
@@ -115,13 +116,20 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async jwt({ token, user, trigger }) {
+    async jwt({ token, user, trigger, session }) {
+      // The browser's "still here" ping (update({ touch: true })): only moves the activity clock, no database work. A token
+      // that has already been idle past the limit is NOT revived by a late ping; it stays expired.
+      if (trigger === "update" && isTouchUpdate(session)) {
+        if (!isIdleExpired(token)) token.lastActivityAt = Date.now();
+        return token;
+      }
       // `user` is only present at sign-in; copy the fields the middleware and UI need into the token.
       if (user) {
         token.id = user.id;
         token.role = user.role;
         token.interpreterId = user.interpreterId ?? null;
         token.displayName = undefined;
+        token.lastActivityAt = Date.now();
       } else if (token.role === "interpreter" && !token.interpreterId && token.id) {
         // Not linked at sign-in. Re-check, so verifying the email link takes effect without signing in again.
         // (Costs one small query per request, and only until the profile is linked.)
@@ -136,6 +144,8 @@ export const authOptions: NextAuthOptions = {
         token.displayName = undefined;
         token.theme = undefined;
       }
+      // A token issued before idle tracking existed is stamped the first time it is re-issued (one-time, at deploy).
+      if (token.lastActivityAt === undefined) token.lastActivityAt = Date.now();
       // Looked up once, then carried in the token, so the very first paint already has the right name.
       if (token.displayName === undefined) token.displayName = await resolveDisplayName(token);
       // The saved workspace theme (agency staff only), carried the same way so the root layout needs no query of its own.
@@ -149,6 +159,8 @@ export const authOptions: NextAuthOptions = {
         session.user.interpreterId = token.interpreterId ?? null;
         session.user.displayName = token.displayName ?? token.name ?? "";
         session.user.theme = themeForRole(token.role, token.theme);
+        // Read by the server guards and the root layout: an idle agency login is signed out even though its cookie is still valid.
+        session.user.idleExpired = isIdleExpired(token);
       }
       return session;
     },

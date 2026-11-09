@@ -24,6 +24,7 @@ import { CountBadge } from "@/components/ui/CountBadge";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
 import { AgencySidebar } from "@/components/agency/AgencySidebar";
 import { MobileBrand } from "@/components/agency/SidebarBrand";
+import { IdleTimeoutGuard } from "@/components/auth/IdleTimeoutGuard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useSession } from "next-auth/react";
@@ -42,6 +43,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <RequestsProvider>
         {/* The page scrolls with the browser's own scrollbar (no inner scroll container); the sidebar stays put. */}
         <div className="flex min-h-screen bg-[var(--canvas)] font-sans text-slate-900">
+          <IdleTimeoutGuard />
           <AgencySidebar userName={userName} userEmail={userEmail} />
 
           {/* Main Content Area */}

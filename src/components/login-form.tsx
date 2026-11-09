@@ -11,6 +11,7 @@ import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } fro
 import type { AppRole } from "@/lib/auth/routes";
 import { PasswordInput } from "@/components/ui/PasswordInput";
 import { AgreementNotice } from "@/components/legal/LegalLinks";
+import { IdleNotice } from "@/components/auth/IdleNotice";
 import { DISPLAYABLE_AUTH_MESSAGES, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 
 const loginSchema = z.object({
@@ -91,6 +92,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
 
  return (
  <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+ <IdleNotice />
  {justRegistered && (
  <p role="status" className="rounded-xl bg-green-50 px-4 py-2.5 text-xs text-green-800">
  Account created successfully. Please log in.

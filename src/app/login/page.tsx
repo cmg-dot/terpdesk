@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Building2, UserRound } from "lucide-react";
 import { LoginShell } from "@/components/auth/LoginShell";
+import { IDLE_LOGIN_REASON } from "@/lib/auth/idle";
 import { loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 
 export const metadata: Metadata = { title: "Sign in | terpDESK" };
@@ -27,6 +28,8 @@ export default function LoginChooserPage({ searchParams }: { searchParams: Searc
   const callbackRole = callback?.startsWith("/") && !callback.startsWith("//") ? requiredRoleForPath(callback.split("?")[0]) : null;
   if (callbackRole) redirect(`${loginPathForRole(callbackRole)}${qs}`);
   if (first(searchParams.registered) === "true") redirect(`${loginPathForRole("interpreter")}${qs}`);
+  // Idle sign-out only ever applies to agency staff, so /login?reason=idle goes to the agency sign-in, notice included.
+  if (first(searchParams.reason) === IDLE_LOGIN_REASON) redirect(`${loginPathForRole("agency")}${qs}`);
 
   const option = "flex items-center gap-4 rounded-2xl border border-neutral-200 p-4 transition-colors hover:border-[var(--forest)] hover:bg-neutral-50";
   return (

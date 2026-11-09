@@ -29,7 +29,9 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   // Resolved on the server and handed to the client provider, so useSession() has data on first paint.
-  const session = await getServerSession(authOptions);
+  const stored = await getServerSession(authOptions);
+  // An agency login idle past the limit is signed out: nothing of it (name, theme) reaches the page.
+  const session = stored?.user?.idleExpired ? null : stored;
 
   return (
     <html lang="en" data-theme={themeForRole(session?.user?.role, session?.user?.theme)}>

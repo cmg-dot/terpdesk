@@ -16,6 +16,8 @@ export const FORBIDDEN = "Forbidden";
 export async function requireSession(): Promise<Session> {
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) throw new Error(UNAUTHORIZED);
+  // An agency login idle past the limit is signed out, even though its cookie has not expired yet.
+  if (session.user.idleExpired) throw new Error(UNAUTHORIZED);
   return session;
 }
 

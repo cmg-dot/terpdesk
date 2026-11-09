@@ -19,6 +19,8 @@ declare module "next-auth" {
       displayName: string;
       /** The workspace theme: the saved choice for agency staff, always "default" for interpreters. Refreshed by `update()`. */
       theme: ThemeId;
+      /** True when this agency login has been idle past the limit (see lib/auth/idle.ts). Always false for interpreters. */
+      idleExpired: boolean;
     } & DefaultSession["user"];
   }
 }
@@ -32,5 +34,7 @@ declare module "next-auth/jwt" {
     displayName?: string;
     /** Cached saved theme (agency only); undefined means "look it up". */
     theme?: ThemeId;
+    /** ms since 1970 of the last activity the browser reported (sign-in, or an update({ touch: true }) ping). */
+    lastActivityAt?: number;
   }
 }

@@ -18,6 +18,9 @@ export const WRONG_PORTAL_MESSAGES: Readonly<Record<AppRole, string>> = {
 
 export const DISPLAYABLE_AUTH_MESSAGES: readonly string[] = [LOCKED_MESSAGE, ...Object.values(WRONG_PORTAL_MESSAGES)];
 
+/** Shown on the sign-in pages after an agency login was signed out for inactivity (?reason=idle). */
+export const IDLE_SIGNED_OUT_MESSAGE = "You were signed out after 30 minutes of inactivity for HIPAA security.";
+
 /** The sign-out confirmation (the modal and the /signout page). */
 export const SIGN_OUT_TITLE = "Sign out of terpDESK?";
 export const SIGN_OUT_TEXT = "You will need to sign in again to see your workspace.";
