@@ -8,7 +8,7 @@ import type { SignInGate } from "@/lib/mfa/secondFactor";
  * Returns which factor was used (null when none was needed) or throws one of the displayable messages. A wrong code is written as
  * `login_failed`, the row the existing lockout counts, so guessing codes runs into the same 5-in-15-minutes limit as guessing passwords.
  */
-export async function enforceSecondFactor(user: { id: string; email: string }, code: string | undefined): Promise<{ method: "totp" | "recovery" | null }> {
+export async function enforceSecondFactor(user: { id: string; email: string }, code: string | undefined): Promise<{ method: "totp" | "recovery" | null; deviceId?: string }> {
   let gate: SignInGate;
   try {
     gate = await evaluateSignIn(user.id, code);
@@ -38,6 +38,6 @@ export async function enforceSecondFactor(user: { id: string; email: string }, c
       if (gate.method === "recovery") {
         await writeAuditLog({ userId: user.id, userEmail: user.email, action: "mfa_recovery_used", details: `recovery codes left=${gate.recoveryLeft ?? 0}` });
       }
-      return { method: gate.method };
+      return { method: gate.method, deviceId: gate.deviceId };
   }
 }

@@ -1,7 +1,7 @@
 import { db } from "@/db";
 import { mfaFeatureEnabled, mfaKey } from "@/lib/mfa/config";
-import { claimStep, consumeRecoveryCode, countRecoveryCodesLeft, getMfa } from "@/lib/mfa/mfaStore";
-import type { Executor, MfaRow } from "@/lib/mfa/mfaStore";
+import { claimStep, consumeRecoveryCode, countRecoveryCodesLeft, listConfirmedDevices } from "@/lib/mfa/mfaStore";
+import type { Executor, MfaDevice } from "@/lib/mfa/mfaStore";
 import { hashRecoveryCode, looksLikeRecoveryCode } from "@/lib/mfa/recoveryCodes";
 import { openSecret } from "@/lib/mfa/secretCrypto";
 import { checkTotp } from "@/lib/mfa/totp";
@@ -13,20 +13,38 @@ import { checkTotp } from "@/lib/mfa/totp";
  */
 
 export type CodeCheck =
-  | { ok: true; method: "totp" | "recovery"; recoveryLeft?: number }
+  | { ok: true; method: "totp" | "recovery"; recoveryLeft?: number; deviceId?: string; deviceLabel?: string }
   | { ok: false; reason: "invalid" | "replayed" | "unavailable" };
 
-/** Checks one typed code against an enrolled, confirmed authenticator. Never throws for a bad code. */
-export async function checkCode(userId: string, row: MfaRow, input: string, exec: Executor = db): Promise<CodeCheck> {
+/**
+ * Tries a 6-digit code against each of the login's confirmed devices (most recently used first) and stops at the first that
+ * accepts it. Each device has its own secret and its own single-use counter. A device whose secret cannot be opened is skipped; the
+ * result is "unavailable" only when NO device could be read (then a code cannot be judged, and the login is refused).
+ */
+async function checkAuthenticatorCode(userId: string, devices: MfaDevice[], code: string, exec: Executor): Promise<CodeCheck> {
+  let unreadable = 0;
+  let replayed = false;
+  for (const device of devices) {
+    const secret = openSecret(device.secretEnc, userId);
+    if (secret === null) {
+      unreadable += 1;
+      continue;
+    }
+    const result = await checkTotp(secret, code);
+    if (!result.ok) continue;
+    if (await claimStep(userId, device.id, result.step, exec)) return { ok: true, method: "totp", deviceId: device.id, deviceLabel: device.label };
+    replayed = true; // right code, but this device's time step (or a later one) was already used: keep looking, then say so
+  }
+  if (replayed) return { ok: false, reason: "replayed" };
+  return { ok: false, reason: unreadable === devices.length ? "unavailable" : "invalid" };
+}
+
+/** Checks one typed code against the login's confirmed authenticators or its recovery codes. Never throws for a bad code. */
+export async function checkCode(userId: string, devices: MfaDevice[], input: string, exec: Executor = db): Promise<CodeCheck> {
   const typed = input.trim();
   if (/^\d{6}$/.test(typed.replace(/\s/g, ""))) {
-    const secret = openSecret(row.secretEnc, userId);
-    if (secret === null) return { ok: false, reason: "unavailable" };
-    const result = await checkTotp(secret, typed.replace(/\s/g, ""));
-    if (!result.ok) return { ok: false, reason: "invalid" };
-    // The code is right but its time step (or a later one) was already used: say so, so the person waits for the next code
-    // instead of retyping the same one. (A wrong code is "invalid", above.)
-    return (await claimStep(userId, result.step, exec)) ? { ok: true, method: "totp" } : { ok: false, reason: "replayed" };
+    // A right code whose time step was already used is "replayed" (so the person waits for the next one); a wrong code is "invalid".
+    return checkAuthenticatorCode(userId, devices, typed.replace(/\s/g, ""), exec);
   }
   if (looksLikeRecoveryCode(typed)) {
     if (!(await consumeRecoveryCode(userId, hashRecoveryCode(typed), exec))) return { ok: false, reason: "invalid" };
@@ -40,7 +58,7 @@ export type SignInGate =
   | { kind: "not_enrolled" }
   | { kind: "skipped_flag_off" }
   | { kind: "required" }
-  | { kind: "ok"; method: "totp" | "recovery"; recoveryLeft?: number }
+  | { kind: "ok"; method: "totp" | "recovery"; recoveryLeft?: number; deviceId?: string }
   | { kind: "invalid" }
   | { kind: "replayed" }
   | { kind: "unavailable" };
@@ -50,12 +68,12 @@ export type SignInGate =
  * unaffected. One that did is asked for a code; if the code cannot be checked (no key, unreadable secret) it is refused, never let in.
  */
 export async function evaluateSignIn(userId: string, code: string | undefined, exec: Executor = db): Promise<SignInGate> {
-  const row = await getMfa(userId, exec);
-  if (!row || !row.confirmedAt) return { kind: "not_enrolled" };
+  const devices = await listConfirmedDevices(userId, exec);
+  if (devices.length === 0) return { kind: "not_enrolled" };
   if (!mfaFeatureEnabled()) return { kind: "skipped_flag_off" };
   if (!mfaKey()) return { kind: "unavailable" };
   if (!code || !code.trim()) return { kind: "required" };
-  const result = await checkCode(userId, row, code, exec);
-  if (result.ok) return { kind: "ok", method: result.method, recoveryLeft: result.recoveryLeft };
+  const result = await checkCode(userId, devices, code, exec);
+  if (result.ok) return { kind: "ok", method: result.method, recoveryLeft: result.recoveryLeft, deviceId: result.deviceId };
   return { kind: result.reason };
 }

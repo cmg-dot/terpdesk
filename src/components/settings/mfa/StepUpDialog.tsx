@@ -12,6 +12,8 @@ interface StepUpDialogProps {
   confirmLabel: string;
   /** Styles the confirm button as destructive (turning two-step off). */
   danger?: boolean;
+  /** When set, a circular checkbox with this wording must be ticked before the confirm button turns on (destructive changes). */
+  acknowledgement?: string;
   onClose: () => void;
   /** Resolves to an error message, or null when it worked (the caller then closes the dialog). */
   onSubmit: (password: string, code: string) => Promise<string | null>;
@@ -21,16 +23,19 @@ const INPUT = "w-full rounded-full border-none bg-[#F4F3EF] px-5 py-2.5 text-sm 
 const LABEL = "mb-2 ml-2 block text-[12px] font-medium text-[var(--sage)]";
 
 /** Re-confirms a change to two-step verification with the current password and a current code (or recovery code). */
-export const StepUpDialog = ({ open, title, description, confirmLabel, danger, onClose, onSubmit }: StepUpDialogProps) => {
+export const StepUpDialog = ({ open, title, description, confirmLabel, danger, acknowledgement, onClose, onSubmit }: StepUpDialogProps) => {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
+  const [acknowledged, setAcknowledged] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const blocked = Boolean(acknowledgement) && !acknowledged;
 
   const reset = () => {
     // Never keep a password or code in state once the dialog is dismissed.
     setPassword("");
     setCode("");
+    setAcknowledged(false);
     setError(null);
   };
   const close = (next: boolean) => {
@@ -41,7 +46,7 @@ export const StepUpDialog = ({ open, title, description, confirmLabel, danger, o
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
-    if (pending || !password || !code.trim()) return;
+    if (pending || blocked || !password || !code.trim()) return;
     setPending(true);
     setError(null);
     try {
@@ -77,6 +82,19 @@ export const StepUpDialog = ({ open, title, description, confirmLabel, danger, o
               </label>
               <input id="mfa-stepup-code" value={code} onChange={(e) => setCode(e.target.value)} autoComplete="one-time-code" spellCheck={false} maxLength={40} disabled={pending} className={INPUT} />
             </div>
+            {acknowledgement && (
+              <label className="flex cursor-pointer items-start gap-3 text-sm text-gray-700">
+                <input
+                  type="checkbox"
+                  checked={acknowledged}
+                  onChange={(e) => setAcknowledged(e.target.checked)}
+                  disabled={pending}
+                  data-mfa-ack
+                  className="mt-0.5 h-5 w-5 shrink-0 cursor-pointer appearance-none rounded-full border-2 border-gray-300 checked:border-red-700 checked:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-300"
+                />
+                {acknowledgement}
+              </label>
+            )}
             {error && (
               <p role="alert" className="rounded-xl bg-red-50 px-4 py-2.5 text-xs text-red-700">
                 {error}
@@ -89,7 +107,7 @@ export const StepUpDialog = ({ open, title, description, confirmLabel, danger, o
             </button>
             <button
               type="submit"
-              disabled={pending || !password || !code.trim()}
+              disabled={pending || blocked || !password || !code.trim()}
               className={`w-full rounded-full px-6 py-2.5 text-sm font-medium text-white disabled:opacity-50 sm:w-auto ${danger ? "bg-red-700 hover:bg-red-800" : "bg-[var(--forest)] hover:bg-[var(--forest-hover)]"}`}
             >
               {pending ? "Checking…" : confirmLabel}

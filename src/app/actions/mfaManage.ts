@@ -1,14 +1,11 @@
 "use server";
 
-import { requireRole } from "@/lib/auth/guards";
 import { writeAuditLog } from "@/lib/audit";
-import { mfaConfigured, mfaFeatureEnabled } from "@/lib/mfa/config";
+import { confirmedCaller } from "@/lib/mfa/caller";
 import { removeMfa, replaceRecoveryCodes } from "@/lib/mfa/mfaStore";
 import { formatRecoveryCode, generateRecoveryCodes, hashRecoveryCode } from "@/lib/mfa/recoveryCodes";
-import { confirmWithPasswordAndCode } from "@/lib/mfa/stepUp";
 import type { DisableResult, RecoveryCodesResult } from "@/lib/mfa/types";
 import { sendMfaChangedEmail } from "@/lib/mfaEmail";
-import { stepUpSchema } from "@/lib/validation/mfa";
 import type { StepUpInput } from "@/lib/validation/mfa";
 
 /**
@@ -16,27 +13,7 @@ import type { StepUpInput } from "@/lib/validation/mfa";
  * unlocked, borrowed laptop cannot weaken the account. Agency logins only; every row is the caller's own (id from the session).
  */
 
-const SIGNED_IN_ONLY = "You need to be signed in as agency staff to do this.";
-
-type Caller = { id: string; email: string };
-
-async function confirmedCaller(input: StepUpInput): Promise<{ caller: Caller } | { error: string }> {
-  let caller: Caller;
-  try {
-    const session = await requireRole("agency");
-    if (!session.user.email) throw new Error("no email");
-    caller = { id: session.user.id, email: session.user.email };
-  } catch {
-    return { error: SIGNED_IN_ONLY };
-  }
-  const parsed = stepUpSchema.safeParse(input);
-  if (!parsed.success) return { error: parsed.error.issues[0]?.message ?? "Enter your password and a code." };
-  if (!mfaFeatureEnabled() || !mfaConfigured()) return { error: "Two-step verification is not available right now." };
-  const confirmed = await confirmWithPasswordAndCode({ userId: caller.id, email: caller.email, password: parsed.data.password, code: parsed.data.code });
-  return confirmed.ok ? { caller } : { error: confirmed.error };
-}
-
-/** Turns two-step verification off: the authenticator and all recovery codes are deleted. */
+/** Turns two-step verification off: every authenticator device and all recovery codes are deleted. Also how the LAST device is removed. */
 export async function disableMfa(input: StepUpInput): Promise<DisableResult> {
   try {
     const checked = await confirmedCaller(input);

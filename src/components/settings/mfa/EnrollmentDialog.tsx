@@ -5,11 +5,21 @@ import type { FormEvent } from "react";
 import { confirmMfaEnrollment, startMfaEnrollment } from "@/app/actions/mfaEnrollment";
 import { RecoveryCodesPanel } from "@/components/settings/mfa/RecoveryCodesPanel";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { DEVICE_LABEL_MAX } from "@/lib/validation/mfa";
+
+export interface StartedEnrollment {
+  qrDataUrl: string;
+  manualKey: string;
+}
 
 interface EnrollmentDialogProps {
   open: boolean;
+  /** A setup already started (adding a later device: the password and a code were checked first). Null = start one here (the first device). */
+  started: StartedEnrollment | null;
+  /** What the name field starts as. */
+  defaultLabel: string;
   onClose: () => void;
-  /** Called once the recovery codes have been saved and the dialog is done. */
+  /** Called once the device is added (and, for the first device, its recovery codes have been saved). */
   onEnrolled: () => void;
 }
 
@@ -25,9 +35,10 @@ const INPUT = "w-full rounded-full border-none bg-[#F4F3EF] px-5 py-2.5 text-cen
  * Turning two-step verification on: scan the QR code, type the first code to prove the app is set up, then save the recovery codes.
  * Until the first code is accepted nothing changes for the account, so closing this part way through is harmless.
  */
-export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialogProps) => {
+export const EnrollmentDialog = ({ open, started, defaultLabel, onClose, onEnrolled }: EnrollmentDialogProps) => {
   const [step, setStep] = useState<Step>({ name: "starting" });
   const [code, setCode] = useState("");
+  const [label, setLabel] = useState(defaultLabel);
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
 
@@ -35,9 +46,14 @@ export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialog
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setStep({ name: "starting" });
     setCode("");
+    setLabel(defaultLabel);
     setError(null);
+    if (started) {
+      setStep({ name: "scan", qrDataUrl: started.qrDataUrl, manualKey: started.manualKey });
+      return;
+    }
+    setStep({ name: "starting" });
     startMfaEnrollment()
       .then((result) => {
         if (cancelled) return;
@@ -47,7 +63,8 @@ export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialog
     return () => {
       cancelled = true;
     };
-  }, [open]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a fresh setup per opening; defaultLabel only seeds the field
+  }, [open, started]);
 
   const close = (next: boolean) => {
     if (next || pending) return;
@@ -61,9 +78,10 @@ export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialog
     setPending(true);
     setError(null);
     try {
-      const result = await confirmMfaEnrollment({ code });
-      if (result.success) setStep({ name: "codes", codes: result.recoveryCodes });
-      else setError(result.error);
+      const result = await confirmMfaEnrollment({ code, label });
+      if (!result.success) setError(result.error);
+      else if (result.recoveryCodes) setStep({ name: "codes", codes: result.recoveryCodes });
+      else onEnrolled(); // a later device: the recovery codes already exist and are not shown again
     } catch {
       setError("Something went wrong. Please try again.");
     } finally {
@@ -76,11 +94,13 @@ export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialog
     <Dialog open={open} onOpenChange={close}>
       <DialogContent className="max-w-lg" hideClose={step.name === "codes"}>
         <DialogHeader>
-          <DialogTitle>{step.name === "codes" ? "Save your recovery codes" : "Turn on two-step verification"}</DialogTitle>
+          <DialogTitle>{step.name === "codes" ? "Save your recovery codes" : started ? "Add another device" : "Turn on two-step verification"}</DialogTitle>
           <DialogDescription>
             {step.name === "codes"
               ? "Two-step verification is now on. One last step."
-              : "You will enter a 6-digit code from an authenticator app each time you sign in."}
+              : started
+                ? "Any of your devices can then give the code when you sign in."
+                : "You will enter a 6-digit code from an authenticator app each time you sign in."}
           </DialogDescription>
         </DialogHeader>
 
@@ -120,8 +140,23 @@ export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialog
                 </div>
               </li>
               <li>
+                <label htmlFor="mfa-enroll-label" className="font-medium text-gray-900">
+                  3. Name this device
+                </label>
+                <input
+                  id="mfa-enroll-label"
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                  maxLength={DEVICE_LABEL_MAX}
+                  autoComplete="off"
+                  disabled={pending}
+                  placeholder="Work phone"
+                  className="mt-2 w-full rounded-full border-none bg-[#F4F3EF] px-5 py-2.5 text-sm text-gray-800 outline-none focus:ring-2 focus:ring-[var(--forest)]"
+                />
+              </li>
+              <li>
                 <label htmlFor="mfa-enroll-code" className="font-medium text-gray-900">
-                  3. Enter the 6-digit code it shows
+                  4. Enter the 6-digit code it shows
                 </label>
                 <input
                   id="mfa-enroll-code"
@@ -148,7 +183,7 @@ export const EnrollmentDialog = ({ open, onClose, onEnrolled }: EnrollmentDialog
                 disabled={pending || code.replace(/\s/g, "").length !== 6}
                 className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:opacity-50"
               >
-                {pending ? "Checking…" : "Verify and turn on"}
+                {pending ? "Checking…" : started ? "Verify and add device" : "Verify and turn on"}
               </button>
             </div>
           </form>

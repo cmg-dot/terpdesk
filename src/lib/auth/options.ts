@@ -112,7 +112,7 @@ export const authOptions: NextAuthOptions = {
 
         // Two-step verification (agency staff who turned it on in Settings): asked for after the password was right.
         // Throws a displayable message to ask for the code or to refuse a wrong one; a login that never enrolled is unaffected.
-        const second = user.role === "agency" ? await enforceSecondFactor({ id: user.id, email }, code) : { method: null };
+        const second: { method: "totp" | "recovery" | null; deviceId?: string } = user.role === "agency" ? await enforceSecondFactor({ id: user.id, email }, code) : { method: null };
 
         // Link an interpreter login to its interpreters row (matched by email) so actions can scope data to it.
         let interpreterId: string | null = null;
@@ -123,7 +123,7 @@ export const authOptions: NextAuthOptions = {
           interpreterId = linked?.id ?? null;
         }
 
-        await writeAuditLog({ userId: user.id, userEmail: email, action: "login_success", details: `role=${user.role}${second.method ? `; mfa=${second.method}` : ""}` });
+        await writeAuditLog({ userId: user.id, userEmail: email, action: "login_success", details: `role=${user.role}${second.method ? `; mfa=${second.method}` : ""}${second.deviceId ? `; device=${second.deviceId}` : ""}` });
 
         return { id: user.id, email: user.email, name: user.name, role: user.role, interpreterId };
       },

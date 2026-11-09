@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { LOCKED_MESSAGE } from "@/lib/auth/messages";
 import { recordMfaFailure, tooManyMfaAttempts } from "@/lib/mfa/attempts";
-import { getMfa } from "@/lib/mfa/mfaStore";
+import { listConfirmedDevices } from "@/lib/mfa/mfaStore";
 import { checkCode } from "@/lib/mfa/secondFactor";
 
 /**
@@ -22,9 +22,9 @@ export async function confirmWithPasswordAndCode(p: { userId: string; email: str
   if (await tooManyMfaAttempts(p.email)) return { ok: false, error: LOCKED_MESSAGE };
   const [user] = await db.select({ passwordHash: users.passwordHash }).from(users).where(eq(users.id, p.userId)).limit(1);
   const passwordOk = await bcrypt.compare(p.password, user?.passwordHash ?? DUMMY_HASH);
-  const row = passwordOk ? await getMfa(p.userId) : null;
-  // The code is only spent (a code works once) when the password was right.
-  const codeOk = row?.confirmedAt ? (await checkCode(p.userId, row, p.code)).ok : false;
+  const devices = passwordOk ? await listConfirmedDevices(p.userId) : [];
+  // The code is only spent (a code works once) when the password was right. Any of the login's devices (or a recovery code) will do.
+  const codeOk = devices.length > 0 ? (await checkCode(p.userId, devices, p.code)).ok : false;
   if (!passwordOk || !codeOk) {
     await recordMfaFailure(p.userId, p.email, "mfa_stepup_failed");
     return { ok: false, error: STEP_UP_FAILED_MESSAGE };

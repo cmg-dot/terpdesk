@@ -115,6 +115,30 @@ export const userMfa = pgTable('user_mfa', {
   updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
 });
 
+// Several authenticator devices per login (src/db/migrations/manual/0008_user_mfa_devices.sql). The single source of truth: two-step
+// verification is on for a login if and only if it has a confirmed row here. `userMfa` above is the legacy one-per-login table, kept
+// only so turning two-step off can clear it and so the backfill stays safe to re-run; sign-in and Settings no longer read it.
+export const userMfaDevices = pgTable('user_mfa_devices', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  label: varchar('label', { length: 100 }).notNull().default('Primary authenticator'),
+  method: text('method').notNull().default('totp'),
+  // AES-256-GCM sealed by src/lib/mfa/secretCrypto.ts, bound to the user id. Never plain text, never returned to a browser.
+  secretEnc: text('secret_enc').notNull(),
+  // NULL while enrolment is started but unconfirmed: sign-in never asks for a code from an unconfirmed device.
+  confirmedAt: timestamp('confirmed_at', { withTimezone: true }),
+  // The last accepted 30-second step for THIS device (each device has its own secret): a code works once.
+  lastUsedStep: bigint('last_used_step', { mode: 'number' }),
+  // Set in the same UPDATE that claims the step. NULL = never used since it was added.
+  lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  userIdx: index('user_mfa_devices_user_idx').on(t.userId),
+  // At most one unfinished enrolment per login.
+  onePending: uniqueIndex('user_mfa_devices_one_pending_idx').on(t.userId).where(sql`${t.confirmedAt} IS NULL`),
+}));
+
 // One-time recovery codes for a lost phone. Only the SHA-256 hash is kept (the codes are 80 random bits).
 export const userRecoveryCodes = pgTable('user_recovery_codes', {
   id: uuid('id').defaultRandom().primaryKey(),
