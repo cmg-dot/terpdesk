@@ -25,8 +25,14 @@ const credentialsSchema = z.object({
   password: z.string().min(1).max(200),
   // Which sign-in portal was used. Required: every sign-in goes through the agency or the interpreter portal.
   portal: z.enum(["agency", "interpreter"]),
-  // The two-step verification code (or a recovery code), sent on the second submit of the sign-in form.
-  code: z.string().trim().max(40).optional(),
+  // The two-step verification code (or a recovery code), sent on the second submit of the sign-in form. Empty, or the text
+  // "undefined" / "null" (what a client library makes of a missing value), means no code was sent.
+  code: z
+    .string()
+    .trim()
+    .max(40)
+    .optional()
+    .transform((value) => (value && value !== "undefined" && value !== "null" ? value : undefined)),
 });
 
 const MAX_FAILED_ATTEMPTS = 5;

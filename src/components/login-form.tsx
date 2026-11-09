@@ -67,7 +67,9 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  setFormError("Enter your code to finish signing in.");
  return;
  }
- const result = await signIn("credentials", { email: data.email, password: data.password, portal, code, redirect: false });
+ // The `code` key is left out entirely on the first step: NextAuth sends its options through URLSearchParams, which would turn
+ // `code: undefined` into the text "undefined", and the server would take that for a (wrong) typed code.
+ const result = await signIn("credentials", { email: data.email, password: data.password, portal, redirect: false, ...(code ? { code } : {}) });
  if (result?.error === MFA_REQUIRED_MESSAGE) {
  // Right password, and this account has two-step verification on: ask for the code (the password stays in the form).
  setNeedsCode(true);
