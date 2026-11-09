@@ -14,7 +14,7 @@ import { checkTotp } from "@/lib/mfa/totp";
 
 export type CodeCheck =
   | { ok: true; method: "totp" | "recovery"; recoveryLeft?: number }
-  | { ok: false; reason: "invalid" | "unavailable" };
+  | { ok: false; reason: "invalid" | "replayed" | "unavailable" };
 
 /** Checks one typed code against an enrolled, confirmed authenticator. Never throws for a bad code. */
 export async function checkCode(userId: string, row: MfaRow, input: string, exec: Executor = db): Promise<CodeCheck> {
@@ -24,7 +24,9 @@ export async function checkCode(userId: string, row: MfaRow, input: string, exec
     if (secret === null) return { ok: false, reason: "unavailable" };
     const result = await checkTotp(secret, typed.replace(/\s/g, ""));
     if (!result.ok) return { ok: false, reason: "invalid" };
-    return (await claimStep(userId, result.step, exec)) ? { ok: true, method: "totp" } : { ok: false, reason: "invalid" };
+    // The code is right but its time step (or a later one) was already used: say so, so the person waits for the next code
+    // instead of retyping the same one. (A wrong code is "invalid", above.)
+    return (await claimStep(userId, result.step, exec)) ? { ok: true, method: "totp" } : { ok: false, reason: "replayed" };
   }
   if (looksLikeRecoveryCode(typed)) {
     if (!(await consumeRecoveryCode(userId, hashRecoveryCode(typed), exec))) return { ok: false, reason: "invalid" };
@@ -40,6 +42,7 @@ export type SignInGate =
   | { kind: "required" }
   | { kind: "ok"; method: "totp" | "recovery"; recoveryLeft?: number }
   | { kind: "invalid" }
+  | { kind: "replayed" }
   | { kind: "unavailable" };
 
 /**

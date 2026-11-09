@@ -1,5 +1,5 @@
 import { writeAuditLog } from "@/lib/audit";
-import { MFA_INVALID_MESSAGE, MFA_REQUIRED_MESSAGE, MFA_UNAVAILABLE_MESSAGE } from "@/lib/auth/messages";
+import { MFA_INVALID_MESSAGE, MFA_REPLAYED_MESSAGE, MFA_REQUIRED_MESSAGE, MFA_UNAVAILABLE_MESSAGE } from "@/lib/auth/messages";
 import { evaluateSignIn } from "@/lib/mfa/secondFactor";
 import type { SignInGate } from "@/lib/mfa/secondFactor";
 
@@ -27,6 +27,10 @@ export async function enforceSecondFactor(user: { id: string; email: string }, c
     case "invalid":
       await writeAuditLog({ userId: user.id, userEmail: user.email, action: "login_failed", details: "invalid two-step code" });
       throw new Error(MFA_INVALID_MESSAGE);
+    case "replayed":
+      // Still a failed attempt (it counts toward the lockout), but the person is told why, so they wait for the next code.
+      await writeAuditLog({ userId: user.id, userEmail: user.email, action: "login_failed", details: "reused two-step code" });
+      throw new Error(MFA_REPLAYED_MESSAGE);
     case "unavailable":
       await writeAuditLog({ userId: user.id, userEmail: user.email, action: "mfa_unavailable", details: "second factor could not be checked" });
       throw new Error(MFA_UNAVAILABLE_MESSAGE);

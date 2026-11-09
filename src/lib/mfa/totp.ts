@@ -8,6 +8,12 @@ import { MFA_ISSUER } from "@/lib/mfa/config";
 
 const PERIOD_SECONDS = 30;
 const DIGITS = 6;
+/**
+ * Clock drift allowed on a phone that is not time-synced: one 30-second step either side of the current one. A code is accepted
+ * if it belongs to the previous, the current or the next step (a 90-second span in all). The library has no `window` option;
+ * its equivalent is `epochTolerance`, in seconds, which is this many steps times the period.
+ */
+export const TOTP_DRIFT_STEPS = 1;
 
 /** A new base32 shared secret (160 bits). */
 export const newTotpSecret = (): string => generateSecret();
@@ -22,14 +28,14 @@ export const groupSecret = (secret: string): string => (secret.match(/.{1,4}/g) 
 export type TotpCheck = { ok: true; step: number } | { ok: false };
 
 /**
- * Checks a 6-digit code against a secret, allowing one 30-second step either side for clock drift. `step` is the time step the
- * code belongs to; the caller records it so the same code cannot be used twice. `nowMs` exists for tests.
+ * Checks a 6-digit code against a secret, allowing TOTP_DRIFT_STEPS (one 30-second step) either side for clock drift. Used for BOTH
+ * signing in and confirming enrolment in Settings, so they can never disagree. `step` is the time step the code belongs to; the caller records it so the same code cannot be used twice. `nowMs` exists for tests.
  */
 export async function checkTotp(secret: string, token: string, nowMs: number = Date.now()): Promise<TotpCheck> {
   if (!/^\d{6}$/.test(token)) return { ok: false };
   try {
     const nowSec = Math.floor(nowMs / 1000);
-    const result = await verify({ secret, token, algorithm: "sha1", digits: DIGITS, period: PERIOD_SECONDS, epoch: nowSec, epochTolerance: PERIOD_SECONDS });
+    const result = await verify({ secret, token, algorithm: "sha1", digits: DIGITS, period: PERIOD_SECONDS, epoch: nowSec, epochTolerance: TOTP_DRIFT_STEPS * PERIOD_SECONDS });
     // `delta` is how many steps from the current one the code matched (0, or -1 / +1 for a drifting clock).
     return result.valid ? { ok: true, step: Math.floor(nowSec / PERIOD_SECONDS) + result.delta } : { ok: false };
   } catch {
