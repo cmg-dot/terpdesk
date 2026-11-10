@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { MileageApprovalField } from "@/components/features/MileageApprovalField";
+import { CLOSED_JOB_LABEL } from "@/lib/closedJob";
 import type { ReviewActionsState } from "@/hooks/useReviewActions";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
@@ -13,6 +14,13 @@ const SECONDARY = "w-full sm:w-auto bg-white border border-gray-300 text-gray-70
  */
 export function ReviewActions({ record, review }: { record: ServiceRecord; review: ReviewActionsState }) {
   const correctionId = useId();
+  if (record.jobClosed) {
+    return (
+      <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700" data-closed-job-note>
+        This job was {CLOSED_JOB_LABEL[record.jobClosed].toLowerCase()}, so these hours are kept for the record but cannot be approved or sent back for correction.
+      </p>
+    );
+  }
   if (record.state !== 'submitted' && record.state !== 'awaiting_review') return null;
   return (
     <div className="bg-[#F5F4F0] p-4 md:p-5 rounded-xl">

@@ -3,6 +3,8 @@ import { getIanaZone } from "@/utils/timezone";
 import { requestReference } from "@/utils/statusEngine";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { closedJobKind } from "@/lib/closedJob";
+import type { ClosedJobKind } from "@/lib/closedJob";
 import { isPlainSingle, positionOrdinal, readPositions } from "@/lib/positions";
 
 export interface ServiceRecord {
@@ -37,6 +39,8 @@ export interface ServiceRecord {
   /** Set when the record comes from a magic-link timesheet submission. */
   timesheetId?: string;
   signatureDataUrl?: string | null;
+  /** Set when the job was voided, returned or cancelled: its hours are kept for the record but are not work to review. */
+  jobClosed?: ClosedJobKind;
   /** Set only when the Verification PDF can be downloaded for this record: a non-state job with hours submitted. The position's stable id. */
   pdfPosition?: number;
   cancellationReason?: string | null;
@@ -45,9 +49,9 @@ export interface ServiceRecord {
   travelLegs?: { fromLabel: string; toLabel: string; miles: number; roundTrip: boolean; countedMiles?: number }[];
 }
 
-/** The single definition of "awaiting review", shared by the dashboard metric and the review panel. */
+/** The single definition of "awaiting review", shared by the dashboard metric and the review panel. A closed job never awaits review. */
 export const isAwaitingReview = (record: ServiceRecord): boolean =>
-  record.state === "submitted" || record.state === "awaiting_review";
+  !record.jobClosed && (record.state === "submitted" || record.state === "awaiting_review");
 
 interface MergeParams {
   /** Records cached in the browser (terpdesk_service_records). */
@@ -196,6 +200,19 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
         else merged.push(rec);
       }
     }
+
+  // A voided, returned or cancelled job keeps its hours on file, but they are marked so they never count as work to review. One pass
+  // over every record (database, timesheet and browser-cached alike), so no branch above can miss one.
+  const closedByRequest = new Map<string, ClosedJobKind>();
+  for (const req of requests) {
+    const kind = closedJobKind({ status: req.status, canceledAt: req.canceledAt, data: req.data });
+    if (kind) closedByRequest.set(req.id, kind);
+  }
+  for (const record of merged) {
+    const kind = closedByRequest.get(record.appointmentId);
+    if (kind) record.jobClosed = kind;
+    else delete record.jobClosed;
+  }
 
   return merged;
 }

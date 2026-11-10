@@ -13,9 +13,10 @@ const STATUS_LABELS: Record<StatusFilter, string> = {
   awaiting: "Awaiting review",
   correction: "Correction requested",
   approved: "Approved",
+  cancelled: "Cancelled / voided",
   all: "All statuses",
 };
-const STATUS_ORDER: readonly StatusFilter[] = ["awaiting", "correction", "approved", "all"];
+const STATUS_ORDER: readonly StatusFilter[] = ["awaiting", "correction", "approved", "cancelled", "all"];
 
 const RANGE_OPTIONS: DropdownOption[] = [
   { value: "any", label: "Any date" },

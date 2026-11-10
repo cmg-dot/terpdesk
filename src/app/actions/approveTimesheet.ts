@@ -15,6 +15,7 @@ import { allBookedPositionsApproved, mirrorTimesheetApproval } from "@/lib/times
 import { MILEAGE_REASON_REQUIRED, mileageAdjustmentReasonSchema, mileageDiffers } from "@/lib/timesheetSchemas";
 import { logActivity } from "@/lib/requestActivity";
 import { formatHoursMinutes } from "@/lib/durationFormat";
+import { CLOSED_JOB_MESSAGE, closedJobKind } from "@/lib/closedJob";
 
 // requests.status is free text (no enum); 'completed' is already recognised by hoursState.ts and the jobs page.
 const REQUEST_COMPLETED_STATUS = "completed";
@@ -54,11 +55,14 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
     // A submitted timesheet's mileage is fixed (its link is used up), so this read cannot go stale before the guarded
     // update below. `mileage` is the server-computed sum of the legs' counted miles.
     const [current] = await db
-      .select({ mileage: timesheets.mileage })
+      .select({ mileage: timesheets.mileage, requestId: timesheets.requestId })
       .from(timesheets)
       .where(and(eq(timesheets.id, timesheetId), eq(timesheets.status, "submitted")))
       .limit(1);
     if (!current) return fail("This timesheet is not awaiting review.");
+    // Approving also rewrites the job's status, so a voided, returned or cancelled job is refused.
+    const [job] = await db.select({ status: requests.status, canceledAt: requests.canceledAt, data: requests.data }).from(requests).where(eq(requests.id, current.requestId)).limit(1);
+    if (closedJobKind(job)) return fail(CLOSED_JOB_MESSAGE);
     const adjusted = mileageDiffers(approvedMileage, Number(current.mileage ?? 0));
     const reason = adjusted ? parsed.data.mileageAdjustmentReason || null : null;
     if (adjusted && !reason) return fail(MILEAGE_REASON_REQUIRED);

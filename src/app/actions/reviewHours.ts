@@ -11,6 +11,7 @@ import type { PositionId } from "@/lib/positions";
 import { positionIdSchema } from "@/lib/validation/position";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { alertInterpreter } from "@/lib/lifecycleAlerts";
+import { CLOSED_JOB_MESSAGE, closedJobKind } from "@/lib/closedJob";
 import { z } from "zod";
 import { MAX_TOTAL_MILES, MILEAGE_REASON_REQUIRED, mileageAdjustmentReasonSchema, mileageDiffers } from "@/lib/timesheetSchemas";
 
@@ -36,13 +37,15 @@ export async function approveHours(
   let approvedText = "Position 1";
   const failure = await db.transaction(async (tx): Promise<string | null> => {
     const [existing] = await tx
-      .select({ data: requests.data })
+      .select({ data: requests.data, status: requests.status, canceledAt: requests.canceledAt })
       .from(requests)
       .where(eq(requests.id, requestId));
 
     if (!existing) {
       throw new Error("Request not found");
     }
+    // Approving would also overwrite the job's status, so a voided, returned or cancelled job is refused.
+    if (closedJobKind(existing)) return CLOSED_JOB_MESSAGE;
 
     const posIdx = positionIdOf(positionIndex);
     const existingData = (existing.data as any) || {};
@@ -137,13 +140,14 @@ export async function requestHoursCorrection(
   await requireRole("agency");
   const reportedBy = await db.transaction(async (tx) => {
     const [existing] = await tx
-      .select({ data: requests.data })
+      .select({ data: requests.data, status: requests.status, canceledAt: requests.canceledAt })
       .from(requests)
       .where(eq(requests.id, requestId));
 
     if (!existing) {
       throw new Error("Request not found");
     }
+    if (closedJobKind(existing)) throw new Error(CLOSED_JOB_MESSAGE);
 
     const posIdx = positionIndex || 1;
     const existingData = (existing.data as any) || {};

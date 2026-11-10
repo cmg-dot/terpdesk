@@ -78,7 +78,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
               No signature
             </span>
           )}
-          <RecordStatusBadge state={record.state} />
+          <RecordStatusBadge state={record.state} closed={record.jobClosed} />
           <ChevronDown className={`h-5 w-5 flex-none text-[var(--forest)] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
           <span className="sr-only">{expanded ? "Hide details" : "Show details"}</span>
         </span>

@@ -6,7 +6,7 @@ import type { ServiceRecord } from "@/utils/hoursReviewRecords";
  * live in the URL (?q=&status=&range=&sig=&page=), and a value equal to its default is left out so a plain page has a plain URL.
  */
 
-export type StatusFilter = "awaiting" | "correction" | "approved" | "all";
+export type StatusFilter = "awaiting" | "correction" | "approved" | "cancelled" | "all";
 export type RangeFilter = "any" | "today" | "7d" | "30d";
 export type SignatureFilter = "any" | "missing";
 
@@ -21,7 +21,7 @@ export interface HoursFilters {
 /** What the page shows on first load: reports awaiting review, no search, any date, any signature. */
 export const DEFAULT_FILTERS: HoursFilters = { q: "", status: "awaiting", range: "any", sig: "any" };
 
-const STATUS_VALUES: readonly StatusFilter[] = ["awaiting", "correction", "approved", "all"];
+const STATUS_VALUES: readonly StatusFilter[] = ["awaiting", "correction", "approved", "cancelled", "all"];
 const RANGE_VALUES: readonly RangeFilter[] = ["any", "today", "7d", "30d"];
 const SIGNATURE_VALUES: readonly SignatureFilter[] = ["any", "missing"];
 
@@ -83,10 +83,17 @@ export function matchesSearch(query: string, ...fields: ReadonlyArray<string | n
 
 // ---- status, date, signature
 
-export type RecordStatus = "awaiting" | "correction" | "approved" | "other";
+export type RecordStatus = "awaiting" | "correction" | "approved" | "closed" | "other";
 
-/** Which filter bucket a record belongs to ("other" = a draft or not started: only "All" shows it). */
-export function recordStatus(record: Pick<ServiceRecord, "state">): RecordStatus {
+/** The record bucket each status filter shows ("all" shows every record). */
+const FILTER_BUCKET: Record<Exclude<StatusFilter, "all">, RecordStatus> = { awaiting: "awaiting", correction: "correction", approved: "approved", cancelled: "closed" };
+
+/**
+ * Which filter bucket a record belongs to ("other" = a draft or not started: only "All" shows it). A record on a voided, returned or
+ * cancelled job is "closed" whatever its hours say, so it leaves the queues and shows only under "Cancelled / voided" and "All".
+ */
+export function recordStatus(record: Pick<ServiceRecord, "state" | "jobClosed">): RecordStatus {
+  if (record.jobClosed) return "closed";
   if (record.state === "submitted" || record.state === "awaiting_review") return "awaiting";
   if (record.state === "changes_requested" || record.state === "correction_requested") return "correction";
   if (record.state === "approved") return "approved";
@@ -110,12 +117,12 @@ export function inRange(record: Pick<ServiceRecord, "scheduledStart" | "timeZone
   return daysAgo >= 0 && daysAgo < RANGE_DAYS[range];
 }
 
-export type FilterableRecord = Pick<ServiceRecord, "state" | "reference" | "title" | "interpreterName" | "scheduledStart" | "timeZone" | "signatureDataUrl">;
+export type FilterableRecord = Pick<ServiceRecord, "state" | "jobClosed" | "reference" | "title" | "interpreterName" | "scheduledStart" | "timeZone" | "signatureDataUrl">;
 
 /** The records that pass every active filter, in their original order. `now` is passed in so the result is testable. */
 export function filterRecords<T extends FilterableRecord>(records: readonly T[], filters: HoursFilters, now: Date = new Date()): T[] {
   return records.filter((record) => {
-    if (filters.status !== "all" && recordStatus(record) !== filters.status) return false;
+    if (filters.status !== "all" && recordStatus(record) !== FILTER_BUCKET[filters.status]) return false;
     if (filters.sig === "missing" && record.signatureDataUrl) return false;
     if (!inRange(record, filters.range, now)) return false;
     return matchesSearch(filters.q, record.reference, record.title, record.interpreterName);
@@ -123,11 +130,12 @@ export function filterRecords<T extends FilterableRecord>(records: readonly T[],
 }
 
 /** How many records are in each status bucket, for the Status dropdown's counts. */
-export function statusCounts(records: ReadonlyArray<Pick<ServiceRecord, "state">>): Record<StatusFilter, number> {
-  const counts: Record<StatusFilter, number> = { awaiting: 0, correction: 0, approved: 0, all: records.length };
+export function statusCounts(records: ReadonlyArray<Pick<ServiceRecord, "state" | "jobClosed">>): Record<StatusFilter, number> {
+  const counts: Record<StatusFilter, number> = { awaiting: 0, correction: 0, approved: 0, cancelled: 0, all: records.length };
   for (const record of records) {
     const status = recordStatus(record);
-    if (status !== "other") counts[status] += 1;
+    if (status === "closed") counts.cancelled += 1;
+    else if (status !== "other") counts[status] += 1;
   }
   return counts;
 }
