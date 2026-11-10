@@ -15,7 +15,7 @@ import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 import { definedOnly } from "@/lib/definedValues";
-import { countFromLabel, positionCount, positionFields } from "@/lib/positions";
+import { clampPositionCount, countFromLabel, positionFields, readPositions, resizePositions } from "@/lib/positions";
 
 export interface UpdateRequestPayload {
   title?: string;
@@ -100,9 +100,12 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     ? "Virtual"
     : (newVenue ? (newAddress ? `${newVenue} · ${newAddress}` : newVenue) : (newAddress || existingData.location || "Location pending"));
 
-  // What the edit form sent wins; otherwise what the job already has.
+  // What the edit form sent wins, but only while nobody is booked: once someone is, positions are added and removed in Staffing
+  // (addSlot / removeSlot), which check bookings and offers. Then the form's number is ignored, so a stale form can't undo it.
   const sentCount = payload.slotCount ?? payload.details?.slotCount ?? payload.requiredPositions ?? countFromLabel(payload.positions ?? payload.details?.positions);
-  const { positions: positionsStr, slotCount } = positionFields(sentCount ?? positionCount(existingData));
+  const resized = sentCount !== undefined && !lock.booked && clampPositionCount(sentCount) !== readPositions(existingData).count;
+  const positionData: Record<string, any> = resized ? resizePositions(existingData, sentCount) : existingData;
+  const { positions: positionsStr, slotCount } = positionFields(readPositions(positionData).count);
 
   // 3. Assemble Overwritten Data (both top-level and cached details fields)
   const updatedDetails = {
@@ -176,6 +179,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     positions: positionsStr,
     requiredPositions: slotCount,
     slotCount: slotCount,
+    ...(resized ? { slots: positionData.slots, slotReplacements: positionData.slotReplacements } : {}),
     repeats: payload.repeats ?? payload.details?.repeats ?? existingData.repeats,
     recurrenceNote: payload.recurrenceNote ?? payload.details?.recurrenceNote ?? existingData.recurrenceNote,
     // The forms own the hearing identity (the staff-only patient fields); every other saved brief key stays.
@@ -202,6 +206,12 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
       slotCount: slotCount,
     }
   };
+
+  // Retired position numbers travel with the resize (they are cleared when none are left).
+  if (resized) {
+    if (positionData.retiredPositions) (updatedData as Record<string, unknown>).retiredPositions = positionData.retiredPositions;
+    else delete (updatedData as Record<string, unknown>).retiredPositions;
+  }
 
   // State job = funding program is ODHH or Apple Health. Derived here, never sent by the client.
   const isStateJob = isStateProgram(payload.data?.intake?.program ?? payload.intake?.program ?? existingData.intake?.program);

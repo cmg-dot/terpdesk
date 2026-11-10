@@ -12,7 +12,8 @@ interface Props {
 
 /** One position (one interpreter): its booking status, who is assigned, and either the booking or the controls to fill it. */
 export function PositionStaffing({ view, ctx, actions }: Props) {
-  const { posIdx, accepted, activeOffer, needsReplacement } = view;
+  const { posIdx, ordinal, accepted, activeOffer, needsReplacement } = view;
+  const several = ctx.totalPositions > 1;
 
   let slotBadgeColor = 'bg-[#FEF3C7] text-[#92400E]';
   let slotBadgeText = 'Booking: Unfilled';
@@ -28,11 +29,24 @@ export function PositionStaffing({ view, ctx, actions }: Props) {
   }
 
   return (
-    <div className={ctx.totalPositions === 2 ? 'p-5 sm:p-6 rounded-2xl border border-gray-200/80 bg-[#FAFAF8]' : ''}>
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-semibold text-[var(--ink)] text-base">Position {posIdx} · interpreter</h3>
-        {ctx.totalPositions === 2 && (
-          <span className="text-xs text-[var(--sage)] font-medium">Position {posIdx} of 2</span>
+    <div data-position={posIdx} className={several ? 'p-5 sm:p-6 rounded-2xl border border-gray-200/80 bg-[#FAFAF8]' : ''}>
+      <div className="flex items-center justify-between gap-3 mb-2">
+        <h3 className="font-semibold text-[var(--ink)] text-base">Position {ordinal} · interpreter</h3>
+        {several && (
+          <div className="flex items-center gap-3">
+            <span className="text-xs text-[var(--sage)] font-medium">Position {ordinal} of {ctx.totalPositions}</span>
+            <button
+              type="button"
+              data-remove-slot
+              onClick={() => actions.removeSlot(posIdx)}
+              disabled={!view.canRemove || ctx.slotBusy !== null}
+              title={view.removeBlockedReason ?? 'Remove this empty position'}
+              aria-label={`Remove Position ${ordinal}`}
+              className="text-xs font-medium text-[var(--sage)] hover:text-red-600 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-[var(--sage)] transition-colors"
+            >
+              {ctx.slotBusy === posIdx ? 'Removing…' : 'Remove slot'}
+            </button>
+          </div>
         )}
       </div>
 

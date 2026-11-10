@@ -33,6 +33,8 @@ interface DirectAssignPanelProps {
   positionIndex: JobPosition;
   /** Show "Position N" in the wording (team jobs only). */
   showPosition: boolean;
+  /** The "N" shown in "Position N" (the position's place in the list); defaults to its number. */
+  positionLabel?: number;
   roster: DirectAssignRosterEntry[];
   fits: Record<string, InterpreterFitStatus>;
   offers: ReadonlyArray<DirectAssignOfferRef>;
@@ -57,7 +59,7 @@ const pendingFor = (offers: ReadonlyArray<DirectAssignOfferRef>, position: JobPo
  * acceptance and their auto-book permission. Asks for one confirmation because it withdraws the pending offers
  * and emails the interpreter.
  */
-export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, fits, offers, onAssigned, onEngagedChange, lockedReason }: DirectAssignPanelProps) => {
+export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, positionLabel, roster, fits, offers, onAssigned, onEngagedChange, lockedReason }: DirectAssignPanelProps) => {
   const [selectedId, setSelectedId] = useState("");
   const [confirming, setConfirming] = useState(false);
   const [assigning, setAssigning] = useState(false);
@@ -67,7 +69,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
   const person = roster.find((r) => r.id === selectedId);
   const fitWarning = person ? FIT_WARNINGS[fits[person.id]] : undefined;
   const pending = pendingFor(offers, positionIndex);
-  const where = showPosition ? ` to Position ${positionIndex}` : "";
+  const where = showPosition ? ` to Position ${positionLabel ?? positionIndex}` : "";
 
   const choose = (id: string) => {
     setSelectedId(id);
@@ -120,7 +122,7 @@ export const DirectAssignPanel = ({ jobId, positionIndex, showPosition, roster, 
       {lockedReason && <p role="status" className="mb-3 text-xs font-medium text-gray-700">{lockedReason}</p>}
       <p className="mb-4 text-xs leading-relaxed text-gray-600">
         Agency override. Books the interpreter right now: no offer, no waiting for them to accept, and no auto-book permission needed.
-        Availability is not enforced. Any pending offers for {showPosition ? `Position ${positionIndex}` : "this job"} are withdrawn.
+        Availability is not enforced. Any pending offers for {showPosition ? `Position ${positionLabel ?? positionIndex}` : "this job"} are withdrawn.
       </p>
 
       <SearchableSelect

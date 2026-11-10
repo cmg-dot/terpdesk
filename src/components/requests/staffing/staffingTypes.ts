@@ -1,4 +1,5 @@
 import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { PositionId } from "@/lib/positions";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 import type { DirectAssignOfferRef, DirectAssignRosterEntry, DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import type { PastOffer } from "@/components/requests/ExpiredOfferNotice";
@@ -8,7 +9,8 @@ import type { PastOffer } from "@/components/requests/ExpiredOfferNotice";
  * what it is given and calls back, so the booking controls live in one place without the page's other concerns.
  */
 
-export type Position = 1 | 2;
+/** A position's stable number on the job (see lib/positions.ts). What staff read as "Position N" is its `ordinal`. */
+export type Position = PositionId;
 
 /** A booking in a position (an accepted offer, or the interpreter the job record says is booked). */
 export interface StaffBooking {
@@ -28,6 +30,12 @@ export interface StaffActiveOffer extends StaffBooking {
 /** One position's own state: who is booked or offered, the roster that may be offered it, and the offer form's values. */
 export interface PositionView {
   posIdx: Position;
+  /** 1-based place in the list: the "N" in "Position N" on screen, whatever the stable id is. */
+  ordinal: number;
+  /** Can this position be removed right now? An empty one can; one with a booking or a waiting offer cannot. */
+  canRemove: boolean;
+  /** Why it cannot (shown on the disabled button), or null. */
+  removeBlockedReason: string | null;
   accepted: StaffBooking | null;
   activeOffer: StaffActiveOffer | null;
   pastOffers: PastOffer[];
@@ -50,7 +58,14 @@ export interface PositionView {
 /** Facts about the job and the page, shared by both positions. */
 export interface StaffingContext {
   requestId: string;
-  totalPositions: 1 | 2;
+  totalPositions: number;
+  /** The most positions a job can have. */
+  maxPositions: number;
+  /** Adding or removing a position is under way (the id being removed, or "add"), and the last refusal, if any. */
+  slotBusy: "add" | Position | null;
+  slotError: string;
+  /** Why a position cannot be added right now (cancelled, finished, at the cap), or null when it can. */
+  addBlockedReason: string | null;
   /** Every offer on the job (for the Directly assign panel's pending-offer count). */
   offers: ReadonlyArray<DirectAssignOfferRef>;
   nowMs: number;
@@ -84,6 +99,9 @@ export interface StaffingActions {
   directlyAssigned: (posIdx: Position, result: DirectAssignSuccess) => Promise<void>;
   setAssignEngaged: (posIdx: Position, engaged: boolean) => void;
   openRemoveBooking: (posIdx: Position, offerId: string | undefined, interpreterName: string | undefined) => void;
+  addSlot: () => void | Promise<void>;
+  removeSlot: (posIdx: Position) => void | Promise<void>;
+  clearSlotError: () => void;
   openAccess: () => void;
   toast: (message: string) => void;
   reloadTimesheetFlags: (requestId: string) => void;

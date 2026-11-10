@@ -176,6 +176,27 @@ export function retirePosition<T extends Loose>(data: T, id: PositionId): Retire
   return { ok: true, data: next as T };
 }
 
+/**
+ * `data` with its active positions brought to `target` (1 to 10): new positions are added with fresh ids, and the highest-numbered
+ * ones are retired to shrink. For a job nobody is booked on (the edit form); it does not check bookings, the caller must.
+ */
+export function resizePositions<T extends Loose>(data: T, target: number): T {
+  const goal = clampPositionCount(target);
+  let next = data;
+  while (readPositions(next).count < goal) {
+    const added = addPosition(next);
+    if (!added.ok) break;
+    next = added.data;
+  }
+  while (readPositions(next).count > goal) {
+    const { ids } = readPositions(next);
+    const retired = retirePosition(next, ids[ids.length - 1]);
+    if (!retired.ok) break;
+    next = retired.data;
+  }
+  return next;
+}
+
 /** The three fields every saved request carries for its position count, kept in step. */
 export const positionFields = (count: number): { positions: string; requiredPositions: number; slotCount: number } => {
   const n = clampPositionCount(count);

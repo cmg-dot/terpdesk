@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionCountField } from "@/components/requests/PositionCountField";
+import { countFromLabel, positionsLabel, readPositions } from "@/lib/positions";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import { useRequests } from "@/context/RequestsContext";
@@ -196,7 +198,7 @@ export default function EditRequestPage() {
        poNumber: existingRequest?.requester?.poNumber || "",
        prepNotes: existingRequest?.prepNotes || "",
        privateNotes: loaded.generalNotes,
-       positions: (existingRequest?.requiredPositions === 2 || existingRequest?.positions === "Team — two independent positions") ? "Team — two independent positions" : (existingRequest?.positions || "One interpreter"),
+       positions: positionsLabel(readPositions(existingRequest?.data ?? existingRequest).count),
        program: existingRequest?.data?.intake?.program || "General",
        odhhSrn: existingRequest?.data?.intake?.odhhSrn || "",
        odhhAccessCode: existingRequest?.data?.intake?.odhhAccessCode || "",
@@ -234,25 +236,6 @@ export default function EditRequestPage() {
     }
   }, [existingRequest]);
 
-  const [position2ClearNotice, setPosition2ClearNotice] = useState(false);
-
-  const isPosition2ActiveOrBooked = useMemo(() => {
-    if (!existingRequest) return false;
-    const reqOffers = existingRequest.offers || [];
-    const offerPositions = existingRequest.data?.offerPositions || {};
-    const pos2Offer = reqOffers.find((o: any) => {
-      const pos = offerPositions[o.id] || o.positionIndex || 1;
-      const isAccepted = o.state === 'accepted' || o.status === 'accepted';
-      const isLivePending = (o.state === 'pending' || o.status === 'pending') && 
-        o.status !== 'expired' && 
-        o.state !== 'expired' && 
-        new Date(o.expiresAt) > new Date() &&
-        (existingRequest.endsAt ? new Date(existingRequest.endsAt) > new Date() : true);
-      return pos === 2 && (isAccepted || isLivePending);
-    });
-    const pos2Slot = existingRequest.slots?.find((s: any) => s.positionIndex === 2);
-    return Boolean(pos2Offer || pos2Slot?.reservedBy);
-  }, [existingRequest]);
 
   const [dbClients, setDbClients] = useState<ClientWithStats[]>([]);
 
@@ -630,8 +613,8 @@ export default function EditRequestPage() {
           repeats: Boolean(formData.repeats),
           recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
           positions: formData.positions,
-          requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-          slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
+          requiredPositions: countFromLabel(formData.positions) ?? 1,
+          slotCount: countFromLabel(formData.positions) ?? 1,
           // Virtual Meeting Details (same fields and keys as Quick Edit).
           platform: formData.platform,
           meetingLink: formData.meetingLink,
@@ -672,8 +655,8 @@ export default function EditRequestPage() {
         messageRecipientId: isScheduleLocked && messageRecipient ? messageRecipient : undefined,
         activity: "updated just now",
         positions: formData.positions,
-        requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-        slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
+        requiredPositions: countFromLabel(formData.positions) ?? 1,
+        slotCount: countFromLabel(formData.positions) ?? 1,
         data: {
           client: formData.client,
           startsAt: startsAtStr,
@@ -681,8 +664,8 @@ export default function EditRequestPage() {
           customStartsAt: startsAtStr,
           customEndsAt: endsAtStr,
           positions: formData.positions,
-          requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-          slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
+          requiredPositions: countFromLabel(formData.positions) ?? 1,
+          slotCount: countFromLabel(formData.positions) ?? 1,
           repeats: Boolean(formData.repeats),
           recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
           // Only the hearing identity (Patient Information card); the server keeps every other saved brief key.
@@ -692,8 +675,8 @@ export default function EditRequestPage() {
             ...programIdentifiers(formData),
             ...extrasPayload.intake,
             positions: formData.positions,
-            requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-            slotCount: formData.positions === "Team — two independent positions" ? 2 : 1,
+            requiredPositions: countFromLabel(formData.positions) ?? 1,
+            slotCount: countFromLabel(formData.positions) ?? 1,
           }
         }
       };
@@ -1206,27 +1189,16 @@ export default function EditRequestPage() {
  {/* Required interpreter positions Section */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Required interpreter positions</h2>
- <Field 
- label="Positions staff will fill"
- subtext="Choose between one interpreter or a two-person interpreting team."
+  <Field
+ label="Interpreters needed"
+ subtext="How many interpreter positions this job has (1 to 10)."
  >
- <CustomSelect 
-   options={["One interpreter", "Team — two independent positions"]} 
-   value={formData.positions} 
-   onChange={(val) => {
-     if (val === "One interpreter" && isPosition2ActiveOrBooked) {
-       setPosition2ClearNotice(true);
-       return;
-     }
-     setPosition2ClearNotice(false);
-     handleChange("positions", val);
-   }} 
+ <PositionCountField
+   value={countFromLabel(formData.positions) ?? 1}
+   onChange={(n) => handleChange("positions", positionsLabel(n))}
+   disabled={isBookedRequest}
+   disabledReason="An interpreter is booked on this job. Add or remove positions in Staffing on the request page, where bookings and offers are checked."
  />
- {position2ClearNotice && (
-   <p className="text-xs text-amber-700 mt-2 font-medium">
-     Position 2 currently has an active offer or booked interpreter. Clear Position 2 in staffing before changing to One interpreter.
-   </p>
- )}
  </Field>
  </div>
 

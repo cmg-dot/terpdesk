@@ -9,6 +9,7 @@ import { buildOfferEmail } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import { generateOfferToken } from "@/lib/jwt";
 import { sendEmail } from "@/lib/timesheetEmail";
+import { positionIdSchema } from "@/lib/validation/position";
 
 export const dynamic = "force-dynamic";
 
@@ -18,7 +19,7 @@ const bodySchema = z.object({
   interpreterId: z.string().uuid(),
   requestId: z.string().uuid(),
   interpreterEmail: z.string().optional(),
-  positionNumber: z.number().int().min(1).max(2).optional(),
+  positionNumber: positionIdSchema.optional(),
 });
 
 /**

@@ -9,7 +9,7 @@ import type { Position, PositionView, StaffingActions, StaffingContext } from "@
 import { pickByReportName } from "@/lib/verificationPending";
 
 interface Props {
-  /** One view per position (one for a single job, two for a team job). */
+  /** One view per active position, in position order (1 to 10). */
   positions: PositionView[];
   ctx: StaffingContext;
   actions: StaffingActions;
@@ -60,7 +60,8 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
           match={match}
           alreadyBooked={alreadyBooked}
           openPosition={openPosition}
-          showPosition={ctx.totalPositions === 2}
+          showPosition={ctx.totalPositions > 1}
+          openOrdinal={positions.find((p) => p.posIdx === openPosition)?.ordinal}
           onSelect={actions.setRecipient}
         />
       )}
@@ -70,6 +71,27 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
           <PositionStaffing key={view.posIdx} view={view} ctx={ctx} actions={actions} />
         ))}
       </div>
+
+      <div className="mt-6 flex flex-wrap items-center gap-x-4 gap-y-2">
+        <button
+          type="button"
+          data-add-slot
+          onClick={actions.addSlot}
+          disabled={Boolean(ctx.addBlockedReason) || ctx.slotBusy !== null}
+          title={ctx.addBlockedReason ?? 'Add another interpreter position to this job'}
+          className="rounded-full border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-[var(--ink)] transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          {ctx.slotBusy === 'add' ? 'Adding…' : '+ Add interpreter slot'}
+        </button>
+        <span className="text-xs text-[var(--sage)]">{positions.length} of {ctx.maxPositions} positions</span>
+        {ctx.addBlockedReason && <span className="text-xs text-[var(--sage)]">{ctx.addBlockedReason}</span>}
+      </div>
+      {ctx.slotError && (
+        <div role="alert" data-slot-error className="mt-3 flex items-start justify-between gap-3 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">
+          <span>{ctx.slotError}</span>
+          <button type="button" onClick={actions.clearSlotError} aria-label="Dismiss" className="text-red-700 hover:text-red-900 leading-none text-lg">&times;</button>
+        </div>
+      )}
 
       <div className="mt-6">
         <button type="button" onClick={actions.openAccess} className="text-sm font-medium text-[var(--forest)] hover:underline transition-colors">

@@ -19,6 +19,8 @@ interface Props {
   openPosition: Position | null;
   /** More than one position, so the button says which one it fills. */
   showPosition: boolean;
+  /** The "N" in "Position N" for that open position. */
+  openOrdinal?: number;
   onSelect: (posIdx: Position, id: string) => void;
 }
 
@@ -26,7 +28,7 @@ interface Props {
  * "Requested: Kimberly Page" above the booking controls, with one click to choose them in the offer picker. It is a preference
  * from the state, not a booking: choosing only fills the picker, and staff still send the offer (or book directly).
  */
-export function RequestedInterpreterBadge({ requestedName, match, alreadyBooked, openPosition, showPosition, onSelect }: Props) {
+export function RequestedInterpreterBadge({ requestedName, match, alreadyBooked, openPosition, showPosition, openOrdinal, onSelect }: Props) {
   return (
     <div data-requested-interpreter className="mb-6 flex flex-wrap items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
       <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-3 py-1 text-[13px] font-semibold text-amber-900">
@@ -45,7 +47,7 @@ export function RequestedInterpreterBadge({ requestedName, match, alreadyBooked,
           onClick={() => onSelect(openPosition, match.id)}
           className="rounded-full bg-[var(--forest-bright)] px-4 py-1.5 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-bright-hover)]"
         >
-          Select {match.name}{showPosition ? ` for Position ${openPosition}` : ""}
+          Select {match.name}{showPosition ? ` for Position ${openOrdinal ?? openPosition}` : ""}
         </button>
       )}
       <span className="text-xs text-amber-800">A request from the state, not a booking.</span>

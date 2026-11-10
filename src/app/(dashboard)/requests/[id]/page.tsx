@@ -10,7 +10,6 @@ import { ChevronDown, Copy, Check, ExternalLink, Video, MapPin, Edit2, X, Lock, 
 import { fetchLiveRequestById } from "@/app/actions/getRequests";
 import { removeBooking } from "@/app/actions/removeBooking";
 import { getInterpreters } from "@/app/actions/getInterpreters";
-import { createOffer } from "@/app/actions/createOffer";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { cancelRequest } from "@/app/actions/cancelRequest";
 import { wallClockToUtc, wallClockToUtcDate, getIanaZone, parseInstantInZone, resolveJobZone, resolveRequestTimes } from "@/utils/timezone";
@@ -27,15 +26,17 @@ import { calendarLink } from "@/lib/calendarLink";
 import { ReturnUnfilledDialog } from "@/components/requests/ReturnUnfilledDialog";
 import { VoidJobDialog } from "@/components/requests/VoidJobDialog";
 import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
-import { offerBlock } from "@/lib/offerAvailability";
-import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from "@/lib/offerExpiry";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import type { DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";
 import { ClarificationsCard } from "@/components/requests/ClarificationsCard";
 import { CollapsibleStateForm } from "@/components/requests/CollapsibleStateForm";
 import { OriginalFormCard } from "@/components/requests/OriginalFormCard";
 import { StaffingPanel } from "@/components/requests/staffing/StaffingPanel";
-import type { Position, PositionView, StaffBooking, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
+import type { Position, PositionView, StaffActiveOffer, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
+import { usePositionOfferForms } from "@/hooks/usePositionOfferForms";
+import { usePositionSlots } from "@/hooks/usePositionSlots";
+import { bookedCountOf, occupiesAnotherPosition, resolvePositions } from "@/lib/positionBookings";
+import { MAX_POSITIONS } from "@/lib/positions";
 import { buildStateFormView, notesWithoutFormSection5 } from "@/lib/stateFormView";
 import { RequestActivityCard } from "@/components/requests/RequestActivityCard";
 import { legacyPosition1Hours } from "@/utils/hoursState";
@@ -147,23 +148,6 @@ export default function AssignmentDetailPage() {
     email: m.email,
   }));
 
-  const [recipient1, setRecipient1] = useState('');
-  // Offer response window: hours + minutes from the moment the offer is sent (24 h unless the job starts sooner).
-  const [expiryHours1, setExpiryHours1] = useState(String(DEFAULT_OFFER_EXPIRY_HOURS));
-  const [expiryMinutes1, setExpiryMinutes1] = useState('0');
-  const [errorMessage1, setErrorMessage1] = useState('');
-  const [successMessage1, setSuccessMessage1] = useState('');
-  const [isSendingOffer1, setIsSendingOffer1] = useState(false);
-
-  const [recipient2, setRecipient2] = useState('');
-  const [expiryHours2, setExpiryHours2] = useState(String(DEFAULT_OFFER_EXPIRY_HOURS));
-  const [expiryMinutes2, setExpiryMinutes2] = useState('0');
-  // Which positions have an interpreter picked in "Directly assign": while one has, that position's offer form is locked.
-  const [assignEngaged, setAssignEngaged] = useState<Record<1 | 2, boolean>>({ 1: false, 2: false });
-  const [errorMessage2, setErrorMessage2] = useState('');
-  const [successMessage2, setSuccessMessage2] = useState('');
-  const [isSendingOffer2, setIsSendingOffer2] = useState(false);
-
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   const showToast = (msg: string) => {
@@ -191,36 +175,8 @@ export default function AssignmentDetailPage() {
   }, [foundRequest?.id, loadTimesheetFlags]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const totalPositions = (
-    foundRequest?.totalPositions || 
-    foundRequest?.slotCount || 
-    foundRequest?.data?.totalPositions || 
-    foundRequest?.data?.slotCount || 
-    (foundRequest?.positions === "Team — two independent positions" ? 2 : 1)
-  ) as 1 | 2;
-
   const isCancelled = foundRequest?.status === 'Cancelled' || foundRequest?.status === 'cancelled';
   const realOffers = foundRequest?.offers || [];
-
-  const slot1Accepted = realOffers.find((o: any) => (o.positionIndex === 1 || !o.positionIndex) && (o.state === 'accepted' || o.status === 'accepted')) || (
-    foundRequest?.slots?.find((s: any) => s.positionIndex === 1 && s.reservedBy)
-      ? { interpreterName: foundRequest.slots.find((s: any) => s.positionIndex === 1).interpreterName || 'Booked', interpreterId: foundRequest.slots.find((s: any) => s.positionIndex === 1).reservedBy, id: 'assigned-1', positionIndex: 1 }
-      : (foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId
-          ? { interpreterName: foundRequest.assignedInterpreterName || foundRequest?.data?.assignedInterpreterName || 'Booked', interpreterId: foundRequest.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId, id: 'assigned-root', positionIndex: 1 }
-          : ((totalPositions === 1 && (foundRequest?.status === 'assigned' || foundRequest?.status === 'booked') && foundRequest?.assignedInterpreterName)
-            ? { interpreterName: foundRequest.assignedInterpreterName, id: 'assigned-booking', positionIndex: 1 }
-            : null))
-  );
-
-  const slot2Accepted = totalPositions === 2 ? (
-    realOffers.find((o: any) => o.positionIndex === 2 && (o.state === 'accepted' || o.status === 'accepted')) || (
-      foundRequest?.slots?.find((s: any) => s.positionIndex === 2 && s.reservedBy)
-        ? { interpreterName: foundRequest.slots.find((s: any) => s.positionIndex === 2).interpreterName || 'Booked', interpreterId: foundRequest.slots.find((s: any) => s.positionIndex === 2).reservedBy, id: 'assigned-2', positionIndex: 2 }
-        : (foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId
-            ? { interpreterName: foundRequest.position2InterpreterName || foundRequest?.data?.position2InterpreterName || 'Booked', interpreterId: foundRequest.position2InterpreterId || foundRequest?.data?.position2InterpreterId, id: 'assigned-pos2', positionIndex: 2 }
-            : null)
-    )
-  ) : null;
 
   const appointmentEndsAtMs = foundRequest?.endsAt ? new Date(foundRequest.endsAt).getTime() : 0;
   const isAppointmentFinished = appointmentEndsAtMs > 0 && currentTime > appointmentEndsAtMs;
@@ -238,70 +194,27 @@ export default function AssignmentDetailPage() {
     return true;
   };
 
-  const slot1ActiveOffer = realOffers.find((o: any) => (o.positionIndex === 1 || !o.positionIndex) && isLiveOffer(o));
-  const slot2ActiveOffer = totalPositions === 2 ? realOffers.find((o: any) => o.positionIndex === 2 && isLiveOffer(o)) : null;
-
-  const slot1PastOffers = realOffers.filter((o: any) => (o.positionIndex === 1 || !o.positionIndex) && o.id !== slot1ActiveOffer?.id && o.id !== slot1Accepted?.id);
-  const slot2PastOffers = totalPositions === 2 ? realOffers.filter((o: any) => o.positionIndex === 2 && o.id !== slot2ActiveOffer?.id && o.id !== slot2Accepted?.id) : [];
-
-  const staffedCount = (slot1Accepted ? 1 : 0) + (slot2Accepted ? 1 : 0);
+  // Every active position, in order: who is booked, the offer out, earlier offers, and whether it needs a replacement.
+  const positionFacts = resolvePositions(foundRequest, realOffers, isLiveOffer);
+  const totalPositions = Math.max(1, positionFacts.length);
+  const staffedCount = bookedCountOf(positionFacts);
   const isAllPositionsFilled = staffedCount >= totalPositions && totalPositions > 0;
+  const positionIds = positionFacts.map((f) => f.id);
 
-  const slot1Slot = foundRequest?.slots?.find((s: any) => s.positionIndex === 1);
-  const slot2Slot = totalPositions === 2 ? foundRequest?.slots?.find((s: any) => s.positionIndex === 2) : null;
+  const reloadRequest = async () => { setFoundRequest(await fetchLiveRequestById(id)); };
+  const offerForms = usePositionOfferForms({ requestId: id, request: foundRequest, ids: positionIds, dbInterpreters, fits: interpreterFitMap, reload: reloadRequest, toast: showToast });
+  const slotActions = usePositionSlots({ requestId: id, reload: async () => { await reloadRequest(); router.refresh(); }, toast: showToast });
 
-  const slot1NeedsReplacement = !isAllPositionsFilled && !slot1Accepted && Boolean(slot1Slot?.needsReplacement || foundRequest?.data?.slotReplacements?.[1]);
-  const slot2NeedsReplacement = !isAllPositionsFilled && !slot2Accepted && Boolean(slot2Slot?.needsReplacement || foundRequest?.data?.slotReplacements?.[2]);
-
-  // Rule — No Duplicate Interpreter Across Slots (Prevent Position Duplication)
-  const isOccupiedInSlot1 = (interpId: string, interpName?: string) => {
-    // Currently selected in Position 1
-    if (recipient1 && recipient1 === interpId) return true;
-
-    // Currently assigned or offered in Position 1
-    if (slot1Accepted) {
-      if (slot1Accepted.interpreterId && slot1Accepted.interpreterId === interpId) return true;
-      if (interpName && slot1Accepted.interpreterName && slot1Accepted.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
-    }
-    const slot1Reserved = slot1Slot?.reservedBy || foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId;
-    if (slot1Reserved && slot1Reserved === interpId) return true;
-    if (slot1ActiveOffer) {
-      if (slot1ActiveOffer.interpreterId && slot1ActiveOffer.interpreterId === interpId) return true;
-      if (interpName && slot1ActiveOffer.interpreterName && slot1ActiveOffer.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
-    }
-    return false;
-  };
-
-  const isOccupiedInSlot2 = (interpId: string, interpName?: string) => {
-    // Currently selected in Position 2
-    if (recipient2 && recipient2 === interpId) return true;
-
-    // Currently assigned or offered in Position 2
-    if (slot2Accepted) {
-      if (slot2Accepted.interpreterId && slot2Accepted.interpreterId === interpId) return true;
-      if (interpName && slot2Accepted.interpreterName && slot2Accepted.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
-    }
-    const slot2Reserved = slot2Slot?.reservedBy || foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId;
-    if (slot2Reserved && slot2Reserved === interpId) return true;
-    if (slot2ActiveOffer) {
-      if (slot2ActiveOffer.interpreterId && slot2ActiveOffer.interpreterId === interpId) return true;
-      if (interpName && slot2ActiveOffer.interpreterName && slot2ActiveOffer.interpreterName.trim().toLowerCase() === interpName.trim().toLowerCase()) return true;
-    }
-    return false;
-  };
-
-  const rosterSlot1 = activeRoster.filter(i => !isOccupiedInSlot2(i.id, i.name));
-  const rosterSlot2 = activeRoster.filter(i => !isOccupiedInSlot1(i.id, i.name));
+  // Rule: no interpreter in two positions of the same job. Each position's roster leaves out whoever is in any other position.
+  const rosterFor = (position: number) => activeRoster.filter((i) => !occupiesAnotherPosition(positionFacts, offerForms.recipients, position, i.id, i.name));
 
   const hasLivePendingOffer = Boolean(
-    slot1ActiveOffer ||
-    slot2ActiveOffer ||
+    positionFacts.some((f) => f.activeOffer) ||
     (!isAppointmentFinished && realOffers.some((o: any) => isLiveOffer(o)))
   );
 
   const hasAcceptedBooking = Boolean(
-    slot1Accepted ||
-    slot2Accepted ||
+    staffedCount > 0 ||
     ['assigned', 'booked', 'Fully staffed'].includes(foundRequest?.status) ||
     realOffers.some((o: any) => o.status === 'accepted' || o.state === 'accepted')
   );
@@ -358,7 +271,7 @@ export default function AssignmentDetailPage() {
 
   const [showRemoveBookingModal, setShowRemoveBookingModal] = useState(false);
   const [removeBookingTarget, setRemoveBookingTarget] = useState<{
-    positionIndex: 1 | 2;
+    positionIndex: Position;
     offerId?: string;
     interpreterName: string;
   } | null>(null);
@@ -366,12 +279,12 @@ export default function AssignmentDetailPage() {
   const [removeBookingError, setRemoveBookingError] = useState<string | null>(null);
   const router = useRouter();
 
-  const handleOpenRemoveBookingModal = (positionIndex: 1 | 2, offerId?: string, interpreterName?: string) => {
+  const handleOpenRemoveBookingModal = (positionIndex: Position, offerId?: string, interpreterName?: string) => {
     setRemoveBookingError(null);
     setRemoveBookingTarget({
       positionIndex,
       offerId,
-      interpreterName: interpreterName || `Position ${positionIndex} interpreter`
+      interpreterName: interpreterName || `Position ${positionFacts.find((f) => f.id === positionIndex)?.ordinal ?? positionIndex} interpreter`
     });
     setShowRemoveBookingModal(true);
   };
@@ -487,22 +400,6 @@ export default function AssignmentDetailPage() {
   }, [foundRequest, dbInterpreters, currentUser?.agency_id]);
 
 
-  // Offer response window pre-fill: 24 hours. Staff's own edits are never overwritten; it is refreshed when a
-  // recipient is picked, because whether 24 hours still fits before the appointment depends on the time of day.
-  const expiryEditedRef = React.useRef<Record<number, boolean>>({});
-  const applyDefaultExpiry = React.useCallback((posIdx: 1 | 2) => {
-    if (!foundRequest || expiryEditedRef.current[posIdx]) return;
-    const fields = defaultOfferExpiry(new Date(), parseSafeDate(foundRequest.startsAt));
-    const [setHours, setMinutes] = posIdx === 1 ? [setExpiryHours1, setExpiryMinutes1] : [setExpiryHours2, setExpiryMinutes2];
-    // Appointment closer than 24 hours: no ready-made value (it would be refused), so staff type a shorter window.
-    setHours(fields?.hours ?? '');
-    setMinutes(fields?.minutes ?? '');
-  }, [foundRequest]);
-  useEffect(() => {
-    applyDefaultExpiry(1);
-    applyDefaultExpiry(2);
-  }, [applyDefaultExpiry]);
-
  const handleCancelAppointment = () => {
  setShowCancelModal(true);
  };
@@ -519,8 +416,8 @@ export default function AssignmentDetailPage() {
  };
 
   // Agency override: the server already booked the interpreter and closed the pending offers; just reflect it here.
-  const handleDirectlyAssigned = async (posIdx: 1 | 2, result: DirectAssignSuccess) => {
-    (posIdx === 1 ? setRecipient1 : setRecipient2)('');
+  const handleDirectlyAssigned = async (posIdx: Position, result: DirectAssignSuccess) => {
+    offerForms.clearRecipient(posIdx);
     try {
       setFoundRequest(await fetchLiveRequestById(id));
     } catch {
@@ -532,104 +429,6 @@ export default function AssignmentDetailPage() {
         ? `${result.interpreterName} is assigned and was emailed the booking details.`
         : `${result.interpreterName} is assigned, but the email could not be sent. Use "Resend details".`
     );
-  };
-
-  const handleCreateOffer = async (posIdx: 1 | 2 = 1) => {
-    const rec = posIdx === 1 ? recipient1 : recipient2;
-    const expHours = posIdx === 1 ? expiryHours1 : expiryHours2;
-    const expMinutes = posIdx === 1 ? expiryMinutes1 : expiryMinutes2;
-    const setErr = posIdx === 1 ? setErrorMessage1 : setErrorMessage2;
-    const setSuccess = posIdx === 1 ? setSuccessMessage1 : setSuccessMessage2;
-    const setRec = posIdx === 1 ? setRecipient1 : setRecipient2;
-    const setIsSending = posIdx === 1 ? setIsSendingOffer1 : setIsSendingOffer2;
-
-    setErr('');
-    setSuccess('');
-
-    if (!rec) {
-      setErr('Please select an interpreter to send the offer to.');
-      return;
-    }
-
-    // The window is sent as minutes; the server turns it into the absolute deadline (this check just fails fast).
-    const expiry = checkOfferExpiry({
-      hours: expHours,
-      minutes: expMinutes,
-      now: new Date(),
-      timeZone: resolveJobZone(foundRequest),
-      startsAt: parseSafeDate(foundRequest?.startsAt),
-    });
-    if (!expiry.ok) {
-      setErr(expiry.message);
-      return;
-    }
-
-    const selectedInterpreter = dbInterpreters.find((i: any) => i.id === rec);
-    const interpreterEmail = selectedInterpreter?.email;
-
-    if (!interpreterEmail) {
-      setErr('Unable to find an email address for the selected interpreter.');
-      return;
-    }
-
-    // Same rule as the disabled button (and the server): no standard offer to someone unavailable / outside hours.
-    const block = offerBlock(interpreterFitMap[rec], selectedInterpreter?.name ?? 'This interpreter');
-    if (block) {
-      setErr(block.message);
-      return;
-    }
-
-    setIsSending(true);
-
-    try {
-      // 1. Create the offer in the database (refused for past jobs and bad deadlines, with a readable reason)
-      const created = await createOffer({
-        requestId: id,
-        interpreterId: rec,
-        expiresInMinutes: expiry.totalMinutes,
-        positionIndex: posIdx
-      });
-      if (!created.success) throw new Error(created.error);
-
-      // 2. Dispatch offer email with magic link
-      const dispatchRes = await fetch('/api/offers/dispatch', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          interpreterId: rec,
-          requestId: id,
-          interpreterEmail,
-          positionNumber: posIdx,
-        }),
-      });
-
-      const dispatchData = await dispatchRes.json();
-
-      if (!dispatchRes.ok || !dispatchData.success) {
-        throw new Error(dispatchData.error || 'Failed to dispatch offer email');
-      }
-
-      // 3. Refetch the request to get updated offers list
-      const updatedRequest = await fetchLiveRequestById(id);
-      setFoundRequest(updatedRequest);
-      
-      setErr('');
-      setSuccess('Offer emailed successfully');
-      showToast('Offer emailed successfully');
-      setRec('');
-      // The next offer for this position starts from a fresh 24-hour default again.
-      expiryEditedRef.current[posIdx] = false;
-      (posIdx === 1 ? setExpiryHours1 : setExpiryHours2)(String(DEFAULT_OFFER_EXPIRY_HOURS));
-      (posIdx === 1 ? setExpiryMinutes1 : setExpiryMinutes2)('0');
-    } catch (error) {
-      console.error('[Offer Dispatch] Error creating or sending offer:');
-      const errorMsg = error instanceof Error ? error.message : 'Failed to create offer. Please try again.';
-      setErr(errorMsg);
-    } finally {
-      setIsSending(false);
-    }
   };
 
  if (isLoading) {
@@ -746,41 +545,40 @@ export default function AssignmentDetailPage() {
  const requestedInterpreterName = textOf(foundRequest?.data?.intake?.requestedInterpreter) || null;
  const fullRoster = activeRoster.map((person) => ({ id: String(person.id), name: String(person.name ?? '') }));
 
- const setRecipientFor = (posIdx: Position, value: string) => {
-   // One way to book at a time: while an interpreter is picked in "Directly assign" the offer form is paused.
-   if (value && assignEngaged[posIdx]) return;
-   if (value) applyDefaultExpiry(posIdx);
-   if (posIdx === 1) {
-     setRecipient1(value);
-     if (value && recipient2 === value) setRecipient2('');
-   } else {
-     setRecipient2(value);
-     if (value && recipient1 === value) setRecipient1('');
-   }
- };
+ const isClosedOut = Boolean(foundRequest?.isCompleted);
+ const addBlockedReason = isCancelled ? 'This appointment is cancelled.'
+   : isClosedOut ? 'This appointment is closed out.'
+   : isAppointmentFinished ? 'This appointment has ended.'
+   : totalPositions >= MAX_POSITIONS ? `A job can have at most ${MAX_POSITIONS} interpreter positions.`
+   : null;
 
- const positionViews: PositionView[] = ([1, 2].slice(0, totalPositions) as Position[]).map((posIdx) => {
-   const isSlot1 = posIdx === 1;
-   const accepted: StaffBooking | null = isSlot1 ? slot1Accepted : slot2Accepted;
-   const reservedBy = isSlot1
-     ? (foundRequest?.slots?.find((s: { positionIndex: number }) => s.positionIndex === 1)?.reservedBy || foundRequest?.assignedInterpreterId || foundRequest?.data?.assignedInterpreterId)
-     : (foundRequest?.slots?.find((s: { positionIndex: number }) => s.positionIndex === 2)?.reservedBy || foundRequest?.position2InterpreterId || foundRequest?.data?.position2InterpreterId);
+ const positionViews: PositionView[] = positionFacts.map((facts) => {
+   const form = offerForms.formOf(facts.id);
+   const accepted = facts.accepted;
+   const removeBlockedReason = isCancelled || isClosedOut ? 'This appointment is cancelled or closed out.'
+     : accepted ? 'An interpreter is booked here. Remove the booking first.'
+     : facts.activeOffer ? 'An offer is waiting for an answer. Withdraw it first.'
+     : totalPositions <= 1 ? 'A job needs at least one interpreter position.'
+     : null;
    return {
-     posIdx,
+     posIdx: facts.id,
+     ordinal: facts.ordinal,
+     canRemove: removeBlockedReason === null,
+     removeBlockedReason,
      accepted,
-     activeOffer: (isSlot1 ? slot1ActiveOffer : slot2ActiveOffer) as StaffActiveOffer | null,
-     pastOffers: isSlot1 ? slot1PastOffers : slot2PastOffers,
-     needsReplacement: isSlot1 ? slot1NeedsReplacement : slot2NeedsReplacement,
-     roster: isSlot1 ? rosterSlot1 : rosterSlot2,
-     recipient: isSlot1 ? recipient1 : recipient2,
-     expiryHours: isSlot1 ? expiryHours1 : expiryHours2,
-     expiryMinutes: isSlot1 ? expiryMinutes1 : expiryMinutes2,
-     errorMessage: isSlot1 ? errorMessage1 : errorMessage2,
-     successMessage: isSlot1 ? successMessage1 : successMessage2,
-     isSending: isSlot1 ? isSendingOffer1 : isSendingOffer2,
-     offerLocked: assignEngaged[posIdx],
+     activeOffer: facts.activeOffer as StaffActiveOffer | null,
+     pastOffers: facts.pastOffers,
+     needsReplacement: facts.needsReplacement,
+     roster: rosterFor(facts.id),
+     recipient: form.recipient,
+     expiryHours: form.expiryHours,
+     expiryMinutes: form.expiryMinutes,
+     errorMessage: form.errorMessage,
+     successMessage: form.successMessage,
+     isSending: form.isSending,
+     offerLocked: Boolean(offerForms.engaged[facts.id]),
      assignedInterpreterId: accepted
-       ? String(accepted.interpreterId || reservedBy || dbInterpreters.find((i: { name: string }) => i.name === accepted.interpreterName)?.id || '')
+       ? String(accepted.interpreterId || facts.reservedBy || dbInterpreters.find((i: { name: string }) => i.name === accepted.interpreterName)?.id || '')
        : '',
    };
  });
@@ -788,6 +586,10 @@ export default function AssignmentDetailPage() {
  const staffingCtx: StaffingContext = {
    requestId: String(foundRequest?.id || id || ''),
    totalPositions,
+   maxPositions: MAX_POSITIONS,
+   slotBusy: slotActions.busy,
+   slotError: slotActions.error,
+   addBlockedReason,
    offers: realOffers,
    nowMs: currentTime,
    isCancelled,
@@ -808,14 +610,9 @@ export default function AssignmentDetailPage() {
  };
 
  const staffingActions: StaffingActions = {
-   setRecipient: setRecipientFor,
-   setExpiry: (posIdx, next) => {
-     (posIdx === 1 ? setExpiryHours1 : setExpiryHours2)(next.hours);
-     (posIdx === 1 ? setExpiryMinutes1 : setExpiryMinutes2)(next.minutes);
-     expiryEditedRef.current[posIdx] = true;
-     (posIdx === 1 ? setErrorMessage1 : setErrorMessage2)('');
-   },
-   createOffer: handleCreateOffer,
+   setRecipient: offerForms.setRecipientFor,
+   setExpiry: offerForms.setExpiry,
+   createOffer: offerForms.send,
    withdrawOffer: async (offerId) => {
      try {
        await updateOfferStatus(offerId, 'withdrawn');
@@ -826,7 +623,10 @@ export default function AssignmentDetailPage() {
      }
    },
    directlyAssigned: handleDirectlyAssigned,
-   setAssignEngaged: (posIdx, engaged) => setAssignEngaged((prev) => (prev[posIdx] === engaged ? prev : { ...prev, [posIdx]: engaged })),
+   setAssignEngaged: offerForms.setEngaged,
+   addSlot: slotActions.add,
+   removeSlot: slotActions.remove,
+   clearSlotError: slotActions.clearError,
    openRemoveBooking: handleOpenRemoveBookingModal,
    openAccess: openEditAccessModal,
    toast: showToast,
@@ -1259,8 +1059,7 @@ export default function AssignmentDetailPage() {
      hoursMap[1] = legacyHours;
    }
 
-   const positionsWithHours = ([1, 2] as const).filter(pos => {
-     if (totalPositions === 1 && pos === 2) return false;
+   const positionsWithHours = positionIds.filter(pos => {
      return Boolean(hoursMap[pos] || (pos === 1 && (foundRequest?.travelStartTime || ['awaiting_review', 'correction_requested', 'approved'].includes(foundRequest?.status))));
    });
 
@@ -1290,7 +1089,7 @@ export default function AssignmentDetailPage() {
          <div>
            <h2 className="text-[18px] font-medium text-[var(--ink)]">Reported service hours</h2>
            <p className="text-xs text-[var(--sage)] mt-0.5">
-             {totalPositions === 2 ? 'Tracked and reviewed per interpreter position' : 'Actual service time submitted by interpreter'}
+             {totalPositions > 1 ? 'Tracked and reviewed per interpreter position' : 'Actual service time submitted by interpreter'}
            </p>
          </div>
          <Link href="/hours-review" className="text-xs font-semibold text-[var(--forest)] hover:underline inline-flex items-center gap-1">
@@ -1308,8 +1107,9 @@ export default function AssignmentDetailPage() {
        <div className="space-y-6">
          {positionsWithHours.map(posIdx => {
            const hoursSub = hoursMap[posIdx] || null;
-           const posAccepted = posIdx === 1 ? slot1Accepted : slot2Accepted;
-           const posInterpreterName = posAccepted?.interpreterName || hoursSub?.interpreterName || (posIdx === 1 ? 'Position 1 interpreter' : 'Position 2 interpreter');
+           const posFacts = positionFacts.find((f) => f.id === posIdx);
+           const posOrdinal = posFacts?.ordinal ?? posIdx;
+           const posInterpreterName = posFacts?.accepted?.interpreterName || hoursSub?.interpreterName || `Position ${posOrdinal} interpreter`;
            
            const actualStart = hoursSub?.actualStartTime || foundRequest?.startsAt;
            const actualEnd = hoursSub?.actualEndTime || foundRequest?.endsAt;
@@ -1341,7 +1141,7 @@ export default function AssignmentDetailPage() {
              <div key={posIdx} className="p-5 bg-gray-50/70 rounded-xl border border-gray-200/80 space-y-4">
                <div className="flex items-center justify-between pb-3 border-b border-gray-200/60">
                  <div className="flex items-center gap-2">
-                   <span className="font-semibold text-sm text-[var(--ink)]">Position {posIdx} · {posInterpreterName}</span>
+                   <span className="font-semibold text-sm text-[var(--ink)]">Position {posOrdinal} · {posInterpreterName}</span>
                  </div>
                  <span className={`px-2.5 py-0.5 text-[11px] font-medium rounded-full ${statusBadge.bg}`}>
                    {statusBadge.label}
@@ -1514,7 +1314,7 @@ export default function AssignmentDetailPage() {
  </div>
  
  {(() => {
-   const hasBookedInterpreter = Boolean(slot1Accepted || slot2Accepted);
+   const hasBookedInterpreter = staffedCount > 0;
    const startsSoonOrStarted = currentTime >= startsAtUtcMs || startsAtUtcMs - currentTime < 24 * 60 * 60 * 1000;
    if (!hasBookedInterpreter) {
      // STATE A: nobody booked
@@ -1613,11 +1413,11 @@ export default function AssignmentDetailPage() {
         </div>
 
         <p className="text-sm text-gray-600 leading-relaxed mb-6">
-          This will unassign <span className="font-semibold text-gray-800">{removeBookingTarget?.interpreterName || (removeBookingTarget?.positionIndex === 2 ? slot2Accepted?.interpreterName : slot1Accepted?.interpreterName) || 'the interpreter'}</span> and reopen <span className="font-semibold text-gray-800">Position {removeBookingTarget?.positionIndex || 1}</span> so a new interpreter can be offered or assigned immediately.{' '}
-          {totalPositions === 2 ? (
+          This will unassign <span className="font-semibold text-gray-800">{removeBookingTarget?.interpreterName || positionFacts.find((f) => f.id === removeBookingTarget?.positionIndex)?.accepted?.interpreterName || 'the interpreter'}</span> and reopen <span className="font-semibold text-gray-800">Position {positionFacts.find((f) => f.id === removeBookingTarget?.positionIndex)?.ordinal ?? 1}</span> so a new interpreter can be offered or assigned immediately.{' '}
+          {totalPositions > 1 ? (
             <>
-              Position {removeBookingTarget?.positionIndex === 2 ? '1' : '2'} will remain completely untouched. The appointment will not be cancelled; its status will transition to{' '}
-              <span className="font-semibold text-amber-700">Needs replacement</span> ({Math.max(0, staffedCount - 1)} of 2 staffed).
+              The other {totalPositions - 1 === 1 ? 'position' : 'positions'} will remain completely untouched. The appointment will not be cancelled; its status will transition to{' '}
+              <span className="font-semibold text-amber-700">Needs replacement</span> ({Math.max(0, staffedCount - 1)} of {totalPositions} staffed).
             </>
           ) : (
             <>

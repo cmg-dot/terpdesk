@@ -79,7 +79,8 @@ export function OpenPosition({ view, ctx, actions }: Props) {
         <DirectAssignPanel
           jobId={ctx.requestId}
           positionIndex={posIdx}
-          showPosition={ctx.totalPositions === 2}
+          showPosition={ctx.totalPositions > 1}
+          positionLabel={view.ordinal}
           roster={view.roster}
           fits={ctx.fits}
           offers={ctx.offers}

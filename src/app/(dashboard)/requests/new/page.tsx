@@ -1,5 +1,7 @@
 "use client";
 
+import { PositionCountField } from "@/components/requests/PositionCountField";
+import { countFromLabel, positionsLabel } from "@/lib/positions";
 import { isStateAgencyClient } from "@/lib/validation/client";
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
@@ -503,16 +505,16 @@ export default function NewRequestPage() {
       repeats: Boolean(formData.repeats),
       recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
       positions: formData.positions,
-      requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-      slotCount: formData.positions === "Team — two independent positions" ? 2 : 1
+      requiredPositions: countFromLabel(formData.positions) ?? 1,
+      slotCount: countFromLabel(formData.positions) ?? 1
     },
    onsite: { venue: formData.venue, address: formData.address, building: formData.building, parking: formData.parking, entrance: formData.entrance, contact: formData.onsiteContactName, contactMethod: formData.onsiteContactPhone, ...extrasPayload.onsite },
    requester: { name: formData.requesterName, org: formData.requesterOrg, email: formData.email, phone: formData.phone, prefContact: formData.prefContact, reqInterpreter: formData.prefInterpreter, teamSuggested: formData.teamSuggested, billOrg: formData.billOrg, billContact: formData.billContact, billEmail: formData.billEmail, poNumber: formData.poNumber },
    prepNotes: formData.prepNotes,
    privateNotes: extrasPayload.privateNotes,
    positions: formData.positions,
-   requiredPositions: formData.positions === "Team — two independent positions" ? 2 : 1,
-   slotCount: formData.positions === "Team — two independent positions" ? 2 : 1
+   requiredPositions: countFromLabel(formData.positions) ?? 1,
+   slotCount: countFromLabel(formData.positions) ?? 1
  };
  
  try {
@@ -934,11 +936,11 @@ export default function NewRequestPage() {
  {/* Required interpreter positions Section */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Required interpreter positions</h2>
- <Field 
- label="Positions staff will fill"
- subtext="Save the request, then choose a recipient for each position. No interpreter is booked yet."
+  <Field
+ label="Interpreters needed"
+ subtext="Choose how many interpreter positions this job has (1 to 10). Save the request, then choose a recipient for each position. No interpreter is booked yet."
  >
- <CustomSelect options={["One interpreter", "Team — two independent positions"]} value={formData.positions} onChange={(val) => handleChange("positions", val)} />
+ <PositionCountField value={countFromLabel(formData.positions) ?? 1} onChange={(n) => handleChange("positions", positionsLabel(n))} />
  </Field>
  </div>
 
