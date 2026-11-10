@@ -8,6 +8,8 @@ interface SignaturePadProps {
   onChange: (dataUrl: string | null) => void;
   height?: number;
   disabled?: boolean;
+  /** What the pad is for, announced to screen readers (two pads can be on one screen). */
+  label?: string;
 }
 
 interface Point {
@@ -15,7 +17,7 @@ interface Point {
   y: number;
 }
 
-export const SignaturePad = ({ onChange, height = 180, disabled = false }: SignaturePadProps) => {
+export const SignaturePad = ({ onChange, height = 180, disabled = false, label = "Signature drawing area" }: SignaturePadProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const drawingRef = useRef(false);
   const lastPointRef = useRef<Point | null>(null);
@@ -116,7 +118,7 @@ export const SignaturePad = ({ onChange, height = 180, disabled = false }: Signa
           ref={canvasRef}
           style={{ height, touchAction: "none" }}
           className="block w-full cursor-crosshair rounded-lg"
-          aria-label="Signature drawing area"
+          aria-label={label}
           onPointerDown={onPointerDown}
           onPointerMove={onPointerMove}
           onPointerUp={onPointerUp}

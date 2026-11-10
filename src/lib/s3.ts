@@ -78,6 +78,20 @@ export async function uploadObject(key: string, body: Buffer, contentType: strin
   );
 }
 
+/**
+ * The bytes of a stored object, read by the server itself (for building a document that embeds it). `maxBytes` guards memory:
+ * an object larger than that is refused rather than loaded.
+ */
+export async function readObject(key: string, maxBytes: number): Promise<Buffer> {
+  const { client, config } = storage();
+  const out = await client.send(new GetObjectCommand({ Bucket: config.bucket, Key: key }));
+  if (!out.Body) throw new Error("The stored file is empty.");
+  if (Number(out.ContentLength ?? 0) > maxBytes) throw new Error("The stored file is too large.");
+  const bytes = Buffer.from(await out.Body.transformToByteArray());
+  if (bytes.length > maxBytes) throw new Error("The stored file is too large.");
+  return bytes;
+}
+
 /** A short-lived GET URL. `fileName` is offered to the browser as the download name. */
 export async function presignDownload(key: string, fileName: string): Promise<string> {
   const { client, config } = storage();

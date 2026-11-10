@@ -24,6 +24,7 @@ import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/ti
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { InterpreterSubmitForm } from "@/components/features/InterpreterSubmitForm";
+import { useOnsiteSignoff } from "@/hooks/useOnsiteSignoff";
 import { useGlobalState } from "@/context/GlobalContext";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
@@ -356,6 +357,9 @@ function ServiceTimeBlock({ job }: { job: any }) {
   const [note, setNote] = useState("");
 
   const [signatureDataUrl, setSignatureDataUrl] = useState<string | null>(null);
+  // Non-state jobs with the on-site sign-off switched on: the facility contact prints their name and signs too (checked again on the server).
+  const onsiteRequired = (job as any).onsiteSignatureRequired === true;
+  const onsiteSignoff = useOnsiteSignoff();
 
   const isOdhh = job.program === 'wa_odhh' || job.program === 'WA ODHH' || (job as any).data?.intake?.program === 'WA ODHH' || (job as any).data?.intake?.program === 'wa_odhh';
   const [travelStart, setTravelStart] = useState(() => toLocalInput(job.startsAt));
@@ -507,6 +511,10 @@ function ServiceTimeBlock({ job }: { job: any }) {
       return;
     }
     if (!signatureDataUrl) return;
+    if (onsiteRequired && !onsiteSignoff.input) {
+      setSubmitError("Please have the on-site contact print their name and sign before submitting.");
+      return;
+    }
     if (isOdhh && serviceCompleted === 'no' && !cancellationReason.trim()) {
       alert("Please give a reason the service was not completed.");
       return;
@@ -607,6 +615,7 @@ function ServiceTimeBlock({ job }: { job: any }) {
           history: updatedHistory,
           positionIndex: (job as any).positionIndex || 1,
           signatureDataUrl,
+          ...(onsiteRequired ? { onsiteSignoff: onsiteSignoff.input } : {}),
           cancellationReason: isOdhh && serviceCompleted === 'no' ? cancellationReason.trim() : undefined,
           legs: mileageLegs.map(leg => ({
             fromLabel: leg.from,
@@ -790,6 +799,11 @@ function ServiceTimeBlock({ job }: { job: any }) {
                onNoteChange={setNote}
                hasSignature={Boolean(signatureDataUrl)}
                onSignatureChange={setSignatureDataUrl}
+               onsite={
+                 onsiteRequired
+                   ? { printedName: onsiteSignoff.printedName, onPrintedNameChange: onsiteSignoff.setPrintedName, onSignatureChange: onsiteSignoff.setSignature, complete: onsiteSignoff.complete }
+                   : undefined
+               }
                onSubmit={handleSubmit}
                onSaveDraft={handleSaveDraft}
              />

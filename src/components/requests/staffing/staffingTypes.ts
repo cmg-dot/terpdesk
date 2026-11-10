@@ -53,6 +53,8 @@ export interface PositionView {
   offerLocked: boolean;
   /** The booked interpreter's id, worked out from the job record ("" when unknown). */
   assignedInterpreterId: string;
+  /** Hours have been submitted for this position (what makes the Verification PDF available on a non-state job). */
+  hasHours: boolean;
 }
 
 /** Facts about the job and the page, shared by both positions. */

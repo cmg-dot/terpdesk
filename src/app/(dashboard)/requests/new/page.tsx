@@ -17,6 +17,7 @@ import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, ty
 import { isInvalidEmail } from "@/utils/validation";
 import { IconInput } from "@/components/ui/IconInput";
 import { programIdentifiers } from "@/lib/programIdentifiers";
+import { OnsiteSignatureCard } from "@/components/requests/form/OnsiteSignatureCard";
 import { RoomFloorFields } from "@/components/requests/form/RoomFloorFields";
 import { RequestFlagsCard } from "@/components/requests/form/RequestFlagsCard";
 import { PatientInfoCard } from "@/components/requests/form/PatientInfoCard";
@@ -189,7 +190,9 @@ export default function NewRequestPage() {
  positions: "One interpreter",
  program: "General",
  odhhSrn: "",
- odhhAccessCode: ""
+ odhhAccessCode: "",
+ // On by default for a new non-state job; the server writes the stored value and always turns it off for a state job.
+ onsiteSignatureRequired: true
  });
 
  const hasPreselectedNewRef = useRef(false);
@@ -514,9 +517,10 @@ export default function NewRequestPage() {
    privateNotes: extrasPayload.privateNotes,
    positions: formData.positions,
    requiredPositions: countFromLabel(formData.positions) ?? 1,
-   slotCount: countFromLabel(formData.positions) ?? 1
+   slotCount: countFromLabel(formData.positions) ?? 1,
+   onsiteSignatureRequired: formData.onsiteSignatureRequired
  };
- 
+
  try {
    const dbId = await createRequest({
      title: formData.appointmentTitle || "Interpreting request",
@@ -911,6 +915,8 @@ export default function NewRequestPage() {
  )}
 
  </div>
+
+ <OnsiteSignatureCard program={formData.program} checked={formData.onsiteSignatureRequired} onChange={(next) => handleChange("onsiteSignatureRequired", next)} />
 
  <PatientInfoCard values={extras} showOther={false} onChange={(field, value) => changeExtras(field, value)} />
 

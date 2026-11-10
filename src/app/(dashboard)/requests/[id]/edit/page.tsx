@@ -21,6 +21,8 @@ import { VirtualMeetingFields, isVirtualFormat } from "@/components/requests/Vir
 import { programIdentifiers } from "@/lib/programIdentifiers";
 import { RoomFloorFields } from "@/components/requests/form/RoomFloorFields";
 import { RequestFlagsCard } from "@/components/requests/form/RequestFlagsCard";
+import { OnsiteSignatureCard } from "@/components/requests/form/OnsiteSignatureCard";
+import { hasSubmittedHours } from "@/lib/onsiteSignature";
 import { PatientInfoCard } from "@/components/requests/form/PatientInfoCard";
 import { EMPTY_EXTRAS, buildExtrasPayload, extrasFromRequest } from "@/lib/requestFormExtras";
 import type { FormExtras } from "@/lib/requestFormExtras";
@@ -152,6 +154,8 @@ export default function EditRequestPage() {
  program: "General",
  odhhSrn: "",
  odhhAccessCode: "",
+ // A job saved before this setting existed has none on file, which counts as off.
+ onsiteSignatureRequired: false,
  platform: "Zoom",
  meetingLink: "",
  meetingId: "",
@@ -202,6 +206,7 @@ export default function EditRequestPage() {
        program: existingRequest?.data?.intake?.program || "General",
        odhhSrn: existingRequest?.data?.intake?.odhhSrn || "",
        odhhAccessCode: existingRequest?.data?.intake?.odhhAccessCode || "",
+       onsiteSignatureRequired: existingRequest?.data?.onsiteSignatureRequired === true,
        platform: existingRequest?.platform || existingRequest?.details?.platform || "Zoom",
        meetingLink: existingRequest?.meetingLink || existingRequest?.details?.meetingLink || existingRequest?.virtualLink || existingRequest?.details?.virtualLink || "",
        meetingId: existingRequest?.meetingId || existingRequest?.details?.meetingId || "",
@@ -668,6 +673,8 @@ export default function EditRequestPage() {
           slotCount: countFromLabel(formData.positions) ?? 1,
           repeats: Boolean(formData.repeats),
           recurrenceNote: formData.repeats ? (formData.recurrenceNote || "") : "",
+          // The server re-resolves this (off for a state job, frozen once hours exist), so this is only the staff's choice.
+          onsiteSignatureRequired: formData.onsiteSignatureRequired,
           // Only the hearing identity (Patient Information card); the server keeps every other saved brief key.
           brief: extrasPayload.brief,
           intake: {
@@ -1160,6 +1167,13 @@ export default function EditRequestPage() {
  )}
 
  </div>
+
+ <OnsiteSignatureCard
+ program={formData.program}
+ checked={formData.onsiteSignatureRequired}
+ locked={hasSubmittedHours(existingRequest?.data)}
+ onChange={(next) => handleChange("onsiteSignatureRequired", next)}
+ />
 
  <PatientInfoCard
  values={extras}

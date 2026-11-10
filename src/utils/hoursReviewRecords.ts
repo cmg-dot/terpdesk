@@ -2,6 +2,7 @@ import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { getIanaZone } from "@/utils/timezone";
 import { requestReference } from "@/utils/statusEngine";
 import { legacyPosition1Hours } from "@/utils/hoursState";
+import { isStateJobRequest } from "@/lib/stateJob";
 import { isPlainSingle, positionOrdinal, readPositions } from "@/lib/positions";
 
 export interface ServiceRecord {
@@ -36,6 +37,8 @@ export interface ServiceRecord {
   /** Set when the record comes from a magic-link timesheet submission. */
   timesheetId?: string;
   signatureDataUrl?: string | null;
+  /** Set only when the Verification PDF can be downloaded for this record: a non-state job with hours submitted. The position's stable id. */
+  pdfPosition?: number;
   cancellationReason?: string | null;
   /** IANA zone of the job. Times are always shown in it, never in the viewer's local zone. */
   timeZone?: string;
@@ -123,6 +126,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             serviceNote: hoursSub?.note || "",
             history: hoursSub?.history || [],
             signatureDataUrl: hoursSub?.signatureDataUrl ?? null,
+            pdfPosition: hoursSub && !isStateJobRequest({ isStateJob: req.isStateJob, data: req.data }) ? pos : undefined,
             cancellationReason: hoursSub?.cancellationReason ?? null,
             travelLegs: Array.isArray(hoursSub?.legs) ? hoursSub.legs : undefined,
           };
@@ -152,6 +156,10 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
         if (r.timesheetId && !liveIds.has(r.timesheetId) && r.state !== 'approved') merged.splice(i, 1);
       }
       for (const ts of submitted) {
+        // An emailed-link record has no position of its own: it is the one whose mirrored hours carry this timesheet's id.
+        const owner = requests.find((r) => r.id === ts.requestId);
+        const mirrored: Record<string, { timesheetId?: string }> = owner?.data?.hoursSubmissions ?? {};
+        const mirroredPosition = Object.keys(mirrored).map(Number).find((p) => Number.isInteger(p) && p >= 1 && mirrored[p]?.timesheetId === ts.timesheetId);
         const rec: ServiceRecord = {
           id: `ts-${ts.timesheetId}`,
           timesheetId: ts.timesheetId,
@@ -180,6 +188,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
           cancellationReason: ts.cancellationReason,
           travelLegs: ts.travelLegs,
           signatureDataUrl: ts.signatureDataUrl,
+          pdfPosition: owner && mirroredPosition && !ts.isOdhh && !isStateJobRequest({ isStateJob: owner.isStateJob, data: owner.data }) ? mirroredPosition : undefined,
           history: [],
         };
         const idx = merged.findIndex(r => r.timesheetId === ts.timesheetId);

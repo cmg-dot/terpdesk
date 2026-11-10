@@ -6,6 +6,7 @@ import { timesheets } from "@/db/schema";
 import { isTeamRequestData, legacyPosition1Hours } from "@/utils/hoursState";
 import { timesheetToHoursSubmission } from "@/lib/timesheetSync";
 import type { TimesheetForSync } from "@/lib/timesheetSync";
+import { withoutOnsiteKey } from "@/lib/onsiteSignature";
 
 type JsonObject = Record<string, unknown>;
 
@@ -91,5 +92,6 @@ export function resolveOwnHours(params: {
       ? { ...fromSheet, ...storedHours, ...(sheet?.status === "approved" ? { status: "approved", approvedMileage: fromSheet.approvedMileage } : {}) }
       : { ...(storedHours || {}), ...fromSheet, isDraft: false };
 
-  return { posIdx, isTeamJob, hoursSub };
+  // The on-site sign-off's storage key stays on the server: the interpreter's browser gets the printed name and time only.
+  return { posIdx, isTeamJob, hoursSub: withoutOnsiteKey(hoursSub) };
 }

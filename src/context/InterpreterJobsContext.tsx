@@ -26,6 +26,8 @@ export interface Job {
   serviceRecordState?: 'not_started' | 'submitted' | 'approved';
   program?: string;
   isStateJob?: boolean;
+  /** The job needs the on-site contact's printed name and signature when hours are submitted (never for a state job). */
+  onsiteSignatureRequired?: boolean;
   timeZone?: string;
   hoursSubmission?: any;
   /** Two-interpreter job: request-wide hours status/travel must never be used for this interpreter's hours. */
@@ -97,6 +99,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           endsAt: o.endsAt,
           program: o.program,
           isStateJob: (o as any).isStateJob === true,
+          onsiteSignatureRequired: (o as any).onsiteSignatureRequired === true,
           timeZone: o.timeZone,
           hoursSubmission: (o as any).hoursSubmission,
           isTeamJob: o.isTeamJob,

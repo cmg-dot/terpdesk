@@ -2,6 +2,8 @@
 
 import { Dropdown } from "@/components/ui/Dropdown";
 import { SignaturePad } from "@/components/ui/SignaturePad";
+import { OnsiteSignoffSection } from "@/components/features/OnsiteSignoffSection";
+import type { OnsiteSignoffSectionProps } from "@/components/features/OnsiteSignoffSection";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 import { sanitizeDecimal } from "@/lib/numericInput";
 
@@ -63,6 +65,8 @@ interface InterpreterSubmitFormProps {
 
   hasSignature: boolean;
   onSignatureChange: (dataUrl: string | null) => void;
+  /** Set only for a job that needs the on-site contact's sign-off (non-state, switched on); `complete` is name + signature both filled in. */
+  onsite?: OnsiteSignoffSectionProps & { complete: boolean };
   onSubmit: () => void;
   /** Omit to hide the "Save draft" button (e.g. the zero-login form has no drafts). */
   onSaveDraft?: () => void;
@@ -232,8 +236,10 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
         <h4 className="text-sm font-medium text-[var(--ink)] mb-1">Signature</h4>
         <p className="text-xs text-[var(--sage)] mb-3">Sign below to confirm the hours you are reporting. A signature is required to submit.</p>
-        <SignaturePad onChange={p.onSignatureChange} disabled={locked || p.isSubmitting} />
+        <SignaturePad onChange={p.onSignatureChange} disabled={locked || p.isSubmitting} label="Interpreter signature drawing area" />
       </div>
+
+      {p.onsite && <OnsiteSignoffSection {...p.onsite} disabled={locked || p.isSubmitting} />}
 
       {p.formError && (
         <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">
@@ -242,7 +248,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature || (p.onsite !== undefined && !p.onsite.complete)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           {p.isSubmitting ? (p.submittingLabel ?? "Submitting...") : (p.submitLabel ?? "Submit actual hours")}
         </button>
         {p.onSaveDraft && (

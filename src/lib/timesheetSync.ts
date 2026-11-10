@@ -5,6 +5,7 @@ import type { RequestData, SelectTimesheet, TimesheetTravelLeg } from "@/db/sche
 import { positionLabel, positionOfOffer } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { legacyPosition1Hours } from "@/utils/hoursState";
+import type { OnsiteSignoff } from "@/lib/onsiteSignature";
 
 /**
  * Keeps magic-link timesheets and in-app hours on ONE source of truth.
@@ -91,7 +92,14 @@ const FINAL_REQUEST_STATUSES = new Set(["approved", "completed", "billed", "canc
  * Writes a just-submitted magic-link timesheet into `requests.data.hoursSubmissions` and moves the request to
  * 'awaiting_review', exactly like an in-app submission. Run inside the submitting transaction.
  */
-export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, interpreterId: string, ts: TimesheetForSync): Promise<void> {
+export async function mirrorTimesheetSubmission(
+  tx: DbTx,
+  requestId: string,
+  interpreterId: string,
+  ts: TimesheetForSync,
+  /** The on-site sign-off that came with this submission (null when the job needs none); omit to leave the record's as it is. */
+  onsiteSignoff?: OnsiteSignoff | null,
+): Promise<void> {
   const [req] = await tx
     .select({ status: requests.status, data: requests.data })
     .from(requests)
@@ -111,6 +119,7 @@ export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, int
   const submission = {
     ...existing,
     ...timesheetToHoursSubmission(ts, pos),
+    ...(onsiteSignoff !== undefined ? { onsiteSignoff } : {}),
     interpreterId,
     history: [
       ...history,

@@ -7,6 +7,7 @@ import type { MileageLeg } from "@/components/features/InterpreterSubmitForm";
 import { submitTimesheet } from "@/app/actions/submitTimesheet";
 import { TimesheetSubmitted } from "@/components/features/TimesheetSubmitted";
 import { formatHoursMinutes } from "@/lib/durationFormat";
+import { useOnsiteSignoff } from "@/hooks/useOnsiteSignoff";
 import { splitTimesheetError } from "@/lib/timesheetErrors";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
 
@@ -17,6 +18,8 @@ interface TimesheetFormProps {
   timeZoneLabel: string;
   isOdhh: boolean;
   odhhPortalUrl: string | null;
+  /** The job needs the on-site contact's printed name and signature too (the server checks this again on submit). */
+  onsiteSignatureRequired: boolean;
 }
 
 const formatServiceTime = (start: string, end: string, breakMinutes: number): string => {
@@ -37,7 +40,9 @@ export const TimesheetForm = ({
   timeZoneLabel,
   isOdhh,
   odhhPortalUrl,
+  onsiteSignatureRequired,
 }: TimesheetFormProps) => {
+  const onsiteSignoff = useOnsiteSignoff();
   const [start, setStart] = useState(defaultStart);
   const [end, setEnd] = useState(defaultEnd);
   const [breakMinutes, setBreakMinutes] = useState("0");
@@ -73,6 +78,10 @@ export const TimesheetForm = ({
       setError("Please give a reason the service was not completed.");
       return;
     }
+    if (onsiteSignatureRequired && !onsiteSignoff.input) {
+      setError("Please have the on-site contact print their name and sign before submitting.");
+      return;
+    }
     setIsPending(true);
     try {
       const result = await submitTimesheet({
@@ -88,6 +97,7 @@ export const TimesheetForm = ({
           roundTrip: leg.type === "round_trip",
         })),
         signatureDataUrl: signature,
+        ...(onsiteSignatureRequired ? { onsiteSignoff: onsiteSignoff.input } : {}),
         ...(isOdhh
           ? {
               travelStartsAt: travelStart,
@@ -171,6 +181,11 @@ export const TimesheetForm = ({
         onNoteChange={setNotes}
         hasSignature={Boolean(signature)}
         onSignatureChange={setSignature}
+        onsite={
+          onsiteSignatureRequired
+            ? { printedName: onsiteSignoff.printedName, onPrintedNameChange: onsiteSignoff.setPrintedName, onSignatureChange: onsiteSignoff.setSignature, complete: onsiteSignoff.complete }
+            : undefined
+        }
         onSubmit={onSubmit}
         submitLabel="Submit Timesheet"
         submittingLabel="Submitting…"

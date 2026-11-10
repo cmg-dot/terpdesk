@@ -5,6 +5,7 @@ import { getIanaZone, resolveRequestTimes, utcToWallClock } from '@/utils/timezo
 import { hashToken, TOKEN_PATTERN } from '@/lib/timesheetToken';
 import { ODHH_VERIFICATION_FORM_URL } from '@/lib/odhhPortal';
 import { isStateJobRequest } from '@/lib/stateJob';
+import { isOnsiteSignatureRequired } from '@/lib/onsiteSignature';
 
 export interface TimesheetAppointment {
   timesheetId: string;
@@ -21,6 +22,8 @@ export interface TimesheetAppointment {
   isOdhh: boolean;
   /** Link-out to the state ODHH portal; only set for ODHH assignments. */
   odhhPortalUrl: string | null;
+  /** The job needs the on-site contact's printed name and signature next to the interpreter's (decided from the job, see onsiteSignature.ts). */
+  onsiteSignatureRequired: boolean;
 }
 
 interface LooseDetails {
@@ -83,6 +86,7 @@ export async function getPendingTimesheetByToken(token: string): Promise<Timeshe
     location: asText(details.location) ?? asText(details.address) ?? asText(data.location),
     isOdhh,
     odhhPortalUrl: isOdhh ? ODHH_VERIFICATION_FORM_URL : null,
+    onsiteSignatureRequired: isOnsiteSignatureRequired(row),
   };
 }
 

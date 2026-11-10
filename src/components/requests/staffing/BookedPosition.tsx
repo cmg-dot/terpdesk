@@ -2,6 +2,7 @@
 
 import { Lock } from "lucide-react";
 import { RequestTimesheetButton } from "@/components/features/RequestTimesheetButton";
+import { VerificationPdfButton } from "@/components/features/VerificationPdfButton";
 import { InterpreterLinkButtons } from "@/components/requests/InterpreterLinkButtons";
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { CollapsiblePreviousOffers } from "@/components/requests/staffing/CollapsiblePreviousOffers";
@@ -46,6 +47,8 @@ export function BookedPosition({ view, booking, ctx, actions }: Props) {
                 }}
               />
             )}
+            {/* Non-state jobs, once hours are in: the Independent Contractor Invoice with both signatures (agency only). */}
+            {!ctx.isStateJob && view.hasHours && ctx.requestId && <VerificationPdfButton requestId={ctx.requestId} position={posIdx} />}
             {/* Booked: staff can re-send the booking confirmation (with the secure details link). */}
             {!ctx.isCancelled && <ResendDetailsButton requestId={ctx.requestId} positionIndex={posIdx} />}
             {/* The same link without sending anything: copy it, or open the interpreter's page. */}

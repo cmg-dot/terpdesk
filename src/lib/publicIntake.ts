@@ -217,6 +217,8 @@ export function buildPublicRequest(input: PublicIntake, receivedAt: Date = new D
       brief: {},
       // Always General: a public submission is never an ODHH / Apple Health (state) job.
       intake: { program: "General" },
+      // A public submission is never a state job, so the on-site sign-off defaults to on (not taken from the submitted body).
+      onsiteSignatureRequired: true,
       overview: { location, status: "Unfilled / draft" },
       details: {
         setting: input.setting,

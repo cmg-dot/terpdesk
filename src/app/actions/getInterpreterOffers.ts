@@ -1,6 +1,7 @@
 "use server";
 
 import { positionCount, positionOrdinal } from "@/lib/positions";
+import { isOnsiteSignatureRequired } from "@/lib/onsiteSignature";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
@@ -127,6 +128,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       interpreterId: row.offer.interpreterId,
       program: rowData?.intake?.program || "General",
       isStateJob: isStateJobRequest(row.request),
+      // Whether the form must collect the on-site contact's sign-off (always false for a state job); the server checks it again on submit.
+      onsiteSignatureRequired: isOnsiteSignatureRequired(row.request),
       timeZone: details.timeZone || "America/Los_Angeles",
       hoursSubmission: hoursSub,
       // Request-level columns are a single-position legacy field; never shown on a team job (each position's own

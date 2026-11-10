@@ -52,6 +52,8 @@ import type { ClientWithStats } from "@/app/actions/clients";
 import { ClientAssignmentBanner } from "@/components/features/ClientAssignmentBanner";
 import { normalizeClientType } from "@/lib/validation/client";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { hasSubmittedHours, isOnsiteSignatureRequired } from "@/lib/onsiteSignature";
+import { OnsiteSignatureSetting } from "@/components/requests/OnsiteSignatureSetting";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 
 function getErrorMessage(error: unknown): string {
@@ -580,6 +582,7 @@ export default function AssignmentDetailPage() {
      assignedInterpreterId: accepted
        ? String(accepted.interpreterId || facts.reservedBy || dbInterpreters.find((i: { name: string }) => i.name === accepted.interpreterName)?.id || '')
        : '',
+     hasHours: Boolean(foundRequest?.data?.hoursSubmissions?.[facts.id] || (facts.id === 1 && legacyPosition1Hours(foundRequest?.data))),
    };
  });
 
@@ -762,6 +765,15 @@ export default function AssignmentDetailPage() {
 
  {/* Staffing and booking, directly under the form. */}
  {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} />}
+
+ {!isCancelled && !isStateRequest && (
+ <OnsiteSignatureSetting
+ requestId={String(foundRequest?.id || id)}
+ required={isOnsiteSignatureRequired({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data })}
+ locked={hasSubmittedHours(foundRequest?.data)}
+ onChanged={(next) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), onsiteSignatureRequired: next } } : prev))}
+ />
+ )}
 
  {/* The older detail cards (still editable from here) are folded away so the form stays the focus. */}
  <details data-job-details className="group rounded-2xl border border-gray-200 bg-white">

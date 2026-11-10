@@ -17,6 +17,10 @@ import { replaceMileageLegs } from "@/lib/mileageLegs";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 import { positionLabel } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
+import { ONSITE_REQUIRED_MESSAGE, isOnsiteSignatureRequired } from "@/lib/onsiteSignature";
+import type { OnsiteSignoffInput } from "@/lib/onsiteSignature";
+import { saveOnsiteSignoff } from "@/lib/onsiteSignoff";
+import { removeObjectsQuietly } from "@/lib/s3";
 
 const signatureSchema = z
   .string()
@@ -41,6 +45,8 @@ export async function submitInterpreterHours(
     version?: number;
     history?: any[];
     signatureDataUrl?: string;
+    /** The on-site contact's printed name and signature; the server decides whether the job needs it. */
+    onsiteSignoff?: OnsiteSignoffInput;
     cancellationReason?: string;
     /** Itemised mileage legs; when present the server computes total miles from them. */
     legs?: TravelLeg[];
@@ -62,6 +68,12 @@ export async function submitInterpreterHours(
     .where(eq(requests.id, requestId))
     .limit(1);
   if (jobRow && isStateJobRequest(jobRow)) throw new Error("Cannot submit internal timesheets for State Jobs.");
+
+  // Whether the job needs the facility contact's sign-off is decided here from the job, never from the browser. The picture is
+  // stored first; if the submission then fails, the unused object is removed again below.
+  const onsiteRequired = jobRow ? isOnsiteSignatureRequired(jobRow) : false;
+  if (onsiteRequired && !extra?.onsiteSignoff) throw new Error(ONSITE_REQUIRED_MESSAGE);
+  const onsiteSignoff = onsiteRequired ? await saveOnsiteSignoff(requestId, extra?.onsiteSignoff) : null;
 
   // Optional, but if present it must be a bounded PNG data URL.
   const signatureDataUrl = extra?.signatureDataUrl === undefined
@@ -166,6 +178,8 @@ export async function submitInterpreterHours(
       note: extra?.note ?? "",
       version: extra?.version ?? 1,
       signatureDataUrl: signatureDataUrl ?? null,
+      // Every (re)submission carries its own sign-off, so an old one never stands for corrected hours.
+      onsiteSignoff,
       cancellationReason: isCompleted === false ? (cancellationReason ?? null) : null,
       submittedAt: new Date().toISOString(),
       reviewMessage: null,
@@ -202,6 +216,9 @@ export async function submitInterpreterHours(
       })
       .where(eq(requests.id, requestId));
     await replaceMileageLegs(tx, { requestId, interpreterId: sessionInterpreterId }, legs);
+  }).catch(async (err: unknown) => {
+    if (onsiteSignoff) await removeObjectsQuietly([onsiteSignoff.storageKey]);
+    throw err;
   });
 
   await logActivity({ requestId, interpreterId: sessionInterpreterId, audience: "shared", kind: "hours_submitted", message: (extra?.version ?? 1) > 1 ? "Corrected hours submitted (in app)" : "Hours submitted (in app)", actorLabel: "Interpreter" });

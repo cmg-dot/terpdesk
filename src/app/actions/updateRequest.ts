@@ -16,6 +16,7 @@ import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipien
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 import { definedOnly } from "@/lib/definedValues";
 import { clampPositionCount, countFromLabel, positionFields, readPositions, resizePositions } from "@/lib/positions";
+import { hasSubmittedHours, resolveOnsiteFlag } from "@/lib/onsiteSignature";
 
 export interface UpdateRequestPayload {
   title?: string;
@@ -163,10 +164,22 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     poNumber: payload.requester?.poNumber ?? payload.poNumber ?? existingRequester.poNumber,
   };
 
+  // State job = funding program is ODHH or Apple Health. Derived here, never sent by the client.
+  const isStateJob = isStateProgram(payload.data?.intake?.program ?? payload.intake?.program ?? existingData.intake?.program);
+  // The on-site sign-off setting is re-resolved here, never copied from the payload: it is off for a state job and frozen once hours exist.
+  const onsiteSignatureRequired = resolveOnsiteFlag({
+    sent: payload.data?.onsiteSignatureRequired,
+    existing: existingData.onsiteSignatureRequired,
+    isStateJob,
+    wasStateJob: existing.isStateJob === true,
+    hoursSubmitted: hasSubmittedHours(existingData),
+  });
+
   const updatedData = {
     ...existingData,
     // A value the form did not send (undefined) never replaces what is on file; "brief" and "intake" are merged below.
     ...definedOnly(payload.data),
+    onsiteSignatureRequired,
     setting: newSetting,
     format: newFormat,
     location: newLocation,
@@ -212,9 +225,6 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     if (positionData.retiredPositions) (updatedData as Record<string, unknown>).retiredPositions = positionData.retiredPositions;
     else delete (updatedData as Record<string, unknown>).retiredPositions;
   }
-
-  // State job = funding program is ODHH or Apple Health. Derived here, never sent by the client.
-  const isStateJob = isStateProgram(payload.data?.intake?.program ?? payload.intake?.program ?? existingData.intake?.program);
 
   // Post-booking edit: work out what the booked interpreter(s) will see change, and flag it in this same write.
   const notice = await planEditNotice(existing, { ...existing, title: newTitle, createdAt: new Date(startsAtIso), data: updatedData });

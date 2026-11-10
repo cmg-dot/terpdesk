@@ -7,6 +7,7 @@ import { requests, RequestData } from "@/db/schema";
 import { revalidatePath } from "next/cache";
 import { isStateProgram } from "@/lib/stateJob";
 import { normalizeRequestData } from "@/lib/requestData";
+import { defaultOnsiteSignatureRequired } from "@/lib/onsiteSignature";
 
 interface CreateRequestPayload {
   title: string;
@@ -26,7 +27,10 @@ export async function createRequest(payload: CreateRequestPayload) {
     throw new Error("The end time must be after the start time.");
   }
 
-  const requestData = normalizeRequestData(payload.data, startsAtIso, endsAtIso);
+  // The on-site sign-off is on by default for a new non-state job (the agency form may switch it off) and always off for a state job.
+  const sentFlag = payload.data?.onsiteSignatureRequired;
+  const onsiteSignatureRequired = isStateJob ? false : typeof sentFlag === "boolean" ? sentFlag : defaultOnsiteSignatureRequired(payload.data?.intake?.program);
+  const requestData: RequestData = { ...normalizeRequestData(payload.data, startsAtIso, endsAtIso), onsiteSignatureRequired };
 
   const [newRequest] = await db.insert(requests).values({
     title: payload.title,

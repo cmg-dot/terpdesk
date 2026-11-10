@@ -32,6 +32,11 @@ export interface RequestData {
     odhhConfirmed?: boolean;
     odhhConfirmedAt?: string;
   };
+  /**
+   * Non-state jobs only: the facility contact must sign off the interpreter's hours (see lib/onsiteSignature.ts). Written when the
+   * job is created; a job without it (created earlier) counts as off.
+   */
+  onsiteSignatureRequired?: boolean;
   [key: string]: any;
 }
 

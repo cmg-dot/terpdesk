@@ -6,6 +6,7 @@ import { RecordSummaryRow } from "@/components/features/hours-review/RecordSumma
 import { ReviewActions } from "@/components/features/hours-review/ReviewActions";
 import { SignaturePanel } from "@/components/features/hours-review/SignaturePanel";
 import { VersionHistory } from "@/components/features/hours-review/VersionHistory";
+import { VerificationPdfButton } from "@/components/features/VerificationPdfButton";
 import { useReviewActions } from "@/hooks/useReviewActions";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
@@ -27,6 +28,7 @@ export function ServiceRecordCard({ record, onUpdate }: { record: ServiceRecord;
           <RecordDetails record={record} />
           <VersionHistory record={record} />
           <SignaturePanel record={record} />
+          {record.pdfPosition !== undefined && <VerificationPdfButton requestId={record.appointmentId} position={record.pdfPosition} className="mb-6" />}
           <ReviewActions record={record} review={review} />
         </div>
       )}

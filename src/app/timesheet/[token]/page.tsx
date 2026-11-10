@@ -85,6 +85,7 @@ export default async function TimesheetPage({ params }: PageProps) {
         timeZoneLabel={zone.replace(/_/g, " ")}
         isOdhh={appointment.isOdhh}
         odhhPortalUrl={appointment.odhhPortalUrl}
+        onsiteSignatureRequired={appointment.onsiteSignatureRequired}
       />
     </Shell>
   );

@@ -13,6 +13,10 @@ import { replaceMileageLegs } from "@/lib/mileageLegs";
 import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
 import { logActivity } from "@/lib/requestActivity";
 import { alertAgency } from "@/lib/lifecycleAlerts";
+import { ONSITE_REQUIRED_MESSAGE, onsiteSignoffInputSchema } from "@/lib/onsiteSignature";
+import type { OnsiteSignoff } from "@/lib/onsiteSignature";
+import { saveOnsiteSignoff } from "@/lib/onsiteSignoff";
+import { removeObjectsQuietly } from "@/lib/s3";
 
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
 const PNG_DATA_URL = /^data:image\/png;base64,[A-Za-z0-9+/]+={0,2}$/;
@@ -39,6 +43,8 @@ const submitTimesheetSchema = z.object({
     .string()
     .max(MAX_SIGNATURE_LENGTH, "Signature is too large.")
     .regex(PNG_DATA_URL, "A signature is required."),
+  // The on-site contact's sign-off. Whether the job needs it is decided server-side from the job, never from the browser.
+  onsiteSignoff: onsiteSignoffInputSchema.optional(),
 });
 
 export type SubmitTimesheetInput = z.input<typeof submitTimesheetSchema>;
@@ -108,6 +114,17 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
     return { success: false, error: "Please give a reason the service was not completed." };
   }
 
+  if (appointment.onsiteSignatureRequired && !parsed.data.onsiteSignoff) return { success: false, error: ONSITE_REQUIRED_MESSAGE };
+  // Saved before the transaction (the picture goes to the private bucket); removed again below if the submission does not go through.
+  let onsiteSignoff: OnsiteSignoff | null = null;
+  if (appointment.onsiteSignatureRequired) {
+    try {
+      onsiteSignoff = await saveOnsiteSignoff(appointment.requestId, parsed.data.onsiteSignoff);
+    } catch (err) {
+      return { success: false, error: err instanceof Error && err.message ? err.message : "The on-site signature could not be saved. Please try again." };
+    }
+  }
+
   const now = new Date();
   // Single conditional UPDATE: the status/expiry guard and the write are one atomic statement,
   // so concurrent submissions of the same link cannot both succeed. The same transaction mirrors the hours into
@@ -143,11 +160,17 @@ export async function submitTimesheet(input: SubmitTimesheetInput): Promise<Subm
       .returning();
     if (!row) return null;
     await replaceMileageLegs(tx, { requestId: row.requestId, interpreterId: row.interpreterId }, legs);
-    await mirrorTimesheetSubmission(tx, row.requestId, row.interpreterId, row);
+    await mirrorTimesheetSubmission(tx, row.requestId, row.interpreterId, row, onsiteSignoff);
     return row;
+  }).catch(async (err: unknown) => {
+    if (onsiteSignoff) await removeObjectsQuietly([onsiteSignoff.storageKey]);
+    throw err;
   });
 
-  if (!submitted) return { success: false, error: INVALID_LINK };
+  if (!submitted) {
+    if (onsiteSignoff) await removeObjectsQuietly([onsiteSignoff.storageKey]);
+    return { success: false, error: INVALID_LINK };
+  }
   await logActivity({ requestId: submitted.requestId, interpreterId: submitted.interpreterId, audience: "shared", kind: "hours_submitted", message: "Hours submitted (secure link)", actorLabel: "Interpreter" });
   // Agency: in-app notification + email that hours are waiting for review.
   await alertAgency({ event: "timesheet_submitted", requestId: submitted.requestId, interpreterId: submitted.interpreterId, href: "/hours-review" });
