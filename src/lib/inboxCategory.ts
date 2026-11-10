@@ -6,7 +6,7 @@ import type { InboxListItem } from "@/types/inbox";
  * tabs), the subject without its "FW:" / "RE:" prefixes, the search, and the short timestamp. Pure; nothing is stored.
  */
 
-export type InboxCategory = "slicr" | "request" | "void" | "notice" | "other";
+export type InboxCategory = "slicr" | "request" | "void" | "notice" | "cancel_request" | "reply" | "other";
 export type InboxTab = "all" | "unread" | "requests" | "slicr" | "voids";
 
 export const INBOX_TABS: { id: InboxTab; label: string }[] = [
@@ -22,7 +22,13 @@ const FORWARD_PREFIX = /^(?:\s*(?:re|fw|fwd)\s*:\s*)+/i;
 /** The subject without "FW:", "Fwd:" or "RE:" in front. */
 export const cleanSubject = (subject: string): string => subject.replace(FORWARD_PREFIX, "").trim() || "(no subject)";
 
-export function categorize(subject: string): InboxCategory {
+/**
+ * `kind` is what the app decided when the email arrived (see inboundMail/classify.ts). A requester's reply keeps the subject's "Interpreter
+ * Request" wording, which used to make it look like a state request, so what was decided wins over the subject.
+ */
+export function categorize(subject: string, kind?: string | null): InboxCategory {
+  if (kind === "requester_cancel_request") return "cancel_request";
+  if (kind === "requester_reply") return "reply";
   const s = cleanSubject(subject);
   if (/\brequest\s+voided\b/i.test(s)) return "void";
   if (/\bSLICR\b|assignment\s+report/i.test(s)) return "slicr";
@@ -37,17 +43,19 @@ export const CATEGORY_LABEL: Record<InboxCategory, string> = {
   request: "State Request",
   void: "Void",
   notice: "Notice",
+  cancel_request: "Cancel Request",
+  reply: "Reply",
   other: "Email",
 };
 
-export function matchesTab(tab: InboxTab, email: Pick<InboxListItem, "subject" | "isRead">): boolean {
+export function matchesTab(tab: InboxTab, email: Pick<InboxListItem, "subject" | "isRead"> & { kind?: string | null }): boolean {
   if (tab === "all") return true;
   if (tab === "unread") return !email.isRead;
-  const category = categorize(email.subject);
+  const category = categorize(email.subject, email.kind);
   if (tab === "requests") return category === "request";
   if (tab === "slicr") return category === "slicr";
   // "Voids": the state voiding a request, and the neighbouring notices (cancellations, reassignments).
-  return category === "void" || category === "notice";
+  return category === "void" || category === "notice" || category === "cancel_request";
 }
 
 /** True when every word of the query is in the subject, the sender's name or address, or the SRN. */
@@ -58,14 +66,14 @@ export function matchesSearch(query: string, email: Pick<InboxListItem, "subject
   return words.every((word) => haystack.includes(word));
 }
 
-export function tabCounts(emails: readonly Pick<InboxListItem, "subject" | "isRead">[]): Record<InboxTab, number> {
+export function tabCounts(emails: readonly (Pick<InboxListItem, "subject" | "isRead"> & { kind?: string | null })[]): Record<InboxTab, number> {
   const counts: Record<InboxTab, number> = { all: emails.length, unread: 0, requests: 0, slicr: 0, voids: 0 };
   for (const email of emails) {
     if (!email.isRead) counts.unread += 1;
-    const category = categorize(email.subject);
+    const category = categorize(email.subject, email.kind);
     if (category === "request") counts.requests += 1;
     else if (category === "slicr") counts.slicr += 1;
-    else if (category === "void" || category === "notice") counts.voids += 1;
+    else if (category === "void" || category === "notice" || category === "cancel_request") counts.voids += 1;
   }
   return counts;
 }

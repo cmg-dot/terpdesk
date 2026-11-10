@@ -53,6 +53,9 @@ import { ClientAssignmentBanner } from "@/components/features/ClientAssignmentBa
 import { normalizeClientType } from "@/lib/validation/client";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { hasSubmittedHours, isOnsiteSignatureRequired } from "@/lib/onsiteSignature";
+import { cancelRequestFlagOf } from "@/lib/cancelRequestFlag";
+import { asBillingModifier } from "@/lib/validation/billingFields";
+import { RequesterCancelBanner } from "@/components/requests/RequesterCancelBanner";
 import { OnsiteSignatureSetting } from "@/components/requests/OnsiteSignatureSetting";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 
@@ -713,6 +716,12 @@ export default function AssignmentDetailPage() {
  </div>
  )}
 
+ {/* A requester asked to cancel by email: nothing is cancelled until a dispatcher confirms. */}
+ {!isCancelled && (() => {
+   const cancelFlag = cancelRequestFlagOf(foundRequest?.data);
+   return cancelFlag && !cancelFlag.dismissedAt ? <RequesterCancelBanner requestId={String(foundRequest?.id || id)} flag={cancelFlag} isStateJob={isStateRequest} onResolved={async () => setFoundRequest(await fetchLiveRequestById(id))} /> : null;
+ })()}
+
  {/* Questions from interpreters: first, so staff see them immediately. */}
  <ClarificationsCard clarifications={foundRequest?.data?.clarifications} />
 
@@ -764,7 +773,7 @@ export default function AssignmentDetailPage() {
  <OriginalFormCard requestId={String(foundRequest?.id || id)} srn={requestSrnValue} />
 
  {/* Staffing and booking, directly under the form. */}
- {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} />}
+ {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} clientDob={textOf(foundRequest?.data?.intake?.clientDob)} onClientDobSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), clientDob: value } } } : prev))} billingModifier={asBillingModifier(foundRequest?.data?.intake?.billingModifier)} onBillingModifierSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), billingModifier: value } } } : prev))} />}
 
  {!isCancelled && !isStateRequest && (
  <OnsiteSignatureSetting

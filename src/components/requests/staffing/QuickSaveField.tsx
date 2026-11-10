@@ -23,6 +23,8 @@ interface Props {
   dataAttribute: string;
   /** What to say when the call itself fails. */
   failureText: string;
+  /** Save as soon as the box loses focus (when something changed), so nothing is lost by tabbing away. Save and Enter still work. */
+  saveOnBlur?: boolean;
 }
 
 /**
@@ -30,7 +32,7 @@ interface Props {
  * locked while an offer is out or an interpreter is booked). Clearing the box and saving removes the value. Used for the client's
  * name and the prior-authorization number, so both behave identically.
  */
-export function QuickSaveField({ label, note, placeholder, maxLength, value, save, onSaved, savedText, clearedText, dataAttribute, failureText }: Props) {
+export function QuickSaveField({ label, note, placeholder, maxLength, value, save, onSaved, savedText, clearedText, dataAttribute, failureText, saveOnBlur = false }: Props) {
   const [saved, setSaved] = useState(value);
   const [draft, setDraft] = useState(value);
   const [saving, setSaving] = useState(false);
@@ -67,6 +69,7 @@ export function QuickSaveField({ label, note, placeholder, maxLength, value, sav
           maxLength={maxLength}
           autoComplete="off"
           onChange={(event) => { setDraft(event.target.value); setMessage(null); }}
+          onBlur={() => { if (saveOnBlur) void submit(); }}
           onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void submit(); } }}
           placeholder={placeholder}
           className="min-w-0 flex-1 rounded-full border-none bg-white px-4 py-2.5 text-sm text-gray-800 outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-[var(--forest)]"

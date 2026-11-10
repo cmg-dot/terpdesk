@@ -7,6 +7,8 @@ const CATEGORY_CLASSES: Record<InboxCategory, string> = {
   request: "bg-indigo-50 text-indigo-700 border-indigo-200",
   void: "bg-rose-50 text-rose-700 border-rose-200",
   notice: "bg-amber-50 text-amber-800 border-amber-200",
+  cancel_request: "bg-orange-50 text-orange-800 border-orange-300",
+  reply: "bg-sky-50 text-sky-700 border-sky-200",
   other: "bg-gray-100 text-gray-600 border-gray-200",
 };
 

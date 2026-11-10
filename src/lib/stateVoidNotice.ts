@@ -41,7 +41,8 @@ export interface StateVoidInput {
   authenticated: boolean;
 }
 
-async function senderTrusted(senderEmail: string): Promise<boolean> {
+/** The sender is the state, a registered agency user, or an address the agency listed (STATE_VOID_TRUSTED_SENDERS). Shared by every notice that acts on a job. */
+export async function senderTrusted(senderEmail: string): Promise<boolean> {
   if (senderAllowed(senderEmail, process.env.STATE_VOID_TRUSTED_SENDERS)) return true;
   const [staff] = await db
     .select({ id: users.id })
@@ -52,7 +53,7 @@ async function senderTrusted(senderEmail: string): Promise<boolean> {
 }
 
 /** One note per kind per job, so a repeated delivery of the same email does not pile up notes or notifications. */
-async function noteOnce(requestId: string, kind: string, message: string, title: string, body: string): Promise<void> {
+export async function noteOnce(requestId: string, kind: string, message: string, title: string, body: string): Promise<void> {
   const [already] = await db.select({ id: requestActivity.id }).from(requestActivity).where(and(eq(requestActivity.requestId, requestId), eq(requestActivity.kind, kind))).limit(1);
   if (already) return;
   await logActivity({ requestId, kind, audience: "agency", message, actorLabel: "Email intake" });

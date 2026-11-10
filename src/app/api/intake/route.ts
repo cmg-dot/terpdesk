@@ -9,6 +9,7 @@ import { resolveIntakeType } from "@/lib/odhhVerificationParser";
 import { processJobOfferEmail } from "@/lib/odhhIntakeProcess";
 import { parseVoidNotice } from "@/lib/stateVoidParse";
 import { processStateVoidNotice } from "@/lib/stateVoidNotice";
+import { handleStateNotice } from "@/lib/inboundMail/handle";
 import { sanitizeSrn, type AppointmentFormat } from "@/lib/odhhEmailParser";
 
 /**
@@ -73,6 +74,14 @@ interface VoidNoticeResponse {
   result: string;
 }
 
+/** A state notice (cancellation, "now in process") or a requester's reply: handled, never a job. */
+interface StateNoticeResponse {
+  success: true;
+  outcome: "state_notice";
+  kind: string;
+  result: string;
+}
+
 interface WebhookErrorResponse {
   success: false;
   error: string;
@@ -109,7 +118,7 @@ function validatePayload(
 
 export async function POST(
   req: Request
-): Promise<NextResponse<WebhookSuccessResponse | NotAJobResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | VoidNoticeResponse | WebhookErrorResponse>> {
+): Promise<NextResponse<WebhookSuccessResponse | NotAJobResponse | DuplicateIntakeResponse | TimesheetIntakeResponse | VoidNoticeResponse | StateNoticeResponse | WebhookErrorResponse>> {
   try {
     const denied = rejectUnlessIntakeAuthorized(req, "Intake Webhook");
     if (denied) return denied;
@@ -154,6 +163,15 @@ export async function POST(
       const voided = await processStateVoidNotice({ srn: voidNotice.srn, senderEmail: email, authenticated: true });
       console.log("[Intake Webhook] Voided notice handled", { outcome: voided.outcome });
       return NextResponse.json({ success: true, outcome: "void_notice", result: voided.outcome }, { status: 200 });
+    }
+
+    // The state's cancellation and "now in process" notices, and a requester's reply: acted on exactly as for mail that reached the Inbox
+    // (a reply never becomes or fills a job; "please cancel" flags the job for a dispatcher). This route is API-key protected, so the
+    // mail counts as authenticated. 200 either way so AWS never retries.
+    const notice = await handleStateNotice({ senderEmail: email, subject, bodyText: rawContent, authenticated: true, messageId: null, receivedAt: new Date() });
+    if (notice) {
+      console.log("[Intake Webhook] Notice handled", { kind: notice.classification.kind, outcome: notice.outcome });
+      return NextResponse.json({ success: true, outcome: "state_notice", kind: notice.classification.kind, result: notice.outcome }, { status: 200 });
     }
 
     // HIPAA: log only that an email arrived and its size. The sender, subject and body can hold PHI, so none are logged.

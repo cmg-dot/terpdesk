@@ -5,6 +5,7 @@ import { jobSchedule, normalizeEmailText, parseIntakeEmail, parseWarnings, sanit
 import type { ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { enrichRequestFromForm } from "@/lib/odhhEnrichStore";
 import { stateNoticeKind } from "@/lib/odhhNotice";
+import { applyRecordedCancellation } from "@/lib/stateCancelNotice";
 import { parseFormExtras } from "@/lib/odhhFormFields";
 import { seedClientQuietly } from "@/lib/clientUpsert";
 import { logActivity } from "@/lib/requestActivity";
@@ -124,6 +125,9 @@ export async function processJobOfferEmail(input: JobEmailInput): Promise<JobEma
   revalidatePath("/requests");
   revalidatePath("/dashboard");
   revalidatePath("/calendar");
+
+  // The state may have cancelled this number before its form reached us: the job it just created must not stay live.
+  if (srn) await applyRecordedCancellation(srn);
 
   const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
   return { outcome: "created", id: inserted.id, parsed, warnings, hasRequestor };

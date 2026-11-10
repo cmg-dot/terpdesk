@@ -1,4 +1,5 @@
 import { InboxCategoryBadge } from "@/components/features/inbox/InboxCategoryBadge";
+import { InboxOutcomeChip } from "@/components/features/inbox/InboxOutcomeChip";
 import { InboxJobLink } from "@/components/features/inbox/InboxJobLink";
 import { categorize, cleanSubject, formatInboxTime } from "@/lib/inboxCategory";
 import { getIanaZone } from "@/utils/timezone";
@@ -54,7 +55,8 @@ export function InboxList({ emails, selectedId, onSelect }: InboxListProps) {
                 </span>
               </button>
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5 px-3 pb-3 pl-[2.125rem]">
-                <InboxCategoryBadge category={categorize(email.subject)} />
+                <InboxCategoryBadge category={categorize(email.subject, email.kind)} />
+                <InboxOutcomeChip outcome={email.outcome} />
                 <InboxJobLink srn={email.srn} jobId={email.jobId} />
               </div>
             </div>

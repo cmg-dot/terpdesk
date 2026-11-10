@@ -3,10 +3,13 @@
 import { useMemo } from "react";
 import { ClientNameField } from "@/components/requests/staffing/ClientNameField";
 import { PriorAuthField } from "@/components/requests/staffing/PriorAuthField";
+import { BillingModifierField } from "@/components/requests/staffing/BillingModifierField";
+import { ClientDobField } from "@/components/requests/staffing/ClientDobField";
 import { PositionStaffing } from "@/components/requests/staffing/PositionStaffing";
 import { RequestedInterpreterBadge } from "@/components/requests/staffing/RequestedInterpreterBadge";
 import type { Position, PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
 import { pickByReportName } from "@/lib/verificationPending";
+import type { BillingModifier } from "@/lib/validation/billingFields";
 
 interface Props {
   /** One view per active position, in position order (1 to 10). */
@@ -23,6 +26,11 @@ interface Props {
   /** The prior-authorization number saved on the job (agency-only), and what to do once a new one is saved. */
   priorAuth: string;
   onPriorAuthSaved: (priorAuth: string) => void;
+  /** The client's date of birth (stored yyyy-MM-dd) and the billing modifier, both agency-only billing fields, and what to do once one is saved. */
+  clientDob: string;
+  onClientDobSaved: (clientDob: string) => void;
+  billingModifier: BillingModifier | "";
+  onBillingModifierSaved: (modifier: BillingModifier | "") => void;
 }
 
 /**
@@ -30,7 +38,7 @@ interface Props {
  * one (send an offer, or book directly). When the state asked for a particular interpreter, that request sits above the controls
  * with a one-click way to choose them.
  */
-export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved }: Props) {
+export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved }: Props) {
   const requested = requestedInterpreter?.trim() || null;
   const match = useMemo(() => {
     if (!requested) return null;
@@ -52,6 +60,8 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <ClientNameField requestId={ctx.requestId} value={clientName} onSaved={onClientSaved} />
         <PriorAuthField requestId={ctx.requestId} value={priorAuth} onSaved={onPriorAuthSaved} />
+        <ClientDobField requestId={ctx.requestId} value={clientDob} onSaved={onClientDobSaved} />
+        <BillingModifierField requestId={ctx.requestId} value={billingModifier} onSaved={onBillingModifierSaved} />
       </div>
 
       {requested && (

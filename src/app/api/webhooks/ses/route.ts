@@ -59,9 +59,10 @@ export async function POST(req: Request) {
     }
     const outcome = await storeInboxEmail(email);
     console.log(`[${TAG}] Email ${outcome}`);
-    // A state request form that came in through the Inbox is applied like one that came through /api/intake, and the state's
-    // "Request Voided" notice voids its job when the sender can be trusted. Never throws.
-    const form = await ingestInboxStateForm({ senderEmail: email.senderEmail, subject: email.subject ?? "", bodyText: email.bodyText ?? null, authenticated: sesAuthenticated(message.Message) });
+    // A state request form that came in through the Inbox is applied like one that came through /api/intake; the state's void and
+    // cancellation notices act on their job when the sender can be trusted, and a requester's "please cancel" flags the job for a
+    // dispatcher. What was decided is saved on the stored email. Never throws.
+    const form = await ingestInboxStateForm({ senderEmail: email.senderEmail, subject: email.subject ?? "", bodyText: email.bodyText ?? null, authenticated: sesAuthenticated(message.Message), messageId: email.messageId, receivedAt: email.receivedAt });
     if (form !== "skipped") console.log(`[${TAG}] State form ${form}`);
     return reply(200, { success: true, outcome });
   } catch (error) {

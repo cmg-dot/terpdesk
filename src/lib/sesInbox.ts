@@ -1,3 +1,4 @@
+import { ensureStateEventTables } from "@/lib/stateEvents";
 import { createHash } from "node:crypto";
 import { simpleParser } from "mailparser";
 import { z } from "zod";
@@ -127,6 +128,8 @@ export async function parseSesNotification(messageJson: string): Promise<ParsedI
 
 /** Inserts the email once. A repeat of the same Message-ID is dropped silently: no error, nothing written. */
 export async function storeInboxEmail(email: ParsedInboxEmail): Promise<"stored" | "duplicate"> {
+  // The insert names every column of agency_inbox, so a database that migration 0009 has not reached must get its columns first.
+  await ensureStateEventTables();
   const inserted = await db
     .insert(agencyInbox)
     .values(email)

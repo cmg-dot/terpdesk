@@ -22,6 +22,8 @@ export async function listInboxEmails(): Promise<InboxListItem[]> {
       subject: agencyInbox.subject,
       receivedAt: agencyInbox.receivedAt,
       isRead: agencyInbox.isRead,
+      kind: agencyInbox.kind,
+      outcome: agencyInbox.outcome,
       bodyRequestMatch: sql<string | null>`substring(${head} from ${BODY_SERVICE_REQUEST_SQL_PATTERN})`,
       bodySrnMatch: sql<string | null>`substring(${head} from ${BODY_SRN_SQL_PATTERN})`,
       subjectMatch: sql<string | null>`substring(${agencyInbox.subject} from ${SUBJECT_SRN_SQL_PATTERN})`,

@@ -31,6 +31,10 @@ export interface RequestData {
     /** Staff marked this state job's booking as confirmed on the ODHH portal (a record of a manual step), and when. */
     odhhConfirmed?: boolean;
     odhhConfirmedAt?: string;
+    /** The client's date of birth (yyyy-MM-dd), typed in Staffing for billing. STRICTLY AGENCY ONLY: interpreter views are built from an allowlist that excludes it, and it is never put in an email, a link or a log. */
+    clientDob?: string;
+    /** The billing modifier: U3 (mental health) or U9 (medical), typed in Staffing. AGENCY ONLY, same as clientDob. */
+    billingModifier?: "U3" | "U9";
   };
   /**
    * Non-state jobs only: the facility contact must sign off the interpreter's hours (see lib/onsiteSignature.ts). Written when the
@@ -370,9 +374,39 @@ export const agencyInbox = pgTable('agency_inbox', {
   messageId: text('message_id').notNull().unique(),
   isRead: boolean('is_read').notNull().default(false),
   receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  // What the app decided about this email (migration 0009). All null for mail received before it, and for mail it did not recognise.
+  kind: varchar('kind', { length: 32 }),
+  srn: varchar('srn', { length: 20 }),
+  outcome: varchar('outcome', { length: 32 }),
+  processedAt: timestamp('processed_at', { withTimezone: true }),
+  // The job it acted on. No foreign key: removing a job must never be blocked by a stored email.
+  requestId: uuid('request_id'),
 }, (t) => ({
   // Serves the inbox list: one agency's mail, newest first.
   agencyReceivedIdx: index('agency_inbox_agency_received_idx').on(t.agencyId, t.receivedAt),
+}));
+
+/**
+ * One row per email that says something about a state request number (migration 0009), keyed by the email's Message-ID so a redelivery
+ * changes nothing. The memory that lets a cancellation which arrives before its request form still apply when the form creates the job.
+ * Agency-only: `senderEmail` is kept so a notice held for lack of a job can be judged by the same trust rule later.
+ */
+export const stateSrnEvents = pgTable('state_srn_events', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  srn: varchar('srn', { length: 20 }).notNull(),
+  kind: varchar('kind', { length: 32 }).notNull(),
+  // The state's own time when the notice states one ("Cancelled On ..."), else when the email was received.
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  receivedAt: timestamp('received_at', { withTimezone: true }).notNull(),
+  messageId: text('message_id').notNull(),
+  senderEmail: text('sender_email'),
+  authenticated: boolean('authenticated').notNull().default(false),
+  outcome: varchar('outcome', { length: 32 }),
+  requestId: uuid('request_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).defaultNow().notNull(),
+}, (t) => ({
+  messageIdx: uniqueIndex('state_srn_events_message_id_idx').on(t.messageId),
+  srnIdx: index('state_srn_events_srn_idx').on(t.srn, t.occurredAt),
 }));
 
 export type SelectAgencyInbox = typeof agencyInbox.$inferSelect;

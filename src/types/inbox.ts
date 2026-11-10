@@ -15,6 +15,10 @@ export interface InboxListItem extends InboxMailHeader {
   srn: string | null;
   /** The job that has that number, or null when no job does (yet). */
   jobId: string | null;
+  /** What the app decided this email is (saved when it arrived), or null for mail from before that or that it did not recognise. */
+  kind: string | null;
+  /** What the app did about it: applied, held for a person, flagged on the job, ignored ... Null when it did nothing. */
+  outcome: string | null;
 }
 
 /** A single email opened in the reading pane. `bodyHtml` is exactly as received and must be sanitized before display. */
