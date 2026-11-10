@@ -1,3 +1,5 @@
+import { positionOfOffer } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { interpreters, offers } from "@/db/schema";
@@ -25,7 +27,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 export interface BookedInterpreter {
   offerId: string;
   interpreterId: string;
-  position: 1 | 2;
+  position: PositionId;
 }
 
 export interface EditNotice {
@@ -49,7 +51,7 @@ export async function planEditNotice(before: JobRequestRow, after: JobRequestRow
     .from(offers)
     .where(and(eq(offers.requestId, before.id), eq(offers.status, "accepted")));
   const positions = ((before.data ?? {}) as { offerPositions?: Record<string, number> }).offerPositions ?? {};
-  const booked = rows.map((r) => ({ ...r, position: positions[r.offerId] === 2 ? (2 as const) : (1 as const) }));
+  const booked = rows.map((r) => ({ ...r, position: positionOfOffer(positions, r.offerId) }));
   return { changes, agencySections, booked };
 }
 

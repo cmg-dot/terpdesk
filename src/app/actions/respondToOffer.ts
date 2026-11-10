@@ -5,12 +5,15 @@ import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
 import { and, eq, gt } from "drizzle-orm";
-import { isPositionTakenByOther, lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
+import { interpreterHoldsOtherPosition, isPositionTakenByOther, lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { alertAgency } from "@/lib/lifecycleAlerts";
+import { isActivePosition } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
+import { staffingFacts, statusAfterBooking, statusAfterDecline } from "@/lib/staffing";
 import { logActivity } from "@/lib/requestActivity";
 
 type OfferRecord = typeof offers.$inferSelect;
@@ -95,7 +98,7 @@ export async function respondToOffer(
 
   // 5. One transaction, locked on the request row: only THIS offer's position is touched, and two interpreters
   // (or an accept and a give-back) on the same job are serialised, so neither can overwrite the other.
-  const outcome = await db.transaction(async (tx): Promise<{ ok: true; offer: OfferRecord; posIdx: 1 | 2 } | { ok: false; error: string }> => {
+  const outcome = await db.transaction(async (tx): Promise<{ ok: true; offer: OfferRecord; posIdx: PositionId } | { ok: false; error: string }> => {
     const locked = await lockRequestForPosition(tx, offer.requestId);
     if (!locked) return { ok: false, error: "The request for this offer no longer exists." };
     const existingData = locked.data as Record<string, any>;
@@ -106,6 +109,13 @@ export async function respondToOffer(
       await tx.update(offers).set({ status: 'withdrawn', updatedAt: now }).where(and(eq(offers.id, offerId), eq(offers.status, 'pending')));
       return { ok: false, error: "This position has already been filled by another interpreter." };
     }
+    if (normResponse === 'accepted') {
+      if (!isActivePosition(existingData, posIdx)) return { ok: false, error: "This position is no longer part of this job." };
+      // One person never holds two positions of the same job.
+      if (await interpreterHoldsOtherPosition(tx, offer.requestId, locked, posIdx, offer.interpreterId)) {
+        return { ok: false, error: "You are already booked in another position of this job." };
+      }
+    }
 
     // Only a still-pending, unexpired offer can be answered (an accepted job is handed back with "Give back").
     const [updatedOffer] = await tx.update(offers)
@@ -114,8 +124,6 @@ export async function respondToOffer(
       .returning();
     if (!updatedOffer) return { ok: false, error: "This offer is no longer open. It may have expired, been withdrawn or already been answered." };
 
-    const totalPositions = (existingData.slotCount === 2 || existingData.details?.slotCount === 2 || existingData.positions === "Team — two independent positions" || existingData.requiredPositions === 2) ? 2 : 1;
-    const otherPos = posIdx === 1 ? 2 : 1;
     const allReqOffers = await tx.select().from(offers).where(eq(offers.requestId, offer.requestId));
 
     if (normResponse === 'accepted') {
@@ -133,20 +141,10 @@ export async function respondToOffer(
         [posIdx]: false
       };
 
-      const otherPosBooked = totalPositions === 2 && allReqOffers.some(o =>
-        o.id !== updatedOffer.id && positionOfOffer(offerPositions, o.id) === otherPos && o.status === 'accepted'
+      const newStatus = statusAfterBooking(
+        staffingFacts({ ...existingData, slotReplacements: updatedSlotReplacements }, allReqOffers, { now, excludeOfferId: updatedOffer.id }),
+        posIdx,
       );
-
-      let newStatus = 'booked';
-      if (totalPositions === 2) {
-        if (otherPosBooked) {
-          newStatus = 'booked';
-        } else if (updatedSlotReplacements[otherPos]) {
-          newStatus = 'Needs replacement';
-        } else {
-          newStatus = 'Partially staffed';
-        }
-      }
 
       let updatedOffersArray = existingData.offers;
       if (Array.isArray(updatedOffersArray)) {
@@ -169,28 +167,8 @@ export async function respondToOffer(
         .where(eq(requests.id, offer.requestId));
     } else {
       // Declined
-      const remainingAccepted = allReqOffers.filter(o => o.id !== updatedOffer.id && o.status === 'accepted');
-      const hasOtherAccepted = remainingAccepted.length > 0;
-      const hasPending = allReqOffers.some(o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now);
-      const hasReplacement = Boolean(existingData.slotReplacements?.[1] || existingData.slotReplacements?.[2]);
-
-      // No other live offer for THIS position means it still needs coverage: flag it instead of leaving a draft.
-      const hasPendingForPosition = allReqOffers.some(
-        o => o.id !== updatedOffer.id && o.status === 'pending' && new Date(o.expiresAt) > now && positionOfOffer(offerPositions, o.id) === posIdx
-      );
-
-      let newStatus = 'Needs replacement';
-      if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
-        newStatus = 'booked';
-      } else if (!hasPendingForPosition) {
-        newStatus = 'Needs replacement';
-      } else if (hasReplacement) {
-        newStatus = 'Needs replacement';
-      } else if (hasOtherAccepted) {
-        newStatus = 'Partially staffed';
-      } else if (hasPending) {
-        newStatus = 'Offer awaiting response';
-      }
+      // No other live offer for THIS position means it still needs coverage: flagged "Needs replacement" instead of left a draft.
+      const newStatus = statusAfterDecline(staffingFacts(existingData, allReqOffers, { now, excludeOfferId: updatedOffer.id }), posIdx);
 
       let updatedOffersArray = existingData.offers;
       if (Array.isArray(updatedOffersArray)) {

@@ -5,10 +5,13 @@ import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import { eq, and } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { positionIdOf, positionOfOffer } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
+import { clearedAssignmentFields } from "@/lib/staffing";
 
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-export async function removeBooking(requestId: string, offerId?: string, positionIndex?: 1 | 2) {
+export async function removeBooking(requestId: string, offerId?: string, positionIndex?: PositionId) {
   await requireRole("agency");
   const [request] = await db.select().from(requests).where(eq(requests.id, requestId));
   if (!request) throw new Error("Request not found");
@@ -18,16 +21,16 @@ export async function removeBooking(requestId: string, offerId?: string, positio
 
   // 1. Withdraw specific offer or find accepted offer for this positionIndex
   const isRealOfferId = Boolean(offerId && UUID_PATTERN.test(offerId));
-  let targetPos: 1 | 2 = positionIndex || 1;
+  let targetPos: PositionId = positionIdOf(positionIndex);
   if (offerId && isRealOfferId) {
-    targetPos = (positionIndex || offerPositions[offerId] || 1) as 1 | 2;
+    targetPos = positionIndex ? positionIdOf(positionIndex) : positionOfOffer(offerPositions, offerId);
     await db.update(offers)
       .set({ status: 'withdrawn', updatedAt: new Date() })
       .where(eq(offers.id, offerId));
   } else {
     // Synthetic ids (e.g. 'assigned-1') or no id: withdraw every accepted offer for this position
     const allReqOffers = await db.select().from(offers).where(and(eq(offers.requestId, requestId), eq(offers.status, 'accepted')));
-    const matches = allReqOffers.filter(o => (offerPositions[o.id] || 1) === targetPos);
+    const matches = allReqOffers.filter(o => positionOfOffer(offerPositions, o.id) === targetPos);
     const toWithdraw = matches.length > 0 ? matches : (positionIndex ? [] : allReqOffers.slice(0, 1));
     for (const match of toWithdraw) {
       await db.update(offers)
@@ -49,14 +52,7 @@ export async function removeBooking(requestId: string, offerId?: string, positio
   );
 
   // Clear every assigned-interpreter field the UI/getRequests derives "Filled" from
-  const clearedAssignment: Record<string, any> = {};
-  if (targetPos === 1) {
-    clearedAssignment.assignedInterpreterId = null;
-    clearedAssignment.assignedInterpreterName = null;
-  } else {
-    clearedAssignment.position2InterpreterId = null;
-    clearedAssignment.position2InterpreterName = null;
-  }
+  const clearedAssignment = clearedAssignmentFields(targetPos);
 
   const newStatus = 'Needs replacement';
 

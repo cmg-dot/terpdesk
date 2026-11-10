@@ -6,6 +6,9 @@ import { offers, requests } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/requestActivity";
+import { positionIdOf, positionOfOffer, readPositions } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
+import { positionIdSchema } from "@/lib/validation/position";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 import { alertInterpreter } from "@/lib/lifecycleAlerts";
 import { z } from "zod";
@@ -14,7 +17,7 @@ import { MAX_TOTAL_MILES, MILEAGE_REASON_REQUIRED, mileageAdjustmentReasonSchema
 const approveHoursSchema = z.object({
   requestId: z.string().uuid(),
   approvedMileage: z.number().finite().min(0).max(MAX_TOTAL_MILES),
-  positionIndex: z.union([z.literal(1), z.literal(2)]),
+  positionIndex: positionIdSchema,
   mileageAdjustmentReason: mileageAdjustmentReasonSchema.optional(),
 });
 
@@ -23,7 +26,7 @@ export type ApproveHoursResult = { success: true } | { success: false; error: st
 export async function approveHours(
   requestId: string,
   approvedMileage: number,
-  positionIndex: 1 | 2 = 1,
+  positionIndex: PositionId = 1,
   mileageAdjustmentReason?: string,
 ): Promise<ApproveHoursResult> {
   await requireRole("agency");
@@ -40,7 +43,7 @@ export async function approveHours(
       throw new Error("Request not found");
     }
 
-    const posIdx = positionIndex || 1;
+    const posIdx = positionIdOf(positionIndex);
     const existingData = (existing.data as any) || {};
     const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(existingData) : null) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
@@ -80,21 +83,19 @@ export async function approveHours(
       [posIdx]: updatedPosHours
     };
 
-    // Check if other position is awaiting review or correction
-    const otherPos = posIdx === 1 ? 2 : 1;
-    const otherPosHours = updatedHoursSubmissions[otherPos];
-    // Team job: if the other position is booked but has no approved hours yet, the request is not done.
+    // Several positions: the request is not done while another position is booked but has no approved hours yet.
+    // Waiting for the agency's review comes first, then waiting for the interpreter's correction.
     const acceptedOffers = await tx
       .select({ id: offers.id })
       .from(offers)
       .where(and(eq(offers.requestId, requestId), eq(offers.status, 'accepted')));
-    const otherPosBooked = acceptedOffers.some((o) => (existingData.offerPositions?.[o.id] === 2 ? 2 : 1) === otherPos);
+    const bookedPositions = new Set(acceptedOffers.map((o) => positionOfOffer(existingData.offerPositions, o.id)));
+    const others = readPositions(existingData).ids.filter((id) => id !== posIdx);
+    const hoursAt = (id: number) => updatedHoursSubmissions[id];
     let overallStatus = "approved";
-    if (otherPosBooked && (!otherPosHours || !otherPosHours.status)) {
+    if (others.some((id) => (bookedPositions.has(id) && !hoursAt(id)?.status) || hoursAt(id)?.status === 'awaiting_review')) {
       overallStatus = "awaiting_review";
-    } else if (otherPosHours && otherPosHours.status === 'awaiting_review') {
-      overallStatus = "awaiting_review";
-    } else if (otherPosHours && otherPosHours.status === 'correction_requested') {
+    } else if (others.some((id) => hoursAt(id)?.status === 'correction_requested')) {
       overallStatus = "correction_requested";
     }
 
@@ -129,7 +130,7 @@ export async function approveHours(
 export async function requestHoursCorrection(
   requestId: string,
   reviewMessage: string,
-  positionIndex: 1 | 2 = 1
+  positionIndex: PositionId = 1
 ): Promise<{ success: boolean }> {
   await requireRole("agency");
   const reportedBy = await db.transaction(async (tx) => {
@@ -200,7 +201,7 @@ export async function requestHoursCorrection(
     .where(and(eq(offers.requestId, requestId), eq(offers.status, "accepted")));
   const booking =
     accepted.find((o) => o.interpreterId === reportedBy.interpreterId) ??
-    accepted.find((o) => (reportedBy.offerPositions[o.id] === 2 ? 2 : 1) === correctionPosition);
+    accepted.find((o) => positionOfOffer(reportedBy.offerPositions, o.id) === correctionPosition);
   const correctionInterpreterId = reportedBy.interpreterId ?? booking?.interpreterId ?? null;
   if (correctionInterpreterId) {
     await alertInterpreter({

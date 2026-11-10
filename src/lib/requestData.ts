@@ -1,4 +1,5 @@
 import type { RequestData } from "@/db/schema";
+import { positionCount, positionFields } from "@/lib/positions";
 
 /**
  * Fills in the derived fields every new request carries (the appointment's start/end repeated where the app reads
@@ -11,9 +12,7 @@ export function normalizeRequestData(data: RequestData, startsAtIso: string, end
   const isRepeats = Boolean(data?.repeats ?? data?.details?.repeats ?? false);
   const recurrenceNoteStr = String(data?.recurrenceNote ?? data?.details?.recurrenceNote ?? "").trim();
 
-  const rawPositions = String(data?.positions ?? data?.details?.positions ?? "One interpreter");
-  const slotCount = (data?.slotCount === 2 || data?.details?.slotCount === 2 || data?.requiredPositions === 2 || rawPositions === "Team — two independent positions") ? 2 : 1;
-  const positionsStr = slotCount === 2 ? "Team — two independent positions" : "One interpreter";
+  const { positions: positionsStr, slotCount } = positionFields(positionCount(data));
 
   return {
     ...data,

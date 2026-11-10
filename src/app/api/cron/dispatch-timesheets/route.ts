@@ -6,6 +6,7 @@ import { dispatchTimesheetCore } from "@/lib/timesheetDispatch";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { isCronAuthorized } from "@/lib/cronAuth";
+import { isPlainSingle, positionOfOffer } from "@/lib/positions";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 
 export const dynamic = "force-dynamic";
@@ -27,10 +28,6 @@ interface HoursData {
   hoursSubmission?: unknown;
   hoursSubmissions?: Record<string, unknown>;
   offerPositions?: Record<string, number>;
-  slotCount?: number;
-  requiredPositions?: number;
-  positions?: string;
-  details?: { slotCount?: number };
 }
 
 interface Candidate {
@@ -82,12 +79,12 @@ export async function GET(request: Request) {
       if (isStateJobRequest(row)) continue;
 
       const data = (row.data ?? {}) as unknown as HoursData;
-      const isTeam = data.slotCount === 2 || data.requiredPositions === 2 || data.details?.slotCount === 2 || data.positions === "Team — two independent positions";
+      const isTeam = !isPlainSingle(data);
       const status = (row.status ?? "").toLowerCase();
       if (status.includes("cancel") || status.includes("draft") || (isTeam ? TEAM_SKIP_STATUSES : SKIP_STATUSES).includes(status)) continue;
 
       // Skip only if THIS interpreter's position already has hours (in-app or mirrored), never the other position's.
-      const position = data.offerPositions?.[row.offerId] === 2 ? 2 : 1;
+      const position = positionOfOffer(data.offerPositions, row.offerId);
       if (data.hoursSubmissions?.[String(position)] || (position === 1 && legacyPosition1Hours(data))) continue;
 
       const { endsAt } = resolveRequestTimes({ createdAt: row.createdAt, data: row.data });

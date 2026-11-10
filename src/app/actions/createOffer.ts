@@ -4,13 +4,15 @@ import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { notifyInterpreter } from "@/lib/notifications";
 import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
 import { offerBlock } from "@/lib/offerAvailability";
 import { offerExpiresAt } from "@/lib/offerExpiry";
+import { isActivePosition, positionOfOffer } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
 import { createOfferSchema } from "@/lib/validation/createOffer";
 import type { CreateOfferInput } from "@/lib/validation/createOffer";
 import { checkInterpreterFit } from "./availability";
@@ -19,7 +21,7 @@ import type { InterpreterFitStatus } from "./availability";
 type OfferRecord = typeof offers.$inferSelect;
 
 /** Problems are returned, not thrown: in production a thrown message is hidden from the browser. */
-export type CreateOfferResult = { success: true; offer: OfferRecord & { positionIndex: 1 | 2 } } | { success: false; error: string };
+export type CreateOfferResult = { success: true; offer: OfferRecord & { positionIndex: PositionId } } | { success: false; error: string };
 
 /** The appointment's own time zone, used only when the interpreter has no profile zone of their own. */
 const jobTimeZoneOf = (data: unknown): string | undefined => {
@@ -48,6 +50,15 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
 
   const status = String(request.status || "").toLowerCase();
   if (status === "cancelled" || status === "canceled") return { success: false, error: "This appointment was cancelled." };
+
+  // The position has to be one the job really has (it may have been removed since the page loaded), and one person never holds
+  // two positions of the same job. Acceptance checks the second rule again under a lock; this just says so up front.
+  if (!isActivePosition(request.data, payload.positionIndex)) return { success: false, error: "This job no longer has that position. Reload the page and try again." };
+  const heldOffers = await db.select({ id: offers.id }).from(offers).where(and(eq(offers.requestId, payload.requestId), eq(offers.interpreterId, payload.interpreterId), eq(offers.status, "accepted")));
+  const heldPositions = (request.data as { offerPositions?: unknown } | null)?.offerPositions;
+  if (heldOffers.some((o) => positionOfOffer(heldPositions, o.id) !== payload.positionIndex)) {
+    return { success: false, error: "This interpreter is already booked in another position of this job." };
+  }
 
   const now = new Date();
   const { startsAt, endsAt } = resolveRequestTimes(request);

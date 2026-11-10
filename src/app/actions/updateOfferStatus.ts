@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { requests, offers } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { staffingFacts, statusAfterWithdraw } from "@/lib/staffing";
 import { respondToOffer } from "./respondToOffer";
 
 export async function updateOfferStatus(offerId: string, status: 'accepted' | 'declined' | 'withdrawn') {
@@ -28,25 +29,8 @@ export async function updateOfferStatus(offerId: string, status: 'accepted' | 'd
 
   if (parentReq) {
     const existingData = (parentReq.data as any) || {};
-    const totalPositions = (existingData.slotCount === 2 || existingData.details?.slotCount === 2 || existingData.positions === "Team — two independent positions" || existingData.requiredPositions === 2) ? 2 : 1;
-
     const allReqOffers = await db.select().from(offers).where(eq(offers.requestId, offer.requestId));
-
-    const remainingAccepted = allReqOffers.filter(o => o.id !== offer.id && o.status === 'accepted');
-    const hasOtherAccepted = remainingAccepted.length > 0;
-    const hasPending = allReqOffers.some(o => o.id !== offer.id && o.status === 'pending' && new Date(o.expiresAt) > new Date());
-    const hasReplacement = Boolean(existingData.slotReplacements?.[1] || existingData.slotReplacements?.[2]);
-
-    let newStatus = 'Unfilled / draft';
-    if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
-      newStatus = 'booked';
-    } else if (hasReplacement) {
-      newStatus = 'Needs replacement';
-    } else if (hasOtherAccepted) {
-      newStatus = 'Partially staffed';
-    } else if (hasPending) {
-      newStatus = 'Offer awaiting response';
-    }
+    const newStatus = statusAfterWithdraw(staffingFacts(existingData, allReqOffers, { now: new Date(), excludeOfferId: offer.id }));
 
     let updatedOffersArray = existingData.offers;
     if (Array.isArray(updatedOffersArray)) {

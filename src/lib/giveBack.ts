@@ -4,6 +4,8 @@ import { offers, requests } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
+import type { PositionId } from "@/lib/positions";
+import { assignedInterpreterIdAt, clearedAssignmentFields } from "@/lib/staffing";
 import { logActivity } from "@/lib/requestActivity";
 import { resolveRequestTimes } from "@/utils/timezone";
 
@@ -30,7 +32,7 @@ export async function giveBackBooking(params: {
   const reason = params.reason.replace(/\r\n/g, "\n").trim().slice(0, MAX_REASON);
   const now = new Date();
 
-  const outcome = await db.transaction(async (tx): Promise<{ ok: true; requestId: string; position: 1 | 2 } | { ok: false; error: string }> => {
+  const outcome = await db.transaction(async (tx): Promise<{ ok: true; requestId: string; position: PositionId } | { ok: false; error: string }> => {
     const [offer] = await tx
       .select({ requestId: offers.requestId })
       .from(offers)
@@ -68,13 +70,8 @@ export async function giveBackBooking(params: {
             : s,
         )
       : data.slots;
-    const ownId = position === 1 ? data.assignedInterpreterId : data.position2InterpreterId;
-    const cleared =
-      ownId && ownId !== params.interpreterId
-        ? {}
-        : position === 1
-          ? { assignedInterpreterId: null, assignedInterpreterName: null }
-          : { position2InterpreterId: null, position2InterpreterName: null };
+    const ownId = assignedInterpreterIdAt(data, position);
+    const cleared = ownId && ownId !== params.interpreterId ? {} : clearedAssignmentFields(position);
     const status = "Needs replacement";
 
     await tx

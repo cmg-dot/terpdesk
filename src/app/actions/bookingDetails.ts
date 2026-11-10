@@ -1,5 +1,6 @@
 "use server";
 
+import { positionIdSchema } from "@/lib/validation/position";
 import { and, count, eq, gt, like } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
@@ -11,7 +12,7 @@ import { logError } from "@/lib/logError";
 
 export type ResendDetailsResult = { success: true; message: string } | { success: false; error: string };
 
-const schema = z.object({ requestId: z.string().uuid(), positionIndex: z.union([z.literal(1), z.literal(2)]) });
+const schema = z.object({ requestId: z.string().uuid(), positionIndex: positionIdSchema });
 const COOLDOWN_MS = 2 * 60 * 1000;
 
 /**

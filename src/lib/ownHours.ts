@@ -1,3 +1,5 @@
+import { positionOfOffer } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { timesheets } from "@/db/schema";
@@ -44,8 +46,8 @@ export async function latestSheetsByRequest(interpreterId: string): Promise<Map<
 }
 
 export interface OwnHours {
-  /** The position (1 or 2) this offer holds on the request. */
-  posIdx: 1 | 2;
+  /** The position this offer holds on the request. */
+  posIdx: PositionId;
   isTeamJob: boolean;
   /** The interpreter's own hours record for the job, or null when none has been reported. */
   hoursSub: JsonObject | null;
@@ -69,7 +71,7 @@ export function resolveOwnHours(params: {
   const { rowData, offerId, interpreterId, sheet } = params;
   const isTeamJob = isTeamRequestData(rowData);
   const knownPosition = asObject(rowData.offerPositions)[offerId];
-  const posIdx = (knownPosition || 1) as 1 | 2;
+  const posIdx = positionOfOffer(rowData.offerPositions, offerId);
   const slotHours = asObject(rowData.hoursSubmissions)[posIdx] || (posIdx === 1 ? legacyPosition1Hours(rowData) : null);
   const slot = slotHours ? asObject(slotHours) : null;
   const ownerId = slot && typeof slot.interpreterId === "string" ? slot.interpreterId : null;

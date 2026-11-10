@@ -5,7 +5,7 @@ import { Send } from "lucide-react";
 import { resendBookingDetails } from "@/app/actions/bookingDetails";
 
 /** "Resend details" on a booked slot: emails the interpreter their booking confirmation (with the secure link) again. */
-export function ResendDetailsButton({ requestId, positionIndex }: { requestId: string; positionIndex: 1 | 2 }) {
+export function ResendDetailsButton({ requestId, positionIndex }: { requestId: string; positionIndex: number }) {
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<{ ok: boolean; text: string } | null>(null);
 

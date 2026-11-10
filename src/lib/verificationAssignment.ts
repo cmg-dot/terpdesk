@@ -4,6 +4,8 @@ import { agencyInterpreters, interpreters, offers, requests, timesheets } from "
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { interpreterDisplayName } from "@/lib/displayNameSql";
 import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
+import { isPlainSingle, readPositions } from "@/lib/positions";
+import { assignmentFields, rebuildSlots } from "@/lib/staffing";
 import { recordStateJobHours } from "@/lib/stateJobHours";
 import type { VerificationEffects } from "@/lib/serviceVerification";
 import { signatureUrlFor } from "@/lib/verificationSignature";
@@ -26,10 +28,6 @@ export type AssignEffects = Pick<VerificationEffects, "exec" | "audit" | "activi
 class Refused extends Error {}
 
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
-const isTeamJob = (data: Record<string, unknown>): boolean => {
-  const details = isRecord(data.details) ? data.details : {};
-  return data.slotCount === 2 || details.slotCount === 2 || data.positions === "Team — two independent positions" || data.requiredPositions === 2;
-};
 const FINAL = new Set(["approved", "completed", "billed", "cancelled", "canceled", "awaiting_review", "correction_requested"]);
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -59,11 +57,11 @@ export async function assignPendingVerification(
       const accepted = await tx.select({ id: offers.id, interpreterId: offers.interpreterId }).from(offers).where(and(eq(offers.requestId, requestId), eq(offers.status, "accepted")));
       let booked = false;
       if (!accepted.some((o) => o.interpreterId === interpreterId)) {
-        const team = isTeamJob(locked.data);
         const slots = Array.isArray(locked.data.slots) ? locked.data.slots.filter(isRecord) : [];
         const taken = new Set<number>(accepted.map((o) => positionOfOffer(locked.offerPositions, o.id)));
         for (const slot of slots) if (slot.reservedBy && typeof slot.positionIndex === "number") taken.add(slot.positionIndex);
-        const position = ([1, 2] as const).slice(0, team ? 2 : 1).find((p) => !taken.has(p));
+        const ids = readPositions(locked.data).ids;
+        const position = ids.find((p) => !taken.has(p));
         if (!position) throw new Refused("Every position on this job is filled by other interpreters. Choose one of them.");
 
         const [person] = await tx.select({ label: interpreterDisplayName }).from(interpreters).where(eq(interpreters.id, interpreterId)).limit(1);
@@ -72,16 +70,11 @@ export async function assignPendingVerification(
         const expiresAt = pending.actualEnd ? new Date(pending.actualEnd) : new Date(Date.now() + THIRTY_DAYS_MS);
         await tx.insert(offers).values({ id: offerId, requestId, interpreterId, status: "accepted", expiresAt });
 
-        const otherBooked = taken.size > 0;
         const replacements = isRecord(locked.data.slotReplacements) ? (locked.data.slotReplacements as Record<string, boolean>) : {};
-        const updatedSlots = (team ? [1, 2] : [1]).map((p) => {
-          const current = slots.find((s) => s.positionIndex === p);
-          return p === position
-            ? { ...current, id: offerId, positionIndex: p, active: true, reservedBy: interpreterId, interpreterName: label, needsReplacement: false, followUp: false }
-            : { followUp: false, ...current, id: current?.id ?? `slot-${p}`, positionIndex: p, active: true, reservedBy: current?.reservedBy ?? null, needsReplacement: Boolean(replacements[p]) };
-        });
+        const updatedSlots = rebuildSlots({ ids, existing: slots, replacements, booking: { position, offerId, interpreterId, interpreterName: label } });
         const nowStatus = String(locked.status ?? "").toLowerCase();
-        const status = FINAL.has(nowStatus) ? locked.status : team && !otherBooked ? "Partially staffed" : "booked";
+        const allFilled = ids.every((id) => id === position || taken.has(id));
+        const status = FINAL.has(nowStatus) ? locked.status : allFilled ? "booked" : "Partially staffed";
         await tx
           .update(requests)
           .set({
@@ -91,7 +84,7 @@ export async function assignPendingVerification(
               offerPositions: { ...locked.offerPositions, [offerId]: position },
               slotReplacements: { ...replacements, [position]: false },
               slots: updatedSlots,
-              ...(position === 1 ? { assignedInterpreterName: label, assignedInterpreterId: interpreterId } : { position2InterpreterName: label, position2InterpreterId: interpreterId }),
+              ...assignmentFields(position, interpreterId, label),
             } as never,
             updatedAt: new Date(),
           })

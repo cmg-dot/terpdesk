@@ -6,6 +6,8 @@ import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";
+import { positionOfOffer } from "@/lib/positions";
+import { positionIdSchema } from "@/lib/validation/position";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { createJobDetailsToken } from "@/lib/jobDetailsToken";
 import { logError } from "@/lib/logError";
@@ -13,7 +15,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 
 export type InterpreterPreviewLinkResult = { success: true; url: string } | { success: false; error: string };
 
-const schema = z.object({ requestId: z.string().uuid(), positionIndex: z.union([z.literal(1), z.literal(2)]) });
+const schema = z.object({ requestId: z.string().uuid(), positionIndex: positionIdSchema });
 
 /**
  * Agency staff get the secure job-details link of the interpreter booked in a position, WITHOUT any email being sent, to open or
@@ -45,7 +47,7 @@ export async function getInterpreterPreviewLink(input: z.input<typeof schema>): 
       .select({ id: offers.id, interpreterId: offers.interpreterId })
       .from(offers)
       .where(and(eq(offers.requestId, requestId), eq(offers.status, "accepted")));
-    const booked = accepted.find((o) => (positions[o.id] || 1) === positionIndex);
+    const booked = accepted.find((o) => positionOfOffer(positions, o.id) === positionIndex);
     if (!booked) return { success: false, error: "No interpreter is booked in this position." };
 
     let endsAt = new Date(NaN);

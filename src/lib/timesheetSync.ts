@@ -2,6 +2,8 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { offers, requests, timesheets } from "@/db/schema";
 import type { RequestData, SelectTimesheet, TimesheetTravelLeg } from "@/db/schema";
+import { positionOfOffer } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 
 /**
@@ -43,7 +45,7 @@ const asObject = (v: unknown): JsonObject => (v && typeof v === "object" && !Arr
 const requestData = (v: unknown): RequestData => ({ brief: {}, intake: {}, ...asObject(v) });
 
 /** The same shape `submitInterpreterHours` writes, built from a magic-link timesheet. */
-export function timesheetToHoursSubmission(ts: TimesheetForSync, positionIndex: 1 | 2): JsonObject {
+export function timesheetToHoursSubmission(ts: TimesheetForSync, positionIndex: PositionId): JsonObject {
   const approved = ts.status === "approved";
   return {
     positionIndex,
@@ -71,8 +73,8 @@ export function timesheetToHoursSubmission(ts: TimesheetForSync, positionIndex: 
   };
 }
 
-/** The position (1 or 2) the interpreter holds on the request, or null if they never had an offer for it. */
-async function positionFor(tx: DbTx, requestId: string, interpreterId: string, data: JsonObject): Promise<1 | 2 | null> {
+/** The position the interpreter holds on the request, or null if they never had an offer for it. */
+async function positionFor(tx: DbTx, requestId: string, interpreterId: string, data: JsonObject): Promise<PositionId | null> {
   const rows = await tx
     .select({ id: offers.id, status: offers.status })
     .from(offers)
@@ -80,7 +82,7 @@ async function positionFor(tx: DbTx, requestId: string, interpreterId: string, d
     .orderBy(desc(offers.updatedAt));
   const offer = rows.find((o) => o.status === "accepted") ?? rows[0];
   if (!offer) return null;
-  return asObject(data.offerPositions)[offer.id] === 2 ? 2 : 1;
+  return positionOfOffer(data.offerPositions, offer.id);
 }
 
 const FINAL_REQUEST_STATUSES = new Set(["approved", "completed", "billed", "cancelled", "canceled"]);
@@ -129,7 +131,7 @@ export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, int
     .update(requests)
     .set({
       ...(FINAL_REQUEST_STATUSES.has(status) ? {} : { status: "awaiting_review" }),
-      // Request-level columns are a Position 1 legacy field; Position 2's values live only in its own slot.
+      // Request-level columns are a Position 1 legacy field; the other positions' values live only in their own slot.
       ...(pos === 1 && ts.travelStartTime ? { travelStartTime: ts.travelStartTime, travelEndTime: ts.travelEndTime } : {}),
       ...(pos === 1 && ts.serviceCompleted !== null ? { serviceCompleted: ts.serviceCompleted } : {}),
       data: {
@@ -155,7 +157,7 @@ export async function mirrorTimesheetApproval(
   if (!req) return;
   const data = requestData(req.data);
   const all = asObject(data.hoursSubmissions);
-  const pos = ([1, 2] as const).find((p) => asObject(all[p]).timesheetId === timesheetId);
+  const pos = Object.keys(all).map(Number).find((p) => Number.isInteger(p) && p >= 1 && asObject(all[p]).timesheetId === timesheetId);
   if (!pos) return;
 
   const current = asObject(all[pos]);
@@ -209,7 +211,7 @@ export async function allBookedPositionsApproved(tx: DbTx, requestId: string): P
     .where(and(eq(timesheets.requestId, requestId), eq(timesheets.status, "approved")));
   const approvedBySheet = new Set(approvedSheets.map((t) => t.interpreterId));
   return booked.every((b) => {
-    const pos = positions[b.id] === 2 ? 2 : 1;
+    const pos = positionOfOffer(positions, b.id);
     return asObject(hours[pos]).status === "approved" || approvedBySheet.has(b.interpreterId);
   });
 }

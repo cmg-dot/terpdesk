@@ -11,7 +11,7 @@ const BUTTON = "inline-flex items-center gap-1.5 text-sm font-medium text-[var(-
  * demand with no email sent. Copying puts it on the clipboard (if the browser refuses, the link is shown to copy by hand);
  * Preview opens it in a new tab (the tab is opened on the click itself so pop-up blockers allow it).
  */
-export function InterpreterLinkButtons({ requestId, positionIndex }: { requestId: string; positionIndex: 1 | 2 }) {
+export function InterpreterLinkButtons({ requestId, positionIndex }: { requestId: string; positionIndex: number }) {
   const [busy, setBusy] = useState<"copy" | "preview" | null>(null);
   const [message, setMessage] = useState<{ ok: boolean; text: string } | null>(null);
   const [manualLink, setManualLink] = useState<string | null>(null);

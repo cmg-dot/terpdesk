@@ -10,12 +10,14 @@ import { td_conflict } from "@/app/actions/availability";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 import { logError } from "@/lib/logError";
-import { isPositionTakenByOther, lockRequestForPosition } from "@/lib/positionClaim";
+import { interpreterHoldsOtherPosition, isPositionTakenByOther, lockRequestForPosition } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
 import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { renderOfferConfirmPage } from "@/lib/offerConfirmPage";
 import { resolveOfferLinkState } from "@/lib/offerLinkState";
+import { isActivePosition, positionIdOf, positionOfOffer as positionOfOfferIn, readPositions } from "@/lib/positions";
+import { assignmentFields, assignedInterpreterIdAt, clearedAssignmentFields, rebuildSlots, staffingFacts, statusAfterBooking, statusAfterDecline } from "@/lib/staffing";
 
 export const dynamic = "force-dynamic";
 
@@ -340,7 +342,7 @@ async function processResponse(token: string | null, actionParam: string | undef
   }
 
   const { interpreterId, requestId, positionNumber } = payload;
-  const positionIndex = (positionNumber === 2 ? 2 : 1) as 1 | 2;
+  const positionIndex = positionIdOf(positionNumber);
   // Set once the database write has committed. After that, nothing may report "expired": the answer is recorded.
   let committed: "accepted" | "declined" | null = null;
 
@@ -393,18 +395,10 @@ async function processResponse(token: string | null, actionParam: string | undef
         : [onsite.venue, onsite.address].filter(Boolean).join(" · ") ||
           existingData.location ||
           "On-site";
-    const roleLabel = positionIndex === 2 ? "Secondary Interpreter (Position 2)" : "Primary Interpreter";
+    const roleLabel = positionIndex === 1 ? "Primary Interpreter" : positionIndex === 2 ? "Secondary Interpreter (Position 2)" : `Interpreter (Position ${positionIndex})`;
     // Progressive disclosure: anyone who has not (or will not) accept sees no exact address.
     const restrictedLocation = jobLocation === "Virtual / Remote" ? "Virtual" : "Shared after you accept";
 
-    const totalPositions =
-      existingData.slotCount === 2 ||
-      existingData.details?.slotCount === 2 ||
-      existingData.positions === "Team — two independent positions" ||
-      existingData.requiredPositions === 2
-        ? 2
-        : 1;
-    const otherPos = positionIndex === 1 ? 2 : 1;
     const existingOfferPositions = existingData.offerPositions || {};
 
     const now = new Date();
@@ -426,7 +420,7 @@ async function processResponse(token: string | null, actionParam: string | undef
 
     const freshData = (freshReq.data as Record<string, any>) || {};
     const freshOfferPositions: Record<string, number> = freshData.offerPositions || {};
-    const positionOf = (offerId: string): number => freshOfferPositions[offerId] || 1;
+    const positionOf = (offerId: string): number => positionOfOfferIn(freshOfferPositions, offerId);
 
     const freshStatus = String(freshReq.status || "").toLowerCase();
     if (freshStatus === "cancelled" || freshStatus === "canceled") return blockedCard();
@@ -607,6 +601,9 @@ async function processResponse(token: string | null, actionParam: string | undef
       // position at the same moment are serialised here, so only the first one gets it.
       const lockedReq = await lockRequestForPosition(tx, requestId);
       if (!lockedReq || (await isPositionTakenByOther(tx, requestId, lockedReq, positionIndex, interpreterId))) return null;
+      // The position must still be part of the job, and one person never holds two positions of the same job.
+      if (!isActivePosition(lockedReq.data, positionIndex)) return null;
+      if (await interpreterHoldsOtherPosition(tx, requestId, lockedReq, positionIndex, interpreterId)) return null;
       // Write from the locked snapshot, not the one read before the transaction: the other position may have changed since.
       const existingData = lockedReq.data as Record<string, any>;
 
@@ -625,7 +622,7 @@ async function processResponse(token: string | null, actionParam: string | undef
         .where(eq(offers.requestId, requestId));
 
       for (const off of allReqOffers) {
-        const offPos = existingOfferPositions[off.id] || 1;
+        const offPos = positionOfOfferIn(existingOfferPositions, off.id);
         if (off.id !== targetOffer.id && offPos === positionIndex && off.status === "pending") {
           await tx
             .update(offers)
@@ -644,50 +641,17 @@ async function processResponse(token: string | null, actionParam: string | undef
         [positionIndex]: false,
       };
 
-      const otherPosBooked =
-        totalPositions === 2 &&
-        allReqOffers.some((o) => {
-          const p = updatedOfferPositions[o.id] || 1;
-          return o.id !== targetOffer.id && p === otherPos && o.status === "accepted";
-        });
+      const newStatus = statusAfterBooking(
+        staffingFacts({ ...existingData, offerPositions: updatedOfferPositions, slotReplacements: updatedSlotReplacements }, allReqOffers, { now, excludeOfferId: targetOffer.id }),
+        positionIndex,
+      );
 
-      let newStatus = "booked";
-      if (totalPositions === 2) {
-        if (otherPosBooked) {
-          newStatus = "booked";
-        } else if (updatedSlotReplacements[otherPos]) {
-          newStatus = "Needs replacement";
-        } else {
-          newStatus = "Partially staffed";
-        }
-      }
-
-      const updatedSlots = [
-        {
-          id: positionIndex === 1 ? targetOffer.id : existingData.slots?.[0]?.id || "slot-1",
-          positionIndex: 1,
-          active: true,
-          reservedBy: positionIndex === 1 ? interpreterId : existingData.slots?.[0]?.reservedBy || null,
-          interpreterName:
-            positionIndex === 1 ? interpreterName : existingData.slots?.[0]?.interpreterName || undefined,
-          needsReplacement: positionIndex === 1 ? false : Boolean(updatedSlotReplacements[1]),
-          followUp: false,
-        },
-        ...(totalPositions === 2
-          ? [
-              {
-                id: positionIndex === 2 ? targetOffer.id : existingData.slots?.[1]?.id || "slot-2",
-                positionIndex: 2,
-                active: true,
-                reservedBy: positionIndex === 2 ? interpreterId : existingData.slots?.[1]?.reservedBy || null,
-                interpreterName:
-                  positionIndex === 2 ? interpreterName : existingData.slots?.[1]?.interpreterName || undefined,
-                needsReplacement: positionIndex === 2 ? false : Boolean(updatedSlotReplacements[2]),
-                followUp: false,
-              },
-            ]
-          : []),
-      ];
+      const updatedSlots = rebuildSlots({
+        ids: readPositions(existingData).ids,
+        existing: existingData.slots,
+        replacements: updatedSlotReplacements,
+        booking: { position: positionIndex, offerId: targetOffer.id, interpreterId, interpreterName },
+      });
 
       // Update requests record parameter-safely linking the accepted interpreter
       await tx
@@ -699,10 +663,8 @@ async function processResponse(token: string | null, actionParam: string | undef
             offerPositions: updatedOfferPositions,
             slotReplacements: updatedSlotReplacements,
             slots: updatedSlots,
-            // Each position has its own fields, so accepting Position 2 never writes into Position 1's.
-            ...(positionIndex === 1
-              ? { assignedInterpreterId: interpreterId, assignedInterpreterName: interpreterName }
-              : { position2InterpreterId: interpreterId, position2InterpreterName: interpreterName }),
+            // Positions 1 and 2 have their own fields; later positions keep their booking in the slot record.
+            ...assignmentFields(positionIndex, interpreterId, interpreterName),
           // existingData is a loose Record, so the spread loses the typed `brief` / `intake` keys.
           } as unknown as RequestData,
           updatedAt: now,
@@ -776,47 +738,11 @@ async function processResponse(token: string | null, actionParam: string | undef
         .from(offers)
         .where(eq(offers.requestId, requestId));
 
-      const remainingAccepted = allReqOffers.filter(
-        (o) => o.interpreterId !== interpreterId && o.status === "accepted"
-      );
-      const remainingPending = allReqOffers.some(
-        (o) => o.interpreterId !== interpreterId && o.status === "pending" && new Date(o.expiresAt) > now
-      );
-      const hasReplacement = Boolean(
-        existingData.slotReplacements?.[1] || existingData.slotReplacements?.[2]
-      );
-
-      // Determine request status
-      // No other live offer for THIS position means it still needs coverage: flag it instead of leaving a draft.
-      const declinedOfferPositions = (existingData.offerPositions || {}) as Record<string, number>;
-      const hasPendingForPosition = allReqOffers.some(
-        (o) =>
-          o.interpreterId !== interpreterId &&
-          o.status === "pending" &&
-          new Date(o.expiresAt) > now &&
-          (declinedOfferPositions[o.id] || 1) === positionIndex
-      );
-
-      let newStatus = "Needs replacement";
-      if (remainingAccepted.length >= totalPositions && totalPositions > 0) {
-        newStatus = "booked";
-      } else if (!hasPendingForPosition) {
-        newStatus = "Needs replacement";
-      } else if (hasReplacement) {
-        newStatus = "Needs replacement";
-      } else if (remainingAccepted.length > 0) {
-        newStatus = "Partially staffed";
-      } else if (remainingPending) {
-        newStatus = "Offer awaiting response";
-      }
+      // No other live offer for THIS position means it still needs coverage: flagged "Needs replacement" instead of left a draft.
+      const newStatus = statusAfterDecline(staffingFacts(existingData, allReqOffers, { now, excludeInterpreterId: interpreterId }), positionIndex);
 
       // 3. Explicitly reset slots and assigned interpreter fields for the declined position
-      const currentSlots = existingData.slots || [
-        { positionIndex: 1, active: false, reservedBy: null, interpreterName: undefined },
-        ...(totalPositions === 2
-          ? [{ positionIndex: 2, active: false, reservedBy: null, interpreterName: undefined }]
-          : []),
-      ];
+      const currentSlots = existingData.slots || readPositions(existingData).ids.map((id) => ({ positionIndex: id, active: false, reservedBy: null, interpreterName: undefined }));
 
       const updatedSlots = currentSlots.map((s: any) => {
         // Only a slot that is empty or held by THIS interpreter is reset; another interpreter's booking is never touched.
@@ -840,13 +766,8 @@ async function processResponse(token: string | null, actionParam: string | undef
       };
 
       // Same rule for the per-position name fields: clear them only if they are empty or this interpreter's.
-      if (positionIndex === 1 && (!existingData.assignedInterpreterId || existingData.assignedInterpreterId === interpreterId)) {
-        updatedData.assignedInterpreterId = null;
-        updatedData.assignedInterpreterName = null;
-      } else if (positionIndex === 2 && (!existingData.position2InterpreterId || existingData.position2InterpreterId === interpreterId)) {
-        updatedData.position2InterpreterId = null;
-        updatedData.position2InterpreterName = null;
-      }
+      const ownerOfField = assignedInterpreterIdAt(existingData, positionIndex);
+      if (!ownerOfField || ownerOfField === interpreterId) Object.assign(updatedData, clearedAssignmentFields(positionIndex));
 
       if (updatedData.overview) {
         updatedData.overview = {

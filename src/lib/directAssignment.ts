@@ -1,8 +1,11 @@
 import { and, eq, inArray } from "drizzle-orm";
 import { offers, requests } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
-import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
+import { interpreterHoldsOtherPosition, lockRequestForPosition, OTHER_POSITION_MESSAGE, positionOfOffer } from "@/lib/positionClaim";
 import type { DbTx } from "@/lib/positionClaim";
+import { isActivePosition, readPositions } from "@/lib/positions";
+import { assignmentFields, rebuildSlots, staffingFacts, statusAfterBooking } from "@/lib/staffing";
+import type { SlotRecord } from "@/lib/staffing";
 import type { JobPosition } from "@/lib/validation/directAssign";
 import { resolveRequestTimes } from "@/utils/timezone";
 
@@ -11,7 +14,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
  * round trip: the interpreter ends up booked exactly as if they had accepted. Runs inside the caller's transaction,
  * under the request row lock (see positionClaim.ts), so it can't race an interpreter accepting at the same moment.
  *
- * Only the chosen position is touched; on a team job the other position's offers and booking are left alone.
+ * Only the chosen position is touched; the job's other positions, their offers and bookings are left alone.
  * Unlike auto-book it never replaces someone already booked: that booking has to be removed first.
  *
  * SERVER ONLY. The caller has already checked the agency role and that the interpreter is on the agency's roster.
@@ -29,17 +32,6 @@ export type DirectAssignOutcome =
   | { ok: true; status: string; offerId: string; withdrawnOffers: number }
   | { ok: false; error: string };
 
-interface SlotRecord {
-  id?: string;
-  positionIndex?: number;
-  active?: boolean;
-  reservedBy?: string | null;
-  interpreterName?: string;
-  needsReplacement?: boolean;
-  followUp?: boolean;
-  [key: string]: unknown;
-}
-
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
 const PAST_MESSAGE =
@@ -47,23 +39,6 @@ const PAST_MESSAGE =
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === "object" && value !== null && !Array.isArray(value);
-
-/** Same test the rest of the booking code uses to tell a team job (two independent positions) from a single one. */
-const isTeamJob = (data: Record<string, unknown>): boolean => {
-  const details = isRecord(data.details) ? data.details : {};
-  return (
-    data.slotCount === 2 ||
-    details.slotCount === 2 ||
-    data.positions === "Team — two independent positions" ||
-    data.requiredPositions === 2
-  );
-};
-
-/** Request status once this position is filled: booked, or what the other position still needs on a team job. */
-const statusAfterBooking = (team: boolean, otherBooked: boolean, otherNeedsReplacement: boolean): string => {
-  if (!team || otherBooked) return "booked";
-  return otherNeedsReplacement ? "Needs replacement" : "Partially staffed";
-};
 
 export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignParams): Promise<DirectAssignOutcome> {
   const { requestId, interpreterId, interpreterName, positionIndex } = params;
@@ -76,8 +51,7 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
   }
 
   const data = locked.data;
-  const team = isTeamJob(data);
-  if (positionIndex === 2 && !team) return { ok: false, error: "This job has only one position." };
+  if (!isActivePosition(data, positionIndex)) return { ok: false, error: "This job has no such position." };
 
   const { startsAt, endsAt } = resolveRequestTimes({ createdAt: locked.createdAt, data });
   const start = new Date(startsAt);
@@ -86,7 +60,6 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
     return { ok: false, error: PAST_MESSAGE };
   }
 
-  const otherPosition: JobPosition = positionIndex === 1 ? 2 : 1;
   const slots: SlotRecord[] = Array.isArray(data.slots) ? data.slots.filter(isRecord) : [];
   const allOffers = await tx
     .select({ id: offers.id, interpreterId: offers.interpreterId, status: offers.status })
@@ -99,9 +72,9 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
   if (heldByOffer || heldBySlot) {
     return { ok: false, error: "This position is already filled. Remove the current booking first, then assign again." };
   }
-  // One person can't hold both positions of a team job.
-  if (allOffers.some((o) => o.status === "accepted" && o.interpreterId === interpreterId && positionOf(o.id) !== positionIndex)) {
-    return { ok: false, error: "This interpreter is already booked in the other position of this job." };
+  // One person can't hold two positions of the same job.
+  if (await interpreterHoldsOtherPosition(tx, requestId, locked, positionIndex, interpreterId)) {
+    return { ok: false, error: OTHER_POSITION_MESSAGE };
   }
 
   // Every offer still waiting on an answer for THIS position is closed (including this interpreter's own, which the
@@ -120,18 +93,14 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
     .returning({ id: offers.id });
 
   const slotReplacements: Record<string, boolean> = { ...(isRecord(data.slotReplacements) ? (data.slotReplacements as Record<string, boolean>) : {}), [positionIndex]: false };
-  const otherBooked =
-    allOffers.some((o) => o.status === "accepted" && positionOf(o.id) === otherPosition) ||
-    Boolean(slots.find((s) => s.positionIndex === otherPosition)?.reservedBy);
-  const status = statusAfterBooking(team, otherBooked, Boolean(slotReplacements[otherPosition]));
+  const facts = staffingFacts({ ...data, slotReplacements }, allOffers, { now, includeSlots: true });
+  const status = statusAfterBooking(facts, positionIndex);
 
-  const positions: JobPosition[] = team ? [1, 2] : [1];
-  const updatedSlots = positions.map((position): SlotRecord => {
-    const current = slots.find((s) => s.positionIndex === position);
-    if (position === positionIndex) {
-      return { ...current, id: booked.id, positionIndex: position, active: true, reservedBy: interpreterId, interpreterName, needsReplacement: false, followUp: false };
-    }
-    return { followUp: false, ...current, id: current?.id ?? `slot-${position}`, positionIndex: position, active: true, reservedBy: current?.reservedBy ?? null, needsReplacement: Boolean(slotReplacements[position]) };
+  const updatedSlots = rebuildSlots({
+    ids: readPositions(data).ids,
+    existing: slots,
+    replacements: slotReplacements,
+    booking: { position: positionIndex, offerId: booked.id, interpreterId, interpreterName },
   });
 
   // The mirrored offers list some older records carry must not keep showing a closed offer as pending.
@@ -150,10 +119,8 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
         slotReplacements,
         slots: updatedSlots,
         ...(mirroredOffers ? { offers: mirroredOffers } : {}),
-        // Each position has its own name and id fields, so Position 2 never fills in Position 1's.
-        ...(positionIndex === 1
-          ? { assignedInterpreterName: interpreterName, assignedInterpreterId: interpreterId }
-          : { position2InterpreterName: interpreterName, position2InterpreterId: interpreterId }),
+        // Positions 1 and 2 have their own name and id fields; later positions keep theirs in the slot record.
+        ...assignmentFields(positionIndex, interpreterId, interpreterName),
         // `data` is a loose record, so the spread loses the typed `brief` / `intake` keys.
       } as unknown as RequestData,
       updatedAt: now,

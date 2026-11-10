@@ -1,3 +1,4 @@
+import { positionIdOf } from "@/lib/positions";
 /**
  * Who an agency message can go to: the interpreters currently booked on the request (accepted offers only, so
  * declined, given-back, withdrawn and pending offers never appear). Client-safe.
@@ -28,7 +29,7 @@ export function bookedRecipients(offers: unknown): MessageRecipient[] {
     if (!accepted || typeof raw.interpreterId !== "string" || seen.has(raw.interpreterId)) continue;
     seen.add(raw.interpreterId);
     const name = typeof raw.interpreterName === "string" && raw.interpreterName.trim() ? raw.interpreterName.trim() : "Interpreter";
-    out.push({ interpreterId: raw.interpreterId, label: `${name} (Position ${raw.positionIndex === 2 ? 2 : 1})` });
+    out.push({ interpreterId: raw.interpreterId, label: `${name} (Position ${positionIdOf(raw.positionIndex)})` });
   }
   return out;
 }

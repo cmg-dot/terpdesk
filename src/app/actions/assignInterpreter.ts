@@ -11,7 +11,10 @@ import { readPermission } from "@/lib/agencyPermissions";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { logActivity } from "@/lib/requestActivity";
 import { ensureAvailabilityTables } from "./availability";
-import { lockRequestForPosition } from "@/lib/positionClaim";
+import { interpreterHoldsOtherPosition, lockRequestForPosition, OTHER_POSITION_MESSAGE } from "@/lib/positionClaim";
+import { isActivePosition, positionOfOffer, readPositions } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
+import { assignmentFields, rebuildSlots, staffingFacts, statusAfterBooking } from "@/lib/staffing";
 
 const AUTO_BOOK_NOT_ALLOWED = "This interpreter has not enabled auto-booking for your agency. You must send an offer instead.";
 
@@ -19,7 +22,7 @@ export async function assignInterpreter(
   requestId: string, 
   interpreterId: string, 
   interpreterName?: string,
-  positionIndex: 1 | 2 = 1
+  positionIndex: PositionId = 1
 ) {
   await requireRole("agency");
 
@@ -36,15 +39,16 @@ export async function assignInterpreter(
 
   const existingData = locked.data as Record<string, any>;
   const existingOfferPositions = existingData.offerPositions || {};
+  if (!isActivePosition(existingData, positionIndex)) return { error: "This job has no such position." } as const;
 
   // 1. Withdraw offers specifically for this positionIndex on this request
   const allReqOffers = await tx.select().from(offers).where(eq(offers.requestId, requestId));
-  // The same interpreter can't hold both positions of a team job.
-  if (allReqOffers.some(o => o.status === 'accepted' && o.interpreterId === interpreterId && (existingOfferPositions[o.id] || 1) !== positionIndex)) {
-    return { error: "This interpreter is already booked in the other position of this job." } as const;
+  // The same interpreter can't hold two positions of the same job.
+  if (await interpreterHoldsOtherPosition(tx, requestId, locked, positionIndex, interpreterId)) {
+    return { error: OTHER_POSITION_MESSAGE } as const;
   }
   for (const off of allReqOffers) {
-    const offPos = existingOfferPositions[off.id] || 1;
+    const offPos = positionOfOffer(existingOfferPositions, off.id);
     if (offPos === positionIndex && (off.status === 'pending' || off.status === 'accepted')) {
       await tx.update(offers)
         .set({ status: 'withdrawn', updatedAt: new Date() })
@@ -70,46 +74,17 @@ export async function assignInterpreter(
     [positionIndex]: false
   };
 
-  const totalPositions = (existingData.slotCount === 2 || existingData.details?.slotCount === 2 || existingData.positions === "Team — two independent positions" || existingData.requiredPositions === 2) ? 2 : 1;
-  const otherPos = positionIndex === 1 ? 2 : 1;
+  // The job's other bookings, as they stand (the offers withdrawn above no longer count).
+  const stillOpen = allReqOffers.filter((o) => !(positionOfOffer(existingOfferPositions, o.id) === positionIndex && (o.status === 'pending' || o.status === 'accepted')));
+  const facts = staffingFacts({ ...existingData, offerPositions: updatedOfferPositions, slotReplacements: updatedSlotReplacements }, stillOpen, { now: new Date() });
+  const newStatus = statusAfterBooking(facts, positionIndex);
 
-  // Check if other position is booked
-  const otherPosBooked = totalPositions === 2 && allReqOffers.some(o => {
-    const pos = updatedOfferPositions[o.id] || 1;
-    return pos === otherPos && o.status === 'accepted';
+  const updatedSlots = rebuildSlots({
+    ids: readPositions(existingData).ids,
+    existing: existingData.slots,
+    replacements: updatedSlotReplacements,
+    booking: { position: positionIndex, offerId: newOffer.id, interpreterId, interpreterName: interpreterName || 'Assigned' },
   });
-
-  let newStatus = 'booked';
-  if (totalPositions === 2) {
-    if (otherPosBooked) {
-      newStatus = 'booked';
-    } else if (updatedSlotReplacements[otherPos]) {
-      newStatus = 'Needs replacement';
-    } else {
-      newStatus = 'Partially staffed';
-    }
-  }
-
-  const updatedSlots = [
-    {
-      id: positionIndex === 1 ? newOffer.id : (existingData.slots?.[0]?.id || 'slot-1'),
-      positionIndex: 1,
-      active: true,
-      reservedBy: positionIndex === 1 ? interpreterId : (existingData.slots?.[0]?.reservedBy || null),
-      interpreterName: positionIndex === 1 ? (interpreterName || 'Assigned') : (existingData.slots?.[0]?.interpreterName || undefined),
-      needsReplacement: positionIndex === 1 ? false : Boolean(updatedSlotReplacements[1]),
-      followUp: false
-    },
-    ...(totalPositions === 2 ? [{
-      id: positionIndex === 2 ? newOffer.id : (existingData.slots?.[1]?.id || 'slot-2'),
-      positionIndex: 2,
-      active: true,
-      reservedBy: positionIndex === 2 ? interpreterId : (existingData.slots?.[1]?.reservedBy || null),
-      interpreterName: positionIndex === 2 ? (interpreterName || 'Assigned') : (existingData.slots?.[1]?.interpreterName || undefined),
-      needsReplacement: positionIndex === 2 ? false : Boolean(updatedSlotReplacements[2]),
-      followUp: false
-    }] : [])
-  ];
 
   // 3. Update request row
   const [updated] = await tx.update(requests)
@@ -120,10 +95,8 @@ export async function assignInterpreter(
         offerPositions: updatedOfferPositions,
         slotReplacements: updatedSlotReplacements,
         slots: updatedSlots,
-        // Each position has its own name field, so Position 2 never fills in Position 1's.
-        ...(positionIndex === 1
-          ? { assignedInterpreterName: interpreterName || 'Assigned' }
-          : { position2InterpreterName: interpreterName || 'Assigned' }),
+        // Positions 1 and 2 have their own name fields; later positions keep theirs in the slot record.
+        ...assignmentFields(positionIndex, interpreterId, interpreterName || 'Assigned'),
         // existingData is a loose record, so the spread loses the typed `brief` / `intake` keys.
       } as unknown as RequestData,
       updatedAt: new Date() 

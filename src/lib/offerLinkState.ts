@@ -1,3 +1,4 @@
+import { positionIdOf, positionOfOffer } from "@/lib/positions";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
@@ -28,9 +29,9 @@ export async function resolveOfferLinkState(payload: OfferTokenPayload, now: Dat
   const status = String(request.status || "").toLowerCase();
   if (status === "cancelled" || status === "canceled") return { kind: "blocked" };
 
-  const position = payload.positionNumber === 2 ? 2 : 1;
+  const position = positionIdOf(payload.positionNumber);
   const positions = ((request.data ?? {}) as { offerPositions?: Record<string, number> }).offerPositions ?? {};
-  const positionOf = (offerId: string): number => positions[offerId] || 1;
+  const positionOf = (offerId: string): number => positionOfOffer(positions, offerId);
   const requestOffers = await db.select().from(offers).where(eq(offers.requestId, payload.requestId));
   const summary = summarizeJob(request, position);
   // A link bound to one offer only ever means that offer.

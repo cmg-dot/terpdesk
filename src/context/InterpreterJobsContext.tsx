@@ -10,7 +10,7 @@ import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 export interface Job {
   id: string;
   requestId: string;
-  positionIndex?: 1 | 2;
+  positionIndex?: number;
   requestStatus?: string;
   title: string;
   dateString: string;

@@ -1,9 +1,11 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
+import { positionOfOffer as readPositionOfOffer } from "@/lib/positions";
+import type { PositionId } from "@/lib/positions";
 
 /**
- * Positional isolation for team (two-interpreter) jobs.
+ * Positional isolation for jobs with several interpreter positions.
  *
  * Every booking action works on ONE position: the one its offer was sent for (`requests.data.offerPositions`).
  * `lockRequestForPosition` takes a row lock on the request first, so two actions on the same job (two interpreters
@@ -21,8 +23,8 @@ export interface LockedRequest {
   offerPositions: Record<string, number>;
 }
 
-export const positionOfOffer = (offerPositions: Record<string, number>, offerId: string): 1 | 2 =>
-  offerPositions[offerId] === 2 ? 2 : 1;
+export const positionOfOffer = (offerPositions: Record<string, number>, offerId: string): PositionId =>
+  readPositionOfOffer(offerPositions, offerId);
 
 /** Locks the request row for the rest of the transaction and returns its fresh data. Null if it no longer exists. */
 export async function lockRequestForPosition(tx: DbTx, requestId: string): Promise<LockedRequest | null> {
@@ -46,7 +48,7 @@ export async function isPositionTakenByOther(
   tx: DbTx,
   requestId: string,
   locked: LockedRequest,
-  position: 1 | 2,
+  position: PositionId,
   interpreterId: string,
 ): Promise<boolean> {
   const accepted = await tx
@@ -60,3 +62,25 @@ export async function isPositionTakenByOther(
   const slot = slots.find((s) => s.positionIndex === position);
   return Boolean(slot?.reservedBy && slot.reservedBy !== interpreterId);
 }
+
+/**
+ * The rule that one person never holds two positions on the same job: true when `interpreterId` is already booked (an accepted
+ * offer, or a reserved slot) in a position OTHER than `position`. Call after `lockRequestForPosition`.
+ */
+export async function interpreterHoldsOtherPosition(
+  tx: DbTx,
+  requestId: string,
+  locked: LockedRequest,
+  position: PositionId,
+  interpreterId: string,
+): Promise<boolean> {
+  const accepted = await tx
+    .select({ id: offers.id })
+    .from(offers)
+    .where(and(eq(offers.requestId, requestId), eq(offers.interpreterId, interpreterId), eq(offers.status, "accepted")));
+  if (accepted.some((o) => positionOfOffer(locked.offerPositions, o.id) !== position)) return true;
+  const slots = Array.isArray(locked.data.slots) ? (locked.data.slots as { positionIndex?: number; reservedBy?: string | null }[]) : [];
+  return slots.some((s) => s.reservedBy === interpreterId && typeof s.positionIndex === "number" && s.positionIndex !== position);
+}
+
+export const OTHER_POSITION_MESSAGE = "This interpreter is already booked in another position of this job.";

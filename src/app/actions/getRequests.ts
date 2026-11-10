@@ -9,6 +9,7 @@ import { formatReference, isCompletedRequest, isNeedsReplacementStatus } from "@
 import { isPlainVoidData, isReturnedData, returnedInPortal } from "@/lib/voidReasons";
 import { rawJobZone, resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
+import { positionIdOf, positionsLabel, readPositions } from "@/lib/positions";
 
 function mapRequestRow(row: any, requestOffers: any[]) {
   const rowData = (row.data as any) || {};
@@ -33,14 +34,15 @@ function mapRequestRow(row: any, requestOffers: any[]) {
       : (onsite.venue ? (onsite.address ? `${onsite.venue} · ${onsite.address}` : onsite.venue) : (onsite.address || "Location pending"))
   );
 
-  const totalPositions = (rowData.slotCount === 2 || rowData.details?.slotCount === 2 || rowData.positions === "Team — two independent positions" || rowData.requiredPositions === 2 || details.positions === "Team — two independent positions" || details.requiredPositions === 2) ? 2 : 1;
-  const positions = totalPositions === 2 ? "Team — two independent positions" : "One interpreter";
+  const positionIds = readPositions(rowData).ids;
+  const totalPositions = positionIds.length;
+  const positions = positionsLabel(totalPositions);
 
   const { startsAt, endsAt } = resolveRequestTimes(row);
   
   const offerPositions = rowData.offerPositions || {};
   const normalizedOffers = requestOffers.map(o => {
-    const posIdx = (offerPositions[o.id] ?? (o as any).positionIndex ?? 1) as 1 | 2;
+    const posIdx = positionIdOf(offerPositions[o.id] ?? (o as any).positionIndex);
     return {
       ...o,
       positionIndex: posIdx,
@@ -51,29 +53,30 @@ function mapRequestRow(row: any, requestOffers: any[]) {
   });
 
   const isCancelled = row.status === 'Cancelled' || row.status === 'cancelled';
+  const isAcceptedOffer = (o: any): boolean => o.status === 'accepted' || o.state === 'accepted';
+  const slotRecords: any[] = Array.isArray(rowData.slots) ? rowData.slots : [];
+  const slotRecordFor = (id: number, index: number) => slotRecords.find((x: any) => x?.positionIndex === id) ?? (slotRecords[index]?.positionIndex == null ? slotRecords[index] : undefined);
+  // The older per-position name fields only exist for Positions 1 and 2.
+  const legacyNameFor = (id: number): string | undefined => (id === 1 ? rowData.assignedInterpreterName : id === 2 ? rowData.position2InterpreterName : undefined) || undefined;
+  const isSingle = totalPositions === 1;
 
-  // Slot 1 Resolution
-  const acceptedOffer1 = normalizedOffers.find(o => o.positionIndex === 1 && (o.status === 'accepted' || o.state === 'accepted'));
-  const fallbackAccepted1 = acceptedOffer1 || (!acceptedOffer1 && totalPositions === 1 ? normalizedOffers.find(o => o.status === 'accepted' || o.state === 'accepted') : null);
-  const isSlot1AssignedOrBooked = !isCancelled && Boolean(
-    fallbackAccepted1 ||
-    rowData.slots?.[0]?.reservedBy ||
-    (totalPositions === 1 && (row.status === 'assigned' || row.status === 'booked' || row.status === 'Fully staffed')) ||
-    rowData.assignedInterpreterName
-  );
-  const slot1InterpreterName = fallbackAccepted1?.interpreterName || rowData.slots?.[0]?.interpreterName || rowData.assignedInterpreterName || (isSlot1AssignedOrBooked ? 'Assigned' : undefined);
+  // Each position: who is booked in it (an accepted offer, a reserved slot, or the older per-position name).
+  const resolved = positionIds.map((id, index) => {
+    const slotRecord = slotRecordFor(id, index);
+    const own = normalizedOffers.find(o => o.positionIndex === id && isAcceptedOffer(o));
+    // A single-interpreter job has always accepted any accepted offer, and a booked/assigned status, as its one booking.
+    const accepted = own || (isSingle && id === 1 ? normalizedOffers.find(isAcceptedOffer) : undefined);
+    const isBooked = !isCancelled && Boolean(
+      accepted ||
+      slotRecord?.reservedBy ||
+      (isSingle && id === 1 && (row.status === 'assigned' || row.status === 'booked' || row.status === 'Fully staffed')) ||
+      legacyNameFor(id)
+    );
+    const name = accepted?.interpreterName || slotRecord?.interpreterName || legacyNameFor(id) || (isBooked ? 'Assigned' : undefined);
+    return { id, index, slotRecord, accepted, isBooked, name };
+  });
 
-  // Slot 2 Resolution
-  const acceptedOffer2 = normalizedOffers.find(o => o.positionIndex === 2 && (o.status === 'accepted' || o.state === 'accepted'));
-  const isSlot2AssignedOrBooked = !isCancelled && totalPositions === 2 && Boolean(
-    acceptedOffer2 ||
-    rowData.slots?.[1]?.reservedBy ||
-    rowData.position2InterpreterName
-  );
-  const slot2InterpreterName = acceptedOffer2?.interpreterName || rowData.slots?.[1]?.interpreterName || rowData.position2InterpreterName || (isSlot2AssignedOrBooked ? 'Assigned' : undefined);
-
-  let staffedCount = (isSlot1AssignedOrBooked ? 1 : 0) + (isSlot2AssignedOrBooked ? 1 : 0);
-  if (staffedCount > totalPositions) staffedCount = totalPositions;
+  const staffedCount = Math.min(resolved.filter(r => r.isBooked).length, totalPositions);
   const isAllPositionsFilled = staffedCount >= totalPositions && totalPositions > 0;
 
   // A live pending offer for a position means that position is being addressed. The replacement flag is
@@ -84,17 +87,16 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     o.state !== 'expired' &&
     new Date(o.expiresAt) > new Date() &&
     new Date(endsAt) > new Date();
-  const hasPendingForPosition = (pos: 1 | 2): boolean =>
-    normalizedOffers.some(o => isLivePendingOffer(o) && (o.positionIndex === pos || (!o.positionIndex && pos === 1)));
+  const hasPendingForPosition = (pos: number): boolean =>
+    normalizedOffers.some(o => isLivePendingOffer(o) && o.positionIndex === pos);
 
   // Replacement flags (auto-cleared once all positions are filled)
-  const slot1ReplacementFlag = Boolean(rowData.slotReplacements?.[1] || rowData.slots?.[0]?.needsReplacement || (totalPositions === 1 && isNeedsReplacementStatus(row.status)));
-  const effectiveSlot1NeedsReplacement = !isAllPositionsFilled && !isSlot1AssignedOrBooked && slot1ReplacementFlag && !hasPendingForPosition(1);
-
-  const slot2ReplacementFlag = totalPositions === 2 && Boolean(rowData.slotReplacements?.[2] || rowData.slots?.[1]?.needsReplacement);
-  const effectiveSlot2NeedsReplacement = !isAllPositionsFilled && !isSlot2AssignedOrBooked && slot2ReplacementFlag && !hasPendingForPosition(2);
-
-  const anyNeedsReplacement = effectiveSlot1NeedsReplacement || effectiveSlot2NeedsReplacement;
+  const needsReplacement = (r: (typeof resolved)[number]): boolean => {
+    const flag = Boolean(rowData.slotReplacements?.[r.id] || r.slotRecord?.needsReplacement || (isSingle && isNeedsReplacementStatus(row.status)));
+    return !isAllPositionsFilled && !r.isBooked && flag && !hasPendingForPosition(r.id);
+  };
+  const replacementById = new Map(resolved.map(r => [r.id, needsReplacement(r)]));
+  const anyNeedsReplacement = Array.from(replacementById.values()).some(Boolean);
 
   const hasActivePendingOffer = normalizedOffers.some(isLivePendingOffer);
 
@@ -105,36 +107,25 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     effectiveStatus = row.status === 'booked' ? 'booked' : 'Fully staffed';
   } else if (anyNeedsReplacement) {
     effectiveStatus = 'Needs replacement';
-  } else if (totalPositions === 2 && staffedCount === 1) {
+  } else if (staffedCount > 0) {
     effectiveStatus = 'Partially staffed';
   } else if (hasActivePendingOffer) {
     effectiveStatus = 'Offer awaiting response';
   } else if (row.status === 'Offer awaiting response') {
-    effectiveStatus = (totalPositions === 2 && staffedCount === 1) ? 'Partially staffed' : 'Unfilled / draft';
+    effectiveStatus = 'Unfilled / draft';
   } else {
     effectiveStatus = row.status || 'Unfilled / draft';
   }
 
-  const slots = [
-    {
-      id: fallbackAccepted1?.id || 'slot-1',
-      positionIndex: 1,
-      active: true,
-      reservedBy: isSlot1AssignedOrBooked ? (fallbackAccepted1?.interpreterId || 'assigned-interpreter-1') : null,
-      interpreterName: isSlot1AssignedOrBooked ? slot1InterpreterName : undefined,
-      needsReplacement: effectiveSlot1NeedsReplacement,
-      followUp: false
-    },
-    ...(totalPositions === 2 ? [{
-      id: acceptedOffer2?.id || 'slot-2',
-      positionIndex: 2,
-      active: true,
-      reservedBy: isSlot2AssignedOrBooked ? (acceptedOffer2?.interpreterId || 'assigned-interpreter-2') : null,
-      interpreterName: isSlot2AssignedOrBooked ? slot2InterpreterName : undefined,
-      needsReplacement: effectiveSlot2NeedsReplacement,
-      followUp: false
-    }] : [])
-  ];
+  const slots = resolved.map(r => ({
+    id: r.accepted?.id || `slot-${r.id}`,
+    positionIndex: r.id,
+    active: true,
+    reservedBy: r.isBooked ? (r.accepted?.interpreterId || `assigned-interpreter-${r.id}`) : null,
+    interpreterName: r.isBooked ? r.name : undefined,
+    needsReplacement: replacementById.get(r.id) ?? false,
+    followUp: false
+  }));
 
   const cleanReference = formatReference(row.id);
 
@@ -205,7 +196,7 @@ function mapRequestRow(row: any, requestOffers: any[]) {
     offers: normalizedOffers,
     hasAcceptedOffer: staffedCount > 0,
     acceptedInterpretersCount: staffedCount,
-    assignedInterpreterName: slot1InterpreterName || slot2InterpreterName,
+    assignedInterpreterName: resolved.map((r) => r.name).find(Boolean),
     travelStartTime: row.travelStartTime ? row.travelStartTime.toISOString() : null,
     travelEndTime: row.travelEndTime ? row.travelEndTime.toISOString() : null,
     serviceCompleted: row.serviceCompleted,

@@ -1,6 +1,7 @@
 import type { ActivityChange } from "@/db/schema";
 import { jobDetailsFor } from "@/lib/jobSummary";
 import type { JobDetails, JobRequestRow } from "@/lib/jobSummary";
+import { positionCount } from "@/lib/positions";
 
 /**
  * What an edit changed, in interpreter-facing terms ("Time changed from X to Y").
@@ -22,11 +23,9 @@ const obj = (v: unknown): LooseData => (v && typeof v === "object" && !Array.isA
 const show = (v: string): string => (v.trim() ? v.trim() : "(none)");
 
 const positionsLabel = (request: JobRequestRow): string => {
-  const data = obj(request.data);
-  const details = obj(data.details);
-  const team =
-    data.slotCount === 2 || details.slotCount === 2 || data.requiredPositions === 2 || data.positions === "Team — two independent positions";
-  return team ? "Team (two interpreters)" : "One interpreter";
+  const count = positionCount(request.data);
+  if (count === 1) return "One interpreter";
+  return count === 2 ? "Team (two interpreters)" : `Team (${count} interpreters)`;
 };
 
 const yesNo = (v: boolean | null): string => (v === null ? "" : v ? "Yes" : "No");

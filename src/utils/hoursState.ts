@@ -1,3 +1,4 @@
+import { isPlainSingle } from "@/lib/positions";
 import { resolveRequestTimes } from "./timezone";
 
 export type HoursWorkflowState = 'not_submitted' | 'draft' | 'awaiting_review' | 'correction_requested' | 'approved';
@@ -149,25 +150,19 @@ export function getHoursBadgeInfo(state: HoursWorkflowState): HoursBadgeInfo {
 
 /**
  * The single `hoursSubmission` field from before team jobs. It only ever means Position 1: older code could copy
- * Position 2's hours into it when Position 2 submitted first, so a copy marked as Position 2 is ignored.
+ * another position's hours into it when that position submitted first, so a copy marked as another position is ignored.
  */
 export function legacyPosition1Hours(data: unknown): Record<string, unknown> | null {
   if (!data || typeof data !== "object") return null;
   const legacy = (data as { hoursSubmission?: unknown }).hoursSubmission;
   if (!legacy || typeof legacy !== "object" || Array.isArray(legacy)) return null;
-  return (legacy as { positionIndex?: unknown }).positionIndex === 2 ? null : (legacy as Record<string, unknown>);
+  const marked = (legacy as { positionIndex?: unknown }).positionIndex;
+  return typeof marked === "number" && marked !== 1 ? null : (legacy as Record<string, unknown>);
 }
 
-const TEAM_LABEL = "Team — two independent positions";
-
-/** True for a two-interpreter (team) job, however the request stored it. */
+/** True for a job that keeps each position's own hours (several positions, or one that is not Position 1), however it was stored. */
 export function isTeamRequestData(data: unknown): boolean {
-  if (!data || typeof data !== "object") return false;
-  const d = data as Record<string, unknown>;
-  const pick = (o: unknown): Record<string, unknown> => (o && typeof o === "object" ? (o as Record<string, unknown>) : {});
-  return [d, pick(d.details), pick(d.intake)].some(
-    (o) => o.slotCount === 2 || o.requiredPositions === 2 || o.positions === TEAM_LABEL,
-  );
+  return !isPlainSingle(data);
 }
 
 /**

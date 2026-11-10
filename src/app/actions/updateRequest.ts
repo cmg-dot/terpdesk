@@ -15,6 +15,7 @@ import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 import { definedOnly } from "@/lib/definedValues";
+import { countFromLabel, positionCount, positionFields } from "@/lib/positions";
 
 export interface UpdateRequestPayload {
   title?: string;
@@ -99,9 +100,9 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     ? "Virtual"
     : (newVenue ? (newAddress ? `${newVenue} · ${newAddress}` : newVenue) : (newAddress || existingData.location || "Location pending"));
 
-  const rawPositions = payload.positions ?? payload.details?.positions ?? existingData.positions ?? existingDetails.positions ?? "One interpreter";
-  const slotCount = payload.slotCount ?? payload.details?.slotCount ?? payload.requiredPositions ?? (rawPositions === "Team — two independent positions" ? 2 : 1);
-  const positionsStr = slotCount === 2 ? "Team — two independent positions" : "One interpreter";
+  // What the edit form sent wins; otherwise what the job already has.
+  const sentCount = payload.slotCount ?? payload.details?.slotCount ?? payload.requiredPositions ?? countFromLabel(payload.positions ?? payload.details?.positions);
+  const { positions: positionsStr, slotCount } = positionFields(sentCount ?? positionCount(existingData));
 
   // 3. Assemble Overwritten Data (both top-level and cached details fields)
   const updatedDetails = {

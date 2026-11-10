@@ -2,6 +2,7 @@ import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { getIanaZone } from "@/utils/timezone";
 import { requestReference } from "@/utils/statusEngine";
 import { legacyPosition1Hours } from "@/utils/hoursState";
+import { isPlainSingle, readPositions } from "@/lib/positions";
 
 export interface ServiceRecord {
   id: string;
@@ -29,7 +30,7 @@ export interface ServiceRecord {
   mileageAdjustmentReason?: string | null;
   serviceNote?: string;
   history?: any[];
-  positionIndex?: 1 | 2;
+  positionIndex?: number;
   /** Set when the record comes from a magic-link timesheet submission. */
   timesheetId?: string;
   signatureDataUrl?: string | null;
@@ -63,8 +64,10 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
     (r) => Boolean(r.timesheetId) || requestIds.has(r.appointmentId),
   );
     for (const req of requests) {
-      const totalPos = (req.totalPositions || req.slotCount || (req.positions === "Team — two independent positions" ? 2 : 1)) as 1 | 2;
-      const posList: (1 | 2)[] = totalPos === 2 ? [1, 2] : [1];
+      const positionData = req.data ?? req;
+      const posList = readPositions(positionData).ids;
+      // A job that is not the plain single position keeps one record per position.
+      const perPosition = !isPlainSingle(positionData);
       // Once any position has real hours, only positions with hours get a record (no empty placeholder twin).
       const hasAnyHours = Object.keys(req.data?.hoursSubmissions ?? {}).length > 0 || Boolean(legacyPosition1Hours(req.data));
 
@@ -75,8 +78,8 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
         if (hoursSub?.timesheetId && hoursSub.status !== 'correction_requested') continue;
         const isEligibleStatus = !hasAnyHours && ['awaiting_review', 'correction_requested', 'approved'].includes(req.status);
         if (hoursSub || isEligibleStatus) {
-          const recordId = totalPos === 2 ? `${req.id}-pos-${pos}` : req.id;
-          const existingIdx = merged.findIndex(r => r.id === recordId || (totalPos === 1 && r.appointmentId === req.id));
+          const recordId = perPosition ? `${req.id}-pos-${pos}` : req.id;
+          const existingIdx = merged.findIndex(r => r.id === recordId || (!perPosition && r.appointmentId === req.id));
           const isOdhh = req.data?.intake?.program === 'WA ODHH' || req.data?.intake?.program === 'wa_odhh' || req.requester?.org === 'WA ODHH';
           const acceptedOffer = req.offers?.find((o: any) => (o.positionIndex === pos || (!o.positionIndex && pos === 1)) && (o.status === 'accepted' || o.state === 'accepted'));
           
@@ -94,7 +97,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             title: req.title,
             reference: requestReference(req.data?.intake?.odhhSrn, req.id),
             positionIndex: pos,
-            interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || (pos === 2 ? "Position 2 Interpreter" : "Position 1 Interpreter"),
+            interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || `Position ${pos} Interpreter`,
             state: state,
             scheduledStart: req.startsAt,
             scheduledEnd: req.endsAt,

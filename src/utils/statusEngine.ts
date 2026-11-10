@@ -1,3 +1,5 @@
+import { readPositions } from "@/lib/positions";
+
 export interface Slot {
   id: string;
   active: boolean;
@@ -69,7 +71,7 @@ export function hasLivePendingOffer(appointment: Appointment, now: number = Date
 }
 
 export function getStaffingRatio(appointment: Appointment) {
-  const totalSlots = appointment.totalPositions || appointment.slotCount || (appointment.requiredPositions || (appointment.positions === "Team — two independent positions" ? 2 : 1));
+  const totalSlots = readPositions(appointment).count;
   const activeSlots = appointment.slots?.filter(s => s.active) || [];
 
   let bookedSlots: Slot[] = [];

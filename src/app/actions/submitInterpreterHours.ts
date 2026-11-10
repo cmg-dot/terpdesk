@@ -15,6 +15,7 @@ import { MAX_TOTAL_MILES, countLegs, sumCountedMiles, travelLegsSchema } from "@
 import type { TravelLeg } from "@/lib/timesheetSchemas";
 import { replaceMileageLegs } from "@/lib/mileageLegs";
 import { alertAgency } from "@/lib/lifecycleAlerts";
+import type { PositionId } from "@/lib/positions";
 
 const signatureSchema = z
   .string()
@@ -27,7 +28,7 @@ export async function submitInterpreterHours(
   actualEndTime: string,
   miles: number,
   extra?: {
-    positionIndex?: 1 | 2;
+    positionIndex?: PositionId;
     interpreterId?: string;
     interpreterName?: string;
     breakMinutes?: number;
@@ -124,7 +125,7 @@ export async function submitInterpreterHours(
       id: Math.random().toString(36).substring(7),
       type: isCorrection ? 'correction_submitted' : 'initial_submission',
       title: isCorrection ? `Correction submitted (v${extra?.version})` : 'Initial hours submitted',
-      actor: extra?.interpreterName || (posIdx === 2 ? 'Interpreter (Position 2)' : 'Interpreter (Position 1)'),
+      actor: extra?.interpreterName || `Interpreter (Position ${posIdx})`,
       timestamp: new Date().toISOString(),
       version: extra?.version ?? 1,
       details: {
