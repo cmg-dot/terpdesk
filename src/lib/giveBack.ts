@@ -4,6 +4,7 @@ import { offers, requests } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
+import { positionLabel } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { assignedInterpreterIdAt, clearedAssignmentFields } from "@/lib/staffing";
 import { logActivity } from "@/lib/requestActivity";
@@ -32,7 +33,7 @@ export async function giveBackBooking(params: {
   const reason = params.reason.replace(/\r\n/g, "\n").trim().slice(0, MAX_REASON);
   const now = new Date();
 
-  const outcome = await db.transaction(async (tx): Promise<{ ok: true; requestId: string; position: PositionId } | { ok: false; error: string }> => {
+  const outcome = await db.transaction(async (tx): Promise<{ ok: true; requestId: string; position: PositionId; posText: string } | { ok: false; error: string }> => {
     const [offer] = await tx
       .select({ requestId: offers.requestId })
       .from(offers)
@@ -89,7 +90,7 @@ export async function giveBackBooking(params: {
         updatedAt: now,
       })
       .where(eq(requests.id, offer.requestId));
-    return { ok: true, requestId: offer.requestId, position };
+    return { ok: true, requestId: offer.requestId, position, posText: positionLabel(data, position) };
   });
 
   if (!outcome.ok) return { success: false, error: outcome.error };
@@ -101,7 +102,7 @@ export async function giveBackBooking(params: {
     requestId: outcome.requestId,
     interpreterId: params.interpreterId,
     kind: "given_back",
-    message: `Assignment given back (Position ${outcome.position})${reason ? `. Reason: ${reason}` : ""}`,
+    message: `Assignment given back (${outcome.posText})${reason ? `. Reason: ${reason}` : ""}`,
     actorLabel: `Interpreter (${params.via})`,
   });
   return { success: true };

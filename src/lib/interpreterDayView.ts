@@ -37,9 +37,11 @@ export interface TimelineJob {
   startsAt: string;
   endsAt: string;
   location: string | null;
-  /** Which of the job's positions (1 or 2) this interpreter holds. */
+  /** Which of the job's positions this interpreter holds, as its 1-based place in the job's own numbering ("Position N"). */
   position: number;
-  /** True when the job has two independent positions. */
+  /** How many interpreter positions the job has. */
+  positionCount: number;
+  /** True when the job has two or more positions (a team assignment). */
   team: boolean;
 }
 

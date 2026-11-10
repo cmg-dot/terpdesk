@@ -1,3 +1,4 @@
+import { positionRole } from "@/lib/positions";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
@@ -92,7 +93,7 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     isVirtual: rawFormat.toLowerCase().includes("virtual") || hasMeetingLink,
     // Generic setting only (e.g. Medical, Legal, Educational).
     setting: rawSetting && rawSetting !== "Choose a setting" ? rawSetting : "General interpreting",
-    role: positionNumber === undefined ? "Interpreter" : positionNumber === 1 ? "Position 1" : `Position ${positionNumber} (team)`,
+    role: positionRole(request.data, positionNumber),
     // Mapped to a fixed label so a free-text program value can never leak client detail into an email.
     program: /odhh/i.test(rawProgram) ? "WA ODHH" : /apple/i.test(rawProgram) ? "WA Apple Health" : "Agency (general)",
     timeZone: zone,

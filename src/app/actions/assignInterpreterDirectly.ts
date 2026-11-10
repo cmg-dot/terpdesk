@@ -62,10 +62,10 @@ export async function assignInterpreterDirectly(input: AssignInterpreterDirectly
     action: "job_assigned_directly",
     details: `requestId=${jobId}; interpreterId=${interpreterId}; position=${positionIndex}; withdrawnOffers=${outcome.withdrawnOffers}`,
   });
-  await logActivity({ requestId: jobId, interpreterId, audience: "shared", kind: "assigned", message: `Assigned directly by the agency · booked for Position ${positionIndex}`, actorLabel: "Agency staff" });
+  await logActivity({ requestId: jobId, interpreterId, audience: "shared", kind: "assigned", message: `Assigned directly by the agency · booked for ${outcome.posText}`, actorLabel: "Agency staff" });
   if (outcome.withdrawnOffers > 0) {
     const n = outcome.withdrawnOffers;
-    await logActivity({ requestId: jobId, kind: "offers_withdrawn", message: `${n} pending offer${n === 1 ? "" : "s"} withdrawn because Position ${positionIndex} was assigned directly`, actorLabel: "Agency staff" });
+    await logActivity({ requestId: jobId, kind: "offers_withdrawn", message: `${n} pending offer${n === 1 ? "" : "s"} withdrawn because ${outcome.posText} was assigned directly`, actorLabel: "Agency staff" });
   }
   await notifyInterpreter(interpreterId, {
     type: "job",

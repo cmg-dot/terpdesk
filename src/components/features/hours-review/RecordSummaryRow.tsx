@@ -49,7 +49,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
             {showReference && <span className="font-normal text-[var(--sage)]"> · {record.reference}</span>}
           </span>
           <span className="block break-words text-sm text-gray-700">
-            {record.interpreterName}{record.positionIndex ? ` · Position ${record.positionIndex}` : ""} · <span className="whitespace-nowrap">{summary.dateLabel}</span>
+            {record.interpreterName}{record.positionIndex ? ` · Position ${record.positionOrdinal ?? record.positionIndex}` : ""} · <span className="whitespace-nowrap">{summary.dateLabel}</span>
           </span>
         </span>
 

@@ -239,7 +239,7 @@ export default function AssignmentDetailPage() {
   // While an interpreter is booked, date, time and time zone are fixed (the server ignores them too).
   const isScheduleLocked = hasAcceptedBooking && !isEditLocked;
   // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
-  const messageRecipients = bookedRecipients(realOffers);
+  const messageRecipients = bookedRecipients(realOffers, positionIds);
   const [editNotice, setEditNotice] = useState<string | null>(null);
   const [activityVersion, setActivityVersion] = useState(0);
 

@@ -11,6 +11,9 @@ export interface Job {
   id: string;
   requestId: string;
   positionIndex?: number;
+  /** Their position's place in the job's own numbering ("Position N"), and how many positions the job has (2 or more = a team assignment). */
+  positionOrdinal?: number;
+  positionCount?: number;
   requestStatus?: string;
   title: string;
   dateString: string;
@@ -82,6 +85,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           id: o.id,
           requestId: o.requestId,
           positionIndex: (o as any).positionIndex || 1,
+          positionOrdinal: (o as any).positionOrdinal,
+          positionCount: (o as any).positionCount,
           requestStatus: o.requestStatus,
           title: o.title || "Interpreter Request",
           dateString: o.startsAt ? new Date(o.startsAt).toLocaleString() : "Date TBD",

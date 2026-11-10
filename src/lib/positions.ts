@@ -132,6 +132,27 @@ export const positionIdOf = (value: unknown): PositionId =>
 /** The position an offer was made for, from the job's `offerPositions` map (Position 1 when it is not listed). */
 export const positionOfOffer = (offerPositions: unknown, offerId: string): PositionId => positionIdOf(asRecord(offerPositions)[offerId]);
 
+/**
+ * The 1-based place of position `id` among the job's active positions: the "N" in "Position N" that staff and interpreters read.
+ * A retired id (kept only for history) keeps its own number.
+ */
+export const positionOrdinal = (data: unknown, id: PositionId): number => {
+  const at = readPositions(data).ids.indexOf(id);
+  return at >= 0 ? at + 1 : id;
+};
+
+/** "Position N" in the job's own numbering. */
+export const positionLabel = (data: unknown, id: PositionId): string => `Position ${positionOrdinal(data, id)}`;
+
+/**
+ * How an interpreter's role on the job reads: "Team interpreter (Position N)" when the job has two or more positions,
+ * otherwise just "Interpreter".
+ */
+export const positionRole = (data: unknown, id?: PositionId): string => {
+  if (id === undefined || readPositions(data).count < 2) return "Interpreter";
+  return `Team interpreter (Position ${positionOrdinal(data, id)})`;
+};
+
 /** Is `id` one of the job's active positions? */
 export const isActivePosition = (data: unknown, id: unknown): id is PositionId =>
   typeof id === "number" && readPositions(data).ids.includes(id);

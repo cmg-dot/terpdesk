@@ -20,7 +20,13 @@ interface OfferLike {
   positionIndex?: unknown;
 }
 
-export function bookedRecipients(offers: unknown): MessageRecipient[] {
+/** `positionIds` are the job's active positions in order; with them the label shows the job's own "Position N" rather than the stable id. */
+const ordinalOf = (id: number, positionIds?: readonly number[]): number => {
+  const at = positionIds ? positionIds.indexOf(id) : -1;
+  return at >= 0 ? at + 1 : id;
+};
+
+export function bookedRecipients(offers: unknown, positionIds?: readonly number[]): MessageRecipient[] {
   if (!Array.isArray(offers)) return [];
   const seen = new Set<string>();
   const out: MessageRecipient[] = [];
@@ -29,7 +35,7 @@ export function bookedRecipients(offers: unknown): MessageRecipient[] {
     if (!accepted || typeof raw.interpreterId !== "string" || seen.has(raw.interpreterId)) continue;
     seen.add(raw.interpreterId);
     const name = typeof raw.interpreterName === "string" && raw.interpreterName.trim() ? raw.interpreterName.trim() : "Interpreter";
-    out.push({ interpreterId: raw.interpreterId, label: `${name} (Position ${positionIdOf(raw.positionIndex)})` });
+    out.push({ interpreterId: raw.interpreterId, label: `${name} (Position ${ordinalOf(positionIdOf(raw.positionIndex), positionIds)})` });
   }
   return out;
 }

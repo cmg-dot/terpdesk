@@ -12,7 +12,7 @@ import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { logActivity } from "@/lib/requestActivity";
 import { ensureAvailabilityTables } from "./availability";
 import { interpreterHoldsOtherPosition, lockRequestForPosition, OTHER_POSITION_MESSAGE } from "@/lib/positionClaim";
-import { isActivePosition, positionOfOffer, readPositions } from "@/lib/positions";
+import { isActivePosition, positionLabel, positionOfOffer, readPositions } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { assignmentFields, rebuildSlots, staffingFacts, statusAfterBooking } from "@/lib/staffing";
 
@@ -103,14 +103,14 @@ export async function assignInterpreter(
     })
     .where(eq(requests.id, requestId))
     .returning();
-  return { request: updated, newOffer } as const;
+  return { request: updated, newOffer, posText: positionLabel(existingData, positionIndex) } as const;
   });
   if ("error" in assigned) return { error: assigned.error };
-  const { request: updated, newOffer } = assigned;
+  const { request: updated, newOffer, posText } = assigned;
 
   // Assigned without an Accept click, so send the same booking confirmation (with the secure full-details link) the
   // interpreter would have received by accepting. It never throws: a failed email can't undo the assignment.
-  await logActivity({ requestId, interpreterId, audience: 'shared', kind: 'assigned', message: `Assigned directly · booked for Position ${positionIndex}`, actorLabel: 'Agency staff' });
+  await logActivity({ requestId, interpreterId, audience: 'shared', kind: 'assigned', message: `Assigned directly · booked for ${posText}`, actorLabel: 'Agency staff' });
   await sendBookingConfirmation({ requestId, interpreterId, positionNumber: positionIndex });
 
   revalidatePath(`/requests/${requestId}`);

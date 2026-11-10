@@ -1,5 +1,6 @@
 "use server";
 
+import { positionCount, positionOrdinal } from "@/lib/positions";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests, offers, interpreters } from "@/db/schema";
@@ -110,6 +111,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       id: row.offer.id,
       requestId: row.request.id,
       positionIndex: posIdx,
+      positionOrdinal: positionOrdinal(rowData, posIdx),
+      positionCount: positionCount(rowData),
       detailsUpdated,
       title: row.request.title,
       startsAt,

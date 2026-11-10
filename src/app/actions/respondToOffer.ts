@@ -11,7 +11,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
 import { td_conflict } from "./availability";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { alertAgency } from "@/lib/lifecycleAlerts";
-import { isActivePosition } from "@/lib/positions";
+import { isActivePosition, positionLabel } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { staffingFacts, statusAfterBooking, statusAfterDecline } from "@/lib/staffing";
 import { logActivity } from "@/lib/requestActivity";
@@ -98,7 +98,7 @@ export async function respondToOffer(
 
   // 5. One transaction, locked on the request row: only THIS offer's position is touched, and two interpreters
   // (or an accept and a give-back) on the same job are serialised, so neither can overwrite the other.
-  const outcome = await db.transaction(async (tx): Promise<{ ok: true; offer: OfferRecord; posIdx: PositionId } | { ok: false; error: string }> => {
+  const outcome = await db.transaction(async (tx): Promise<{ ok: true; offer: OfferRecord; posIdx: PositionId; posText: string } | { ok: false; error: string }> => {
     const locked = await lockRequestForPosition(tx, offer.requestId);
     if (!locked) return { ok: false, error: "The request for this offer no longer exists." };
     const existingData = locked.data as Record<string, any>;
@@ -189,7 +189,7 @@ export async function respondToOffer(
         })
         .where(eq(requests.id, offer.requestId));
     }
-    return { ok: true, offer: updatedOffer, posIdx };
+    return { ok: true, offer: updatedOffer, posIdx, posText: positionLabel(existingData, posIdx) };
   });
 
   if (!outcome.ok) {
@@ -197,7 +197,7 @@ export async function respondToOffer(
     revalidatePath('/interpreter-home');
     return { success: false, error: outcome.error };
   }
-  const { offer: updatedOffer, posIdx } = outcome;
+  const { offer: updatedOffer, posIdx, posText } = outcome;
 
   // Agency: in-app notification + email, with the job's reference, date and location.
   await alertAgency({
@@ -212,7 +212,7 @@ export async function respondToOffer(
     // The interpreter sees their own booking in the shared history; a decline stays staff-only.
     audience: normResponse === 'accepted' ? 'shared' : 'agency',
     kind: normResponse === 'accepted' ? 'offer_accepted' : 'offer_declined',
-    message: normResponse === 'accepted' ? `Offer accepted · booked for Position ${posIdx}` : `Offer declined (Position ${posIdx})`,
+    message: normResponse === 'accepted' ? `Offer accepted · booked for ${posText}` : `Offer declined (${posText})`,
     actorLabel: 'Interpreter (in app)',
   });
   // Booked: send the confirmation with the secure full-details link (same email as the magic-link path).

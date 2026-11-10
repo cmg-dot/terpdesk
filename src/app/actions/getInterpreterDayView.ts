@@ -12,7 +12,7 @@ import { logError } from "@/lib/logError";
 import { getRosterInterpreters, getRosterProfileTags } from "@/lib/roster";
 import { dayWindow, mergeSpans, nextDateKey, previousDateKey } from "@/lib/resourceTimeline";
 import { splitCredentials } from "@/lib/timelineFilters";
-import { isPlainSingle, positionOfOffer } from "@/lib/positions";
+import { hasSeveralPositions, positionCount, positionOfOffer, positionOrdinal } from "@/lib/positions";
 import { interpreterDayViewInputSchema } from "@/lib/validation/interpreterDayView";
 import { resolveRequestTimes } from "@/utils/timezone";
 
@@ -131,8 +131,9 @@ export async function getInterpreterDayView(input: { date: string }): Promise<In
         startsAt,
         endsAt,
         location: text(data.location) ?? text(onsite.venue) ?? text(details.location),
-        position: positionOfOffer(offerPositions, row.offerId),
-        team: !isPlainSingle(data),
+        position: positionOrdinal(data, positionOfOffer(offerPositions, row.offerId)),
+        positionCount: positionCount(data),
+        team: hasSeveralPositions(data),
       });
     }
     jobs.sort((a, b) => a.startsAt.localeCompare(b.startsAt));

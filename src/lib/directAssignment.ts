@@ -3,7 +3,7 @@ import { offers, requests } from "@/db/schema";
 import type { RequestData } from "@/db/schema";
 import { interpreterHoldsOtherPosition, lockRequestForPosition, OTHER_POSITION_MESSAGE, positionOfOffer } from "@/lib/positionClaim";
 import type { DbTx } from "@/lib/positionClaim";
-import { isActivePosition, readPositions } from "@/lib/positions";
+import { isActivePosition, positionLabel, readPositions } from "@/lib/positions";
 import { assignmentFields, rebuildSlots, staffingFacts, statusAfterBooking } from "@/lib/staffing";
 import type { SlotRecord } from "@/lib/staffing";
 import type { JobPosition } from "@/lib/validation/directAssign";
@@ -29,7 +29,7 @@ export interface DirectAssignParams {
 }
 
 export type DirectAssignOutcome =
-  | { ok: true; status: string; offerId: string; withdrawnOffers: number }
+  | { ok: true; status: string; offerId: string; withdrawnOffers: number; posText: string }
   | { ok: false; error: string };
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
@@ -127,5 +127,5 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
     })
     .where(eq(requests.id, requestId));
 
-  return { ok: true, status, offerId: booked.id, withdrawnOffers: pendingIds.length };
+  return { ok: true, status, offerId: booked.id, withdrawnOffers: pendingIds.length, posText: positionLabel(data, positionIndex) };
 }

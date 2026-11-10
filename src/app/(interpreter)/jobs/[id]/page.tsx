@@ -1445,7 +1445,7 @@ export default function JobDetailPage() {
             <p className="text-[14px] text-[var(--sage)] mb-8">Pending offers do not reserve time.</p>
 
             <h3 className="text-[16px] font-semibold text-[var(--ink)] mb-4">
-              {job.positionIndex ? `Position ${job.positionIndex} · interpreter` : "Your position · interpreter"}
+              {job.positionIndex ? ((job.positionCount ?? 1) > 1 ? `Team interpreter · Position ${job.positionOrdinal ?? job.positionIndex} of ${job.positionCount}` : `Position ${job.positionOrdinal ?? job.positionIndex} · interpreter`) : "Your position · interpreter"}
             </h3>
 
             <div className="flex flex-wrap items-center gap-3 mb-6">

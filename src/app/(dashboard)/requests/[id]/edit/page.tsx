@@ -398,7 +398,7 @@ export default function EditRequestPage() {
   const isScheduleLocked = isBookedRequest && !isEditLocked;
   const [messageToInterpreter, setMessageToInterpreter] = useState("");
   // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
-  const messageRecipients = bookedRecipients(realOffers);
+  const messageRecipients = bookedRecipients(realOffers, readPositions(existingRequest?.data ?? existingRequest).ids);
   const [messageRecipient, setMessageRecipient] = useState("");
   const recipientDefault = defaultRecipient(messageRecipients, existingRequest?.data?.clarifications);
   useEffect(() => {

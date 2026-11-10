@@ -87,7 +87,7 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
     const approveEntry = {
       id: Math.random().toString(36).substring(7),
       type: "approved",
-      title: record.positionIndex ? `Hours approved and finalized (Position ${record.positionIndex})` : "Hours approved and finalized",
+      title: record.positionIndex ? `Hours approved and finalized (Position ${record.positionOrdinal ?? record.positionIndex})` : "Hours approved and finalized",
       actor: "Agency Staff",
       timestamp: new Date().toISOString(),
       version: record.version || 1,
@@ -135,7 +135,7 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
     const corrEntry = {
       id: Math.random().toString(36).substring(7),
       type: "correction_requested",
-      title: record.positionIndex ? `Correction requested by agency (Position ${record.positionIndex})` : "Correction requested by agency",
+      title: record.positionIndex ? `Correction requested by agency (Position ${record.positionOrdinal ?? record.positionIndex})` : "Correction requested by agency",
       actor: "Agency Staff",
       timestamp: new Date().toISOString(),
       version: record.version || 1,

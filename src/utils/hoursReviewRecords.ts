@@ -2,7 +2,7 @@ import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { getIanaZone } from "@/utils/timezone";
 import { requestReference } from "@/utils/statusEngine";
 import { legacyPosition1Hours } from "@/utils/hoursState";
-import { isPlainSingle, readPositions } from "@/lib/positions";
+import { isPlainSingle, positionOrdinal, readPositions } from "@/lib/positions";
 
 export interface ServiceRecord {
   id: string;
@@ -31,6 +31,8 @@ export interface ServiceRecord {
   serviceNote?: string;
   history?: any[];
   positionIndex?: number;
+  /** The position's 1-based place in the job's own numbering (what "Position N" shows; positionIndex is the stable id). */
+  positionOrdinal?: number;
   /** Set when the record comes from a magic-link timesheet submission. */
   timesheetId?: string;
   signatureDataUrl?: string | null;
@@ -72,6 +74,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
       const hasAnyHours = Object.keys(req.data?.hoursSubmissions ?? {}).length > 0 || Boolean(legacyPosition1Hours(req.data));
 
       for (const pos of posList) {
+        const ordinal = positionOrdinal(positionData, pos);
         const hoursSub = req.data?.hoursSubmissions?.[pos] || (pos === 1 ? legacyPosition1Hours(req.data) : null);
         // Mirrored from a magic-link timesheet: that timesheet's own record (below) represents it,
         // unless the agency has since sent it back for correction (tracked on the request, as before).
@@ -97,7 +100,8 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             title: req.title,
             reference: requestReference(req.data?.intake?.odhhSrn, req.id),
             positionIndex: pos,
-            interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || `Position ${pos} Interpreter`,
+            positionOrdinal: ordinal,
+            interpreterName: acceptedOffer?.interpreterName || hoursSub?.interpreterName || `Position ${ordinal} Interpreter`,
             state: state,
             scheduledStart: req.startsAt,
             scheduledEnd: req.endsAt,

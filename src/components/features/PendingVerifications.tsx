@@ -39,7 +39,7 @@ export function PendingVerifications({ onAssigned, query = "" }: { onAssigned: (
       <div>
         <h2 className="text-xl font-semibold text-[var(--ink)]">Needs matching to an interpreter ({shown.length === items.length ? items.length : `${shown.length} of ${items.length}`})</h2>
         <p className="text-sm text-[var(--sage)]">
-          These ODHH reports arrived for a job where nobody is booked, or where the report does not say which of two interpreters it is for. Match each one to the interpreter who worked it. This does not approve the hours: it links the report to that interpreter (and books them on the job if they are not booked yet), and the hours then wait under Awaiting review, where you approve them.
+          These ODHH reports arrived for a job where nobody is booked, or where the report does not say which of the job's interpreters it is for. Match each one to the interpreter who worked it. This does not approve the hours: it links the report to that interpreter (and books them on the job if they are not booked yet), and the hours then wait under Awaiting review, where you approve them.
         </p>
         {shown.length === 0 && <p role="status" className="mt-2 text-sm text-[var(--sage)]">None of these match your search.</p>}
       </div>

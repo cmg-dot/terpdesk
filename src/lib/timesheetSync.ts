@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { offers, requests, timesheets } from "@/db/schema";
 import type { RequestData, SelectTimesheet, TimesheetTravelLeg } from "@/db/schema";
-import { positionOfOffer } from "@/lib/positions";
+import { positionLabel, positionOfOffer } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 
@@ -118,7 +118,7 @@ export async function mirrorTimesheetSubmission(tx: DbTx, requestId: string, int
         id: ts.id,
         type: "initial_submission",
         title: "Hours submitted via secure link",
-        actor: `Interpreter (Position ${pos})`,
+        actor: `Interpreter (${positionLabel(data, pos)})`,
         timestamp: iso(ts.submittedAt) ?? new Date().toISOString(),
         version: 1,
         details: { actualStart: iso(ts.actualStartTime), actualEnd: iso(ts.actualEndTime), mileage: num(ts.mileage) ?? 0, positionIndex: pos },
@@ -173,7 +173,7 @@ export async function mirrorTimesheetApproval(
       {
         id: `${timesheetId}-approved`,
         type: "approved",
-        title: `Hours approved and finalized (Position ${pos})`,
+        title: `Hours approved and finalized (${positionLabel(data, pos)})`,
         actor: "Agency Staff",
         timestamp: new Date().toISOString(),
         version: Number(current.version ?? 1),

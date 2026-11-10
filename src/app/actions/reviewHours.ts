@@ -6,7 +6,7 @@ import { offers, requests } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { logActivity } from "@/lib/requestActivity";
-import { positionIdOf, positionOfOffer, readPositions } from "@/lib/positions";
+import { positionIdOf, positionLabel, positionOfOffer, readPositions } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { positionIdSchema } from "@/lib/validation/position";
 import { legacyPosition1Hours } from "@/utils/hoursState";
@@ -33,6 +33,7 @@ export async function approveHours(
   const parsed = approveHoursSchema.safeParse({ requestId, approvedMileage, positionIndex: positionIndex || 1, mileageAdjustmentReason });
   if (!parsed.success) return { success: false, error: "Enter a valid, non-negative mileage." };
 
+  let approvedText = "Position 1";
   const failure = await db.transaction(async (tx): Promise<string | null> => {
     const [existing] = await tx
       .select({ data: requests.data })
@@ -45,6 +46,7 @@ export async function approveHours(
 
     const posIdx = positionIdOf(positionIndex);
     const existingData = (existing.data as any) || {};
+    approvedText = positionLabel(existingData, posIdx);
     const existingHours = existingData.hoursSubmissions?.[posIdx] || (posIdx === 1 ? legacyPosition1Hours(existingData) : null) || {};
     const existingHistory = Array.isArray(existingHours.history) ? existingHours.history : [];
 
@@ -56,7 +58,7 @@ export async function approveHours(
     const approveHistoryEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'approved',
-      title: `Hours approved and finalized (Position ${posIdx})`,
+      title: `Hours approved and finalized (${positionLabel(existingData, posIdx)})`,
       actor: 'Agency Staff',
       timestamp: new Date().toISOString(),
       version: existingHours.version || 1,
@@ -116,7 +118,7 @@ export async function approveHours(
   });
   if (failure) return { success: false, error: failure };
 
-  await logActivity({ requestId, kind: "hours_approved", message: `Hours approved (Position ${positionIndex || 1})`, actorLabel: "Agency staff" });
+  await logActivity({ requestId, kind: "hours_approved", message: `Hours approved (${approvedText})`, actorLabel: "Agency staff" });
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
   revalidatePath("/dashboard");
@@ -151,7 +153,7 @@ export async function requestHoursCorrection(
     const corrReqHistoryEntry = {
       id: Math.random().toString(36).substring(7),
       type: 'correction_requested',
-      title: `Correction requested by agency (Position ${posIdx})`,
+      title: `Correction requested by agency (${positionLabel(existingData, posIdx)})`,
       actor: 'Agency Staff',
       timestamp: new Date().toISOString(),
       version: existingHours.version || 1,
@@ -190,6 +192,7 @@ export async function requestHoursCorrection(
     return {
       interpreterId: typeof existingHours.interpreterId === "string" ? (existingHours.interpreterId as string) : null,
       offerPositions: (existingData.offerPositions || {}) as Record<string, number>,
+      posText: positionLabel(existingData, posIdx),
     };
   });
 
@@ -213,7 +216,7 @@ export async function requestHoursCorrection(
     });
   }
 
-  await logActivity({ requestId, kind: "hours_correction_requested", message: `Hours correction requested (Position ${positionIndex || 1})`, actorLabel: "Agency staff" });
+  await logActivity({ requestId, kind: "hours_correction_requested", message: `Hours correction requested (${reportedBy.posText})`, actorLabel: "Agency staff" });
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
   revalidatePath("/dashboard");

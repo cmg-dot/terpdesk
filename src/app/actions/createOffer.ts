@@ -11,7 +11,7 @@ import { logActivity } from "@/lib/requestActivity";
 import { logError } from "@/lib/logError";
 import { offerBlock } from "@/lib/offerAvailability";
 import { offerExpiresAt } from "@/lib/offerExpiry";
-import { isActivePosition, positionOfOffer } from "@/lib/positions";
+import { isActivePosition, positionLabel, positionOfOffer } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { createOfferSchema } from "@/lib/validation/createOffer";
 import type { CreateOfferInput } from "@/lib/validation/createOffer";
@@ -123,7 +123,7 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
     })
     .where(eq(requests.id, payload.requestId));
 
-  await logActivity({ requestId: payload.requestId, interpreterId: payload.interpreterId, kind: "offer_sent", message: `Offer sent (Position ${positionIndex})` });
+  await logActivity({ requestId: payload.requestId, interpreterId: payload.interpreterId, kind: "offer_sent", message: `Offer sent (${positionLabel(request.data, positionIndex)})` });
 
   await notifyInterpreter(payload.interpreterId, {
     type: "job",

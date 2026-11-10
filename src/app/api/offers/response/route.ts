@@ -16,7 +16,7 @@ import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { renderOfferConfirmPage } from "@/lib/offerConfirmPage";
 import { resolveOfferLinkState } from "@/lib/offerLinkState";
-import { isActivePosition, positionIdOf, positionOfOffer as positionOfOfferIn, readPositions } from "@/lib/positions";
+import { isActivePosition, positionIdOf, positionLabel, positionOfOffer as positionOfOfferIn, positionRole, readPositions } from "@/lib/positions";
 import { assignmentFields, assignedInterpreterIdAt, clearedAssignmentFields, rebuildSlots, staffingFacts, statusAfterBooking, statusAfterDecline } from "@/lib/staffing";
 
 export const dynamic = "force-dynamic";
@@ -395,7 +395,8 @@ async function processResponse(token: string | null, actionParam: string | undef
         : [onsite.venue, onsite.address].filter(Boolean).join(" · ") ||
           existingData.location ||
           "On-site";
-    const roleLabel = positionIndex === 1 ? "Primary Interpreter" : positionIndex === 2 ? "Secondary Interpreter (Position 2)" : `Interpreter (Position ${positionIndex})`;
+    const roleLabel = positionRole(existingData, positionIndex);
+    const positionText = positionLabel(existingData, positionIndex);
     // Progressive disclosure: anyone who has not (or will not) accept sees no exact address.
     const restrictedLocation = jobLocation === "Virtual / Remote" ? "Virtual" : "Shared after you accept";
 
@@ -675,7 +676,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       });
       if (!claimed) return blockedCard();
       committed = "accepted";
-      await logActivity({ requestId, interpreterId, audience: "shared", kind: "offer_accepted", message: `Offer accepted · booked for Position ${positionIndex}`, actorLabel: "Interpreter (email link)" });
+      await logActivity({ requestId, interpreterId, audience: "shared", kind: "offer_accepted", message: `Offer accepted · booked for ${positionText}`, actorLabel: "Interpreter (email link)" });
 
       // Agency: in-app notification + email, with the job's reference, date and location.
       await alertAgency({ event: "offer_accepted", requestId, interpreterId, positionNumber: positionIndex });
@@ -790,7 +791,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       });
       if (!declined) return blockedCard();
       committed = "declined";
-      await logActivity({ requestId, interpreterId, kind: "offer_declined", message: `Offer declined (Position ${positionIndex})`, actorLabel: "Interpreter (email link)" });
+      await logActivity({ requestId, interpreterId, kind: "offer_declined", message: `Offer declined (${positionText})`, actorLabel: "Interpreter (email link)" });
 
       await alertAgency({ event: "offer_declined", requestId, interpreterId, positionNumber: positionIndex });
 

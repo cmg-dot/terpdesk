@@ -25,7 +25,7 @@ export const TimelineJobBlock = ({ block, zone, nowMs }: Props) => {
   const tone = jobTone(job.status, job.startsAt, job.endsAt, nowMs);
   const range = `${formatInTimeZone(job.startsAt, zone, "h:mm a")} – ${formatInTimeZone(job.endsAt, zone, "h:mm a")}`;
   const detail = job.location ?? job.title;
-  const label = `${range}, ${detail}, ${job.status}${job.team ? `, position ${job.position}` : ""}`;
+  const label = `${range}, ${detail}, ${job.status}${job.team ? `, team assignment, position ${job.position} of ${job.positionCount}` : ""}`;
 
   return (
     <Link
@@ -50,7 +50,7 @@ export const TimelineJobBlock = ({ block, zone, nowMs }: Props) => {
         {block.clippedEnd && " ▸"}
       </span>
       <span className="truncate opacity-90">
-        {job.team && <span className="mr-1 rounded bg-black/10 px-1 font-semibold">P{job.position}</span>}
+        {job.team && <span title={`Team assignment: Position ${job.position} of ${job.positionCount}`} className="mr-1 rounded bg-black/10 px-1 font-semibold">P{job.position}/{job.positionCount}</span>}
         {detail}
       </span>
     </Link>

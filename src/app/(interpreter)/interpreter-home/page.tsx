@@ -592,7 +592,7 @@ export default function InterpreterHomePage() {
  </span>
  {job.positionIndex && (
  <span className="text-xs font-medium text-[var(--forest-soft)] bg-[var(--surface)] px-2.5 py-0.5 rounded-full">
- Position {job.positionIndex}
+ {(job.positionCount ?? 1) > 1 ? `Team · Position ${job.positionOrdinal ?? job.positionIndex} of ${job.positionCount}` : `Position ${job.positionOrdinal ?? job.positionIndex}`}
  </span>
  )}
  </div>
