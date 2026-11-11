@@ -33,8 +33,8 @@ export interface RequestData {
     odhhConfirmedAt?: string;
     /** The client's date of birth (yyyy-MM-dd), typed in Staffing for billing. STRICTLY AGENCY ONLY: interpreter views are built from an allowlist that excludes it, and it is never put in an email, a link or a log. */
     clientDob?: string;
-    /** The billing modifier: U3 (mental health) or U9 (medical), typed in Staffing. AGENCY ONLY, same as clientDob. */
-    billingModifier?: "U3" | "U9";
+    /** The billing modifier chosen in Staffing: "U3" (medical) or "U3 U9" (mental health). AGENCY ONLY, same as clientDob. */
+    billingModifier?: "U3" | "U3 U9";
   };
   /**
    * Non-state jobs only: the facility contact must sign off the interpreter's hours (see lib/onsiteSignature.ts). Written when the

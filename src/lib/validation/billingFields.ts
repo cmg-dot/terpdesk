@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * The two billing fields typed in Staffing: the client's date of birth and the billing modifier (U3 mental health, U9 medical).
+ * The two billing fields typed in Staffing: the client's date of birth and the billing modifier (U3 for medical, "U3 U9" for mental health).
  * STRICTLY AGENCY ONLY: they are stored on the job's intake, which interpreter views never copy (see interpreterJobData.ts), and they
  * are never put in an email, a link, a notification or a log. Shared by the Staffing boxes and the server actions (the real check).
  * Pure.
@@ -36,12 +36,21 @@ export function formatDob(stored: string | null | undefined): string {
   return m ? `${m[2]}/${m[3]}/${m[1]}` : "";
 }
 
-export const BILLING_MODIFIERS = ["U3", "U9"] as const;
+/**
+ * The two codes billing uses. Mental health is billed with BOTH modifiers, written "U3 U9" (one value, a single space). They were first
+ * offered the other way round (U3 mental health, U9 medical), which was wrong; a lone "U9" is no longer a value, and a job that still has
+ * one stored simply shows no selection until someone picks again.
+ */
+export const BILLING_MODIFIERS = ["U3", "U3 U9"] as const;
 export type BillingModifier = (typeof BILLING_MODIFIERS)[number];
-export const BILLING_MODIFIER_LABEL: Record<BillingModifier, string> = { U3: "U3 — Mental Health", U9: "U9 — Medical" };
+export const BILLING_MODIFIER_LABEL: Record<BillingModifier, string> = { U3: "U3 — Medical", "U3 U9": "U3 U9 — Mental Health" };
 
 /** The stored modifier when it is one of the two, else "" (anything else on file is treated as not set). */
 export const asBillingModifier = (value: unknown): BillingModifier | "" => (BILLING_MODIFIERS as readonly unknown[]).includes(value) ? (value as BillingModifier) : "";
 
 export const setClientDobSchema = z.object({ requestId: z.string().uuid(), clientDob: z.string().max(DOB_MAX_INPUT) });
-export const setBillingModifierSchema = z.object({ requestId: z.string().uuid(), modifier: z.enum(["", ...BILLING_MODIFIERS]) });
+/** One of the two codes, or empty (or null) to clear it. Nothing else: not another code, a different case, extra spaces or the words. */
+export const setBillingModifierSchema = z.object({
+  requestId: z.string().uuid(),
+  modifier: z.preprocess((value) => (value === null ? "" : value), z.enum(["", ...BILLING_MODIFIERS])),
+});

@@ -8,10 +8,11 @@ import type { IntakeBillingKey } from "@/lib/intakeFieldStore";
 import { logError } from "@/lib/logError";
 import { logActivity } from "@/lib/requestActivity";
 import { DOB_FORMAT_MESSAGE, parseDob, setBillingModifierSchema, setClientDobSchema } from "@/lib/validation/billingFields";
+import type { BillingModifier } from "@/lib/validation/billingFields";
 
 /** Problems are returned, not thrown: in production a thrown message is hidden from the browser. */
 export type SetClientDobResult = { success: true; clientDob: string } | { success: false; error: string };
-export type SetBillingModifierResult = { success: true; modifier: "" | "U3" | "U9" } | { success: false; error: string };
+export type SetBillingModifierResult = { success: true; modifier: "" | BillingModifier } | { success: false; error: string };
 
 type Who = { id?: string; email?: string | null };
 
@@ -54,7 +55,7 @@ export async function setClientDob(input: unknown): Promise<SetClientDobResult> 
   return done.ok ? { success: true, clientDob: stored } : { success: false, error: done.error };
 }
 
-/** Saves the billing modifier (intake.billingModifier): U3 (mental health) or U9 (medical); empty clears it. Agency only. */
+/** Saves the billing modifier (intake.billingModifier): "U3" (medical) or "U3 U9" (mental health); empty (or null) clears it. Agency only. */
 export async function setBillingModifier(input: unknown): Promise<SetBillingModifierResult> {
   let session;
   try {
@@ -63,7 +64,7 @@ export async function setBillingModifier(input: unknown): Promise<SetBillingModi
     return { success: false, error: NOT_ALLOWED_MESSAGE };
   }
   const parsed = setBillingModifierSchema.safeParse(input);
-  if (!parsed.success) return { success: false, error: "Choose U3, U9 or none." };
+  if (!parsed.success) return { success: false, error: "Choose U3 (Medical), U3 U9 (Mental Health) or none." };
   const done = await save(parsed.data.requestId, "billingModifier", parsed.data.modifier, session.user, { audit: "billing_modifier_saved", activityKind: "billing_modifier", activityNoun: "Billing modifier" });
   return done.ok ? { success: true, modifier: parsed.data.modifier } : { success: false, error: done.error };
 }

@@ -14,7 +14,7 @@ interface Props {
 }
 
 /**
- * The billing modifier selector beside the client's date of birth in Staffing: U3 (mental health) or U9 (medical). It saves the moment
+ * The billing modifier selector beside the client's date of birth in Staffing: U3 (medical) or U3 U9 (mental health). It saves the moment
  * it changes, without opening Edit assignment (locked while an offer is out or an interpreter is booked). For agency billing only: it
  * is never shown to interpreters or put in an email, a link or a notification. "None" removes it.
  */
