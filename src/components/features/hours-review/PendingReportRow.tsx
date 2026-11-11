@@ -1,11 +1,14 @@
 "use client";
 
 import { useId, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown } from "lucide-react";
 import { assignVerificationInterpreter } from "@/app/actions/pendingVerifications";
 import { SignatureImage } from "@/components/features/SignatureImage";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type { SearchableOption } from "@/components/ui/SearchableSelect";
+import { useHoursMotion } from "@/hooks/useHoursMotion";
+import { PANEL } from "@/lib/hoursMotion";
 import { candidateTag, completionLabel, detailsToggleLabel, reportedName } from "@/lib/pendingVerificationView";
 import type { PendingVerificationView } from "@/lib/verificationPending";
 import { formatDateTimeRangeInZone } from "@/utils/timezone";
@@ -20,6 +23,7 @@ export function PendingReportRow({ item, onDone }: { item: PendingVerificationVi
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const panelId = useId();
+  const { transition } = useHoursMotion();
 
   const options = useMemo<SearchableOption[]>(
     () =>
@@ -108,32 +112,36 @@ export function PendingReportRow({ item, onDone }: { item: PendingVerificationVi
         </button>
       </div>
 
-      {open && (
-        <div id={panelId} className="space-y-4 border-t border-amber-100 p-4 text-sm">
-          <div className="rounded-xl bg-[#F5F4F0] p-4">
-            <h4 className="mb-2 text-sm font-medium text-[var(--ink)]">Service-verification signature</h4>
-            {item.signatureUrl ? <SignatureImage src={item.signatureUrl} alt="Service-verification signature" /> : <p className="text-sm text-[var(--sage)]">No signature came with this report.</p>}
-          </div>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <div>
-              <div className="mb-1 text-[var(--sage)]">Reported service time</div>
-              <div className="text-[var(--ink)]">{item.actualStart && item.actualEnd ? formatDateTimeRangeInZone(item.actualStart, item.actualEnd, item.timeZone) : "No times reported"}</div>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div key="details" id={panelId} initial={PANEL.initial} animate={PANEL.animate} exit={PANEL.exit} transition={transition()}>
+            <div className="space-y-4 border-t border-amber-100 p-4 text-sm">
+              <div className="rounded-xl bg-[#F5F4F0] p-4">
+                <h4 className="mb-2 text-sm font-medium text-[var(--ink)]">Service-verification signature</h4>
+                {item.signatureUrl ? <SignatureImage src={item.signatureUrl} alt="Service-verification signature" /> : <p className="text-sm text-[var(--sage)]">No signature came with this report.</p>}
+              </div>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                <div>
+                  <div className="mb-1 text-[var(--sage)]">Reported service time</div>
+                  <div className="text-[var(--ink)]">{item.actualStart && item.actualEnd ? formatDateTimeRangeInZone(item.actualStart, item.actualEnd, item.timeZone) : "No times reported"}</div>
+                </div>
+                {item.cancellation && (
+                  <div>
+                    <div className="mb-1 text-[var(--sage)]">Cancellation</div>
+                    <div className="text-[var(--ink)]">{item.cancellation}</div>
+                  </div>
+                )}
+                {item.comments && (
+                  <div>
+                    <div className="mb-1 text-[var(--sage)]">ODHH comments</div>
+                    <div className="text-[var(--ink)]">{item.comments}</div>
+                  </div>
+                )}
+              </div>
             </div>
-            {item.cancellation && (
-              <div>
-                <div className="mb-1 text-[var(--sage)]">Cancellation</div>
-                <div className="text-[var(--ink)]">{item.cancellation}</div>
-              </div>
-            )}
-            {item.comments && (
-              <div>
-                <div className="mb-1 text-[var(--sage)]">ODHH comments</div>
-                <div className="text-[var(--ink)]">{item.comments}</div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {error && <p role="alert" className="mx-4 mb-4 rounded-xl bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</p>}
     </article>

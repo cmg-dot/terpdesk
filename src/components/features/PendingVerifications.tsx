@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AnimatePresence } from "framer-motion";
 import { getPendingVerifications } from "@/app/actions/pendingVerifications";
+import { AnimatedListItem } from "@/components/features/hours-review/AnimatedListItem";
 import { PendingReportRow } from "@/components/features/hours-review/PendingReportRow";
 import { matchesSearch } from "@/lib/hoursReviewFilter";
 import { previewItems, showAllLabel } from "@/lib/pendingVerificationView";
@@ -43,9 +45,15 @@ export function PendingVerifications({ onAssigned, query = "" }: { onAssigned: (
         </p>
         {shown.length === 0 && <p role="status" className="mt-2 text-sm text-[var(--sage)]">None of these match your search.</p>}
       </div>
-      {visible.map((item) => (
-        <PendingReportRow key={item.reportId} item={item} onDone={() => { onAssigned(); void load(); }} />
-      ))}
+      <div className="-mb-3">
+        <AnimatePresence initial={false}>
+          {visible.map((item, index) => (
+            <AnimatedListItem key={item.reportId} index={index}>
+              <PendingReportRow item={item} onDone={() => { onAssigned(); void load(); }} />
+            </AnimatedListItem>
+          ))}
+        </AnimatePresence>
+      </div>
       {toggleLabel && (
         <button
           type="button"

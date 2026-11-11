@@ -5,7 +5,8 @@ import { LogStateJobHoursDialog } from "@/components/features/LogStateJobHoursDi
 import { PendingVerifications } from "@/components/features/PendingVerifications";
 import { HoursPager } from "@/components/features/hours-review/HoursPager";
 import { HoursReviewFilterBar } from "@/components/features/hours-review/HoursReviewFilterBar";
-import { ServiceRecordCard } from "@/components/features/hours-review/ServiceRecordCard";
+import { AnimatedRecordList } from "@/components/features/hours-review/AnimatedRecordList";
+import { HoursEmptyState } from "@/components/features/hours-review/HoursEmptyState";
 import { useHoursRecords } from "@/hooks/useHoursRecords";
 import { useHoursReviewFilters } from "@/hooks/useHoursReviewFilters";
 import { DEFAULT_FILTERS, countActiveFilters, filterRecords, hrefForPage, statusCounts as countStatuses } from "@/lib/hoursReviewFilter";
@@ -53,27 +54,12 @@ function HoursReviewContent() {
 
       {totalPages > 1 && <HoursPager position="top" page={page} totalPages={totalPages} hrefFor={hrefFor} />}
 
-      <div className="flex flex-col gap-3 w-full">
-        {displayedRecords.length === 0 ? (
-          <div className="bg-white p-12 rounded-2xl border border-gray-200 text-center flex flex-col items-center justify-center">
-            <h3 className="text-lg font-medium text-[var(--ink)] mb-2">No service records found</h3>
-            {countActiveFilters(filters) > 0 ? (
-              <>
-                <p className="text-sm text-[var(--sage)] mb-4">No records match your search and filters.</p>
-                <button type="button" onClick={() => setFilters(DEFAULT_FILTERS)} className="text-sm font-medium text-[var(--forest)] hover:underline">
-                  Clear filters
-                </button>
-              </>
-            ) : (
-              <p className="text-sm text-[var(--sage)]">There are currently no records to review.</p>
-            )}
-          </div>
-        ) : (
-          pageRecords.map(record => (
-            <ServiceRecordCard key={record.id} record={record} onUpdate={updateRecord} />
-          ))
-        )}
-      </div>
+      <AnimatedRecordList
+        records={pageRecords}
+        viewKey={`${filters.status}:${page}`}
+        onUpdate={updateRecord}
+        empty={<HoursEmptyState filtersActive={countActiveFilters(filters) > 0} onClearFilters={() => setFilters(DEFAULT_FILTERS)} />}
+      />
 
       {totalPages > 1 && <HoursPager page={page} totalPages={totalPages} hrefFor={hrefFor} />}
     </div>
