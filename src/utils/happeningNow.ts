@@ -116,22 +116,20 @@ export function sortUpcomingWithHappeningNow<T extends { startsAt?: string | Dat
   jobs: T[],
   nowMs: number = Date.now()
 ): T[] {
-  return [...jobs].sort((a, b) => {
-    const aHappening = isAppointmentHappeningNow(a, nowMs);
-    const bHappening = isAppointmentHappeningNow(b, nowMs);
-
-    // Happening now appointments are prioritized to the very front/top
-    if (aHappening && !bHappening) return -1;
-    if (!aHappening && bHappening) return 1;
-
-    // Subsequent appointments sorted in chronological order
-    const aTimes = resolveRequestTimes(a);
-    const bTimes = resolveRequestTimes(b);
-
-    const timeA = aTimes?.startsAt ? new Date(aTimes.startsAt).getTime() : 0;
-    const timeB = bTimes?.startsAt ? new Date(bTimes.startsAt).getTime() : 0;
-
-    return timeA - timeB;
-  });
+  // Each job's live state and start are worked out ONCE, not inside the comparator (which ran them twice per comparison: thousands of
+  // time-zone parses to sort a long list). Same order as before.
+  return jobs
+    .map((job) => {
+      const startsAt = resolveRequestTimes(job)?.startsAt;
+      return { job, happening: isAppointmentHappeningNow(job, nowMs), time: startsAt ? new Date(startsAt).getTime() : 0 };
+    })
+    .sort((a, b) => {
+      // Happening now appointments are prioritized to the very front/top
+      if (a.happening && !b.happening) return -1;
+      if (!a.happening && b.happening) return 1;
+      // Subsequent appointments sorted in chronological order
+      return a.time - b.time;
+    })
+    .map((entry) => entry.job);
 }
 

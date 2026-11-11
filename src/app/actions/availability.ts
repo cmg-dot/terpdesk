@@ -33,12 +33,16 @@ let ensureInFlight: Promise<void> | null = null;
 const SCHEMA_LOCK_KEY = 727346101;
 
 /**
- * Auto-migration pattern: creates availability tables in PostgreSQL if not present.
- * Pages call this from several actions at once (e.g. the dashboard on a cold start). Callers in the same process share
- * one run, and the script holds a Postgres advisory lock, so two server instances can't run it at the same time and
- * collide on "concurrent create" errors.
+ * The tables behind interpreter profiles, availability, credentials and files are created by migration 0010
+ * (src/db/migrations/manual/0010_availability_profile_schema.sql), like every other table: the server ASSUMES they exist. This
+ * therefore does nothing, so no read (the dashboard, the requests list, the calendar) runs DDL, takes table locks, or pays for 34
+ * statements on the first request of a new server instance.
+ *
+ * For a throwaway database that has not had the migration, set TERPDESK_RUNTIME_DDL=1 and the old behaviour returns: the statements
+ * run once per process (callers share one run, under a Postgres advisory lock so two instances never collide).
  */
 export async function ensureAvailabilityTables(): Promise<void> {
+  if (process.env.TERPDESK_RUNTIME_DDL !== "1") return;
   if (tablesEnsured) return;
   if (!ensureInFlight) {
     ensureInFlight = runEnsureAvailabilityTables().finally(() => {

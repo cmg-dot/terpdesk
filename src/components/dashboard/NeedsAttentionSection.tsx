@@ -28,12 +28,14 @@ const cardStyle = (job: NeedsAttentionJob): { dotColor: string; btnLabel: string
 
 interface Props {
   jobs: readonly NeedsAttentionJob[];
+  /** How many jobs need attention in all: `jobs` is only the most urgent of them. */
+  total: number;
   /** How many of `jobs` start later than the attention horizon. */
   laterCount: number;
 }
 
 /** "Needs attention": jobs that need someone, the imminent ones first (see lib/needsAttention.ts). */
-export const NeedsAttentionSection = ({ jobs, laterCount }: Props) => (
+export const NeedsAttentionSection = ({ jobs, total, laterCount }: Props) => (
   <section className="space-y-5">
     <h2 className="text-lg font-semibold text-[var(--ink)] px-2">Needs attention</h2>
 
@@ -60,10 +62,16 @@ export const NeedsAttentionSection = ({ jobs, laterCount }: Props) => (
           );
         }}
       />
-      {laterCount > 0 && jobs.length > laterCount && (
+      {total > jobs.length && (
+        <p className="px-2 pt-1 text-xs text-[var(--sage)]">
+          Showing the {jobs.length} most urgent of {total}.{" "}
+          <Link href="/requests?filter=needing-coverage" className="font-medium text-slate-600 hover:text-[var(--ink)] transition-colors">See the rest in Requests →</Link>
+        </p>
+      )}
+      {total <= jobs.length && laterCount > 0 && jobs.length > laterCount && (
         <p className="px-2 pt-1 text-xs text-[var(--sage)]">{laterCount} more starting later than {NEEDS_ATTENTION_HORIZON_DAYS} days are listed after the nearer ones.</p>
       )}
-      {laterCount > 0 && jobs.length === laterCount && (
+      {total <= jobs.length && laterCount > 0 && jobs.length === laterCount && (
         <p className="px-2 pt-1 text-xs text-[var(--sage)]">Nothing starts in the next {NEEDS_ATTENTION_HORIZON_DAYS} days; these all start later.</p>
       )}
     </div>

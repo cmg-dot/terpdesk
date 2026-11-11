@@ -1,9 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { fetchRequestList } from "@/app/actions/getRequestList";
+import { useRequestList } from "@/hooks/useRequestList";
 import { agencyDateKey, civilDate } from "@/lib/agencyTime";
 import { CalendarDayView } from "@/components/calendar/CalendarDayView";
 import { CalendarHistoryNotice } from "@/components/calendar/CalendarHistoryNotice";
@@ -22,7 +22,6 @@ import { useCalendarKeys } from "@/hooks/useCalendarKeys";
 import { useCalendarNavigation } from "@/hooks/useCalendarNavigation";
 import { useDayIndex, useScheduledCards } from "@/hooks/useDayIndex";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
-import type { CalendarRequest } from "@/lib/calendarDayIndex";
 import { rangeBeforeHistory } from "@/lib/calendarHistory";
 import { buildSearchEntries } from "@/lib/calendarSearch";
 import { rangeKeyFor, weekStartKey } from "@/lib/calendarNav";
@@ -39,8 +38,7 @@ export default function CalendarPage() {
 }
 
 function CalendarScreen() {
-  const [requests, setRequests] = useState<CalendarRequest[]>([]);
-  const [loaded, setLoaded] = useState(false);
+  const { requests, loaded } = useRequestList();
   // Job View is the original calendar (month / week / day of job cards). Interpreter View is the resource timeline.
   const [mode, setMode] = useState<CalendarMode>("jobs");
   // Same filter and default as Requests & assignments. Cancelled jobs stay off today and the days ahead until asked for; on past days they show muted.
@@ -54,10 +52,6 @@ function CalendarScreen() {
   const cards = useScheduledCards(requests);
   const index = useDayIndex(cards, statusFilter, nowMs);
   const entries = useMemo(() => buildSearchEntries(cards), [cards]);
-
-  useEffect(() => {
-    fetchRequestList().then((rows) => { setRequests(rows); setLoaded(true); }).catch(() => console.error("[calendar page] request failed"));
-  }, []);
 
   const interpreters = mode === "interpreters";
   // The Interpreter View is one day wide, so its arrows (and Left / Right) move one day; Shift + arrow moves a week.

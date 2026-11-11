@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { recordIdleSignOut } from "@/app/actions/recordIdleSignOut";
+import { clearClientCache } from "@/lib/clientCache";
 import { IDLE_LIMIT_MS, IDLE_LOGIN_REASON, IDLE_TOUCH_INTERVAL_MS, IDLE_WARNING_LEAD_MS } from "@/lib/auth/idle";
 
 /**
@@ -62,6 +63,7 @@ export function useIdleTimeout(): IdleTimeoutState {
     const finish = async (record: boolean) => {
       // The audit row is best effort and bounded: the sign-out never waits long for it.
       if (record) await Promise.race([recordIdleSignOut().catch(() => undefined), new Promise((r) => setTimeout(r, AUDIT_WAIT_MS))]);
+      clearClientCache();
       await signOut({ callbackUrl: SIGNED_OUT_URL });
     };
     const end = (record: boolean) => {
@@ -155,6 +157,7 @@ export function useIdleTimeout(): IdleTimeoutState {
         } else if (message?.type === "signout" && !ended) {
           ended = true;
           stopTimers();
+          clearClientCache();
           void signOut({ callbackUrl: SIGNED_OUT_URL });
         }
       };

@@ -11,21 +11,19 @@ import { NeedsAttentionSection } from "@/components/dashboard/NeedsAttentionSect
 import { UpcomingBookingsSection } from "@/components/dashboard/UpcomingBookingsSection";
 import { useDashboardSummary } from "@/hooks/useDashboardSummary";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
-import { buildDashboardLists } from "@/lib/dashboardLists";
-
-const NO_JOBS: never[] = [];
+import { dashboardViewOf } from "@/lib/dashboardView";
 
 export default function DashboardPage() {
   const { data: session } = useSession();
   const welcomeName = (session?.user?.displayName || session?.user?.name)?.trim();
   const { summary, failed } = useDashboardSummary();
   // The page's own clock decides what is live, upcoming or finished, so a job moves the minute it starts or ends; the six figures and
-  // the jobs themselves come from the server (see fetchDashboardSummary).
+  // the few jobs listed come from the server (see fetchDashboardSummary).
   const nowMs = useMinuteClock();
-  const lists = useMemo(() => buildDashboardLists(summary?.active ?? NO_JOBS, nowMs), [summary, nowMs]);
+  const lists = useMemo(() => dashboardViewOf(summary, nowMs), [summary, nowMs]);
 
   return (
-    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2">
+    <motion.div initial={summary ? false : { opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2">
       <LiveAppointmentBanner jobs={lists.happeningNow} />
 
       <div className="space-y-6">
@@ -50,7 +48,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-8">
-          <NeedsAttentionSection jobs={lists.needsAttention} laterCount={lists.needsAttentionLaterCount} />
+          <NeedsAttentionSection jobs={lists.needsAttention} total={lists.needsAttentionTotal} laterCount={lists.needsAttentionLaterCount} />
           <UpcomingBookingsSection jobs={lists.upcoming} liveCount={lists.upcomingHappeningNowCount} nowMs={nowMs} />
         </div>
 

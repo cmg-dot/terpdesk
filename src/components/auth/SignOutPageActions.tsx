@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { signOut } from "next-auth/react";
+import { clearClientCache } from "@/lib/clientCache";
 import { useRouter } from "next/navigation";
 import { SignOutActions } from "@/components/auth/SignOutActions";
 
@@ -13,6 +14,7 @@ export function SignOutPageActions() {
   const confirm = async () => {
     setBusy(true);
     try {
+      clearClientCache();
       await signOut({ callbackUrl: "/login" });
     } catch {
       setBusy(false);

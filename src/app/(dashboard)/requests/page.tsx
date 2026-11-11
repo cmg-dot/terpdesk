@@ -13,9 +13,8 @@ import { RefreshCw, Building2, MapPin, Users2 } from "lucide-react";
 import { getStaffingRatio, formatReference } from "@/utils/statusEngine";
 import { DEFAULT_STATUS_FILTER, STATUS_FILTER_OPTIONS, listCopy, matchesStatusFilter, requestStatusLabel, tabForFilter } from "@/lib/requestListFilter";
 import { RequestStatusBadge } from "@/components/requests/RequestStatusBadge";
-import { fetchRequestList } from "@/app/actions/getRequestList";
+import { useRequestList } from "@/hooks/useRequestList";
 import { asAppointment, asListed } from "@/lib/requestListRow";
-import type { RequestListRow } from "@/lib/requestListRow";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatInTimeZone } from "date-fns-tz";
@@ -55,13 +54,9 @@ const formatJobDate = (startsAt?: string, endsAt?: string, timeZone?: string) =>
 };
 
 function RequestsPageContent() {
-  const [requests, setRequests] = useState<RequestListRow[]>([]);
+  const { requests } = useRequestList();
   const searchParams = useSearchParams();
   const filterParam = searchParams.get("filter");
-
-  useEffect(() => {
-    fetchRequestList().then(data => setRequests(data)).catch(() => console.error("[requests page] request failed"));
-  }, []);
 
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
   useEffect(() => {

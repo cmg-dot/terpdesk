@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 import { signOut } from "next-auth/react";
+import { clearClientCache } from "@/lib/clientCache";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { SignOutActions } from "@/components/auth/SignOutActions";
 import { SIGN_OUT_TEXT, SIGN_OUT_TITLE } from "@/lib/auth/messages";
@@ -19,6 +20,7 @@ export const SignOutButton = ({ className, children }: { className?: string; chi
   const confirm = async () => {
     setBusy(true);
     try {
+      clearClientCache();
       await signOut({ callbackUrl: "/login" });
     } catch {
       setBusy(false);

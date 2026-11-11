@@ -8,8 +8,24 @@ export function utcToWallClock(isoString: string, zone: string): string {
   return formatInTimeZone(isoString, zone, "yyyy-MM-dd'T'HH:mm");
 }
 
+const ianaZoneCache = new Map<string, string>();
+const IANA_ZONE_CACHE_LIMIT = 500;
+
+/**
+ * The IANA zone a stored zone text means ("Pacific Time — Seattle, Los Angeles" -> America/Los_Angeles). A pure function of its text, and
+ * called for every job on every list (several times per job), so each answer is remembered: the lookup of a real zone builds an
+ * Intl.DateTimeFormat, which is far too slow to repeat thousands of times.
+ */
 export function getIanaZone(tz?: string): string {
   if (!tz || typeof tz !== 'string') return 'America/Los_Angeles';
+  const known = ianaZoneCache.get(tz);
+  if (known !== undefined) return known;
+  const zone = resolveIanaZone(tz);
+  if (ianaZoneCache.size < IANA_ZONE_CACHE_LIMIT) ianaZoneCache.set(tz, zone);
+  return zone;
+}
+
+function resolveIanaZone(tz: string): string {
   const trimmed = tz.trim();
   const lower = trimmed.toLowerCase();
 

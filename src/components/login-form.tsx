@@ -7,6 +7,7 @@ import * as z from "zod";
 import Link from "next/link";
 import { getSession, signIn, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import { clearClientCache } from "@/lib/clientCache";
 import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 import type { AppRole } from "@/lib/auth/routes";
 import { PasswordInput } from "@/components/ui/PasswordInput";
@@ -96,6 +97,7 @@ export function LoginForm({ portal }: { portal: AppRole }) {
  }
  if (role !== portal) {
  // The server already refuses this; never keep a session that came through the wrong portal.
+ clearClientCache();
  await signOut({ redirect: false });
  setFormError(WRONG_PORTAL_MESSAGES[portal]);
  return;
