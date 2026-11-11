@@ -1,4 +1,4 @@
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, desc, eq, gte, lte, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { agencyInbox, stateSrnEvents } from "@/db/schema";
 import type { InboundKind } from "@/lib/inboundMail/classify";
@@ -53,14 +53,53 @@ export interface StateEventInput {
   authenticated: boolean;
 }
 
-/** Records the event once per email. False when this email was already recorded (a redelivery) or the write failed. */
+/**
+ * The state's own notices reach the app through two doors for one email: the Inbox webhook (keyed by the email's real Message-ID) and
+ * the Lambda's /api/intake (no Message-ID, so keyed by a fingerprint). The Message-ID key can never see that they are the same email,
+ * so each notice was recorded twice, up to about a minute apart. Requester replies are left out: two replies are two emails.
+ */
+const TWIN_CHECKED_KINDS: ReadonlySet<InboundKind> = new Set<InboundKind>(["state_in_process", "state_cancellation"]);
+/** How far apart two copies of one notice may arrive and still count as the same notice. */
+export const TWIN_WINDOW_MS = 10 * 60 * 1000;
+
+/**
+ * Records the event once per email. False when this email was already recorded (a redelivery), when its other door already recorded it
+ * (see TWIN_CHECKED_KINDS), or when the write failed. A twin is the same request number and kind, from the same sender with the same
+ * authentication, received within TWIN_WINDOW_MS; a cancellation must also state the same cancellation time, so a different notice
+ * (a forward, a second sender, a later cancellation) is never mistaken for a copy. A skipped twin writes nothing and is not an error.
+ */
 export async function recordStateEvent(event: StateEventInput): Promise<boolean> {
   try {
-    const inserted = await db
-      .insert(stateSrnEvents)
-      .values({ srn: event.srn, kind: event.kind, occurredAt: event.occurredAt, receivedAt: event.receivedAt, messageId: event.messageId, senderEmail: event.senderEmail.toLowerCase(), authenticated: event.authenticated })
-      .onConflictDoNothing({ target: stateSrnEvents.messageId })
-      .returning({ id: stateSrnEvents.id });
+    const senderEmail = event.senderEmail.toLowerCase();
+    const values = { srn: event.srn, kind: event.kind, occurredAt: event.occurredAt, receivedAt: event.receivedAt, messageId: event.messageId, senderEmail, authenticated: event.authenticated };
+    if (!TWIN_CHECKED_KINDS.has(event.kind)) {
+      const inserted = await db.insert(stateSrnEvents).values(values).onConflictDoNothing({ target: stateSrnEvents.messageId }).returning({ id: stateSrnEvents.id });
+      return inserted.length > 0;
+    }
+    const inserted = await db.transaction(async (tx) => {
+      // Both doors can run at the same moment, so the look and the write are serialised per request number and kind.
+      await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`state_srn_event:${event.srn}:${event.kind}`}))`);
+      const [twin] = await tx
+        .select({ id: stateSrnEvents.id })
+        .from(stateSrnEvents)
+        .where(
+          and(
+            eq(stateSrnEvents.srn, event.srn),
+            eq(stateSrnEvents.kind, event.kind),
+            eq(stateSrnEvents.senderEmail, senderEmail),
+            eq(stateSrnEvents.authenticated, event.authenticated),
+            gte(stateSrnEvents.receivedAt, new Date(event.receivedAt.getTime() - TWIN_WINDOW_MS)),
+            lte(stateSrnEvents.receivedAt, new Date(event.receivedAt.getTime() + TWIN_WINDOW_MS)),
+            event.kind === "state_cancellation" ? eq(stateSrnEvents.occurredAt, event.occurredAt) : undefined,
+          ),
+        )
+        .limit(1);
+      if (twin) {
+        console.debug(`[idempotency] skipped duplicate ${event.kind} event for SRN ${event.srn}`);
+        return [];
+      }
+      return tx.insert(stateSrnEvents).values(values).onConflictDoNothing({ target: stateSrnEvents.messageId }).returning({ id: stateSrnEvents.id });
+    });
     return inserted.length > 0;
   } catch (err) {
     logError("recordStateEvent", err);
