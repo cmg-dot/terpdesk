@@ -1,5 +1,4 @@
 import type { DayCard } from "@/lib/calendarDayIndex";
-import { requestOrganization, requestSrn, requestWhere } from "@/lib/requestSummary";
 
 /** One job as the calendar search sees it: what is shown in a result, plus one lowercase line to match against. */
 export interface SearchEntry {
@@ -28,10 +27,8 @@ const bookedNames = (card: DayCard): string[] => {
 export const buildSearchEntries = (cards: readonly DayCard[]): SearchEntry[] =>
   cards.map((card) => {
     const { request } = card;
-    const srn = requestSrn(request);
-    const organization = requestOrganization(request) ?? "";
-    const where = requestWhere(request);
-    const venue = where.virtual ? where.text : where.parts[0] && where.parts[0] !== "Location pending" ? where.parts[0] : "";
+    const { srn, where, where: { venue } } = request;
+    const organization = request.organization ?? "";
     const title = request.title ?? "";
     const haystack = [srn ?? "", organization, where.text, title, ...bookedNames(card)].join(" | ").toLowerCase();
     return { id: request.id, srn, organization, venue, title, dayKey: card.dayKey, startsAt: card.startsAt, endsAt: card.endsAt, startMs: card.startMs, cancelled: card.cancelled, haystack };

@@ -1,14 +1,14 @@
-import type { fetchLiveRequests } from "@/app/actions/getRequests";
+import type { RequestListRow } from "@/lib/requestListRow";
 import { agencyDateKey } from "@/lib/agencyTime";
 import { DEFAULT_STATUS_FILTER, isCancelledRequest, matchesStatusFilter } from "@/lib/requestListFilter";
 import type { ListedRequest } from "@/lib/requestListFilter";
 import { isAppointmentHappeningNow, isAppointmentPast } from "@/utils/happeningNow";
 import { resolveRequestTimes } from "@/utils/timezone";
 
-/** A request as the agency calendar receives it. */
-export type CalendarRequest = Awaited<ReturnType<typeof fetchLiveRequests>>[number];
+/** A request as the agency calendar receives it: the lean list row (see fetchRequestList). */
+export type CalendarRequest = RequestListRow;
 
-/** The mapped rows from fetchLiveRequests are what the list filter was written for (the Requests page hands them over the same way). */
+/** The list rows carry what the list filter reads (the Requests page hands them over the same way). */
 const listed = (request: CalendarRequest): ListedRequest => request as unknown as ListedRequest;
 
 /** One appointment on the calendar, its schedule worked out once (not once per cell, per render). */
@@ -32,9 +32,8 @@ export const NO_CARDS: readonly DayCard[] = [];
 
 /** The schedule of a request, or null when it has no start time (such a request is not on the calendar). */
 const scheduleOf = (request: CalendarRequest): DayCard | null => {
-  const data = request.data as { startsAt?: string; details?: { startDate?: string; startTime?: string } } | null | undefined;
-  const hasStart = Boolean(request.startsAt || data?.startsAt || (data?.details?.startDate && data?.details?.startTime));
-  if (!hasStart) return null;
+  // A row always carries the start the server worked out (resolveRequestTimes always yields one).
+  if (!request.startsAt) return null;
   const { startsAt, endsAt } = resolveRequestTimes(request);
   if (!startsAt) return null;
   try {

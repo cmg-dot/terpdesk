@@ -1,6 +1,5 @@
 "use client";
 
-import { settingLabel } from "@/lib/settingLabel";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import React, { useState, useEffect, useMemo } from "react";
@@ -14,7 +13,9 @@ import { RefreshCw, Building2, MapPin, Users2 } from "lucide-react";
 import { getStaffingRatio, formatReference } from "@/utils/statusEngine";
 import { DEFAULT_STATUS_FILTER, STATUS_FILTER_OPTIONS, listCopy, matchesStatusFilter, requestStatusLabel, tabForFilter } from "@/lib/requestListFilter";
 import { RequestStatusBadge } from "@/components/requests/RequestStatusBadge";
-import { fetchLiveRequests } from "@/app/actions/getRequests";
+import { fetchRequestList } from "@/app/actions/getRequestList";
+import { asAppointment, asListed } from "@/lib/requestListRow";
+import type { RequestListRow } from "@/lib/requestListRow";
 import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatInTimeZone } from "date-fns-tz";
@@ -54,12 +55,12 @@ const formatJobDate = (startsAt?: string, endsAt?: string, timeZone?: string) =>
 };
 
 function RequestsPageContent() {
-  const [requests, setRequests] = useState<any[]>([]);
+  const [requests, setRequests] = useState<RequestListRow[]>([]);
   const searchParams = useSearchParams();
   const filterParam = searchParams.get("filter");
 
   useEffect(() => {
-    fetchLiveRequests().then(data => setRequests(data)).catch(() => console.error("[requests page] request failed"));
+    fetchRequestList().then(data => setRequests(data)).catch(() => console.error("[requests page] request failed"));
   }, []);
 
   const [currentTime, setCurrentTime] = useState<number>(Date.now());
@@ -91,64 +92,38 @@ function RequestsPageContent() {
   };
   const copy = listCopy(statusFilter);
 
-  const [interpreterJobs, setInterpreterJobs] = useState<any[]>([]);
-  useEffect(() => {
-    try {
-      const storedJobs = JSON.parse(localStorage.getItem('terpdesk_interpreter_jobs') || '[]');
-      setInterpreterJobs(storedJobs);
-    } catch (e) {
-      console.error("[requests page] operation failed");
-    }
-  }, []);
-
-  const enrichedRequests = React.useMemo(() => {
-    return requests.map(req => {
-      const reqJobs = interpreterJobs.filter(j => j.id === req.id || j.requestId === req.id);
-      const bookedJob = reqJobs.find(j => j.status === 'booked' || j.status === 'accepted');
-      if (bookedJob) {
-        return {
-          ...req,
-          status: req.status === 'Cancelled' ? 'Cancelled' : (req.status === 'booked' ? 'booked' : 'assigned'),
-          hasAcceptedOffer: true,
-          acceptedInterpretersCount: Math.max(req.acceptedInterpretersCount || 0, 1),
-          assignedInterpreterName: bookedJob.interpreterName || 'Booked'
-        };
-      }
-      return req;
-    });
-  }, [requests, interpreterJobs]);
-
   const orgOptions = useMemo(() => {
     const orgs = new Set<string>();
-    enrichedRequests.forEach(req => {
-      const org = req.requester?.org || req.data?.requester?.org || req.data?.client;
+    requests.forEach(req => {
+      const org = req.requester.org || req.client;
       if (org && typeof org === 'string' && org.trim()) {
         orgs.add(org.trim());
       }
     });
     return ["All organizations", ...Array.from(orgs).sort()];
-  }, [enrichedRequests]);
+  }, [requests]);
 
-  const filteredRequests = enrichedRequests.filter(req => {
+  // Every status, count and name comes from the database (the lean rows), never from a copy the browser kept.
+  const filteredRequests = requests.filter(req => {
     const searchLower = searchQuery.toLowerCase();
     const titleMatch = req.title.toLowerCase().includes(searchLower);
     const cleanRef = formatReference(req.id).toLowerCase();
     const refMatch = req.id.toLowerCase().includes(searchLower) || cleanRef.includes(searchLower);
-    const orgMatch = req.requester?.org?.toLowerCase().includes(searchLower) || false;
+    const orgMatch = req.requester.org?.toLowerCase().includes(searchLower) || false;
  
     if (searchQuery && !titleMatch && !refMatch && !orgMatch) return false;
  
     if (orgFilter !== "All organizations") {
-      const org = req.requester?.org || req.data?.requester?.org || req.data?.client || "Organization not provided";
+      const org = req.requester.org || req.client || "Organization not provided";
       if (org.toLowerCase() !== orgFilter.toLowerCase()) return false;
     }
  
     if (formatFilter !== "All formats") {
-      const format = req.details?.format || "Virtual";
+      const format = req.format || "Virtual";
       if (format !== formatFilter && !(formatFilter === "In Person" && format === "In person")) return false;
     }
 
-    return matchesStatusFilter(req, statusFilter, currentTime);
+    return matchesStatusFilter(asListed(req), statusFilter, currentTime);
   });
 
   const upcomingRequests = sortUpcomingWithHappeningNow(
@@ -247,13 +222,13 @@ function RequestsPageContent() {
  className="space-y-4"
  getKey={(req) => req.id}
  renderItem={(req) => {
- const org = req.requester?.org || "Organization not provided";
- const setting = settingLabel(req.setting, req.details?.setting);
- const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
- const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
- const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
- const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(req as any);
- const statusLabel = requestStatusLabel(req);
+ const org = req.requester.org || "Organization not provided";
+ const setting = req.setting;
+ const format = req.format || (req.isVirtual ? "Virtual" : "In person");
+ const location = req.location || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
+ const isCancelled = req.status === "Cancelled";
+ const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(asAppointment(req));
+ const statusLabel = requestStatusLabel(asListed(req));
  let staffingText = isCancelled ? "0 of 0 staffed" : `${bookedCount} of ${totalSlots} staffed`;
  if (bookedSlots.length > 0) {
    staffingText += ` (${bookedSlots.map(s => s.interpreterName).join(', ')})`;
@@ -268,7 +243,7 @@ function RequestsPageContent() {
  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
  <div className="space-y-1">
  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
- <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
+ <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.timeZone)}</p>
  </div>
  <div className="flex flex-row flex-wrap items-center justify-end gap-2">
  {isAppointmentHappeningNow(req, currentTime) && (
@@ -294,7 +269,7 @@ function RequestsPageContent() {
  <span className="text-[13px] text-[var(--sage)]">
  {format} · {location}
  </span>
- <span className="text-[13px] text-slate-400 font-medium">{req.data?.intake?.odhhSrn ? `SRN: ${req.data.intake.odhhSrn}` : formatReference(req.id)}</span>
+ <span className="text-[13px] text-slate-400 font-medium">{req.srn ? `SRN: ${req.srn}` : formatReference(req.id)}</span>
  </div>
  </div>
  {/* Col 3 */}
@@ -330,13 +305,13 @@ function RequestsPageContent() {
  className="space-y-4"
  getKey={(req) => req.id}
  renderItem={(req) => {
- const org = req.requester?.org || "Organization not provided";
- const setting = settingLabel(req.setting, req.details?.setting);
- const format = req.format || req.details?.format || (req.isVirtual ? "Virtual" : "In person");
- const location = req.location || req.onsite?.venue || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
- const isCancelled = req.status === "Cancelled" || req.state === "cancelled";
- const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(req as any);
- const statusLabel = requestStatusLabel(req);
+ const org = req.requester.org || "Organization not provided";
+ const setting = req.setting;
+ const format = req.format || (req.isVirtual ? "Virtual" : "In person");
+ const location = req.location || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
+ const isCancelled = req.status === "Cancelled";
+ const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(asAppointment(req));
+ const statusLabel = requestStatusLabel(asListed(req));
  let staffingText = isCancelled ? "0 of 0 staffed" : `${bookedCount} of ${totalSlots} staffed`;
  if (bookedSlots.length > 0) {
    staffingText += ` (${bookedSlots.map(s => s.interpreterName).join(', ')})`;
@@ -351,7 +326,7 @@ function RequestsPageContent() {
  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
  <div className="space-y-1">
  <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
- <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.details?.timeZone || req.data?.details?.timeZone)}</p>
+ <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.timeZone)}</p>
  </div>
  <div className="flex items-center gap-2">
  <RequestStatusBadge status={statusLabel} />
@@ -374,7 +349,7 @@ function RequestsPageContent() {
  <span className="text-[13px] text-[var(--sage)]">
  {format} · {location}
  </span>
- <span className="text-[13px] text-slate-400 font-medium">{req.data?.intake?.odhhSrn ? `SRN: ${req.data.intake.odhhSrn}` : formatReference(req.id)}</span>
+ <span className="text-[13px] text-slate-400 font-medium">{req.srn ? `SRN: ${req.srn}` : formatReference(req.id)}</span>
  </div>
  </div>
  {/* Col 3 */}

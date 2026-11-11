@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { format } from "date-fns";
-import { fetchLiveRequests } from "@/app/actions/getRequests";
+import { fetchRequestList } from "@/app/actions/getRequestList";
 import { agencyDateKey, civilDate } from "@/lib/agencyTime";
 import { CalendarDayView } from "@/components/calendar/CalendarDayView";
 import { CalendarHistoryNotice } from "@/components/calendar/CalendarHistoryNotice";
@@ -56,7 +56,7 @@ function CalendarScreen() {
   const entries = useMemo(() => buildSearchEntries(cards), [cards]);
 
   useEffect(() => {
-    fetchLiveRequests().then((rows) => { setRequests(rows); setLoaded(true); }).catch(() => console.error("[calendar page] request failed"));
+    fetchRequestList().then((rows) => { setRequests(rows); setLoaded(true); }).catch(() => console.error("[calendar page] request failed"));
   }, []);
 
   const interpreters = mode === "interpreters";

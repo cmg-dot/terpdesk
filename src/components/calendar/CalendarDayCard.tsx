@@ -56,7 +56,7 @@ export const CalendarDayCard = memo(function CalendarDayCard({ card, phase, vari
   const href = `/requests/${req.id}`;
 
   if (variant === "day") {
-    const org = req.requester?.org || req.data?.intake?.program || "General";
+    const org = req.requester.org || req.program || "General";
     return (
       <Link
         href={href}
