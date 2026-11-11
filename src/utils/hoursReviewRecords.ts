@@ -64,8 +64,8 @@ interface MergeParams {
 
 /**
  * Builds the list of hours records shown in the review panel. The database is the source of truth:
- * cached records whose request no longer exists are dropped, and for records that do exist the
- * database status wins over a stale cached state.
+ * cached records whose request no longer exists are dropped, cached records of a timesheet that no longer exists are dropped (any state),
+ * and for records that do exist the database status wins over a stale cached state.
  */
 export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeParams): ServiceRecord[] {
   const requestIds = new Set<string>(requests.map((r) => r.id));
@@ -157,7 +157,11 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
       const liveIds = new Set(submitted.map(t => t.timesheetId));
       for (let i = merged.length - 1; i >= 0; i--) {
         const r = merged[i];
-        if (r.timesheetId && !liveIds.has(r.timesheetId) && r.state !== 'approved') merged.splice(i, 1);
+        // A cached record tied to a timesheet that is no longer in the database goes, whatever its state. (An approved copy of a deleted
+        // timesheet used to stay here for good: the page writes this merged list back to the browser cache on every load, so it was
+        // never dropped, and a long-gone test job kept showing as an approved record.) A timesheet that exists is always in `timesheets`
+        // (submitted and approved ones are both read), so nothing real is lost, and its record is rebuilt from the database below.
+        if (r.timesheetId && !liveIds.has(r.timesheetId)) merged.splice(i, 1);
       }
       for (const ts of submitted) {
         // An emailed-link record has no position of its own: it is the one whose mirrored hours carry this timesheet's id.

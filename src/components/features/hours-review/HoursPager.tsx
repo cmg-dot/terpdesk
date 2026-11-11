@@ -12,7 +12,11 @@ interface Props {
   position?: "top" | "bottom";
 }
 
-/** Same numbered-block look as "Needs attention" and "Upcoming bookings". */
+/**
+ * Same numbered-block look as "Needs attention" and "Upcoming bookings". Every link is `scroll={false}`: Next scrolls the window to the
+ * top after a navigation unless told not to, which threw a person who had paged from the bottom of the list back above the whole page.
+ * (The list itself brings its own top edge into view when it needs to: see AnimatedRecordList.)
+ */
 export function HoursPager({ page, totalPages, hrefFor, position = "bottom" }: Props) {
   const top = position === "top";
   return (
@@ -21,7 +25,7 @@ export function HoursPager({ page, totalPages, hrefFor, position = "bottom" }: P
       className={`flex flex-wrap items-center gap-2 ${top ? "" : "mt-6 py-4 border-t border-gray-200"}`}
     >
       {page > 1 ? (
-        <Link href={hrefFor(page - 1)} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
+        <Link href={hrefFor(page - 1)} scroll={false} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
           Prev
         </Link>
       ) : (
@@ -35,6 +39,7 @@ export function HoursPager({ page, totalPages, hrefFor, position = "bottom" }: P
           <Link
             key={token}
             href={hrefFor(token)}
+            scroll={false}
             aria-current={token === page ? 'page' : undefined}
             className={`${pagerBase} ${
               token === page
@@ -52,7 +57,7 @@ export function HoursPager({ page, totalPages, hrefFor, position = "bottom" }: P
       )}
 
       {page < totalPages ? (
-        <Link href={hrefFor(page + 1)} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
+        <Link href={hrefFor(page + 1)} scroll={false} className={`${pagerBase} bg-white text-slate-700 hover:bg-slate-50`}>
           Next
         </Link>
       ) : (

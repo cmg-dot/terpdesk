@@ -9,6 +9,7 @@ import { AnimatedRecordList } from "@/components/features/hours-review/AnimatedR
 import { HoursEmptyState } from "@/components/features/hours-review/HoursEmptyState";
 import { useHoursRecords } from "@/hooks/useHoursRecords";
 import { useHoursReviewFilters } from "@/hooks/useHoursReviewFilters";
+import { usePageDirection } from "@/hooks/usePageDirection";
 import { DEFAULT_FILTERS, countActiveFilters, filterRecords, hrefForPage, statusCounts as countStatuses } from "@/lib/hoursReviewFilter";
 
 const ITEMS_PER_PAGE = 10;
@@ -28,6 +29,8 @@ function HoursReviewContent() {
   const page = Math.min(requestedPage, totalPages);
   const pageRecords = displayedRecords.slice((page - 1) * ITEMS_PER_PAGE, page * ITEMS_PER_PAGE);
   const hrefFor = (target: number) => hrefForPage(filters, target, pathname);
+  // Paging slides the rows the way you are going; changing the tab or a filter (which also restarts at page 1) just fades.
+  const direction = usePageDirection(`${filters.status}|${filters.q}|${filters.range}|${filters.sig}`, page);
 
   return (
     <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 space-y-6 pb-24 antialiased pt-6">
@@ -57,6 +60,7 @@ function HoursReviewContent() {
       <AnimatedRecordList
         records={pageRecords}
         viewKey={`${filters.status}:${page}`}
+        direction={direction}
         onUpdate={updateRecord}
         empty={<HoursEmptyState filtersActive={countActiveFilters(filters) > 0} onClearFilters={() => setFilters(DEFAULT_FILTERS)} />}
       />

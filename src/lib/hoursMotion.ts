@@ -14,6 +14,8 @@ export const HOURS_MOTION_S = 0.2;
 export const HOURS_EASE = [0.4, 0, 0.2, 1] as const;
 /** The most any one item waits behind the ones above it when a list arrives (a light stagger, never a slow cascade). */
 export const HOURS_STAGGER_S = 0.025;
+/** How far a page of rows slides when the page number changes. */
+export const HOURS_SLIDE_PX = 24;
 export const HOURS_STAGGER_MAX_STEPS = 5;
 
 /**
