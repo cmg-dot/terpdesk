@@ -56,7 +56,7 @@ export const isAwaitingReview = (record: ServiceRecord): boolean =>
 interface MergeParams {
   /** Records cached in the browser (terpdesk_service_records). */
   localRecords: ServiceRecord[];
-  /** Live requests from the database (fetchLiveRequests). */
+  /** Requests from the database, as the merge reads them: the full mapped request or the slim HoursRequestRow (see hoursRequestRow.ts). */
   requests: any[];
   /** Live magic-link timesheets (submitted or approved). */
   timesheets: SubmittedTimesheet[];

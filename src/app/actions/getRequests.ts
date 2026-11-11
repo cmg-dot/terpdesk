@@ -10,8 +10,9 @@ import { mapRequestRow } from "@/lib/mapRequestRow";
 import { loadRequestRows } from "@/lib/requestRows";
 
 /**
- * The FULL loader: every request with its whole data blob and every offer. Only screens that really need the whole record use it
- * (the hours review). The dashboard, the requests list and the calendar read the lean rows from getRequestList.ts instead.
+ * The FULL loader: every request with its whole data blob and every offer (8+ MB). No screen uses it any more: the dashboard, the
+ * requests list and the calendar read the lean rows from getRequestList.ts, the hours review reads only the requests that hold hours
+ * (getHoursReviewData.ts), and one request's page reads fetchLiveRequestById. Kept only for maintenance scripts.
  */
 export async function fetchLiveRequests() {
   await requireRole("agency");

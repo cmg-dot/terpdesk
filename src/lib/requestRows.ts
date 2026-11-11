@@ -1,4 +1,5 @@
 import { desc, eq, inArray } from "drizzle-orm";
+import type { SQL } from "drizzle-orm";
 import { db } from "@/db";
 import { interpreters, offers, requests } from "@/db/schema";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
@@ -12,12 +13,13 @@ import { sweepExpiredOffers } from "@/lib/offerSweep";
  *
  * `offerScope`: "all" returns every offer ever made (the full loader). "open" returns only pending and accepted offers: the only ones
  * that change a job's status, its staffing or its pending-offer flag, so lists and counts are identical and the offers read is smaller.
- * SERVER ONLY.
+ * `requestFilter` limits which requests are read (the hours review reads only the ones it needs); the offers read is not narrowed, since
+ * it is already small, so a request's status and staffing come out exactly as they do in the unfiltered read. SERVER ONLY.
  */
-export async function loadRequestRows(offerScope: "all" | "open"): Promise<MappedRequest[]> {
+export async function loadRequestRows(offerScope: "all" | "open", requestFilter?: SQL): Promise<MappedRequest[]> {
   await ensureDisplayNameColumns();
   const [dbRows, allOffers] = await Promise.all([
-    db.select().from(requests).orderBy(desc(requests.createdAt)),
+    db.select().from(requests).where(requestFilter).orderBy(desc(requests.createdAt)),
     db
       .select({
         id: offers.id,
