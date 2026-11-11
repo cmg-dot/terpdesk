@@ -11,17 +11,20 @@ import type { RequestData } from "@/db/schema";
 
 type Executor = Pick<typeof db, "select" | "update">;
 
-export type PriorAuthWrite = { ok: true; hadValue: boolean } | { ok: false; reason: "not_found" };
+/** `previous` is the number saved before (empty when there was none), so a save that changes nothing can be told apart. */
+export type PriorAuthWrite = { ok: true; hadValue: boolean; previous: string } | { ok: false; reason: "not_found" };
 
 export async function writePriorAuth(requestId: string, priorAuth: string, exec: Executor = db): Promise<PriorAuthWrite> {
   const [existing] = await exec.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).limit(1);
   if (!existing) return { ok: false, reason: "not_found" };
-  const hadValue = typeof existing.data?.intake?.priorAuthNumber === "string" && existing.data.intake.priorAuthNumber.trim() !== "";
+  const stored = existing.data?.intake?.priorAuthNumber;
+  const previous = typeof stored === "string" ? stored.trim() : "";
+  const hadValue = previous !== "";
   const intake = sql`coalesce(${requests.data} -> 'intake', '{}'::jsonb)`;
   const nextIntake = priorAuth === "" ? sql`${intake} - 'priorAuthNumber'` : sql`${intake} || jsonb_build_object('priorAuthNumber', ${priorAuth}::text)`;
   await exec
     .update(requests)
     .set({ data: sql<RequestData>`jsonb_set(${requests.data}, '{intake}', ${nextIntake}, true)`, updatedAt: new Date() })
     .where(eq(requests.id, requestId));
-  return { ok: true, hadValue };
+  return { ok: true, hadValue, previous };
 }

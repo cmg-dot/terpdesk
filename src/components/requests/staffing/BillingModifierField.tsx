@@ -2,6 +2,8 @@
 
 import { useId, useState } from "react";
 import { setBillingModifier } from "@/app/actions/setBillingFields";
+import { Dropdown } from "@/components/ui/Dropdown";
+import type { DropdownOption } from "@/lib/dropdown";
 import { BILLING_MODIFIERS, BILLING_MODIFIER_LABEL, asBillingModifier } from "@/lib/validation/billingFields";
 import type { BillingModifier } from "@/lib/validation/billingFields";
 
@@ -13,10 +15,13 @@ interface Props {
   onSaved: (modifier: BillingModifier | "") => void;
 }
 
+const OPTIONS: readonly DropdownOption[] = [{ value: "", label: "None" }, ...BILLING_MODIFIERS.map((code) => ({ value: code, label: BILLING_MODIFIER_LABEL[code] }))];
+
 /**
- * The billing modifier selector beside the client's date of birth in Staffing: U3 (medical) or U3 U9 (mental health). It saves the moment
- * it changes, without opening Edit assignment (locked while an offer is out or an interpreter is booked). For agency billing only: it
- * is never shown to interpreters or put in an email, a link or a notification. "None" removes it.
+ * The billing modifier beside the client's date of birth in Staffing, on the app's own cream/emerald dropdown (never the browser's
+ * select): None, "U3 — Medical" or "U3 U9 — Mental Health". It saves the moment a choice is made, without opening Edit assignment
+ * (locked while an offer is out or an interpreter is booked), and goes back to the saved choice if the server refuses. For agency billing
+ * only: it is never shown to interpreters or put in an email, a link or a notification.
  */
 export function BillingModifierField({ requestId, value, onSaved }: Props) {
   const [saved, setSaved] = useState<BillingModifier | "">(value);
@@ -46,18 +51,9 @@ export function BillingModifierField({ requestId, value, onSaved }: Props) {
       <label htmlFor={selectId} className="block text-sm font-medium text-[var(--ink)]">
         Billing modifier <span className="font-normal text-[var(--sage)]">(optional, agency billing only)</span>
       </label>
-      <select
-        id={selectId}
-        value={saved}
-        disabled={saving}
-        onChange={(event) => void change(asBillingModifier(event.target.value))}
-        className="mt-2 w-full rounded-full border-none bg-white px-4 py-2.5 text-sm text-gray-800 outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-[var(--forest)] disabled:opacity-60"
-      >
-        <option value="">None</option>
-        {BILLING_MODIFIERS.map((code) => (
-          <option key={code} value={code}>{BILLING_MODIFIER_LABEL[code]}</option>
-        ))}
-      </select>
+      <div className="mt-2">
+        <Dropdown id={selectId} options={OPTIONS} value={saved} onChange={(next) => void change(asBillingModifier(next))} variant="form" disabled={saving} />
+      </div>
       <p role="status" aria-live="polite" className={`mt-2 min-h-[1.25rem] text-xs ${message?.kind === "error" ? "text-red-700" : "text-emerald-800"}`}>
         {saving ? "Saving…" : message?.text ?? ""}
       </p>

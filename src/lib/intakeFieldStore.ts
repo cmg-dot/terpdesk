@@ -14,18 +14,20 @@ type Executor = Pick<typeof db, "select" | "update">;
 
 export type IntakeBillingKey = "clientDob" | "billingModifier";
 
-export type IntakeFieldWrite = { ok: true; hadValue: boolean } | { ok: false; reason: "not_found" };
+/** `previous` is what was saved before (empty when nothing was), so the caller can say what changed. */
+export type IntakeFieldWrite = { ok: true; hadValue: boolean; previous: string } | { ok: false; reason: "not_found" };
 
 export async function writeIntakeField(requestId: string, key: IntakeBillingKey, value: string, exec: Executor = db): Promise<IntakeFieldWrite> {
   const [existing] = await exec.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).limit(1);
   if (!existing) return { ok: false, reason: "not_found" };
   const current = existing.data?.intake?.[key];
-  const hadValue = typeof current === "string" && current.trim() !== "";
+  const previous = typeof current === "string" ? current.trim() : "";
+  const hadValue = previous !== "";
   const intake = sql`coalesce(${requests.data} -> 'intake', '{}'::jsonb)`;
   const nextIntake = value === "" ? sql`${intake} - ${key}::text` : sql`${intake} || jsonb_build_object(${key}::text, ${value}::text)`;
   await exec
     .update(requests)
     .set({ data: sql<RequestData>`jsonb_set(${requests.data}, '{intake}', ${nextIntake}, true)`, updatedAt: new Date() })
     .where(eq(requests.id, requestId));
-  return { ok: true, hadValue };
+  return { ok: true, hadValue, previous };
 }

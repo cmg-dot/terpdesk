@@ -3,11 +3,12 @@
 import { useEffect, useState } from "react";
 import { getRequestActivity } from "@/app/actions/requestActivity";
 import type { ActivityItem } from "@/lib/requestActivity";
-import { ActivityLog } from "@/components/requests/ActivityLog";
+import { CollapsibleActivityLog } from "@/components/requests/CollapsibleActivityLog";
 
 /**
  * Agency request page: the live activity log from the database. `refreshKey` changes (e.g. the request's updatedAt)
- * re-fetch it, so an edit, offer or cancellation shows up without a reload.
+ * re-fetch it, so an edit, offer or cancellation shows up without a reload. The latest entries are shown and the older ones fold away
+ * behind a toggle, so a request with a long history stays a short card.
  */
 export function RequestActivityCard({
   requestId,
@@ -52,7 +53,7 @@ export function RequestActivityCard({
       ) : items === null ? (
         <p className="text-sm text-[var(--sage)]">Loading activity…</p>
       ) : (
-        <ActivityLog items={items} timeZone={timeZone} showInterpreterNames emptyText="No activity recorded yet. New actions on this request are logged here." />
+        <CollapsibleActivityLog items={items} timeZone={timeZone} showInterpreterNames emptyText="No activity recorded yet. New actions on this request are logged here." />
       )}
     </div>
   );

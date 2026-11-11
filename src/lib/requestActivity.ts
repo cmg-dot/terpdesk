@@ -7,8 +7,10 @@ import { logError } from "@/lib/logError";
 
 /**
  * The request activity log (see `requestActivity` in the schema). Writes never throw: a failed log line must not undo
- * or block the action it describes. Never put PHI-heavy free text (client names, notes, billing codes) in a
- * message; field changes carry only interpreter-facing job fields.
+ * or block the action it describes. Never put PHI-heavy free text (client names, notes, a date of birth) in a
+ * message; field changes carry only interpreter-facing job fields. The one deliberate exception: the agency-only (audience "agency")
+ * lines for the Staffing billing boxes say what the prior-authorization number and the billing modifier changed to, so a dispatcher can see
+ * it without opening the job (see setPriorAuth.ts and setBillingFields.ts). Interpreters only ever read "shared" entries.
  *
  * SERVER ONLY.
  */

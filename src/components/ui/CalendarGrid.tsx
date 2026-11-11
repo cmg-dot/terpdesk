@@ -2,7 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent } from "react";
-import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { YearList } from "@/components/ui/YearList";
 import { WEEKDAY_LABELS, formatDateSpoken, monthGrid, monthLabel, parseDateKey, shiftDay, shiftMonth, todayKey } from "@/lib/dateTimePicker";
 
 interface Props {
@@ -16,6 +17,11 @@ interface Props {
   today?: string;
   onPick: (key: string) => void;
   onDone: () => void;
+  /**
+   * For dates far from today (a birth date): the month name becomes a button that opens a "choose a year" list, and a calendar with no day
+   * chosen yet opens on that list. Off by default, so every other date field is exactly as before.
+   */
+  yearPicker?: boolean;
 }
 
 const navButton = "rounded-full p-1.5 text-[var(--forest)] transition-colors hover:bg-[var(--mint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]";
@@ -25,11 +31,12 @@ const navButton = "rounded-full p-1.5 text-[var(--forest)] transition-colors hov
  * primary emerald, today is ringed, and hovering a day gives it a soft emerald wash. Keyboard: arrows move by a day or a
  * week, PageUp / PageDown by a month (Shift for a year), Home / End to the start / end of the week, Enter picks.
  */
-export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, onDone }: Props) => {
+export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, onDone, yearPicker = false }: Props) => {
   const today = todayOverride ?? todayKey();
   const start = parseDateKey(value) ? value : today;
   // The day the keyboard is on (the only tab stop in the grid); the grid shows the month that contains it.
   const [focusKey, setFocusKey] = useState(start);
+  const [showYears, setShowYears] = useState(yearPicker && !parseDateKey(value));
   const grid = useRef<HTMLDivElement>(null);
   const moveFocus = useRef(false);
   const shown = parseDateKey(focusKey) ?? parseDateKey(today)!;
@@ -70,6 +77,23 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
     setFocusKey((key) => shiftMonth(key, months));
   };
 
+  // Choosing a year keeps the month and day (clamped to the month's length), then returns to the month view.
+  if (showYears) {
+    return (
+      <YearList
+        selectedYear={shown.year}
+        minYear={parseDateKey(min ?? "")?.year ?? shown.year - 100}
+        maxYear={parseDateKey(max ?? "")?.year ?? shown.year + 10}
+        onPick={(year) => {
+          moveFocus.current = false;
+          setFocusKey((key) => shiftMonth(key, (year - (parseDateKey(key)?.year ?? year)) * 12));
+          setShowYears(false);
+        }}
+        onBack={() => setShowYears(false)}
+      />
+    );
+  }
+
   return (
     <div className="w-[19rem] max-w-full select-none">
       <div className="mb-2 flex items-center justify-between">
@@ -77,7 +101,19 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
           <button type="button" className={navButton} onClick={() => jump(-12)} aria-label="Previous year"><ChevronsLeft className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" className={navButton} onClick={() => jump(-1)} aria-label="Previous month"><ChevronLeft className="h-4 w-4" aria-hidden="true" /></button>
         </div>
-        <p className="text-sm font-semibold tracking-tight text-[var(--forest)]" aria-live="polite">{monthLabel(shown.year, shown.month)}</p>
+        {yearPicker ? (
+          <button
+            type="button"
+            onClick={() => setShowYears(true)}
+            aria-label={`${monthLabel(shown.year, shown.month)}, choose a year`}
+            className="inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-sm font-semibold tracking-tight text-[var(--forest)] transition-colors hover:bg-[var(--mint)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]"
+          >
+            {monthLabel(shown.year, shown.month)}
+            <ChevronDown className="h-3.5 w-3.5" aria-hidden="true" />
+          </button>
+        ) : (
+          <p className="text-sm font-semibold tracking-tight text-[var(--forest)]" aria-live="polite">{monthLabel(shown.year, shown.month)}</p>
+        )}
         <div className="flex">
           <button type="button" className={navButton} onClick={() => jump(1)} aria-label="Next month"><ChevronRight className="h-4 w-4" aria-hidden="true" /></button>
           <button type="button" className={navButton} onClick={() => jump(12)} aria-label="Next year"><ChevronsRight className="h-4 w-4" aria-hidden="true" /></button>

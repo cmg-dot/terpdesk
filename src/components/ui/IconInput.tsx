@@ -29,6 +29,8 @@ interface IconInputProps {
   min?: string;
   /** Latest date that can be picked (dates only). */
   max?: string;
+  /** Dates only: a "choose a year" list in the calendar, for dates far from today such as a birth date. */
+  yearPicker?: boolean;
   id?: string;
   placeholder?: string;
   "aria-label"?: string;
@@ -51,6 +53,7 @@ export function IconInput({
   disabled = false,
   min,
   max,
+  yearPicker = false,
   id,
   placeholder,
   "aria-label": ariaLabel,
@@ -82,6 +85,7 @@ export function IconInput({
             value={value}
             min={min}
             max={max}
+            yearPicker={yearPicker}
             onPick={(key) => {
               emit(key);
               close();
