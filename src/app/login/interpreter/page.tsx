@@ -11,6 +11,7 @@ export default function InterpreterLoginPage() {
       eyebrow="Interpreter workspace"
       title="Interpreter sign-in"
       subtitle="Your jobs, calendar, prep materials and agencies in one place."
+      brandCopy="Your jobs, calendar and prep materials, with every agency you work for, side by side."
     >
       <LoginForm portal="interpreter" />
       <div className="mt-6 space-y-3 text-xs lg:text-sm leading-relaxed text-[var(--sage)]">

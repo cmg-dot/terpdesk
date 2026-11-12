@@ -3,21 +3,23 @@ import type { UseFormRegisterReturn } from "react-hook-form";
 interface MfaCodeFieldProps {
   registration: UseFormRegisterReturn;
   recovery: boolean;
-  onToggleRecovery: () => void;
   disabled: boolean;
   error?: string;
 }
 
-const INPUT =
-  "w-full rounded-full bg-neutral-100 px-4 py-2.5 text-sm tracking-widest outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)]";
+const BASE =
+  "w-full rounded-full bg-neutral-100 px-4 py-3 text-center font-mono tabular-nums text-[var(--ink)] outline-none transition-colors placeholder:text-slate-300 focus:bg-neutral-200 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)]";
+// The wide letter spacing also trails the last digit, so the text is indented by the same amount to stay centred.
+const CODE = `${BASE} text-2xl tracking-[0.45em] indent-[0.45em]`;
+const RECOVERY = `${BASE} text-base tracking-widest placeholder:tracking-normal`;
 
 /**
- * The second step of the sign-in form, shown after the password was right for an account with two-step verification on: the
- * 6-digit code from the authenticator app, or (one click away) a recovery code for a lost phone.
+ * The code input of the two-step verification card: the 6-digit code from the authenticator app, or (one click away) a recovery
+ * code for a lost phone.
  */
-export const MfaCodeField = ({ registration, recovery, onToggleRecovery, disabled, error }: MfaCodeFieldProps) => (
-  <div className="space-y-1" data-mfa-step>
-    <label htmlFor="mfa-code" className="block text-xs lg:text-sm text-[var(--sage)]">
+export const MfaCodeField = ({ registration, recovery, disabled, error }: MfaCodeFieldProps) => (
+  <div className="space-y-1.5">
+    <label htmlFor="mfa-code" className="sr-only">
       {recovery ? "Recovery code" : "Authentication code"}
     </label>
     <input
@@ -28,19 +30,18 @@ export const MfaCodeField = ({ registration, recovery, onToggleRecovery, disable
       maxLength={recovery ? 24 : 7}
       autoCapitalize="characters"
       spellCheck={false}
+      placeholder={recovery ? "Recovery code" : "······"}
       disabled={disabled}
-      aria-describedby="mfa-code-help"
+      aria-describedby={recovery ? "mfa-code-help" : undefined}
       {...registration}
-      className={INPUT}
+      className={recovery ? RECOVERY : CODE}
     />
     {error && <p className="text-xs text-red-500">{error}</p>}
-    <p id="mfa-code-help" className="text-xs leading-relaxed text-[var(--sage)]">
-      {recovery
-        ? "Enter one of the recovery codes you saved when you turned on two-step verification. Each works once."
-        : "Open your authenticator app and enter the 6-digit code for terpDESK."}{" "}
-      <button type="button" onClick={onToggleRecovery} className="font-medium text-[var(--forest)] underline underline-offset-2">
-        {recovery ? "Use my authenticator app instead" : "Use a recovery code instead"}
-      </button>
-    </p>
+    {/* The card's subtitle already explains the 6-digit code; a recovery code needs a word more. */}
+    {recovery && (
+      <p id="mfa-code-help" className="text-xs leading-relaxed text-[var(--sage)]">
+        Use one of the recovery codes you saved when you turned on two-step verification. Each works once.
+      </p>
+    )}
   </div>
 );

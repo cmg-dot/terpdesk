@@ -4,22 +4,30 @@ import { forwardRef, useState } from "react";
 import type { InputHTMLAttributes } from "react";
 import { Eye, EyeOff } from "lucide-react";
 
-type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type">;
+type PasswordInputProps = Omit<InputHTMLAttributes<HTMLInputElement>, "type"> & {
+  /** Told whenever the eye button shows or hides the password. */
+  onVisibilityChange?: (visible: boolean) => void;
+};
 
 /**
  * Password field with a show/hide eye button. Defined once at module level (never inside another
  * component's render) so it keeps its identity and the input never loses focus while typing.
  * `forwardRef` keeps it compatible with react-hook-form's `register`.
  */
-export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({ className = "", ...props }, ref) => {
+export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(({ className = "", onVisibilityChange, ...props }, ref) => {
   const [visible, setVisible] = useState(false);
+  const toggle = () => {
+    const next = !visible;
+    setVisible(next);
+    onVisibilityChange?.(next);
+  };
 
   return (
     <div className="relative">
       <input ref={ref} type={visible ? "text" : "password"} className={`${className} pr-12`} {...props} />
       <button
         type="button"
-        onClick={() => setVisible((v) => !v)}
+        onClick={toggle}
         disabled={props.disabled}
         aria-label={visible ? "Hide password" : "Show password"}
         aria-pressed={visible}

@@ -14,6 +14,7 @@ export default function AgencyLoginPage() {
       eyebrow="Agency workspace"
       title="Agency sign-in"
       subtitle="For agency owners and staff: requests, offers, interpreters, hours review and billing."
+      brandCopy="Requests, offers, interpreters, hours review and billing for your whole team, side by side."
     >
       <LoginForm portal="agency" />
       <div className="mt-6 space-y-3 text-xs lg:text-sm leading-relaxed text-[var(--sage)]">
