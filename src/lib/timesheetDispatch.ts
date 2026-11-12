@@ -1,6 +1,6 @@
 import { getBaseUrl } from "@/lib/baseUrl";
 import { randomBytes } from "crypto";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
 import { formatInTimeZone } from "date-fns-tz";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -88,38 +88,48 @@ export async function dispatchTimesheetCore(input: DispatchTimesheetInput): Prom
 
   const rawToken = randomBytes(32).toString("hex");
   const tokenHash = hashToken(rawToken);
-  const now = new Date();
-  const tokenExpiresAt = new Date(now.getTime() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-  const [existing] = await db
-    .select({ id: timesheets.id, status: timesheets.status, updatedAt: timesheets.updatedAt })
-    .from(timesheets)
-    .where(and(eq(timesheets.requestId, requestId), eq(timesheets.interpreterId, interpreterId)))
-    .orderBy(desc(timesheets.createdAt))
-    .limit(1);
+  // Check-then-claim, as ONE step per (request, interpreter). Without this, two callers at the same moment (two overlapping cron runs, a
+  // cron event delivered twice, the cron and the agency button) both saw "nothing sent yet", both inserted and both emailed. The
+  // advisory lock makes the second caller wait until the first has committed, and it then finds the row: pending and just sent, so it
+  // is refused. The row is the claim, written before the email goes out; the lock is released when the transaction ends (the email is
+  // sent after it). Different pairs never wait for each other.
+  const claim = await db.transaction(async (tx): Promise<{ ok: true; insertedId: string | null } | { ok: false; error: string }> => {
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${`timesheet-dispatch:${requestId}`}), hashtext(${interpreterId}))`);
+    const now = new Date();
+    const tokenExpiresAt = new Date(now.getTime() + TOKEN_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-  if (existing && (existing.status === "submitted" || existing.status === "approved")) {
-    return fail("A timesheet has already been submitted for this interpreter.");
-  }
+    const [existing] = await tx
+      .select({ id: timesheets.id, status: timesheets.status, updatedAt: timesheets.updatedAt })
+      .from(timesheets)
+      .where(and(eq(timesheets.requestId, requestId), eq(timesheets.interpreterId, interpreterId)))
+      .orderBy(desc(timesheets.createdAt))
+      .limit(1);
 
-  if (existing?.status === "pending" && now.getTime() - existing.updatedAt.getTime() < RESEND_COOLDOWN_MS) {
-    return fail("A timesheet link was just sent. Please wait a couple of minutes before resending.");
-  }
+    if (existing && (existing.status === "submitted" || existing.status === "approved")) {
+      return { ok: false, error: "A timesheet has already been submitted for this interpreter." };
+    }
 
-  let insertedId: string | null = null;
-  if (existing) {
-    // Pending or rejected: rotate the token so any previously emailed link stops working.
-    await db
-      .update(timesheets)
-      .set({ tokenHash, tokenExpiresAt, status: "pending", updatedAt: now })
-      .where(eq(timesheets.id, existing.id));
-  } else {
-    const [created] = await db
+    if (existing?.status === "pending" && now.getTime() - existing.updatedAt.getTime() < RESEND_COOLDOWN_MS) {
+      return { ok: false, error: "A timesheet link was just sent. Please wait a couple of minutes before resending." };
+    }
+
+    if (existing) {
+      // Pending or rejected: rotate the token so any previously emailed link stops working.
+      await tx
+        .update(timesheets)
+        .set({ tokenHash, tokenExpiresAt, status: "pending", updatedAt: now })
+        .where(eq(timesheets.id, existing.id));
+      return { ok: true, insertedId: null };
+    }
+    const [created] = await tx
       .insert(timesheets)
       .values({ requestId, interpreterId, tokenHash, tokenExpiresAt, status: "pending" })
       .returning({ id: timesheets.id });
-    insertedId = created?.id ?? null;
-  }
+    return { ok: true, insertedId: created?.id ?? null };
+  });
+  if (!claim.ok) return fail(claim.error);
+  const insertedId = claim.insertedId;
 
   const data = (request.data ?? {}) as unknown as LooseData;
   const zone = getIanaZone(data.details?.timeZone ?? data.details?.timezone ?? data.timeZone ?? data.timezone);

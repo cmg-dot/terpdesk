@@ -10,6 +10,8 @@ import { isPlainSingle, positionOfOffer } from "@/lib/positions";
 import { legacyPosition1Hours } from "@/utils/hoursState";
 
 export const dynamic = "force-dynamic";
+/** Up to MAX_PER_RUN emails go out one after the other; the default function limit can cut that short (the next run would finish it). */
+export const maxDuration = 60;
 
 /** Only jobs that ended within this window are considered, so a first run never mass-emails old history. */
 const LOOKBACK_DAYS = Number(process.env.CRON_TIMESHEET_LOOKBACK_DAYS) || 14;
