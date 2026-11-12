@@ -31,7 +31,7 @@ export type StatusFilter = (typeof STATUS_FILTER_OPTIONS)[number];
 
 type StatusFilterInput = Parameters<typeof getStatusFilters>[0];
 
-/** A request as the list receives it from fetchLiveRequests. */
+/** A request as the list receives it (a lean list row from fetchRequestList; see requestListRow.ts). */
 export type ListedRequest = StatusFilterInput & { isCompleted?: boolean; isVoided?: boolean; isReturned?: boolean };
 
 export function matchesStatusFilter(req: ListedRequest, filter: string, currentTime: number): boolean {

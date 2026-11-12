@@ -7,18 +7,13 @@ import { eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 import { mapRequestRow } from "@/lib/mapRequestRow";
-import { loadRequestRows } from "@/lib/requestRows";
 
 /**
- * The FULL loader: every request with its whole data blob and every offer (8+ MB). No screen uses it any more: the dashboard, the
- * requests list and the calendar read the lean rows from getRequestList.ts, the hours review reads only the requests that hold hours
- * (getHoursReviewData.ts), and one request's page reads fetchLiveRequestById. Kept only for maintenance scripts.
+ * ONE request in full (its whole data blob and every offer), for that request's own page. There is deliberately no "every request in
+ * full" action any more (it was 8+ MB and a public endpoint): lists and counts read the lean rows (getRequestList.ts,
+ * getDashboardSummary.ts) and the hours review reads only the requests that hold hours (getHoursReviewData.ts). A maintenance script
+ * that really needs every request in full can call loadRequestRows("all") from lib/requestRows.ts.
  */
-export async function fetchLiveRequests() {
-  await requireRole("agency");
-  return loadRequestRows("all");
-}
-
 export async function fetchLiveRequestById(id: string) {
   await requireRole("agency");
   await ensureDisplayNameColumns();

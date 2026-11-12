@@ -7,7 +7,7 @@ import { positionIdOf, positionsLabel, readPositions } from "@/lib/positions";
 /**
  * One request as the agency screens use it: its staffing worked out from its positions, slots and offers (who is booked, whether an
  * offer is waiting, whether a position needs replacing) and its schedule resolved. The ONE place that rule lives: the full loader
- * (fetchLiveRequests, fetchLiveRequestById) returns this as is, and the lean list rows (requestListRow.ts) are cut from it, so a list
+ * (fetchLiveRequestById, loadRequestRows) returns this as is, and the lean list rows (requestListRow.ts) are cut from it, so a list
  * can never disagree with the detail page about what state a job is in. Pure: no database, safe on the server only because it
  * reads the whole data blob.
  */
