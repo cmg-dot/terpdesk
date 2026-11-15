@@ -31,8 +31,9 @@ import { buildJobRows } from "./demo/rows";
 const DEFAULTS = {
   password: "DemoTerp2026!",
   agencyEmail: "demo@myterpdesk.com",
-  terp1: "ralphsilva0405+terp1@gmail.com",
-  terp2: "ralphsilva0405+terp2@gmail.com",
+  // SES-verified inboxes, so offers and magic links reach the demo team out of the box.
+  terp1: "cmg@createmygraphicsva.com",
+  terp2: "ralphchryslersilva65@gmail.com",
 } as const;
 
 const env = (key: string, fallback: string): string => process.env[key]?.trim() || fallback;

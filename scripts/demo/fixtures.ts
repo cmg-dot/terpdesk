@@ -37,7 +37,7 @@ export interface DemoClient {
   requester: { name: string; email: string; phone: string };
 }
 
-/** "someone+terp1@gmail.com" -> "someone+terp1" / "gmail.com"; the base inbox drops any "+tag". */
+/** ("someone@example.com", "marcus") -> "someone+marcus@example.com"; any existing "+tag" on the inbox is dropped first. */
 function plusAddress(inbox: string, tag: string): string {
   const [local, domain] = inbox.split("@");
   return `${local.split("+")[0]}+${tag}@${domain}`;
