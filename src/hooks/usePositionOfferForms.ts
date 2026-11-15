@@ -6,6 +6,7 @@ import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { offerBlock } from "@/lib/offerAvailability";
 import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from "@/lib/offerExpiry";
 import type { PositionId } from "@/lib/positions";
+import type { EmailOutcome } from "@/lib/timesheetEmail";
 import { parseSafeDate } from "@/lib/requestDetailsFormat";
 import { resolveJobZone } from "@/utils/timezone";
 
@@ -18,6 +19,13 @@ export interface OfferFormState {
   successMessage: string;
   isSending: boolean;
 }
+
+/** What staff are told after an offer is saved, by what happened to its email. */
+const OFFER_OUTCOME: Record<EmailOutcome, string> = {
+  sent: "Offer emailed successfully",
+  muted: "Offer saved — email notifications are off for this interpreter",
+  suppressed: "Offer saved — outgoing email is paused, so no email was sent",
+};
 
 const blank = (): OfferFormState => ({
   recipient: "",
@@ -121,15 +129,16 @@ export function usePositionOfferForms({ requestId, request, ids, dbInterpreters,
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ interpreterId: form.recipient, requestId, interpreterEmail: selected.email, positionNumber: id }),
       });
-      const body = await res.json();
+      const body = (await res.json()) as { success?: boolean; error?: string; email?: EmailOutcome };
       if (!res.ok || !body.success) throw new Error(body.error || "Failed to dispatch offer email");
 
       // 3. Re-read the job to get the updated offers list
       await reload();
-      toast("Offer emailed successfully");
+      const outcome = OFFER_OUTCOME[body.email ?? "sent"];
+      toast(outcome);
       // The next offer for this position starts from a fresh 24-hour default again.
       edited.current[id] = false;
-      patch(id, { errorMessage: "", successMessage: "Offer emailed successfully", recipient: "", expiryHours: String(DEFAULT_OFFER_EXPIRY_HOURS), expiryMinutes: "0" });
+      patch(id, { errorMessage: "", successMessage: outcome, recipient: "", expiryHours: String(DEFAULT_OFFER_EXPIRY_HOURS), expiryMinutes: "0" });
     } catch (error) {
       console.error("[Offer Dispatch] Error creating or sending offer:");
       fail(error instanceof Error ? error.message : "Failed to create offer. Please try again.");

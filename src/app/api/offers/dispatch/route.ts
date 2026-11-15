@@ -77,8 +77,9 @@ export async function POST(req: Request) {
     const declineUrl = `${appUrl}/api/offers/response?token=${token}&action=decline`;
 
     const email = buildOfferEmail(summarizeJob(request, body.positionNumber), acceptUrl, declineUrl);
-    await sendEmail(interpreter.email, email.subject, email.html, email.text);
-    return NextResponse.json({ success: true });
+    // The offer is already saved; `email` says whether it was emailed or held back ("muted" / "suppressed").
+    const outcome = await sendEmail(interpreter.email, email.subject, email.html, email.text);
+    return NextResponse.json({ success: true, email: outcome });
   } catch {
     // Generic on purpose: SES errors can echo the recipient address.
     console.error("[Offer Dispatch] could not send the offer email");

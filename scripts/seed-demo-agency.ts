@@ -31,7 +31,8 @@ import { buildJobRows } from "./demo/rows";
 const DEFAULTS = {
   password: "DemoTerp2026!",
   agencyEmail: "demo@myterpdesk.com",
-  // SES-verified inboxes, so offers and magic links reach the demo team out of the box.
+  // SES-verified inboxes, so offers and magic links reach the demo team out of the box. Christy McDade / Ralph Silva in
+  // demo/fixtures.ts; both have email notifications on.
   terp1: "cmg@createmygraphicsva.com",
   terp2: "ralphchryslersilva65@gmail.com",
 } as const;
@@ -58,7 +59,7 @@ async function main(): Promise<void> {
   if (bucketOverride) process.env.AWS_S3_BUCKET_NAME = bucketOverride;
   console.log(`Target: database "${target.database}" on ${target.host}; signatures to bucket "${process.env.AWS_S3_BUCKET_NAME ?? "(not set)"}"`);
 
-  const client = postgres(target.url, { prepare: false, ssl: databaseSslOptions(), max: 1 });
+  const client = postgres(target.url, { prepare: false, ssl: databaseSslOptions(), max: 1, onnotice: () => undefined });
   try {
     await assertConnectedToDemo(client, target);
     const db = drizzle(client, { schema });
@@ -100,6 +101,8 @@ async function main(): Promise<void> {
         const tables = await tx.execute<{ tablename: string }>(sql`select tablename from pg_tables where schemaname = 'public' order by tablename`);
         const list = tables.map((t) => `public."${t.tablename.replace(/"/g, '""')}"`).join(", ");
         if (list) await tx.execute(sql.raw(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`));
+        // Newer roster columns the app also adds at runtime (src/lib/agencyInterpreterColumns.ts); Drizzle inserts name them all.
+        await tx.execute(sql`ALTER TABLE agency_interpreters ADD COLUMN IF NOT EXISTS email_notifications_enabled BOOLEAN NOT NULL DEFAULT false`);
 
         await tx.insert(schema.users).values(people.users);
         await tx.insert(schema.interpreters).values(people.interpreters);

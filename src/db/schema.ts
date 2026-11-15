@@ -251,6 +251,9 @@ export const agencyInterpreters = pgTable('agency_interpreters', {
   websitePermissionStatus: varchar('website_permission_status', { length: 20, enum: websitePermissionValues })
     .notNull()
     .default('not_shared'),
+  // Agency switch for operational email (offers, confirmations, job updates, timesheet links). Off by default: a muted
+  // interpreter still gets everything in the app. Enforced in src/lib/emailGate.ts. Also added at runtime (see above).
+  emailNotificationsEnabled: boolean('email_notifications_enabled').notNull().default(false),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

@@ -31,7 +31,8 @@ export async function sendMfaChangedEmail(to: string, change: MfaChange, deviceL
   const html = buildTerpDeskEmail({ title: copy.subject, preheader: named, bodyContent: body });
   const text = [named, "", NOT_YOU].join("\n");
   try {
-    await sendEmail(to, copy.subject, html, text);
+    // A security notice about the person's own change: never muted by the agency's notification switch.
+    await sendEmail(to, copy.subject, html, text, { purpose: "account" });
   } catch {
     // Not worth failing the change over; the audit log has it.
   }

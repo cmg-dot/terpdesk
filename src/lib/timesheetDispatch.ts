@@ -7,6 +7,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { interpreters, offers, requests, timesheets } from "@/db/schema";
 import { sendTimesheetEmail } from "@/lib/timesheetEmail";
+import type { EmailOutcome } from "@/lib/timesheetEmail";
 import { hashToken } from "@/lib/timesheetToken";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
@@ -137,8 +138,9 @@ export async function dispatchTimesheetCore(input: DispatchTimesheetInput): Prom
   const isVirtual = (data.details?.format ?? data.format) === "Virtual";
   const baseUrl = getBaseUrl();
 
+  let outcome: EmailOutcome;
   try {
-    await sendTimesheetEmail({
+    outcome = await sendTimesheetEmail({
       to: interpreter.email,
       interpreterName: interpreter.name,
       dateLabel: formatInTimeZone(startsAt, zone, "MMMM d, yyyy"),
@@ -154,5 +156,11 @@ export async function dispatchTimesheetCore(input: DispatchTimesheetInput): Prom
   }
 
   revalidatePath(`/requests/${requestId}`);
+  if (outcome === "muted") {
+    return { success: true, message: `Timesheet request created, but email notifications are off for ${interpreter.name}, so it was not emailed.` };
+  }
+  if (outcome === "suppressed") {
+    return { success: true, message: "Timesheet request created. Outgoing email is paused, so it was not emailed." };
+  }
   return { success: true, message: `Timesheet request emailed to ${interpreter.name}.` };
 }

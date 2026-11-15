@@ -111,8 +111,8 @@ async function emailInterpreter(after: JobRequestRow, b: BookedInterpreter, chan
     const token = createJobDetailsToken({ requestId: after.id, interpreterId: b.interpreterId }, endsAt);
     const detailsUrl = token ? `${getBaseUrl()}/job-details?token=${encodeURIComponent(token)}` : null;
     const email = buildUpdateEmail(summarizeJob(after, b.position), changes, detailsUrl, message);
-    await sendEmail(row.email, email.subject, email.html, email.text);
-    return true;
+    // Counted as notified only when the email actually went out (a muted interpreter still sees the update in the app).
+    return (await sendEmail(row.email, email.subject, email.html, email.text)) === "sent";
   } catch {
     // Never log the error object: it can include the recipient address.
     console.error("[jobUpdateNotice] could not send the job update email");

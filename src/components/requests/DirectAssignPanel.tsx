@@ -5,6 +5,7 @@ import { assignInterpreterDirectly } from "@/app/actions/assignInterpreterDirect
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { InterpreterFitBadge } from "@/components/scheduling-ui";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import type { EmailOutcome } from "@/lib/timesheetEmail";
 import type { JobPosition } from "@/lib/validation/directAssign";
 
 export interface DirectAssignRosterEntry {
@@ -25,7 +26,8 @@ export interface DirectAssignSuccess {
   positionIndex: JobPosition;
   interpreterName: string;
   withdrawnOffers: number;
-  emailed: boolean;
+  /** What happened to the booking-details email ("failed" = it could not be sent; staff can use "Resend details"). */
+  email: EmailOutcome | "failed";
 }
 
 interface DirectAssignPanelProps {

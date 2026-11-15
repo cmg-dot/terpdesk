@@ -132,7 +132,7 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
     const program = data.intake?.program;
 
     try {
-      await sendApprovalEmail({
+      const outcome = await sendApprovalEmail({
         to: row.email,
         interpreterName: row.name,
         dateLabel: formatInTimeZone(startsAt, zone, "MMMM d, yyyy"),
@@ -142,7 +142,7 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
         isOdhh: program === "WA ODHH" || program === "wa_odhh",
         travelLegCount: Array.isArray(approved.travelLegs) ? approved.travelLegs.length : 0,
       });
-      return { success: true, emailSent: true };
+      return { success: true, emailSent: outcome === "sent" };
     } catch {
       // The approval is already saved; report the email failure separately.
       return { success: true, emailSent: false };

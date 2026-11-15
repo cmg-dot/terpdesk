@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Mail, Phone, Send, ShieldCheck, UserPlus } from "lucide-react";
+import { BellOff, Mail, Phone, Send, ShieldCheck, UserPlus } from "lucide-react";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import type { ManageAccessTarget } from "@/components/interpreters/ManageAccessModal";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
@@ -12,9 +12,10 @@ import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 
 /**
  * A roster row. `rosterActive` is false for archived interpreters (missing = active, e.g. just added);
- * `photoUrl` is the profile photo path, shown instead of initials when present.
+ * `photoUrl` is the profile photo path, shown instead of initials when present; `emailNotifications` is the agency's
+ * email switch for them (missing = off, the default for someone just added).
  */
-export type RosterItem = SelectInterpreter & { rosterActive?: boolean; photoUrl?: string | null; certification?: string };
+export type RosterItem = SelectInterpreter & { rosterActive?: boolean; photoUrl?: string | null; certification?: string; emailNotifications?: boolean };
 
 interface RosterTabProps {
   /** Rows to show (already filtered by the page's search box). */
@@ -132,6 +133,16 @@ export const RosterTab = ({ items, searchQuery, filtersActive = false, onManage,
                   <span className="px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-[#F4F3EF] text-gray-600 border border-gray-200/60">
                     {interpreter.rosterActive === false ? "Archived" : "Active on Roster"}
                   </span>
+
+                  {!interpreter.emailNotifications && (
+                    <span
+                      title="Email notifications are off. Turn them on from the interpreter's page."
+                      className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200"
+                    >
+                      <BellOff className="w-3 h-3" aria-hidden="true" />
+                      <span>Email off</span>
+                    </span>
+                  )}
                 </div>
 
                 {/* Email and Phone */}
@@ -159,7 +170,9 @@ export const RosterTab = ({ items, searchQuery, filtersActive = false, onManage,
                 <p className="text-[11.5px] text-gray-400 pt-1">
                   {isRegistered
                     ? "Full terpDESK portal access · Receives calendar invites and in-app offers"
-                    : "External profile · Receives AWS SES email dispatch with one-click token response"}
+                    : interpreter.emailNotifications
+                      ? "External profile · Receives AWS SES email dispatch with one-click token response"
+                      : "External profile · No email until notifications are turned on"}
                 </p>
               </div>
             </div>

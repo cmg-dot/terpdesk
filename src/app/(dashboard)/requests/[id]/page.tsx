@@ -430,9 +430,13 @@ export default function AssignmentDetailPage() {
     }
     updateRequest(id, { status: result.status });
     showToast(
-      result.emailed
+      result.email === "sent"
         ? `${result.interpreterName} is assigned and was emailed the booking details.`
-        : `${result.interpreterName} is assigned, but the email could not be sent. Use "Resend details".`
+        : result.email === "muted"
+          ? `${result.interpreterName} is assigned. Email notifications are off for this interpreter, so no email was sent.`
+          : result.email === "suppressed"
+            ? `${result.interpreterName} is assigned. Outgoing email is paused, so no email was sent.`
+            : `${result.interpreterName} is assigned, but the email could not be sent. Use "Resend details".`
     );
   };
 

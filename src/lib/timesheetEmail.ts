@@ -6,6 +6,8 @@ import {
   emailDetailsTable,
   escapeHtml,
 } from "@/lib/emailTemplate";
+import { checkRecipient } from "@/lib/emailGate";
+import type { RecipientDecision } from "@/lib/emailGate";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 
 /**
@@ -14,18 +16,47 @@ import { isPlaceholderEmail } from "@/lib/placeholderEmail";
  */
 const SENDER = process.env.EMAIL_FROM_ADDRESS?.trim() || "dispatch@aslprofessionals.net";
 
-export const sendEmail = async (to: string, subject: string, html: string, text: string): Promise<void> => {
+/**
+ * What happened to an email: "sent" (handed to SES), "muted" (the agency has this interpreter's email notifications off),
+ * or "suppressed" (silent mode, a placeholder address, no demo sender, not on EMAIL_ALLOWLIST, or the gate check failed).
+ */
+export type EmailOutcome = "sent" | "muted" | "suppressed";
+
+export interface SendEmailOptions {
+  /** "account": self-triggered sign-up verification or a two-step security notice. Skips the per-recipient gate only. */
+  purpose?: "operational" | "account";
+}
+
+export const sendEmail = async (to: string, subject: string, html: string, text: string, options: SendEmailOptions = {}): Promise<EmailOutcome> => {
   // Global Silent Mode: a server-only switch (read at call time) that suppresses every outbound email, e.g. during a bulk import.
   if (process.env.EMAIL_SILENT_MODE === "true") {
     console.log("Silent mode active: Email suppressed");
-    return;
+    return "suppressed";
   }
   // Bulk-imported people with no email on file hold a placeholder on a reserved domain: never send to it.
-  if (isPlaceholderEmail(to)) return;
+  if (isPlaceholderEmail(to)) return "suppressed";
   // The demo deployment must never send as the production agency: without its own sender it sends nothing at all.
   if (process.env.NEXT_PUBLIC_DEMO_MODE === "true" && !process.env.EMAIL_FROM_ADDRESS?.trim()) {
     console.warn("Demo mode without EMAIL_FROM_ADDRESS: email suppressed");
-    return;
+    return "suppressed";
+  }
+  if (options.purpose !== "account") {
+    let decision: RecipientDecision;
+    try {
+      decision = await checkRecipient(to);
+    } catch {
+      // Fail closed. Never log the error object: it can include the recipient address.
+      console.error("[sendEmail] recipient check failed: email suppressed");
+      return "suppressed";
+    }
+    if (decision === "muted") {
+      console.log("Email notifications are off for this interpreter: email suppressed");
+      return "muted";
+    }
+    if (decision === "not_allowlisted") {
+      console.log("Recipient is not on EMAIL_ALLOWLIST: email suppressed");
+      return "suppressed";
+    }
   }
   const ses = new SESClient({
     region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2",
@@ -43,6 +74,7 @@ export const sendEmail = async (to: string, subject: string, html: string, text:
       },
     }),
   );
+  return "sent";
 };
 
 // ---------------------------------------------------------------------------
@@ -61,7 +93,7 @@ export interface TimesheetEmailParams {
 }
 
 /** Sends the timesheet magic link. Content is deliberately free of PHI. */
-export const sendTimesheetEmail = (p: TimesheetEmailParams): Promise<void> => {
+export const sendTimesheetEmail = (p: TimesheetEmailParams): Promise<EmailOutcome> => {
   const subject = `Timesheet Request for Assignment on ${p.dateLabel}`;
   const expiry = `No login is required. This link expires in ${p.expiryDays} days and can be used once.`;
 
@@ -109,7 +141,7 @@ export interface ApprovalEmailParams {
 }
 
 /** Receipt sent after approval. Date, hours and mileage only; no PHI. */
-export const sendApprovalEmail = (p: ApprovalEmailParams): Promise<void> => {
+export const sendApprovalEmail = (p: ApprovalEmailParams): Promise<EmailOutcome> => {
   const subject = `Hours Approved for Assignment on ${p.dateLabel}`;
   const rows = [
     { label: "Assignment date", value: p.dateLabel },

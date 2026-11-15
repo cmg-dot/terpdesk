@@ -12,12 +12,13 @@ import { logError } from "@/lib/logError";
 import { notifyInterpreter } from "@/lib/notifications";
 import { getRosterInterpreters } from "@/lib/roster";
 import { logActivity } from "@/lib/requestActivity";
+import type { EmailOutcome } from "@/lib/timesheetEmail";
 import { assignInterpreterDirectlySchema } from "@/lib/validation/directAssign";
 import type { AssignInterpreterDirectlyInput, JobPosition } from "@/lib/validation/directAssign";
 
 /** Problems are returned, not thrown: in production a thrown message is hidden from the browser. */
 export type AssignDirectlyResult =
-  | { success: true; status: string; positionIndex: JobPosition; interpreterName: string; withdrawnOffers: number; emailed: boolean }
+  | { success: true; status: string; positionIndex: JobPosition; interpreterName: string; withdrawnOffers: number; email: EmailOutcome | "failed" }
   | { success: false; error: string };
 
 /**
@@ -73,7 +74,7 @@ export async function assignInterpreterDirectly(input: AssignInterpreterDirectly
     title: "You have been assigned to a job",
     message: "Your agency booked you for a job. Open it to see the details.",
   });
-  const emailed = await sendBookingConfirmation({ requestId: jobId, interpreterId, positionNumber: positionIndex, kind: "assigned" });
+  const email = await sendBookingConfirmation({ requestId: jobId, interpreterId, positionNumber: positionIndex, kind: "assigned" });
 
   revalidatePath(`/requests/${jobId}`);
   revalidatePath("/requests");
@@ -81,5 +82,5 @@ export async function assignInterpreterDirectly(input: AssignInterpreterDirectly
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");
 
-  return { success: true, status: outcome.status, positionIndex, interpreterName, withdrawnOffers: outcome.withdrawnOffers, emailed };
+  return { success: true, status: outcome.status, positionIndex, interpreterName, withdrawnOffers: outcome.withdrawnOffers, email };
 }

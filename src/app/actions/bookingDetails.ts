@@ -55,7 +55,9 @@ export async function resendBookingDetails(input: z.input<typeof schema>): Promi
     if (Number(recent?.total ?? 0) > 0) return { success: false, error: "Details were just sent. Please wait a couple of minutes." };
 
     const sent = await sendBookingConfirmation({ requestId, interpreterId: booked.interpreterId, positionNumber: positionIndex });
-    if (!sent) return { success: false, error: "We could not send the email. Check the interpreter's email address and try again." };
+    if (sent === "muted") return { success: false, error: "Email notifications are off for this interpreter. Turn them on in their profile to email the details." };
+    if (sent === "suppressed") return { success: false, error: "Outgoing email is paused, so the details were not sent." };
+    if (sent !== "sent") return { success: false, error: "We could not send the email. Check the interpreter's email address and try again." };
 
     await writeAuditLog({ userId: session.user.id, userEmail: session.user.email ?? null, action: "booking_details_resent", details: marker });
     return { success: true, message: "Booking details sent to the interpreter." };

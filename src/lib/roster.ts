@@ -2,6 +2,7 @@ import { asc, and, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { agencyInterpreters, interpreterProfiles, interpreters } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { ensureDisplayNameColumns } from "@/lib/displayName";
 import { interpreterDisplayName, interpreterPhotoUrl } from "@/lib/displayNameSql";
 import { areasFromLegacy, cleanAreas } from "@/lib/serviceAreas";
@@ -14,11 +15,13 @@ import { areasFromLegacy, cleanAreas } from "@/lib/serviceAreas";
  * dispatched, so dispatch callers pass `activeOnly`.
  * `name` is the display name (preferred name, else account name), so the roster and offer dropdowns agree.
  * `photoUrl` is the profile photo path ("/api/files/<id>") or null, so lists can show it instead of initials.
+ * `emailNotifications` is the agency's email switch for them (false = muted; see src/lib/emailGate.ts).
  *
  * SERVER ONLY: queries the database.
  */
 export async function getRosterInterpreters(agencyId: string, opts: { activeOnly?: boolean } = {}) {
   await ensureDisplayNameColumns();
+  await ensureAgencyInterpreterColumns();
   const conditions = [eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.status, "approved")];
   if (opts.activeOnly) conditions.push(eq(agencyInterpreters.isActive, true));
   return db
@@ -27,6 +30,7 @@ export async function getRosterInterpreters(agencyId: string, opts: { activeOnly
       name: interpreterDisplayName,
       photoUrl: interpreterPhotoUrl,
       rosterActive: agencyInterpreters.isActive,
+      emailNotifications: agencyInterpreters.emailNotificationsEnabled,
     })
     .from(interpreters)
     .innerJoin(agencyInterpreters, eq(agencyInterpreters.interpreterId, interpreters.id))

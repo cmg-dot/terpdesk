@@ -17,6 +17,7 @@ export async function ensureAgencyInterpreterColumns(): Promise<void> {
     await db.execute(sql`
       ALTER TABLE agency_interpreters ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT true;
       ALTER TABLE agency_interpreters ADD COLUMN IF NOT EXISTS website_permission_status VARCHAR(20) NOT NULL DEFAULT 'not_shared';
+      ALTER TABLE agency_interpreters ADD COLUMN IF NOT EXISTS email_notifications_enabled BOOLEAN NOT NULL DEFAULT false;
     `);
     ensured = true;
   } catch (err) {

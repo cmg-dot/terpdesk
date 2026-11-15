@@ -6,14 +6,17 @@ import type { ClientData, ClientType } from "@/db/schema";
  * are plus-addresses of ONE inbox the demo team reads, so every offer or magic link the demo sends arrives there and nowhere else.
  */
 
-export type InterpreterKey = "jordan" | "priya" | "marcus" | "sofia" | "hannah" | "daniel" | "grace" | "liam";
+export type InterpreterKey = "christy" | "ralph" | "marcus" | "sofia" | "hannah" | "daniel" | "grace" | "liam";
 export type ClientKey = "harborview" | "pscc" | "cascadia" | "olympic" | "soundTransit";
 
 export interface DemoInterpreter {
   key: InterpreterKey;
   name: string;
   email: string;
-  /** The two primary demo interpreters sign in (DEMO_TERP1_EMAIL / DEMO_TERP2_EMAIL); the rest are agency-added profiles. */
+  /**
+   * The two primary demo interpreters (Christy McDade = DEMO_TERP1_EMAIL, Ralph Silva = DEMO_TERP2_EMAIL) sign in and have
+   * email notifications on; the other six are agency-added profiles with no login and email notifications off.
+   */
   login: boolean;
   phone: string;
   city: string;
@@ -55,8 +58,8 @@ export function demoInterpreters({ terp1Email, terp2Email }: FixtureEnv): DemoIn
     rates: { state: (55 + n).toFixed(2), nonState: (68 + n * 2).toFixed(2) },
   });
   return [
-    person("jordan", "Jordan Ellis", terp1Email, true, 1, "Seattle", ["Seattle", "Bellevue"], "NIC Advanced", "Medical and mental-health settings; 9 years in the field."),
-    person("priya", "Priya Natarajan", terp2Email, true, 2, "Tacoma", ["Tacoma", "Olympia"], "NIC; BEI Basic", "Educational interpreting and pediatric appointments."),
+    person("christy", "Christy McDade", terp1Email, true, 1, "Seattle", ["Seattle", "Bellevue"], "NIC Advanced", "Medical and mental-health settings; 9 years in the field."),
+    person("ralph", "Ralph Silva", terp2Email, true, 2, "Tacoma", ["Tacoma", "Olympia"], "NIC; BEI Basic", "Educational interpreting and pediatric appointments."),
     person("marcus", "Marcus Bell", tagged("marcus"), false, 3, "Everett", ["Everett", "Lynnwood"], "NIC", "Higher education, conferences and workplace meetings."),
     person("sofia", "Sofia Ramirez", tagged("sofia"), false, 4, "Seattle", ["Seattle", "Renton"], "NIC Master; trilingual (ASL/English/Spanish)", "Trilingual interpreter for community and legal settings."),
     person("hannah", "Hannah Cho", tagged("hannah"), false, 5, "Bellevue", ["Bellevue", "Redmond"], "NIC Advanced", "Healthcare, technical and workplace assignments."),

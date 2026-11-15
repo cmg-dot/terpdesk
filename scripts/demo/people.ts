@@ -7,7 +7,8 @@ import { ZONE, localDate } from "./schedule";
 /**
  * The demo agency's logins and roster. The agency admin and the two primary interpreters can sign in (one shared password, no
  * two-step verification devices, so there is no 2FA prompt); the other six are agency-added profiles with no login, the way a
- * roster import leaves them. Everyone is approved and active on the workspace's agency id, with availability shared.
+ * roster import leaves them. Everyone is approved and active on the workspace's agency id, with availability shared. Only the
+ * two sign-in interpreters have email notifications on.
  */
 
 export interface PeopleRows {
@@ -42,7 +43,8 @@ export function buildPeopleRows(params: { interpreters: DemoInterpreter[]; admin
     const userId = person.login ? randomUUID() : null;
     if (userId) rows.users.push({ id: userId, email: person.email, passwordHash, name: person.name, role: "interpreter", accountStatus: "approved" });
     rows.interpreters.push({ id: interpreterId, name: person.name, email: person.email, phone: person.phone, userId });
-    rows.roster.push({ agencyId: DEFAULT_AGENCY_ID, interpreterId, userId, status: "approved", isActive: true });
+    // Only the two sign-in interpreters (the demo team's real, SES-verified inboxes) get email; the rest stay muted like production.
+    rows.roster.push({ agencyId: DEFAULT_AGENCY_ID, interpreterId, userId, status: "approved", isActive: true, emailNotificationsEnabled: person.login });
     const virtualOnly = person.serviceAreas.includes("Virtual Only");
     rows.profiles.push({
       id: randomUUID(),

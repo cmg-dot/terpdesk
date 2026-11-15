@@ -47,6 +47,8 @@ export interface AgencyInterpreterView {
   /** Their sign-in / dispatch email; "" when only the bulk-import placeholder is on file. Agency-only. */
   email: string;
   hasPlaceholderEmail: boolean;
+  /** This agency's switch for operational email to them (off by default). */
+  emailNotificationsEnabled: boolean;
   photoUrl: string;
   city: string;
   stateOrRegion: string;
@@ -80,7 +82,13 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
   await ensureAvailabilityTables();
 
   const [row] = await db
-    .select({ id: interpreters.id, name: interpreters.name, email: interpreters.email, userId: interpreters.userId })
+    .select({
+      id: interpreters.id,
+      name: interpreters.name,
+      email: interpreters.email,
+      userId: interpreters.userId,
+      emailNotificationsEnabled: agencyInterpreters.emailNotificationsEnabled,
+    })
     .from(interpreters)
     .innerJoin(agencyInterpreters, eq(agencyInterpreters.interpreterId, interpreters.id))
     .where(and(eq(interpreters.id, interpreterId), eq(agencyInterpreters.agencyId, agencyId), eq(agencyInterpreters.status, "approved")))
@@ -163,6 +171,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     isRegistered: isRegisteredInterpreter(row),
     email: isPlaceholderEmail(row.email) ? "" : row.email,
     hasPlaceholderEmail: isPlaceholderEmail(row.email),
+    emailNotificationsEnabled: row.emailNotificationsEnabled,
     photoUrl: profile?.photoUrl ?? "",
     city: profile?.city ?? "",
     stateOrRegion: profile?.stateOrRegion ?? "",

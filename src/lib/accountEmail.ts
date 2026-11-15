@@ -25,5 +25,6 @@ export async function sendProfileClaimEmail(params: { to: string; name: string; 
     "This link expires in 24 hours. If you did not create an account, you can ignore this email.",
   ].join("\n");
 
-  await sendEmail(params.to, subject, html, text);
+  // Self-triggered (the person just signed up or asked for a new link): never muted by the agency's notification switch.
+  await sendEmail(params.to, subject, html, text, { purpose: "account" });
 }

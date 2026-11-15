@@ -10,6 +10,7 @@ import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { JobSummary } from "@/lib/jobSummary";
 import { sendEmail } from "@/lib/timesheetEmail";
+import type { EmailOutcome } from "@/lib/timesheetEmail";
 import { resolveRequestTimes } from "@/utils/timezone";
 
 /**
@@ -148,9 +149,9 @@ export async function sendOdhhPostJobReminder(params: { to: string; name: string
 /**
  * Sends the booking confirmation after an interpreter accepts (in the app or through the email link), is assigned
  * directly, or when staff choose "Resend details". Never throws: a failed email must not undo or block the booking.
- * Returns whether the email went out.
+ * Returns what happened to the email ("failed" = it could not be built or SES refused it).
  */
-export async function sendBookingConfirmation(params: { requestId: string; interpreterId: string; positionNumber?: number; kind?: ConfirmationKind }): Promise<boolean> {
+export async function sendBookingConfirmation(params: { requestId: string; interpreterId: string; positionNumber?: number; kind?: ConfirmationKind }): Promise<EmailOutcome | "failed"> {
   try {
     const [request] = await db
       .select({ id: requests.id, title: requests.title, createdAt: requests.createdAt, data: requests.data })
@@ -162,7 +163,7 @@ export async function sendBookingConfirmation(params: { requestId: string; inter
       .from(interpreters)
       .where(eq(interpreters.id, params.interpreterId))
       .limit(1);
-    if (!request || !interpreter?.email) return false;
+    if (!request || !interpreter?.email) return "failed";
 
     const summary = summarizeJob(request, params.positionNumber);
     let endsAt = new Date(NaN);
@@ -176,15 +177,17 @@ export async function sendBookingConfirmation(params: { requestId: string; inter
     const name = (await getInterpreterDisplayName(params.interpreterId).catch(() => null)) ?? "";
 
     const email = buildConfirmationEmail(summary, name, detailsUrl, params.kind);
-    await sendEmail(interpreter.email, email.subject, email.html, email.text);
-    await writeAuditLog({
-      action: "booking_confirmation_sent",
-      details: `requestId=${request.id}; interpreterId=${params.interpreterId}`,
-    });
-    return true;
+    const outcome = await sendEmail(interpreter.email, email.subject, email.html, email.text);
+    if (outcome === "sent") {
+      await writeAuditLog({
+        action: "booking_confirmation_sent",
+        details: `requestId=${request.id}; interpreterId=${params.interpreterId}`,
+      });
+    }
+    return outcome;
   } catch {
     // Never log the error object here: it can include the recipient address.
     console.error("[jobEmails] could not send the booking confirmation");
-    return false;
+    return "failed";
   }
 }
