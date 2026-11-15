@@ -20,6 +20,7 @@ export type InboundKind =
   | "state_in_process"
   | "state_cancellation"
   | "state_void"
+  | "state_unable_to_fill"
   | "hours_report"
   | "requester_cancel_request"
   | "requester_reply"
@@ -38,7 +39,7 @@ export interface InboundClassification {
   srn: string | null;
   isReply: boolean;
   isForward: boolean;
-  /** state_cancellation: the state's own "Cancelled On" time (an ISO instant), when the notice states one. */
+  /** state_cancellation / state_unable_to_fill: the state's own "Cancelled On" / "Agency unable to fill on" time (an ISO instant), when stated. */
   cancelledAt: string | null;
   /** state_cancellation: the portal login the notice names ("By king"), when it names one. */
   cancelledBy: string | null;
@@ -93,11 +94,13 @@ export function cancelSnippet(top: string): string | null {
 
 // ---- the state's cancellation notice: "Cancelled On 11/9/2026 11:34:58 AM" / "By king"
 const CANCELLED_ON = /Cancell?ed\s+On\s*[:\-]?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)/i;
+/** The state's "Agency Reassignment" notice: "Agency unable to fill on 11/4/2026 1:54:08 PM" (the agency returned the job in the portal). */
+const UNABLE_ON = /unable\s+to\s+fill\s+on\s*[:\-]?\s*(\d{1,2})\/(\d{1,2})\/(\d{4})\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*([AP]M)/i;
 const CANCELLED_BY = /Cancell?ed\s+On[^\n]*\n[>\s]*By\s+([A-Za-z0-9._@-]{2,60})/i;
 
 /** The notice's own time as an instant (its clock is Pacific, like every state email), or null when it is missing or not a real time. */
-export function parseCancelledAt(text: string): string | null {
-  const m = CANCELLED_ON.exec(text);
+export function parseCancelledAt(text: string, stamp: RegExp = CANCELLED_ON): string | null {
+  const m = stamp.exec(text);
   if (!m) return null;
   const [month, day, year, minute, second] = [Number(m[1]), Number(m[2]), Number(m[3]), Number(m[5]), Number(m[6] ?? 0)];
   let hour = Number(m[4]) % 12;
@@ -134,6 +137,8 @@ export function classifyInboundMail(mail: InboundMail): InboundClassification {
   if (fromState || isForward) {
     if (kind === "cancellation" && srn) return { ...base, kind: "state_cancellation", srn, cancelledAt: parseCancelledAt(text), cancelledBy: CANCELLED_BY.exec(text)?.[1] ?? null };
     if (kind === "in_process" && srn) return { ...base, kind: "state_in_process", srn };
+    // "Agency Reassignment": the state confirms the agency was unable to fill (returned it in the portal) and passes the job on.
+    if (kind === "reassignment" && srn && /unable\s+to\s+(?:be\s+)?fill/i.test(text)) return { ...base, kind: "state_unable_to_fill", srn, cancelledAt: parseCancelledAt(text, UNABLE_ON) };
     return { ...base, kind: kind === "request_form" ? "state_request_form" : "other", srn };
   }
 

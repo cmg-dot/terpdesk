@@ -8,6 +8,13 @@ const ODHH_CONFIRM_BASE = "https://fortress.wa.gov/dshs/odhhapps/interpreters/se
 export const ODHH_VERIFICATION_FORM_URL = "https://fortress.wa.gov/dshs/odhhapps/Interpreters/AssignmentReport.aspx";
 
 /**
+ * The state's "Consumer Info" page (static: staff pick the contractor and type the SRN and access code there) and its "Rebook
+ * Access" page (static: SRN and access code), both confirmed from the browser. Nothing is appended to either.
+ */
+export const ODHH_CONSUMER_INFO_URL = "https://fortress.wa.gov/dshs/odhhapps/Interpreters/Consumer.aspx";
+export const ODHH_REBOOK_URL = "https://fortress.wa.gov/dshs/odhhapps/Interpreters/Rebook.aspx";
+
+/**
  * Where staff confirm ("acknowledge") a job on the state portal: the same link the state prints in every request email
  * ("If you acknowledge this job, please click here"). With the SRN it opens that job; without one it opens the portal's list.
  */

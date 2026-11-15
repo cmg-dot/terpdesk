@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { z } from "zod";
 import { writeAuditLog } from "@/lib/audit";
 import { NOT_ALLOWED_MESSAGE, requireRole } from "@/lib/auth/guards";
 import { writeIntakeField } from "@/lib/intakeFieldStore";
 import type { IntakeBillingKey } from "@/lib/intakeFieldStore";
 import { logError } from "@/lib/logError";
+import { PROVIDER_ONE_MAX, normalizeProviderOne } from "@/lib/providerOne";
 import { logActivity } from "@/lib/requestActivity";
 import { BILLING_MODIFIER_LABEL, DOB_FORMAT_MESSAGE, asBillingModifier, parseDob, setBillingModifierSchema, setClientDobSchema } from "@/lib/validation/billingFields";
 import type { BillingModifier } from "@/lib/validation/billingFields";
@@ -64,6 +66,28 @@ export async function setClientDob(input: unknown): Promise<SetClientDobResult> 
   if (stored === null) return { success: false, error: DOB_FORMAT_MESSAGE };
   const done = await save(parsed.data.requestId, "clientDob", stored, session.user, { audit: "client_dob_saved", activityKind: "client_dob", describe: (previous, next) => (next === "" ? "Client date of birth removed" : previous === "" ? "Client date of birth added" : "Client date of birth updated") });
   return done.ok ? { success: true, clientDob: stored } : { success: false, error: done.error };
+}
+
+export type SetProviderOneResult = { success: true; providerOne: string } | { success: false; error: string };
+
+const setProviderOneSchema = z.object({ requestId: z.string().uuid(), providerOne: z.string().max(PROVIDER_ONE_MAX) });
+
+/**
+ * Saves the client's WA # (intake.providerOneNumber), normalized ("123456789WA"); empty clears it. A value that is not the standard
+ * form is still saved (the box only warns). Agency only. Like the date of birth, the number itself is never written to a log.
+ */
+export async function setProviderOne(input: unknown): Promise<SetProviderOneResult> {
+  let session;
+  try {
+    session = await requireRole("agency");
+  } catch {
+    return { success: false, error: NOT_ALLOWED_MESSAGE };
+  }
+  const parsed = setProviderOneSchema.safeParse(input);
+  if (!parsed.success) return { success: false, error: `Enter the WA # (up to ${PROVIDER_ONE_MAX} characters).` };
+  const value = normalizeProviderOne(parsed.data.providerOne);
+  const done = await save(parsed.data.requestId, "providerOneNumber", value, session.user, { audit: "provider_one_saved", activityKind: "provider_one", describe: (previous, next) => (next === "" ? "Client WA # removed" : previous === "" ? "Client WA # added" : "Client WA # updated") });
+  return done.ok ? { success: true, providerOne: value } : { success: false, error: done.error };
 }
 
 /** Saves the billing modifier (intake.billingModifier): "U3" (medical) or "U3 U9" (mental health); empty (or null) clears it. Agency only. */

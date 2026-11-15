@@ -2,8 +2,7 @@
 
 import { useId, useState } from "react";
 import { setClientDob } from "@/app/actions/setBillingFields";
-import { IconInput } from "@/components/ui/IconInput";
-import { todayKey } from "@/lib/dateTimePicker";
+import { DOB_FORMAT_MESSAGE, formatDob, parseDob } from "@/lib/validation/billingFields";
 
 interface Props {
   requestId: string;
@@ -13,67 +12,78 @@ interface Props {
   onSaved: (clientDob: string) => void;
 }
 
-/** Nobody in the system was born before this; the server refuses anything earlier or in the future (the real check). */
-const EARLIEST_DOB = "1900-01-01";
-
-const PICKER_LOOK =
-  "w-full rounded-full border-none bg-white px-4 py-2.5 text-sm text-gray-800 outline-none ring-1 ring-gray-200 transition-shadow hover:ring-[rgb(var(--forest-rgb)/0.4)] focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-60";
+/** What is typed, as MM/DD/YYYY: digits only, the slashes added as you go. A pasted 1985-03-04 is turned round. */
+function maskDob(raw: string): string {
+  const iso = /^\s*(\d{4})-(\d{2})-(\d{2})\s*$/.exec(raw);
+  if (iso) return `${iso[2]}/${iso[3]}/${iso[1]}`;
+  const digits = raw.replace(/\D/g, "").slice(0, 8);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
+  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+}
 
 /**
- * The "Client date of birth" box next to the client's name in Staffing. The app's own date picker, with a year list so a birth year is two
- * clicks: nothing is typed, so there are no typos. Choosing a date saves it at once (no Save button), without opening Edit assignment, which is
- * locked while an offer is out or an interpreter is booked. "Remove" clears it. For agency billing only: it is never shown to interpreters or
- * put in an email, a link, a notification or a log.
+ * The "Client date of birth" box in Staffing: typed as MM/DD/YYYY with the keyboard (the slashes fill in), saved when you leave the box
+ * or press Enter, without opening Edit assignment. A date that is not real, is before 1900 or is in the future is refused right here and
+ * again by the server. Clearing the box (or "Remove") removes it. For agency billing only: it is never shown to interpreters or put in
+ * an email, a link, a notification or a log.
  */
 export function ClientDobField({ requestId, value, onSaved }: Props) {
   const [saved, setSaved] = useState(value);
-  // What the picker shows: the choice at once, going back to `saved` if the server refuses it.
-  const [shown, setShown] = useState(value);
+  const [draft, setDraft] = useState(formatDob(value));
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
-  const pickerId = useId();
+  const inputId = useId();
 
-  const save = async (next: string) => {
-    if (saving || next === saved) return;
-    setShown(next);
+  const save = async (typed: string) => {
+    const next = parseDob(typed);
+    if (next === null) {
+      setMessage({ kind: "error", text: DOB_FORMAT_MESSAGE });
+      return;
+    }
+    if (saving || next === saved) {
+      setDraft(formatDob(next));
+      return;
+    }
     setSaving(true);
     setMessage(null);
     const result = await setClientDob({ requestId, clientDob: next }).catch(() => ({ success: false as const, error: "We could not save the date of birth. Please try again." }));
     setSaving(false);
     if (!result.success) {
-      setShown(saved);
       setMessage({ kind: "error", text: result.error });
       return;
     }
     setSaved(result.clientDob);
-    setShown(result.clientDob);
+    setDraft(formatDob(result.clientDob));
     setMessage({ kind: "ok", text: result.clientDob === "" ? "Client date of birth removed." : "Client date of birth saved." });
     onSaved(result.clientDob);
   };
 
   return (
     <div data-client-dob-field="" className="rounded-xl border border-gray-200 bg-[#FBFAF7] p-4">
-      <label htmlFor={pickerId} className="block text-sm font-medium text-[var(--ink)]">
-        Client date of birth <span className="font-normal text-[var(--sage)]">(optional, agency billing only)</span>
+      <label htmlFor={inputId} className="block text-sm font-medium text-[var(--ink)]">
+        Client date of birth <span className="font-normal text-[var(--sage)]">(MM/DD/YYYY, agency billing only)</span>
       </label>
       <div className="mt-2 flex items-center gap-3">
-        <IconInput
-          kind="date"
-          id={pickerId}
-          yearPicker
-          value={shown}
-          min={EARLIEST_DOB}
-          max={todayKey()}
+        <input
+          id={inputId}
+          type="text"
+          inputMode="numeric"
+          autoComplete="off"
+          placeholder="MM/DD/YYYY"
+          maxLength={10}
+          value={draft}
           disabled={saving}
-          placeholder="Choose date of birth"
-          wrapperClassName="relative min-w-0 flex-1"
-          className={PICKER_LOOK}
-          onChange={(event) => void save(event.target.value)}
+          aria-invalid={message?.kind === "error"}
+          onChange={(event) => { setDraft(maskDob(event.target.value)); setMessage(null); }}
+          onBlur={() => void save(draft)}
+          onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void save(draft); } }}
+          className="min-w-0 flex-1 rounded-full border-none bg-white px-4 py-2.5 text-sm tabular-nums text-gray-800 outline-none ring-1 ring-gray-200 transition-shadow focus:ring-2 focus:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-60"
         />
         {saved !== "" && (
           <button
             type="button"
-            onClick={() => void save("")}
+            onClick={() => { setDraft(""); void save(""); }}
             disabled={saving}
             className="flex-none rounded-full px-3 py-2 text-sm font-medium text-gray-600 underline-offset-4 transition-colors hover:text-red-700 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:cursor-not-allowed disabled:opacity-50"
           >

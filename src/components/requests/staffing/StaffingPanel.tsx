@@ -5,6 +5,9 @@ import { ClientNameField } from "@/components/requests/staffing/ClientNameField"
 import { PriorAuthField } from "@/components/requests/staffing/PriorAuthField";
 import { BillingModifierField } from "@/components/requests/staffing/BillingModifierField";
 import { ClientDobField } from "@/components/requests/staffing/ClientDobField";
+import { OdhhPortalLinksRow, OdhhRebookBanner } from "@/components/requests/staffing/OdhhPortalLinks";
+import type { OdhhIds } from "@/components/requests/staffing/OdhhPortalLinks";
+import { ProviderOneField } from "@/components/requests/staffing/ProviderOneField";
 import { PositionStaffing } from "@/components/requests/staffing/PositionStaffing";
 import { RequestedInterpreterBadge } from "@/components/requests/staffing/RequestedInterpreterBadge";
 import type { Position, PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
@@ -31,6 +34,12 @@ interface Props {
   onClientDobSaved: (clientDob: string) => void;
   billingModifier: BillingModifier | "";
   onBillingModifierSaved: (modifier: BillingModifier | "") => void;
+  /** The client's WA # saved on the job (agency-only), the number on the state's form when none is saved yet, and the save hook. */
+  providerOne: string;
+  providerOneSuggested: string;
+  onProviderOneSaved: (providerOne: string) => void;
+  /** A state job's SRN and access code, for the ODHH portal links (null on other jobs). */
+  odhh: OdhhIds | null;
 }
 
 /**
@@ -38,7 +47,7 @@ interface Props {
  * one (send an offer, or book directly). When the state asked for a particular interpreter, that request sits above the controls
  * with a one-click way to choose them.
  */
-export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved }: Props) {
+export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved, providerOne, providerOneSuggested, onProviderOneSaved, odhh }: Props) {
   const requested = requestedInterpreter?.trim() || null;
   const match = useMemo(() => {
     if (!requested) return null;
@@ -57,12 +66,18 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
       <p className="text-sm text-[var(--sage)] mb-1">Pending offers do not reserve time.</p>
       <p className="text-sm text-[var(--sage)] mb-6">Back-to-back appointments are allowed. Travel time is not checked.</p>
 
+      {odhh && positions.some((p) => p.needsReplacement) && <OdhhRebookBanner ids={odhh} />}
+
+      {/* Billing order Josie works in: name, WA #, date of birth, PA #, modifier. */}
       <div className="mb-6 grid gap-4 md:grid-cols-2">
         <ClientNameField requestId={ctx.requestId} value={clientName} onSaved={onClientSaved} />
-        <PriorAuthField requestId={ctx.requestId} value={priorAuth} onSaved={onPriorAuthSaved} />
+        <ProviderOneField requestId={ctx.requestId} value={providerOne} suggested={providerOneSuggested} onSaved={onProviderOneSaved} />
         <ClientDobField requestId={ctx.requestId} value={clientDob} onSaved={onClientDobSaved} />
+        <PriorAuthField requestId={ctx.requestId} value={priorAuth} onSaved={onPriorAuthSaved} />
         <BillingModifierField requestId={ctx.requestId} value={billingModifier} onSaved={onBillingModifierSaved} />
       </div>
+
+      {odhh && <OdhhPortalLinksRow ids={odhh} />}
 
       {requested && (
         <RequestedInterpreterBadge

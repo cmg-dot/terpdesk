@@ -12,7 +12,7 @@ import type { RequestData } from "@/db/schema";
 
 type Executor = Pick<typeof db, "select" | "update">;
 
-export type IntakeBillingKey = "clientDob" | "billingModifier";
+export type IntakeBillingKey = "clientDob" | "billingModifier" | "providerOneNumber";
 
 /** `previous` is what was saved before (empty when nothing was), so the caller can say what changed. */
 export type IntakeFieldWrite = { ok: true; hadValue: boolean; previous: string } | { ok: false; reason: "not_found" };

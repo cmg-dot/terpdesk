@@ -7,11 +7,13 @@ import type { InboundClassification } from "@/lib/inboundMail/classify";
 import { logError } from "@/lib/logError";
 import { processRequesterCancelRequest } from "@/lib/requesterCancel";
 import { processStateCancellation, processStateInProcess } from "@/lib/stateCancelNotice";
+import { processStateUnableToFill } from "@/lib/stateUnableToFill";
 import { markInboxMail, recordStateEvent, setEventOutcome } from "@/lib/stateEvents";
 import { noteOnce, processStateVoidNotice } from "@/lib/stateVoidNotice";
 
 /**
- * Acts on incoming mail that is NOT a request form: the state's void, cancellation and "now in process" notices, and a requester's
+ * Acts on incoming mail that is NOT a request form: the state's void, cancellation, "unable to fill" (Agency Reassignment) and "now
+ * in process" notices, and a requester's
  * reply. Both doors call it (the Inbox webhook and the Lambda's /api/intake), so the same email means the same thing wherever it
  * arrived. A request form (and anything unrecognised) returns null and the caller carries on with the form flow.
  *
@@ -81,6 +83,15 @@ export async function handleStateNotice(mail: InboundMailInput): Promise<Handled
         const id = "id" in r ? r.id : null;
         if (r.outcome === "cancelled") return done("cancelled", id, "cancelled", true);
         if (r.outcome === "unverified" || r.outcome === "needs_review") return done("cancel_held", id, "cancel_held", true);
+        if (r.outcome === "no_job") return done("no_job", null, "no_job", true);
+        return done(r.outcome === "failed" ? "failed" : "already_closed", id, r.outcome === "failed" ? "failed" : "unchanged", true);
+      }
+      case "state_unable_to_fill": {
+        await record();
+        const r = await processStateUnableToFill({ srn: srn ?? "", senderEmail: mail.senderEmail, authenticated: mail.authenticated, at: classification.cancelledAt ? new Date(classification.cancelledAt) : null });
+        const id = "id" in r ? r.id : null;
+        if (r.outcome === "returned") return done("returned", id, "returned", true);
+        if (r.outcome === "unverified" || r.outcome === "needs_review") return done("unable_held", id, "unable_held", true);
         if (r.outcome === "no_job") return done("no_job", null, "no_job", true);
         return done(r.outcome === "failed" ? "failed" : "already_closed", id, r.outcome === "failed" ? "failed" : "unchanged", true);
       }

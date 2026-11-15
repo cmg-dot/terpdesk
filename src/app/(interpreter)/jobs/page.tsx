@@ -3,6 +3,7 @@
 import { settingLabel } from "@/lib/settingLabel";
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import { HoursOverdueBanner } from "@/components/interpreter/HoursOverdueBanner";
 import { RefreshCw, MapPin } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { useGlobalState } from "@/context/GlobalContext";
@@ -174,6 +175,8 @@ export default function InterpreterJobsPage() {
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased">
     
+      <HoursOverdueBanner />
+
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pt-4">
         <div>

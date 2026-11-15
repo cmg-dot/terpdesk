@@ -1159,7 +1159,7 @@ export default function EditRequestPage() {
  <div className="mt-6">
  <Field 
  label="ODHH access code"
- subtext="Staff only — never shown to interpreters or included in notifications. Pilot: enter fictional values only; this app is not approved for real Medicaid or patient data."
+ subtext="Staff only — never shown to interpreters or included in notifications."
  >
  <input type="text" className={inputClass} value={formData.odhhAccessCode} onChange={(e) => handleChange("odhhAccessCode", e.target.value)} />
  </Field>

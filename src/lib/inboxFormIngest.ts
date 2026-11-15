@@ -26,7 +26,7 @@ export interface InboxMail {
   receivedAt?: Date;
 }
 
-export type InboxIngestResult = "created" | "filled" | "unchanged" | "skipped" | "failed" | "voided" | "void_held" | "void_ignored" | "cancelled" | "cancel_held" | "flagged" | "noted" | "no_job";
+export type InboxIngestResult = "created" | "filled" | "unchanged" | "skipped" | "failed" | "voided" | "void_held" | "void_ignored" | "cancelled" | "cancel_held" | "returned" | "unable_held" | "flagged" | "noted" | "no_job";
 
 export async function ingestInboxStateForm(mail: InboxMail): Promise<InboxIngestResult> {
   const text = mail.bodyText ?? "";

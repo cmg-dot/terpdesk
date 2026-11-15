@@ -52,6 +52,9 @@ import type { ClientWithStats } from "@/app/actions/clients";
 import { ClientAssignmentBanner } from "@/components/features/ClientAssignmentBanner";
 import { normalizeClientType } from "@/lib/validation/client";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { buildOdhhConfirmUrl } from "@/lib/odhhPortal";
+import { extrasFromRequest } from "@/lib/requestFormExtras";
+import { providerOneFromStateText } from "@/lib/providerOne";
 import { hasSubmittedHours, isOnsiteSignatureRequired } from "@/lib/onsiteSignature";
 import { cancelRequestFlagOf } from "@/lib/cancelRequestFlag";
 import { asBillingModifier } from "@/lib/validation/billingFields";
@@ -506,6 +509,8 @@ export default function AssignmentDetailPage() {
  const requestSrnValue = requestSrn(foundRequest);
  const where = requestWhere(foundRequest);
  const isStateRequest = isStateJobRequest({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data });
+ // The WA # on the state's form (Section 5 of the private notes), offered in Staffing for older jobs that never saved one.
+ const providerOneOnForm = extrasFromRequest(foundRequest?.data, foundRequest?.privateNotes).extras.providerOneNumber || providerOneFromStateText(typeof foundRequest?.privateNotes === 'string' ? foundRequest.privateNotes : '') || '';
  const whenText = formatDetailsDate(assignment.startsAt, assignment.endsAt, assignment.details?.timeZone || assignment.timeZone);
  const showMissingAddress = where.missingAddress && !where.virtual && where.text !== 'Location pending';
 
@@ -777,7 +782,7 @@ export default function AssignmentDetailPage() {
  <OriginalFormCard requestId={String(foundRequest?.id || id)} srn={requestSrnValue} />
 
  {/* Staffing and booking, directly under the form. */}
- {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} clientDob={textOf(foundRequest?.data?.intake?.clientDob)} onClientDobSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), clientDob: value } } } : prev))} billingModifier={asBillingModifier(foundRequest?.data?.intake?.billingModifier)} onBillingModifierSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), billingModifier: value } } } : prev))} />}
+ {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} clientDob={textOf(foundRequest?.data?.intake?.clientDob)} onClientDobSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), clientDob: value } } } : prev))} billingModifier={asBillingModifier(foundRequest?.data?.intake?.billingModifier)} onBillingModifierSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), billingModifier: value } } } : prev))}  providerOne={textOf(foundRequest?.data?.intake?.providerOneNumber)} providerOneSuggested={providerOneOnForm} onProviderOneSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), providerOneNumber: value } } } : prev))} odhh={isStateRequest ? { srn: textOf(foundRequest?.data?.intake?.odhhSrn), accessCode: textOf(foundRequest?.data?.intake?.odhhAccessCode) } : null} />}
 
  {!isCancelled && !isStateRequest && (
  <OnsiteSignatureSetting
@@ -1033,7 +1038,7 @@ export default function AssignmentDetailPage() {
  </div>
  </div>
  <a 
- href={`https://fortress.wa.gov/dshs/odhhapps/interpreters/servicerequest.aspx?id=${foundRequest.data.intake.odhhSrn}`}
+ href={buildOdhhConfirmUrl(foundRequest.data.intake.odhhSrn)}
  target="_blank"
  rel="noopener noreferrer"
  className="inline-block mt-4 rounded-full px-5 py-2.5 text-sm font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest-bright-hover)] transition-colors"
@@ -1367,7 +1372,7 @@ export default function AssignmentDetailPage() {
  
  <div className="mb-6 space-y-4">
  <div>
- <label className="block text-sm text-gray-600 mb-2">Internal reason (agency only)</label>
+ <label className="block text-sm text-gray-600 mb-2">Internal note (optional, agency only)</label>
  <input 
  type="text" 
  value={cancelReasonInput}
@@ -1397,9 +1402,8 @@ export default function AssignmentDetailPage() {
  Keep this appointment
  </button>
  <button 
- onClick={confirmCancelAppointment} 
- disabled={!cancelReasonInput.trim()}
- className={`w-full sm:w-auto px-5 py-2.5 rounded-full text-[15px] font-medium transition-colors ${!cancelReasonInput.trim() ? 'bg-[#E5B5B0] text-white opacity-70 cursor-not-allowed' : 'bg-[#C28C84] text-white hover:bg-[#B37C74]'}`}
+ onClick={confirmCancelAppointment}
+ className="w-full sm:w-auto px-5 py-2.5 rounded-full text-[15px] font-medium transition-colors bg-[#C28C84] text-white hover:bg-[#B37C74]"
  >
  Cancel all positions
  </button>

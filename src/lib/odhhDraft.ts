@@ -2,6 +2,7 @@ import type { RequestData } from "@/db/schema";
 import { FORMAT_LABELS, ODHH_PROGRAM, ODHH_TIME_ZONE_LABEL, type ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { contactMethodText, stateFlagsLine, type FormExtras } from "@/lib/odhhFormFields";
 import { liftMeetingFromNote } from "@/lib/odhhLocationParse";
+import { providerOneFromStateText } from "@/lib/providerOne";
 
 /**
  * What a state request email says, as the app's request data. Used twice: to make the draft request when the email is
@@ -47,6 +48,7 @@ export function buildDraftData(input: DraftInput): RequestData {
   const lifted = !parsed.meetingLink && parsed.format === "virtual" ? liftMeetingFromNote(extras.parking) : null;
   const meetingLink = parsed.meetingLink ?? lifted?.meetingLink ?? null;
   const parking = lifted ? lifted.rest : extras.parking;
+  const providerOne = providerOneFromStateText(parsed.clientInfoBlock) ?? providerOneFromStateText(rawContent);
 
   return {
     brief: {},
@@ -59,6 +61,8 @@ export function buildDraftData(input: DraftInput): RequestData {
       ...(extras.bookingPeriod ? { bookingPeriod: extras.bookingPeriod } : {}),
       ...(extras.isPublic !== null ? { isPublic: extras.isPublic } : {}),
       ...(extras.isMixedGroup !== null ? { isMixedGroup: extras.isMixedGroup } : {}),
+      // The client's WA # (staff-only, like the rest of section 5), so Staffing shows it without anyone retyping it.
+      ...(providerOne ? { providerOneNumber: providerOne } : {}),
     },
     details: {
       timeZone: ODHH_TIME_ZONE_LABEL,

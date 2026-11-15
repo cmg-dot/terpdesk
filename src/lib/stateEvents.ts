@@ -58,7 +58,7 @@ export interface StateEventInput {
  * the Lambda's /api/intake (no Message-ID, so keyed by a fingerprint). The Message-ID key can never see that they are the same email,
  * so each notice was recorded twice, up to about a minute apart. Requester replies are left out: two replies are two emails.
  */
-const TWIN_CHECKED_KINDS: ReadonlySet<InboundKind> = new Set<InboundKind>(["state_in_process", "state_cancellation"]);
+const TWIN_CHECKED_KINDS: ReadonlySet<InboundKind> = new Set<InboundKind>(["state_in_process", "state_cancellation", "state_unable_to_fill"]);
 /** How far apart two copies of one notice may arrive and still count as the same notice. */
 export const TWIN_WINDOW_MS = 10 * 60 * 1000;
 
@@ -90,7 +90,7 @@ export async function recordStateEvent(event: StateEventInput): Promise<boolean>
             eq(stateSrnEvents.authenticated, event.authenticated),
             gte(stateSrnEvents.receivedAt, new Date(event.receivedAt.getTime() - TWIN_WINDOW_MS)),
             lte(stateSrnEvents.receivedAt, new Date(event.receivedAt.getTime() + TWIN_WINDOW_MS)),
-            event.kind === "state_cancellation" ? eq(stateSrnEvents.occurredAt, event.occurredAt) : undefined,
+            event.kind === "state_cancellation" || event.kind === "state_unable_to_fill" ? eq(stateSrnEvents.occurredAt, event.occurredAt) : undefined,
           ),
         )
         .limit(1);

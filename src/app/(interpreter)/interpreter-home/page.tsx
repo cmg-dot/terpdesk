@@ -5,6 +5,7 @@ import React from "react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { VerificationBanners } from "@/components/features/VerificationBanners";
+import { HoursOverdueBanner } from "@/components/interpreter/HoursOverdueBanner";
 import { getConnectedAgencyCount } from "@/app/actions/agencyConnections";
 import { Calendar, MapPin, Clock, X, AlertCircle } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
@@ -282,6 +283,8 @@ export default function InterpreterHomePage() {
   )}
 
   <VerificationBanners />
+
+  <HoursOverdueBanner />
 
   {/* Header */}
  <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pt-4">

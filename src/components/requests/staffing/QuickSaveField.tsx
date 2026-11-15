@@ -25,6 +25,10 @@ interface Props {
   failureText: string;
   /** Save as soon as the box loses focus (when something changed), so nothing is lost by tabbing away. Save and Enter still work. */
   saveOnBlur?: boolean;
+  /** A value found elsewhere (e.g. on the state's form) to start the box with when nothing is saved yet; it is kept only once saved. */
+  suggested?: string;
+  /** A soft check: the note shown under the box for the typed value (it never blocks saving). */
+  warn?: (draft: string) => string | null;
 }
 
 /**
@@ -32,9 +36,9 @@ interface Props {
  * locked while an offer is out or an interpreter is booked). Clearing the box and saving removes the value. Used for the client's
  * name and the prior-authorization number, so both behave identically.
  */
-export function QuickSaveField({ label, note, placeholder, maxLength, value, save, onSaved, savedText, clearedText, dataAttribute, failureText, saveOnBlur = false }: Props) {
+export function QuickSaveField({ label, note, placeholder, maxLength, value, save, onSaved, savedText, clearedText, dataAttribute, failureText, saveOnBlur = false, suggested = "", warn }: Props) {
   const [saved, setSaved] = useState(value);
-  const [draft, setDraft] = useState(value);
+  const [draft, setDraft] = useState(value || suggested);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
   const inputId = useId();
@@ -83,8 +87,8 @@ export function QuickSaveField({ label, note, placeholder, maxLength, value, sav
           {saving ? "Saving…" : "Save"}
         </button>
       </div>
-      <p role="status" aria-live="polite" className={`mt-2 min-h-[1.25rem] text-xs ${message?.kind === "error" ? "text-red-700" : "text-emerald-800"}`}>
-        {message?.text ?? ""}
+      <p role="status" aria-live="polite" className={`mt-2 min-h-[1.25rem] text-xs ${message?.kind === "error" ? "text-red-700" : message ? "text-emerald-800" : "text-amber-800"}`}>
+        {message?.text ?? (saved === "" && suggested !== "" && draft === suggested ? "Found on the state's form. Press Save to keep it." : warn?.(draft) ?? "")}
       </p>
     </div>
   );
