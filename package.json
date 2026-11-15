@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "NEXTAUTH_URL=https://terpdesk.vercel.app next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "seed:demo": "tsx scripts/seed-demo-agency.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1154.0",
@@ -52,6 +53,7 @@
     "eslint-config-next": "14.2.14",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.13",
+    "tsx": "^4.23.15",
     "typescript": "^5"
   }
 }

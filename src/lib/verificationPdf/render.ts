@@ -3,6 +3,8 @@ import type { PDFFont, PDFImage, PDFPage } from "pdf-lib";
 import { ASL_MARK_BOX, ASL_MARK_PNG_BASE64 } from "@/lib/verificationPdf/logoAsset";
 import { cleanLine, fitBlock, fitOneLine, wrapText } from "@/lib/verificationPdf/text";
 import type { VerificationPdfData } from "@/lib/verificationPdf/types";
+import { invoiceLetterhead } from "@/lib/verificationPdf/letterhead";
+import type { Letterhead } from "@/lib/verificationPdf/letterhead";
 
 /**
  * Draws Kari Owen's "Independent Contractor Invoice" on one US Letter page. Every position below was measured from her Word
@@ -77,17 +79,21 @@ function signature(ctx: Ctx, image: PDFImage | null, box: { x: number; top: numb
   ctx.page.drawImage(image, { x: box.x + (box.width - width) / 2, y: PAGE.height - box.top - box.height + (box.height - height) / 2, width, height });
 }
 
-function drawHeader(ctx: Ctx, mark: PDFImage): void {
-  ctx.page.drawImage(mark, { x: ASL_MARK_BOX.x, y: PAGE.height - ASL_MARK_BOX.top - ASL_MARK_BOX.height, width: ASL_MARK_BOX.width, height: ASL_MARK_BOX.height });
-  put(ctx, "ASL Professionals", 189 + HANG, ASL_BASELINE_TOP, 36, { bold: true });
-  put(ctx, "American Sign Language Interpreting Service", 190.8 + HANG, 89.4, 14, { bold: true });
-  put(ctx, "Kari Owen", 101.4 + HANG, 135.6, 11, { bold: true });
-  put(ctx, "Owner", 111 + HANG, 148.2, 9);
-  put(ctx, "(253) 759-7653 Voice", 480 + HANG, 135.6, 10);
-  put(ctx, "(509) 895-7136 Fax", 482.4 + HANG, 148.2, 9);
-  const email = "aslprofessionals@comcast.net";
-  put(ctx, email, 481.8 + HANG, 158.4, 9, { color: LINK_BLUE });
-  rule(ctx, 481.8 + HANG, 481.8 + HANG + ctx.regular.widthOfTextAtSize(email, 9), 158.4, 9, 0.5, LINK_BLUE);
+/** Kari's letterhead sits right of her mark; one without the mark starts at the page margin instead. */
+function drawHeader(ctx: Ctx, mark: PDFImage | null, lh: Letterhead): void {
+  if (mark) ctx.page.drawImage(mark, { x: ASL_MARK_BOX.x, y: PAGE.height - ASL_MARK_BOX.top - ASL_MARK_BOX.height, width: ASL_MARK_BOX.width, height: ASL_MARK_BOX.height });
+  const nameX = mark ? 189 + HANG : 54;
+  const name = fitOneLine(ctx.bold, lh.name, 36, RIGHT_EDGE - nameX, 18);
+  put(ctx, name.text, nameX, ASL_BASELINE_TOP, name.size, { bold: true });
+  put(ctx, lh.tagline, mark ? 190.8 + HANG : 54, 89.4, 14, { bold: true });
+  put(ctx, lh.contactName, 101.4 + HANG, 135.6, 11, { bold: true });
+  put(ctx, lh.contactTitle, 111 + HANG, 148.2, 9);
+  put(ctx, lh.phone, 480 + HANG, 135.6, 10);
+  put(ctx, lh.fax, 482.4 + HANG, 148.2, 9);
+  if (lh.email) {
+    put(ctx, lh.email, 481.8 + HANG, 158.4, 9, { color: LINK_BLUE });
+    rule(ctx, 481.8 + HANG, 481.8 + HANG + ctx.regular.widthOfTextAtSize(lh.email, 9), 158.4, 9, 0.5, LINK_BLUE);
+  }
   put(ctx, "Independent Contractor Invoice", 202.8 + HANG, 199.8, 16, { bold: true });
 }
 
@@ -163,8 +169,8 @@ function drawSignatures(ctx: Ctx, d: VerificationPdfData, images: { interpreter:
   if (overflow) put(ctx, "(Notes continue on page 2)", 54, 624.5, 8, { color: GREY });
 }
 
-function drawFooter(ctx: Ctx, electronic: boolean): void {
-  put(ctx, "Send completed invoice to: ASL Professionals, P O Box 265  Henderson, TN  38340", 95.4 + HANG, 711.6, 9);
+function drawFooter(ctx: Ctx, electronic: boolean, lh: Letterhead): void {
+  put(ctx, `Send completed invoice to: ${lh.sendTo}`, 95.4 + HANG, 711.6, 9);
   put(ctx, "To receive payment invoice must be received within 30 days from above date.", 67.8, 721.8, 9);
   if (electronic) put(ctx, "Signatures were captured electronically in terpDESK.", 67.8, 748, 7, { color: GREY });
 }
@@ -183,27 +189,27 @@ function drawContinuation(doc: PDFDocument, fonts: Pick<Ctx, "regular" | "bold">
 }
 
 /** The finished PDF. Throws when a signature image is not a PNG; everything else that is missing is simply left blank. */
-export async function renderVerificationPdf(data: VerificationPdfData): Promise<Uint8Array> {
+export async function renderVerificationPdf(data: VerificationPdfData, lh: Letterhead = invoiceLetterhead()): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   doc.setTitle("Independent Contractor Invoice");
-  doc.setAuthor("ASL Professionals");
+  doc.setAuthor(lh.name);
   doc.setCreator("terpDESK");
   doc.setProducer("terpDESK");
   doc.setCreationDate(new Date());
   const regular = await doc.embedFont(StandardFonts.TimesRoman);
   const bold = await doc.embedFont(StandardFonts.TimesRomanBold);
-  const mark = await doc.embedPng(Buffer.from(ASL_MARK_PNG_BASE64, "base64"));
+  const mark = lh.showMark ? await doc.embedPng(Buffer.from(ASL_MARK_PNG_BASE64, "base64")) : null;
   const images = {
     interpreter: await embedPng(doc, data.interpreterSignature, "interpreter's signature"),
     authorized: await embedPng(doc, data.authorizedSignature, "on-site contact's signature"),
   };
 
   const ctx: Ctx = { page: doc.addPage([PAGE.width, PAGE.height]), regular, bold };
-  drawHeader(ctx, mark);
+  drawHeader(ctx, mark, lh);
   drawDetails(ctx, data);
   const overflow = drawTimes(ctx, data) === 1;
   drawSignatures(ctx, data, images, overflow);
-  drawFooter(ctx, Boolean(images.interpreter || images.authorized));
+  drawFooter(ctx, Boolean(images.interpreter || images.authorized), lh);
   if (overflow) drawContinuation(doc, { regular, bold }, data.notes);
   return doc.save();
 }

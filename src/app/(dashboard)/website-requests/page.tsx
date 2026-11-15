@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 export default function WebsiteRequestsPage() {
  return (
@@ -21,7 +22,7 @@ export default function WebsiteRequestsPage() {
  </svg>
  <h3 className="font-medium text-[var(--ink)] mt-4 text-base">No website requests yet</h3>
  <p className="text-[var(--sage)] text-sm mt-1">
- New requests from the gated ASL Professionals site will appear here.
+ New requests from the gated {DEFAULT_AGENCY_NAME} site will appear here.
  </p>
  </div>
  </motion.div>

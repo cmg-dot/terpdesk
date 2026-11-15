@@ -8,7 +8,11 @@ import {
 } from "@/lib/emailTemplate";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 
-const SENDER = "dispatch@aslprofessionals.net";
+/**
+ * Production sends as ASL Professionals' dispatch address. Another deployment (the demo) sets EMAIL_FROM_ADDRESS to its own
+ * SES-verified sender, so its mail, and any reply to it, never involves the agency's real mailbox.
+ */
+const SENDER = process.env.EMAIL_FROM_ADDRESS?.trim() || "dispatch@aslprofessionals.net";
 
 export const sendEmail = async (to: string, subject: string, html: string, text: string): Promise<void> => {
   // Global Silent Mode: a server-only switch (read at call time) that suppresses every outbound email, e.g. during a bulk import.
@@ -18,6 +22,11 @@ export const sendEmail = async (to: string, subject: string, html: string, text:
   }
   // Bulk-imported people with no email on file hold a placeholder on a reserved domain: never send to it.
   if (isPlaceholderEmail(to)) return;
+  // The demo deployment must never send as the production agency: without its own sender it sends nothing at all.
+  if (process.env.NEXT_PUBLIC_DEMO_MODE === "true" && !process.env.EMAIL_FROM_ADDRESS?.trim()) {
+    console.warn("Demo mode without EMAIL_FROM_ADDRESS: email suppressed");
+    return;
+  }
   const ses = new SESClient({
     region: process.env.AWS_REGION || process.env.AWS_DEFAULT_REGION || "us-west-2",
   });

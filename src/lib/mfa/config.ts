@@ -8,8 +8,10 @@
  *                       already-enrolled login cannot be verified, so it is refused rather than let in.
  */
 
-/** The name an authenticator app shows beside the account. */
-export const MFA_ISSUER = "terpDESK (ASL Professionals)";
+import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
+
+/** The name an authenticator app shows beside the account ("terpDESK (ASL Professionals)" in production). */
+export const MFA_ISSUER = `terpDESK (${DEFAULT_AGENCY_NAME})`;
 
 export const mfaFeatureEnabled = (): boolean => (process.env.MFA_ENABLED ?? "true").trim().toLowerCase() !== "false";
 

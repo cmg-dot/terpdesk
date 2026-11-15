@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 import Link from "next/link";
 import { LoginBrandPanel, LoginMobileBrand } from "@/components/auth/LoginBrandPanel";
 import { LoginMascotProvider } from "@/components/auth/LoginMascotContext";
+import { DEMO_ENTRY_URL, IS_DEMO_MODE } from "@/lib/demoMode";
 
 const DEFAULT_BRAND_COPY = "One sign-in for agency teams and the interpreters they work with.";
 
@@ -50,15 +51,20 @@ export function LoginShell({
   );
 }
 
+/** Production: a link to the separate demo deployment (NEXT_PUBLIC_DEMO_URL). On the demo itself: a note that the data is fictional. */
 const DemoFooter = () => (
   <div className="mt-6 text-center text-xs lg:text-sm text-slate-700">
-    <p>
-      Curious about terpDESK?{" "}
-      <Link href="/demo" className="font-medium text-slate-700 underline decoration-slate-400 underline-offset-4 hover:text-[var(--ink)]">
-        Explore the demo
-      </Link>{" "}
-      — fictional sample data, nothing saved.
-    </p>
+    {IS_DEMO_MODE ? (
+      <p>You are in the terpDESK demo sandbox: every agency, client and interpreter here is fictional.</p>
+    ) : (
+      <p>
+        Curious about terpDESK?{" "}
+        <Link href={DEMO_ENTRY_URL} className="font-medium text-slate-700 underline decoration-slate-400 underline-offset-4 hover:text-[var(--ink)]">
+          Explore the demo
+        </Link>{" "}
+        — a sandbox agency with fictional sample data.
+      </p>
+    )}
   </div>
 );
 

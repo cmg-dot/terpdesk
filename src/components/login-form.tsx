@@ -8,6 +8,8 @@ import { useLoginFlow } from "@/hooks/useLoginFlow";
 import { LoginCredentialsStep } from "@/components/auth/LoginCredentialsStep";
 import { LoginMfaStep } from "@/components/auth/LoginMfaStep";
 import { LoginFormError } from "@/components/auth/LoginFormError";
+import { DemoCredentialsBanner } from "@/components/auth/DemoCredentialsBanner";
+import type { DemoLogin } from "@/lib/demoMode";
 
 const EASE = [0.4, 0, 0.2, 1] as const;
 /**
@@ -28,15 +30,25 @@ export function LoginForm({ portal }: { portal: AppRole }) {
   const {
     register,
     getValues,
+    setValue,
     setFocus,
     formState: { errors, isSubmitting },
   } = flow.form;
   const focusCode = useCallback(() => setFocus("code"), [setFocus]);
+  // Demo deployment only: the sandbox login goes into the fields, ready for "Sign in".
+  const fillDemoLogin = useCallback(
+    ({ email, password }: DemoLogin) => {
+      setValue("email", email, { shouldValidate: true });
+      setValue("password", password, { shouldValidate: true });
+    },
+    [setValue],
+  );
   const error = <LoginFormError message={flow.formError} portal={portal} />;
   const direction = flow.step === "mfa" ? 1 : -1;
 
   return (
     <form onSubmit={flow.submit}>
+      {flow.step === "credentials" && <DemoCredentialsBanner portal={portal} disabled={isSubmitting || flow.welcomed} onUse={fillDemoLogin} />}
       <AnimatePresence mode="wait" initial={false} custom={direction}>
         <motion.div key={flow.step} custom={direction} variants={reduce ? FADE : STEP} initial="enter" animate="shown" exit="leave">
           {flow.step === "mfa" ? (
