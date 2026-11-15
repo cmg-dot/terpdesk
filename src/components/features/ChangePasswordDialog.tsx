@@ -75,7 +75,7 @@ export const ChangePasswordDialog = ({ triggerClassName }: { triggerClassName?: 
         {done ? (
           <>
             <p role="status" className="rounded-xl bg-green-50 px-4 py-3 text-sm text-green-800">
-              Your password has been changed.
+              Your password has been changed. Any other device that was signed in has been signed out.
             </p>
             <DialogFooter>
               <button

@@ -5,8 +5,11 @@ import { and, count, eq, gt } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { auditLogs, users } from "@/db/schema";
+import { sendPasswordChangedEmail } from "@/lib/accountEmail";
 import { writeAuditLog } from "@/lib/audit";
 import { requireSession } from "@/lib/auth/guards";
+import { currentSessionId, endSessions } from "@/lib/auth/sessionRevocation";
+import { getBaseUrl } from "@/lib/baseUrl";
 import { passwordSchema } from "@/lib/validation/password";
 
 const changePasswordSchema = z
@@ -25,7 +28,10 @@ export type ChangePasswordResult = { success: true } | { success: false; error: 
 const MAX_FAILED_ATTEMPTS = 5;
 const WINDOW_MS = 15 * 60 * 1000;
 
-/** Any signed-in user changing their own password. The target account always comes from the session. */
+/**
+ * Any signed-in user changing their own password. The target account always comes from the session. Their other sessions end and
+ * a notice goes to the account's address (self-triggered, so never muted by the agency's switch).
+ */
 export async function changePassword(input: ChangePasswordInput): Promise<ChangePasswordResult> {
   let session;
   try {
@@ -67,9 +73,17 @@ export async function changePassword(input: ChangePasswordInput): Promise<Change
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 12);
-    await db.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+    // This session stays signed in; every other session of the login ends (a stolen one included).
+    const keep = await currentSessionId();
+    await db.transaction(async (tx) => {
+      await tx.update(users).set({ passwordHash, updatedAt: new Date() }).where(eq(users.id, userId));
+      await endSessions(tx, userId, keep);
+    });
 
     await writeAuditLog({ userId, userEmail, action: "password_changed", details: "self-service" });
+    if (userEmail) {
+      await sendPasswordChangedEmail({ to: userEmail, name: session.user.name ?? "there", via: "settings", resetUrl: `${getBaseUrl()}/reset-password` });
+    }
     return { success: true };
   } catch (err) {
     const code = (err as { code?: string } | null)?.code ?? "unknown";

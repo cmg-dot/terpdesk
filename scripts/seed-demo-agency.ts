@@ -103,6 +103,8 @@ async function main(): Promise<void> {
         if (list) await tx.execute(sql.raw(`TRUNCATE TABLE ${list} RESTART IDENTITY CASCADE`));
         // Newer roster columns the app also adds at runtime (src/lib/agencyInterpreterColumns.ts); Drizzle inserts name them all.
         await tx.execute(sql`ALTER TABLE agency_interpreters ADD COLUMN IF NOT EXISTS email_notifications_enabled BOOLEAN NOT NULL DEFAULT false`);
+        // Session revocation (src/db/migrations/manual/0011_user_security.sql), so a fresh demo database has it too.
+        await tx.execute(sql`CREATE TABLE IF NOT EXISTS user_security (user_id uuid PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE, sessions_valid_after timestamptz NOT NULL, kept_session_id text)`);
 
         await tx.insert(schema.users).values(people.users);
         await tx.insert(schema.interpreters).values(people.interpreters);

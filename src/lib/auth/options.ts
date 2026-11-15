@@ -1,5 +1,5 @@
 import bcrypt from "bcryptjs";
-import { and, count, eq, gt, sql } from "drizzle-orm";
+import { and, count, eq, gt, max, sql } from "drizzle-orm";
 import type { NextAuthOptions } from "next-auth";
 import type { JWT } from "next-auth/jwt";
 import CredentialsProvider from "next-auth/providers/credentials";
@@ -13,6 +13,7 @@ import { LOCKED_MESSAGE, WRONG_PORTAL_MESSAGES } from "@/lib/auth/messages";
 import { isAppRole } from "@/lib/auth/routes";
 import { writeAuditLog } from "@/lib/audit";
 import { isIdleExpired, isTouchUpdate } from "@/lib/auth/idle";
+import { isSessionRevoked, newSessionId, SESSION_REVOKED } from "@/lib/auth/sessionRevocation";
 import { enforceSecondFactor } from "@/lib/mfa/loginGate";
 import { themeForRole } from "@/lib/theme";
 import { readSavedTheme } from "@/lib/themeStore";
@@ -82,7 +83,14 @@ export const authOptions: NextAuthOptions = {
         const { email, password, portal, code } = parsed.data;
 
         // Brute-force protection: checked before any password work, and by submitted email, so an
-        // unknown address is locked exactly like a real one (no way to tell them apart).
+        // unknown address is locked exactly like a real one (no way to tell them apart). A completed password reset
+        // proves the person owns the address, so failures from before it no longer count.
+        const [lastReset] = await db
+          .select({ at: max(auditLogs.createdAt) })
+          .from(auditLogs)
+          .where(and(eq(auditLogs.action, "password_reset_completed"), eq(auditLogs.userEmail, email)));
+        const windowStart = new Date(Date.now() - LOCKOUT_WINDOW_MS);
+        const resetAt = lastReset?.at ? new Date(lastReset.at) : null;
         const [recent] = await db
           .select({ failures: count() })
           .from(auditLogs)
@@ -90,7 +98,7 @@ export const authOptions: NextAuthOptions = {
             and(
               eq(auditLogs.action, "login_failed"),
               eq(auditLogs.userEmail, email),
-              gt(auditLogs.createdAt, new Date(Date.now() - LOCKOUT_WINDOW_MS)),
+              gt(auditLogs.createdAt, resetAt && resetAt > windowStart ? resetAt : windowStart),
             ),
           );
         if (Number(recent?.failures ?? 0) >= MAX_FAILED_ATTEMPTS) throw new Error(LOCKED_MESSAGE);
@@ -144,13 +152,22 @@ export const authOptions: NextAuthOptions = {
         token.interpreterId = user.interpreterId ?? null;
         token.displayName = undefined;
         token.lastActivityAt = Date.now();
-      } else if (token.role === "interpreter" && !token.interpreterId && token.id) {
-        // Not linked at sign-in. Re-check, so verifying the email link takes effect without signing in again.
-        // (Costs one small query per request, and only until the profile is linked.)
-        const [linked] = await db.select({ id: interpreters.id }).from(interpreters).where(eq(interpreters.userId, token.id)).limit(1);
-        if (linked) {
-          token.interpreterId = linked.id;
-          token.displayName = undefined;
+        token.sid = newSessionId();
+        token.authAt = Date.now();
+      } else {
+        // Ended by a password reset or change made after this sign-in (one primary-key lookup per request). Throwing makes
+        // NextAuth treat the request as signed out and clear the cookie.
+        if (await isSessionRevoked(token)) throw new Error(SESSION_REVOKED);
+        // A session from before session ids existed gets one, so a later password change can keep it.
+        if (!token.sid) token.sid = newSessionId();
+        if (token.role === "interpreter" && !token.interpreterId && token.id) {
+          // Not linked at sign-in. Re-check, so verifying the email link takes effect without signing in again.
+          // (Costs one small query per request, and only until the profile is linked.)
+          const [linked] = await db.select({ id: interpreters.id }).from(interpreters).where(eq(interpreters.userId, token.id)).limit(1);
+          if (linked) {
+            token.interpreterId = linked.id;
+            token.displayName = undefined;
+          }
         }
       }
       // The client calls update() after the profile is saved: read the name again instead of trusting the cookie.

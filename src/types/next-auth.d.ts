@@ -36,5 +36,9 @@ declare module "next-auth/jwt" {
     theme?: ThemeId;
     /** ms since 1970 of the last activity the browser reported (sign-in, or an update({ touch: true }) ping). */
     lastActivityAt?: number;
+    /** Random id of this session, stamped at sign-in (see lib/auth/sessionRevocation.ts). */
+    sid?: string;
+    /** ms since 1970 the password was entered for this session; never moved by later re-issues. */
+    authAt?: number;
   }
 }

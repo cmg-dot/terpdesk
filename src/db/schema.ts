@@ -111,6 +111,15 @@ export const userPreferences = pgTable('user_preferences', {
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 });
 
+// Session revocation after a password reset or change (src/db/migrations/manual/0011_user_security.sql, read by
+// src/lib/auth/sessionRevocation.ts). A sign-in token issued before `sessionsValidAfter` is refused, except the one session
+// named in `keptSessionId` (the session that changed its own password). A table of its own so nothing that reads `users` changes.
+export const userSecurity = pgTable('user_security', {
+  userId: uuid('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  sessionsValidAfter: timestamp('sessions_valid_after', { withTimezone: true }).notNull(),
+  keptSessionId: text('kept_session_id'),
+});
+
 // Two-step verification (TOTP authenticator app), opt-in per agency login. Created by hand with
 // src/db/migrations/manual/0007_user_mfa.sql; a table of its own so nothing that reads `users` is affected.
 export const userMfa = pgTable('user_mfa', {
