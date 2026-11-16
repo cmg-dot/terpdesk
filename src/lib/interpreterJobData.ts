@@ -1,5 +1,7 @@
 import { settingLabel } from "@/lib/settingLabel";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
+import { readInterpreterNotes } from "@/lib/interpreterNotes";
+import type { InterpreterNotes } from "@/lib/interpreterNotes";
 
 /**
  * What an interpreter's browser may receive about a job. The raw `requests.data` holds staff-only material (the client's
@@ -48,6 +50,8 @@ export interface InterpreterJobView {
   virtualInstructions: string | null;
   /** The agency's preparation notes for interpreters (never the agency-private notes). Shared once booked. */
   prepNotes: string;
+  /** The agency's pinned booking notes for the team (lib/interpreterNotes.ts). Shared once booked; null otherwise. */
+  interpreterNotes: InterpreterNotes | null;
   /** The state form's "Public" and "Mixed Group" answers (null when it did not say): the job brief, not a person's details. */
   groupFlags: { isPublic: boolean | null; isMixedGroup: boolean | null };
   /** The client's name (details.deafParticipant). Shared ONLY with an interpreter who is booked on the job: null on an offer. */
@@ -122,6 +126,7 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
     passcode: booked ? orNull(passcode) : null,
     virtualInstructions: booked ? orNull(instructions) : null,
     prepNotes: booked ? text(data.prepNotes) : "",
+    interpreterNotes: booked ? readInterpreterNotes(data) : null,
     clientName: booked ? orNull(details.deafParticipant) : null,
     groupFlags: {
       isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,

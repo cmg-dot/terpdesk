@@ -2,6 +2,8 @@ import { positionRole } from "@/lib/positions";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
+import { readInterpreterNotes } from "@/lib/interpreterNotes";
+import type { InterpreterNotes } from "@/lib/interpreterNotes";
 import { formatReference, interpreterReference, srnOf } from "@/utils/statusEngine";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
@@ -53,6 +55,8 @@ export interface JobDetails extends JobSummary {
   /** "SRN #202786433" on a state job, else null (see interpreterReference). SECURE PAGE / in-app only, never an email. */
   stateReference: string | null;
   prepNotes: string;
+  /** The agency's pinned booking notes for the team (lib/interpreterNotes.ts). SECURE PAGE ONLY, never an email. */
+  interpreterNotes: InterpreterNotes | null;
   /** The client's name. Only on this secure page for a booked interpreter (summarizeJob, which feeds every email, never has it). */
   clientName: string;
   /** The state form's "Public" and "Mixed Group" answers (null when it did not say). Part of the job brief, not a person's details. */
@@ -131,6 +135,7 @@ export function jobDetailsFor(request: JobRequestRow, positionNumber?: number): 
     ...summary,
     stateReference: interpreterReference(srnOf(data)),
     prepNotes: text(data.prepNotes),
+    interpreterNotes: readInterpreterNotes(data),
     clientName: text(details.deafParticipant),
     groupFlags: {
       isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,

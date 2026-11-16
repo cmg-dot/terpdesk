@@ -7,6 +7,7 @@ import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { useGlobalState } from "@/context/GlobalContext";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
+import type { InterpreterNotes } from "@/lib/interpreterNotes";
 
 export interface Job {
   id: string;
@@ -55,6 +56,8 @@ export interface Job {
   credentialsLocked?: boolean;
   /** The agency's preparation notes, once the interpreter is booked. */
   prepNotes?: string;
+  /** The agency's pinned booking notes for the team, once the interpreter is booked. */
+  interpreterNotes?: InterpreterNotes | null;
   /** The state form's Public / Mixed Group answers (null when it did not say). */
   groupFlags?: { isPublic: boolean | null; isMixedGroup: boolean | null };
   agencyName?: string;
@@ -126,6 +129,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           clientName: o.clientName || null,
           credentialsLocked: o.credentialsLocked,
           prepNotes: o.prepNotes,
+          interpreterNotes: o.interpreterNotes,
           groupFlags: o.groupFlags,
           agencyName: o.agencyName || DEFAULT_AGENCY_NAME,
           details: o.details || {},

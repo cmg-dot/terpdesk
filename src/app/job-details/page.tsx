@@ -160,6 +160,12 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
               </Card>
             )}
 
+            {access.details.interpreterNotes && (
+              <Card title="Booking notes from the agency">
+                <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700"><LinkifiedText text={access.details.interpreterNotes.text} /></p>
+              </Card>
+            )}
+
             <Card title="Preparation notes">
               <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700">
                 {access.details.prepNotes ? <LinkifiedText text={access.details.prepNotes} /> : "No preparation notes for this job."}

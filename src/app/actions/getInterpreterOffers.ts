@@ -153,6 +153,7 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       virtualInstructions: job.virtualInstructions,
       credentialsLocked: job.credentialsLocked,
       prepNotes: job.prepNotes,
+      interpreterNotes: job.interpreterNotes,
       // The client's name reaches only an interpreter who is booked (null on an offer); see interpreterJobData.ts.
       clientName: job.clientName,
       groupFlags: job.groupFlags,

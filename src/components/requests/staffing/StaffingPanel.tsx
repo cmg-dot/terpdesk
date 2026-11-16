@@ -10,6 +10,7 @@ import type { OdhhIds } from "@/components/requests/staffing/OdhhPortalLinks";
 import { ProviderOneField } from "@/components/requests/staffing/ProviderOneField";
 import { PositionStaffing } from "@/components/requests/staffing/PositionStaffing";
 import { RequestedInterpreterBadge } from "@/components/requests/staffing/RequestedInterpreterBadge";
+import { InterpreterNotesField } from "@/components/requests/staffing/InterpreterNotesField";
 import type { Position, PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
 import { pickByReportName } from "@/lib/verificationPending";
 import type { BillingModifier } from "@/lib/validation/billingFields";
@@ -40,6 +41,8 @@ interface Props {
   onProviderOneSaved: (providerOne: string) => void;
   /** A state job's SRN and access code, for the ODHH portal links (null on other jobs). */
   odhh: OdhhIds | null;
+  /** The job's booking notes for its interpreters (lib/interpreterNotes.ts) and the save hook; omitted = the field is not shown. */
+  interpreterNotes?: { value: string; onSaved: (text: string) => void };
 }
 
 /**
@@ -47,7 +50,7 @@ interface Props {
  * one (send an offer, or book directly). When the state asked for a particular interpreter, that request sits above the controls
  * with a one-click way to choose them.
  */
-export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved, providerOne, providerOneSuggested, onProviderOneSaved, odhh }: Props) {
+export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved, providerOne, providerOneSuggested, onProviderOneSaved, odhh, interpreterNotes }: Props) {
   const requested = requestedInterpreter?.trim() || null;
   const match = useMemo(() => {
     if (!requested) return null;
@@ -78,6 +81,8 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
       </div>
 
       {odhh && <OdhhPortalLinksRow ids={odhh} />}
+
+      {interpreterNotes && <InterpreterNotesField requestId={ctx.requestId} value={interpreterNotes.value} onSaved={interpreterNotes.onSaved} />}
 
       {requested && (
         <RequestedInterpreterBadge

@@ -21,6 +21,7 @@ import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { interpreterReference } from "@/utils/statusEngine";
 import { TeamContactsCard } from "@/components/interpreter/TeamContactsCard";
+import { BookingNotesCard } from "@/components/interpreter/BookingNotesCard";
 import { AcceptOfferDialog } from "@/components/interpreter/AcceptOfferDialog";
 import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
@@ -1457,6 +1458,9 @@ export default function JobDetailPage() {
 
           {/* Where to go: the virtual meeting, the on-site place, or both (a virtual job can have a place too). */}
           <JobPlaceCards job={job} />
+
+          {/* The agency's pinned notes for the booked team (booked only: the server sends none on an offer). */}
+          {job.status === 'booked' && <BookingNotesCard notes={job.interpreterNotes} timeZone={getIanaZone(job.details?.timeZone || job.timeZone)} />}
 
           {/* Card 2 */}
           <CollapsibleCard cardId="preparation-notes" title="Preparation notes">
