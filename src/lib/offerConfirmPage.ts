@@ -8,9 +8,9 @@ import type { JobSummary } from "@/lib/jobSummary";
 export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary }): Response {
   const { token, action, summary: s } = params;
   const accepting = action === "accept";
+  // No reference: the page is opened from an email link, so it shows what the email does (the APT reference is staff-only).
   const rows: [string, string][] = [
-    ["Reference", s.reference],
-    ["Assignment", s.title],
+    ["Assignment", s.emailTitle],
     ["Date", s.dateLabel],
     ["Time", s.timeLabel],
     ["Format", s.format],

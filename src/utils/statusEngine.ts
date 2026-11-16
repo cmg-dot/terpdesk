@@ -50,6 +50,22 @@ export function requestReference(srn: string | null | undefined, id?: string): s
   return clean ? `SRN #${clean}` : formatReference(id);
 }
 
+/** The ODHH SRN saved on a request's data (`intake.odhhSrn`), or null. */
+export function srnOf(data: unknown): string | null {
+  const intake = data && typeof data === "object" ? (data as { intake?: { odhhSrn?: unknown } }).intake : undefined;
+  const srn = typeof intake?.odhhSrn === "string" ? intake.odhhSrn.trim() : "";
+  return srn || null;
+}
+
+/**
+ * How an INTERPRETER sees a job's reference: "SRN #202786433" on a state job, null on any other (the APT reference is the agency's
+ * own and is never shown to interpreters). In the app and on the secure job page only: emails never carry it (security.md).
+ */
+export function interpreterReference(srn: string | null | undefined): string | null {
+  const clean = typeof srn === "string" ? srn.trim() : "";
+  return clean ? `SRN #${clean}` : null;
+}
+
 export function isNeedsReplacementStatus(status?: string | null): boolean {
   return !!status && status.toLowerCase().replace(/[\s_-]+/g, '') === 'needsreplacement';
 }

@@ -1,7 +1,7 @@
 import { formatInTimeZone } from "date-fns-tz";
 import { BUSINESS_ZONE } from "@/lib/businessHours";
 import { buildTerpDeskEmail, emailActionCard, emailDetailsTable, emailHeroButton, escapeHtml } from "@/lib/emailTemplate";
-import { summaryRows, summaryText } from "@/lib/jobEmails";
+import { interpreterEmailTitle, summaryRows, summaryText } from "@/lib/jobEmails";
 import type { JobSummary } from "@/lib/jobSummary";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 
@@ -30,7 +30,7 @@ export function buildHoursOverdueEmail(p: OverdueEmailInput): { subject: string;
       : { line: "Use the timesheet link we emailed you after the assignment, or ask your agency for a new one.", button: null };
   const intro = `Your hours for this assignment were due by ${due} (48 business hours after it ended). ${where.line}`;
   const html = buildTerpDeskEmail({
-    title: `Hours overdue ${s.reference}`,
+    title: interpreterEmailTitle("Hours overdue", s),
     preheader: `Your hours for ${s.dateLabel} are overdue.`,
     bodyContent: `
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">Your hours are overdue</h1>
@@ -48,5 +48,5 @@ export function buildHoursOverdueEmail(p: OverdueEmailInput): { subject: string;
     "",
     "If you already submitted these hours, you can ignore this reminder.",
   ].join("\n");
-  return { subject: `Hours overdue: ${s.reference} - terpDESK`, html, text };
+  return { subject: `${interpreterEmailTitle("Hours overdue", s)} - terpDESK`, html, text };
 }

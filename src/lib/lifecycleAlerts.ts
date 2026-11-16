@@ -4,20 +4,22 @@ import { interpreters, requests, users } from "@/db/schema";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, escapeHtml } from "@/lib/emailTemplate";
-import { summaryRows, summaryText } from "@/lib/jobEmails";
+import { interpreterEmailTitle, summaryRows, summaryText } from "@/lib/jobEmails";
 import { jobDetailsFor } from "@/lib/jobSummary";
 import type { JobSummary } from "@/lib/jobSummary";
 import { logError } from "@/lib/logError";
 import { notifyAgencyAdmins, notifyInterpreter } from "@/lib/notifications";
 import { sendEmail } from "@/lib/timesheetEmail";
+import { interpreterReference } from "@/utils/statusEngine";
 
 /**
  * One place for the booking-lifecycle alerts: each event sends an in-app notification AND an AWS SES email.
  *
  * What goes where (security.md: no PHI in outbound email):
- *  - In-app (inside the signed-in app): reference, date, time and location; staff alerts also carry the ODHH SRN.
- *  - Email: the restricted job summary only (reference, assignment, date, time, format, generic setting, role,
- *    program), never the SRN, an address, notes or a reason, plus a link to sign in for the rest.
+ *  - In-app (inside the signed-in app): date, time and location, with the APT reference and SRN for staff and only the SRN
+ *    (on a state job) for an interpreter.
+ *  - Email: the restricted job summary only (assignment, date, time, format, generic setting, role, program; staff emails
+ *    add the APT reference), never the SRN, an address, notes or a reason, plus a link to sign in for the rest.
  * Never throws: an alert must not undo or block the action that triggered it.
  *
  * SERVER ONLY.
@@ -50,14 +52,13 @@ async function loadContext(requestId: string, positionNumber?: number): Promise<
   return { requestId, summary: details, srn, location };
 }
 
-/** "REF-123 (SRN 1234567) · Tue, Dec 15, 2026 · 8:00 AM – 9:00 AM PST · Harborview" */
-const inAppContext = (ctx: AlertContext, withSrn: boolean): string =>
-  [
-    `${ctx.summary.reference}${withSrn && ctx.srn ? ` (SRN ${ctx.srn})` : ""}`,
-    ctx.summary.dateLabel,
-    ctx.summary.timeLabel,
-    ctx.location,
-  ].join(" · ");
+/** Staff: "APT-1A2B3C (SRN 1234567) · Tue, Dec 15, 2026 · 8:00 AM – 9:00 AM PST · Harborview". */
+const staffContext = (ctx: AlertContext): string =>
+  [`${ctx.summary.reference}${ctx.srn ? ` (SRN ${ctx.srn})` : ""}`, ctx.summary.dateLabel, ctx.summary.timeLabel, ctx.location].join(" · ");
+
+/** Interpreter (in the app): "SRN #1234567 · Tue, Dec 15, 2026 · ..." on a state job; no reference on any other (the APT one is staff-only). */
+const interpreterContext = (ctx: AlertContext): string =>
+  [interpreterReference(ctx.srn), ctx.summary.dateLabel, ctx.summary.timeLabel, ctx.location].filter(Boolean).join(" · ");
 
 const AGENCY_COPY: Record<AgencyAlertEvent, { title: string; did: string; next: string }> = {
   offer_accepted: { title: "Offer accepted", did: "accepted", next: "The interpreter is now booked." },
@@ -95,7 +96,7 @@ export async function alertAgency(params: {
       type: "job",
       href,
       title: copy.title,
-      message: `${name} ${copy.did} ${inAppContext(ctx, true)}. ${copy.next}`,
+      message: `${name} ${copy.did} ${staffContext(ctx)}. ${copy.next}`,
     });
 
     const url = `${getBaseUrl()}${href}`;
@@ -106,10 +107,10 @@ export async function alertAgency(params: {
       bodyContent: `
         <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${escapeHtml(copy.title)}</h1>
         <p style="margin:0 0 4px;">${escapeHtml(name)} ${escapeHtml(copy.did)} booking <strong>${escapeHtml(s.reference)}</strong>. ${escapeHtml(copy.next)}</p>
-        ${emailActionCard(`${emailDetailsTable(summaryRows(s))}<p style="margin:20px 0 0;">${emailButton("Open in terpDESK", url)}</p>`)}
+        ${emailActionCard(`${emailDetailsTable(summaryRows(s, { withReference: true }))}<p style="margin:20px 0 0;">${emailButton("Open in terpDESK", url)}</p>`)}
         <p style="margin:0;font-size:13px;color:#6B7280;">For privacy, the SRN, location and notes are only shown in terpDESK.</p>`,
     });
-    const text = [`${copy.title}: ${s.reference}`, "", `${name} ${copy.did} booking ${s.reference}. ${copy.next}`, "", summaryText(s), "", `Open in terpDESK: ${url}`].join("\n");
+    const text = [`${copy.title}: ${s.reference}`, "", `${name} ${copy.did} booking ${s.reference}. ${copy.next}`, "", summaryText(s, { withReference: true }), "", `Open in terpDESK: ${url}`].join("\n");
 
     const staff = await db.select({ email: users.email }).from(users).where(eq(users.role, "agency"));
     for (const member of staff) await sendSafely(member.email, `${copy.title} ${s.reference} - terpDESK`, html, text, params.event);
@@ -156,14 +157,14 @@ export async function alertInterpreter(params: {
       type: "job",
       href,
       title: copy.title,
-      message: `${inAppContext(ctx, false)}. ${copy.line} ${copy.action(true)}`,
+      message: `${interpreterContext(ctx)}. ${copy.line} ${copy.action(true)}`,
     });
 
     if (!person?.email) return;
     const s = ctx.summary;
     const button = hasLogin ? `<p style="margin:20px 0 0;">${emailButton("Open terpDESK", `${getBaseUrl()}${href}`)}</p>` : "";
     const html = buildTerpDeskEmail({
-      title: `${copy.title} ${s.reference}`,
+      title: interpreterEmailTitle(copy.title, s),
       preheader: `${copy.title}: ${s.dateLabel}.`,
       bodyContent: `
         <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${escapeHtml(copy.title)}</h1>
@@ -171,8 +172,8 @@ export async function alertInterpreter(params: {
         ${emailActionCard(`${emailDetailsTable(summaryRows(s))}${button}`)}
         <p style="margin:0;font-size:13px;color:#6B7280;">For your clients' privacy, location and notes are never sent by email.</p>`,
     });
-    const text = [`${copy.title}: ${s.reference}`, "", copy.line, copy.action(hasLogin), "", summaryText(s)].join("\n");
-    await sendSafely(person.email, `${copy.title} ${s.reference} - terpDESK`, html, text, params.event);
+    const text = [`${interpreterEmailTitle(copy.title, s)}`, "", copy.line, copy.action(hasLogin), "", summaryText(s)].join("\n");
+    await sendSafely(person.email, `${interpreterEmailTitle(copy.title, s)} - terpDESK`, html, text, params.event);
   } catch (err) {
     logError("alertInterpreter", err);
   }

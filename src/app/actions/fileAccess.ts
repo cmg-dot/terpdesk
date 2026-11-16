@@ -13,7 +13,7 @@ import { logError } from "@/lib/logError";
 import { bookedRequestIds } from "@/lib/prepAccess";
 import { StorageNotConfiguredError, presignDownload } from "@/lib/s3";
 import type { InterpreterPrepFile, PrepFile } from "@/lib/validation/file";
-import { formatReference } from "@/utils/statusEngine";
+import { interpreterReference, srnOf } from "@/utils/statusEngine";
 import { resolveRequestTimes } from "@/utils/timezone";
 
 export type DownloadUrlResult = { success: true; url: string } | { success: false; error: string };
@@ -73,14 +73,14 @@ export async function getMyPrepMaterials(): Promise<InterpreterPrepFile[]> {
   if (requestIds.length === 0) return [];
 
   const rows = await db
-    .select({ file: files, requestCreatedAt: requests.createdAt, requestData: requests.data })
+    .select({ file: files, requestCreatedAt: requests.createdAt, requestData: requests.data, requestTitle: requests.title })
     .from(files)
     .innerJoin(requests, eq(requests.id, files.linkedJobId))
     .where(and(inArray(files.linkedJobId, requestIds), eq(files.sharedWithInterpreters, true)))
     .orderBy(desc(files.createdAt));
 
   const result: InterpreterPrepFile[] = [];
-  for (const { file, requestCreatedAt, requestData } of rows) {
+  for (const { file, requestCreatedAt, requestData, requestTitle } of rows) {
     if (!file.linkedJobId) continue;
     let jobStartsAt: string | null = null;
     try {
@@ -88,7 +88,9 @@ export async function getMyPrepMaterials(): Promise<InterpreterPrepFile[]> {
     } catch {
       jobStartsAt = null;
     }
-    result.push({ ...toPrepFile(file), jobId: file.linkedJobId, jobReference: formatReference(file.linkedJobId), jobStartsAt });
+    // The state's SRN on a state job, else the job's title: never the agency's APT reference.
+    const jobLabel = interpreterReference(srnOf(requestData)) ?? (requestTitle?.trim() || "Interpreting assignment");
+    result.push({ ...toPrepFile(file), jobId: file.linkedJobId, jobLabel, jobStartsAt });
   }
   return result;
 }

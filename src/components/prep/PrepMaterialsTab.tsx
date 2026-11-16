@@ -50,7 +50,7 @@ export const PrepMaterialsTab = ({ files }: { files: InterpreterPrepFile[] }) =>
       {jobs.map(([jobId, jobFiles]) => (
         <section key={jobId} className="rounded-2xl border border-gray-200 bg-white p-5">
           <div className="mb-3 flex flex-col gap-0.5 sm:flex-row sm:items-baseline sm:justify-between">
-            <h2 className="text-[16px] font-semibold text-[var(--ink)]">Job {jobFiles[0].jobReference}</h2>
+            <h2 className="text-[16px] font-semibold text-[var(--ink)]">{jobFiles[0].jobLabel}</h2>
             <span className="text-[13px] text-gray-500">{formatJobDate(jobFiles[0].jobStartsAt)}</span>
           </div>
           <ul className="divide-y divide-stone-200 rounded-xl bg-stone-50">

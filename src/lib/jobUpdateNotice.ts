@@ -7,6 +7,7 @@ import { getBaseUrl } from "@/lib/baseUrl";
 import { writeAuditLog } from "@/lib/audit";
 import { buildTerpDeskEmail, emailActionCard, emailButton, escapeHtml } from "@/lib/emailTemplate";
 import { createJobDetailsToken } from "@/lib/jobDetailsToken";
+import { interpreterEmailTitle } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { JobRequestRow, JobSummary } from "@/lib/jobSummary";
 import { notifyInterpreter } from "@/lib/notifications";
@@ -74,11 +75,11 @@ function buildUpdateEmail(s: JobSummary, changes: JobFieldChange[], detailsUrl: 
        </div>`
     : "";
   const html = buildTerpDeskEmail({
-    title: hasChanges ? `Job details updated ${s.reference}` : `Message about ${s.reference}`,
+    title: interpreterEmailTitle(hasChanges ? "Job details updated" : "Message about your booking", s),
     preheader: hasChanges ? `The agency changed your booking for ${s.dateLabel}.` : `The agency sent you a message about your booking for ${s.dateLabel}.`,
     bodyContent: `
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${hasChanges ? "Job details updated" : "A message about your booking"}</h1>
-      <p style="margin:0 0 12px;">${hasChanges ? "The agency changed your booking" : "The agency sent you a note about your booking"} <strong>${escapeHtml(s.reference)}</strong> (${escapeHtml(s.title)}). You're still booked.${hasChanges ? " Here is what changed:" : ""}</p>
+      <p style="margin:0 0 12px;">${hasChanges ? "The agency changed your booking" : "The agency sent you a note about your booking"} <strong>${escapeHtml(s.emailTitle)}</strong> on ${escapeHtml(s.dateLabel)}. You're still booked.${hasChanges ? " Here is what changed:" : ""}</p>
       ${messageBlock}
       ${emailActionCard(`
         ${hasChanges ? `<ul style="margin:0;padding-left:20px;">${items}</ul>` : ""}
@@ -87,7 +88,7 @@ function buildUpdateEmail(s: JobSummary, changes: JobFieldChange[], detailsUrl: 
       <p style="margin:0;font-size:13px;color:#6B7280;">For your clients' privacy, location and meeting details are never sent by email. If the new details don't work for you, contact the agency.</p>`,
   });
   const text = [
-    hasChanges ? `Job details updated: ${s.reference} (${s.title})` : `Message about your booking: ${s.reference} (${s.title})`,
+    hasChanges ? `Job details updated: ${s.emailTitle} on ${s.dateLabel}` : `Message about your booking: ${s.emailTitle} on ${s.dateLabel}`,
     "",
     hasChanges ? "The agency changed your booking. You're still booked. What changed:" : "The agency sent you a note. You're still booked.",
     ...changes.map((c) => `- ${changeLine(c)}`),
@@ -95,7 +96,7 @@ function buildUpdateEmail(s: JobSummary, changes: JobFieldChange[], detailsUrl: 
     "",
     detailsUrl ? `Job details: ${detailsUrl}` : "Sign in to terpDESK to see the job details.",
   ].join("\n");
-  return { subject: hasChanges ? `Job details updated ${s.reference} - terpDESK` : `Message about your booking ${s.reference} - terpDESK`, html, text };
+  return { subject: `${interpreterEmailTitle(hasChanges ? "Job details updated" : "Message about your booking", s)} - terpDESK`, html, text };
 }
 
 async function emailInterpreter(after: JobRequestRow, b: BookedInterpreter, changes: JobFieldChange[], message?: string): Promise<boolean> {

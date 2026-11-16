@@ -2,15 +2,15 @@ import { positionRole } from "@/lib/positions";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatHoursMinutes } from "@/lib/durationFormat";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
-import { formatReference } from "@/utils/statusEngine";
+import { formatReference, interpreterReference, srnOf } from "@/utils/statusEngine";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
 /**
  * Progressive disclosure for job emails.
  *
- * `summarizeJob` returns ONLY what an interpreter may see before accepting (and what goes in any email): reference,
- * title, date/time, format, generic setting, role and broad program type (e.g. "WA ODHH"). No address, client, notes
- * or materials.
+ * `summarizeJob` returns ONLY what an interpreter may see before accepting (and what goes in any email): title, date/time,
+ * format, generic setting, role and broad program type (e.g. "WA ODHH"). No address, client, notes or materials. Its APT
+ * `reference` is for staff emails only: interpreter emails name the job by its date instead.
  * `jobDetailsFor` returns the full picture; it is only rendered on the secure details page after acceptance, never
  * put in an email (security.md: no PHI in outbound email).
  */
@@ -25,9 +25,17 @@ export interface JobRequestRow {
 }
 
 export interface JobSummary {
+  /** The agency's APT reference: staff emails and screens only, never shown to an interpreter. */
   reference: string;
   title: string;
+  /**
+   * The title as an email may show it. A state job's generated title ("ODHH SRN #202787458 — Capitol Clinic") carries the SRN and
+   * the place, which never go in an email, so it reads "WA ODHH assignment" there; any other title is unchanged.
+   */
+  emailTitle: string;
   dateLabel: string;
+  /** "Tue, Nov 18": how an interpreter email names the job in its subject ("Job offer · Tue, Nov 18"). */
+  shortDate: string;
   timeLabel: string;
   /** "1 hr 30 min", or "Time to be confirmed" when the times are unknown. */
   durationLabel: string;
@@ -42,6 +50,8 @@ export interface JobSummary {
 }
 
 export interface JobDetails extends JobSummary {
+  /** "SRN #202786433" on a state job, else null (see interpreterReference). SECURE PAGE / in-app only, never an email. */
+  stateReference: string | null;
   prepNotes: string;
   /** The client's name. Only on this secure page for a booked interpreter (summarizeJob, which feeds every email, never has it). */
   clientName: string;
@@ -54,12 +64,16 @@ export interface JobDetails extends JobSummary {
 
 const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
 
+/** The title odhhDraft.ts generates for a state job: "ODHH SRN #<srn>", optionally followed by " — <venue>". */
+const GENERATED_STATE_TITLE = /^ODHH\s+SRN\s*#/i;
+
 export function summarizeJob(request: JobRequestRow, positionNumber?: number): JobSummary {
   const data = (request.data ?? {}) as LooseData;
   const details = (data.details ?? {}) as LooseData;
   const zone = getIanaZone(details.timeZone || details.timezone || data.timeZone || data.timezone);
 
   let dateLabel = "Date to be confirmed";
+  let shortDate = "Date to be confirmed";
   let timeLabel = "Time to be confirmed";
   let durationLabel = "Time to be confirmed";
   try {
@@ -68,6 +82,7 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     const end = new Date(endsAt);
     if (!Number.isNaN(start.getTime())) {
       dateLabel = formatInTimeZone(start, zone, "EEE, MMM d, yyyy");
+      shortDate = formatInTimeZone(start, zone, "EEE, MMM d");
       if (!Number.isNaN(end.getTime()) && end.getTime() > start.getTime()) durationLabel = formatHoursMinutes((end.getTime() - start.getTime()) / 60000);
       timeLabel = Number.isNaN(end.getTime())
         ? formatInTimeZone(start, zone, "h:mm a zzz")
@@ -82,10 +97,13 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
   const intake = (data.intake ?? {}) as LooseData;
   const rawProgram = text(intake.program) || text(data.program);
   const hasMeetingLink = [details.meetingLink, details.virtualLink, data.meetingLink, data.virtualLink].some((value) => text(value) !== "");
+  const title = text(request.title) || text(details.title) || "Interpreting assignment";
   return {
     reference: formatReference(request.id),
-    title: text(request.title) || text(details.title) || "Interpreting assignment",
+    title,
+    emailTitle: GENERATED_STATE_TITLE.test(title) ? "WA ODHH assignment" : title,
     dateLabel,
+    shortDate,
     timeLabel,
     durationLabel,
     format: rawFormat,
@@ -111,6 +129,7 @@ export function jobDetailsFor(request: JobRequestRow, positionNumber?: number): 
 
   return {
     ...summary,
+    stateReference: interpreterReference(srnOf(data)),
     prepNotes: text(data.prepNotes),
     clientName: text(details.deafParticipant),
     groupFlags: {

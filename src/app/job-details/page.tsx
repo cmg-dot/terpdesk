@@ -87,7 +87,9 @@ export default async function JobDetailsPage({ searchParams }: { searchParams: {
           <>
             <div className="space-y-1 text-center">
               <h1 className="text-[24px] font-semibold tracking-tight">{access.details.title}</h1>
-              <p className="text-[14px] text-[var(--sage)]">Booking {access.details.reference} · Please don&apos;t share this page.</p>
+              <p className="text-[14px] text-[var(--sage)]">
+                {access.details.stateReference ? `${access.details.stateReference} · ` : ""}Please don&apos;t share this page.
+              </p>
             </div>
 
             {messages.length > 0 && (

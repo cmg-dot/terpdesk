@@ -14,16 +14,20 @@ import type { EmailOutcome } from "@/lib/timesheetEmail";
 import { resolveRequestTimes } from "@/utils/timezone";
 
 /**
- * Job emails with progressive disclosure. These emails carry the restricted summary only (reference, title, date and
- * time, format, generic setting, role, broad program type). Addresses, prep notes and materials are never emailed;
+ * Job emails with progressive disclosure. These emails carry the restricted summary only (title, date and time, format,
+ * generic setting, role, broad program type), and no reference: the subject names the job by its date. Addresses, prep notes and materials are never emailed;
  * after acceptance they are on the secure details page that the confirmation links to.
  *
  * SERVER ONLY.
  */
 
-export const summaryRows = (s: JobSummary) => [
-  { label: "Reference", value: s.reference },
-  { label: "Assignment", value: s.title },
+/**
+ * The job's rows in an email. `withReference` adds the agency's APT reference, for STAFF emails only: an interpreter email never
+ * carries a reference (the APT one is the agency's own, and the SRN is never emailed), it names the job by its date instead.
+ */
+export const summaryRows = (s: JobSummary, opts: { withReference?: boolean } = {}) => [
+  ...(opts.withReference ? [{ label: "Reference", value: s.reference }] : []),
+  { label: "Assignment", value: s.emailTitle },
   { label: "Date", value: s.dateLabel },
   { label: "Time", value: s.timeLabel },
   { label: "Format", value: s.format },
@@ -32,7 +36,10 @@ export const summaryRows = (s: JobSummary) => [
   { label: "Program", value: s.program },
 ];
 
-export const summaryText = (s: JobSummary) => summaryRows(s).map((r) => `${r.label}: ${r.value}`).join("\n");
+export const summaryText = (s: JobSummary, opts: { withReference?: boolean } = {}) => summaryRows(s, opts).map((r) => `${r.label}: ${r.value}`).join("\n");
+
+/** How an interpreter email names its job: "Job offer · Tue, Nov 18". */
+export const interpreterEmailTitle = (prefix: string, s: JobSummary): string => `${prefix} · ${s.shortDate}`;
 
 /** The offer email: restricted details plus Accept / Decline links. */
 export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string): { subject: string; html: string; text: string } {
@@ -40,7 +47,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
     ? "The meeting link is shared after you accept."
     : "The exact location is shared after you accept.";
   const html = buildTerpDeskEmail({
-    title: `Job offer ${s.reference}`,
+    title: interpreterEmailTitle("Job offer", s),
     preheader: `A new interpreting job offer for ${s.dateLabel}. Please respond promptly.`,
     bodyContent: `
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">You have a new job offer</h1>
@@ -64,7 +71,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
     "",
     "No password is needed. This link is valid for 48 hours.",
   ].join("\n");
-  return { subject: `Job offer ${s.reference} - terpDESK`, html, text };
+  return { subject: `${interpreterEmailTitle("Job offer", s)} - terpDESK`, html, text };
 }
 
 /** "accepted": the interpreter said yes. "assigned": agency staff booked them directly, so there is nothing to answer. */
@@ -87,7 +94,7 @@ export function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: 
        <p style="margin:0;font-size:13px;color:#6B7280;">The exact location or meeting link, program, preparation notes and prep materials are on this private page (no password needed). Prep materials are also in the terpDESK app.</p>`
     : `<p style="margin:16px 0 0;font-size:13px;color:#6B7280;">Sign in to terpDESK to see the location, preparation notes and prep materials.</p>`;
   const html = buildTerpDeskEmail({
-    title: `${copy.title} ${s.reference}`,
+    title: interpreterEmailTitle(copy.title, s),
     preheader: `You're booked for ${s.dateLabel}.`,
     bodyContent: `
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${copy.heading}${name ? `, ${escapeHtml(name)}` : ""}</h1>
@@ -107,7 +114,7 @@ export function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: 
     "",
     "For your clients' privacy, location and preparation details are never sent by email.",
   ].join("\n");
-  return { subject: `${copy.subject} ${s.reference} - terpDESK`, html, text };
+  return { subject: `${interpreterEmailTitle(copy.subject, s)} - terpDESK`, html, text };
 }
 
 /** The external portal where ODHH interpreters report the assignment (kept exactly as the state publishes it). */
@@ -120,7 +127,7 @@ export const ODHH_ASSIGNMENT_REPORT_URL = ODHH_VERIFICATION_FORM_URL;
 export async function sendOdhhPostJobReminder(params: { to: string; name: string; summary: JobSummary }): Promise<void> {
   const s = params.summary;
   const html = buildTerpDeskEmail({
-    title: `Post-job action required ${s.reference}`,
+    title: interpreterEmailTitle("Post-job action required", s),
     preheader: "Your ODHH assignment has ended. Please submit your hours.",
     bodyContent: `
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">Post-job action required</h1>
@@ -143,7 +150,7 @@ export async function sendOdhhPostJobReminder(params: { to: string; name: string
     "",
     "If you already submitted these hours, you can ignore this reminder.",
   ].join("\n");
-  await sendEmail(params.to, `Post-job action required: submit your ODHH hours (${s.reference})`, html, text);
+  await sendEmail(params.to, `Post-job action required: submit your ODHH hours (${s.shortDate})`, html, text);
 }
 
 /**

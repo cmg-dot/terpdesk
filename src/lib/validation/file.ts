@@ -28,7 +28,8 @@ export interface PrepFile {
 /** A prep file on the interpreter's Prep page, with the job it belongs to. */
 export interface InterpreterPrepFile extends PrepFile {
   jobId: string;
-  jobReference: string;
+  /** "SRN #202786433" on a state job, else the job's title (never the agency's APT reference). */
+  jobLabel: string;
   jobStartsAt: string | null;
 }
 

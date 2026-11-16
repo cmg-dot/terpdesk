@@ -19,7 +19,7 @@ import { LinkifiedText } from "@/components/ui/LinkifiedText";
 import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
-import { formatReference } from "@/utils/statusEngine";
+import { interpreterReference } from "@/utils/statusEngine";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
@@ -1356,10 +1356,13 @@ export default function JobDetailPage() {
                 <span className="text-[14px] text-gray-400">Location</span>
                 <span className="text-[14px] text-[var(--ink)] text-right">{job.location}</span>
               </div>
-              <div className="flex items-center justify-between py-3 border-b border-gray-50">
-                <span className="text-[14px] text-gray-400">Reference</span>
-                <span className="text-[14px] font-medium text-[var(--ink)]">{formatReference(job.requestId || job.id)}</span>
-              </div>
+              {/* The state's SRN on a state job; nothing on any other (the APT reference is the agency's own). */}
+              {interpreterReference(job.data?.intake?.odhhSrn) && (
+                <div className="flex items-center justify-between py-3 border-b border-gray-50">
+                  <span className="text-[14px] text-gray-400">Reference</span>
+                  <span className="text-[14px] font-medium text-[var(--ink)]">{interpreterReference(job.data?.intake?.odhhSrn)}</span>
+                </div>
+              )}
               <div className="flex items-center justify-between py-3">
                 <span className="text-[14px] text-gray-400">Status</span>
                 <span className="text-[14px] text-[var(--ink)]">See your offer status below</span>
