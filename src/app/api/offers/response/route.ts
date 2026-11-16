@@ -16,6 +16,9 @@ import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { renderOfferConfirmPage } from "@/lib/offerConfirmPage";
 import { resolveOfferLinkState } from "@/lib/offerLinkState";
+import { offerAnswerColumns } from "@/lib/acceptAnswers";
+import type { AcceptAnswers } from "@/lib/acceptAnswers";
+import { confirmPageWithProblem, readAcceptAnswers } from "@/lib/offerLinkAnswers";
 import { isActivePosition, positionIdOf, positionLabel, positionOfOffer as positionOfOfferIn, positionRole, readPositions } from "@/lib/positions";
 import { assignmentFields, assignedInterpreterIdAt, clearedAssignmentFields, rebuildSlots, staffingFacts, statusAfterBooking, statusAfterDecline } from "@/lib/staffing";
 
@@ -318,7 +321,7 @@ function renderHtmlCard({
  * one transaction, and the confirmation email and notifications are sent only after it has committed. An expired or
  * invalid link therefore changes nothing and sends nothing.
  */
-async function processResponse(token: string | null, actionParam: string | undefined): Promise<Response> {
+async function processResponse(token: string | null, actionParam: string | undefined, answers: AcceptAnswers | null): Promise<Response> {
 
   // 1. Validate query parameters
   if (!token || !actionParam || (actionParam !== "accept" && actionParam !== "decline")) {
@@ -611,7 +614,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       // Atomically claim the offer: only succeeds if it is still pending at write time
       const [targetOffer] = await tx
         .update(offers)
-        .set({ status: "accepted", updatedAt: now })
+        .set({ status: "accepted", updatedAt: now, ...(answers ? offerAnswerColumns(answers) : {}) })
         .where(and(eq(offers.id, pendingOffer.id), eq(offers.status, "pending")))
         .returning();
       if (!targetOffer) return null;
@@ -879,13 +882,18 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   let token: string | null = null;
   let action: string | undefined;
+  let form: FormData;
   try {
-    const form = await request.formData();
+    form = await request.formData();
     const rawToken = form.get("token");
     token = typeof rawToken === "string" ? rawToken : null;
     action = String(form.get("action") ?? "").trim().toLowerCase();
   } catch {
     return expiredLinkCard();
   }
-  return processResponse(token, action);
+  if (action !== "accept") return processResponse(token, action, null);
+  // Accepting needs the travel-time answer: a missing or bad one changes nothing, and the confirm page comes back with the problem.
+  const answers = readAcceptAnswers(form);
+  if (!answers.ok) return (token ? await confirmPageWithProblem(token, answers.error) : null) ?? expiredLinkCard();
+  return processResponse(token, action, answers.answers);
 }

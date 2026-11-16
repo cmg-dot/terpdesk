@@ -1,11 +1,32 @@
 import { escapeHtml } from "@/lib/emailTemplate";
 import type { JobSummary } from "@/lib/jobSummary";
+import { MAX_AVAILABILITY_NOTE } from "@/lib/acceptAnswers";
 
 /**
  * The page an Accept / Decline email link opens. It changes nothing by itself: the button posts to the same
  * address, and only that POST books or declines. Shows the restricted summary only (no address, program or notes).
  */
-export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary }): Response {
+const FIELD = "width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:10px;padding:9px 10px;font-size:14px;margin-top:4px;";
+
+/**
+ * Accepting asks what the app asks (lib/acceptAnswers.ts): "Do you need travel time?" (required) with hours and minutes, and an
+ * optional availability note. Plain form fields, no script; the server checks the answers and shows this page again on a problem.
+ */
+const acceptQuestions = (): string => `
+    <fieldset style="border:0;padding:0;margin:20px 0 0;">
+      <legend style="font-size:14px;font-weight:600;margin-bottom:8px;">Do you need travel time?</legend>
+      <label style="margin-right:18px;font-size:14px;"><input type="radio" name="travel" value="yes" required> Yes</label>
+      <label style="font-size:14px;"><input type="radio" name="travel" value="no" required> No</label>
+      <div style="display:flex;gap:10px;margin-top:10px;">
+        <label style="flex:1;font-size:12px;color:#64748b;">If yes, hours<input name="travelHours" inputmode="numeric" maxlength="2" style="${FIELD}"></label>
+        <label style="flex:1;font-size:12px;color:#64748b;">and minutes<input name="travelMinutes" inputmode="numeric" maxlength="2" style="${FIELD}"></label>
+      </div>
+    </fieldset>
+    <label style="display:block;margin-top:14px;font-size:14px;font-weight:600;">Availability note <span style="font-weight:400;color:#64748b;">(optional)</span>
+      <input name="availabilityNote" maxlength="${MAX_AVAILABILITY_NOTE}" placeholder="e.g. Available 10:00-11:00 AM only" style="${FIELD}font-weight:400;">
+    </label>`;
+
+export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary; error?: string }): Response {
   const { token, action, summary: s } = params;
   const accepting = action === "accept";
   // No reference: the page is opened from an email link, so it shows what the email does (the APT reference is staff-only).
@@ -42,6 +63,9 @@ export function renderOfferConfirmPage(params: { token: string; action: "accept"
     <form method="POST" action="/api/offers/response" style="margin-top:20px;">
       <input type="hidden" name="token" value="${escapeHtml(token)}">
       <input type="hidden" name="action" value="${action}">
+      ${accepting ? acceptQuestions() : ""}
+      ${params.error ? `<p role="alert" style="margin:14px 0 0;padding:10px 12px;border-radius:10px;background:#FEF2F2;color:#B91C1C;font-size:13px;">${escapeHtml(params.error)}</p>` : ""}
+      <div style="height:16px;"></div>
       <button type="submit" style="width:100%;border:0;border-radius:999px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer;color:${
         accepting ? "#fff" : "#0B3B32"
       };background:${accepting ? "#0B3B32" : "#fff"};${accepting ? "" : "border:1px solid #0B3B32;"}">${

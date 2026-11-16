@@ -31,6 +31,10 @@ export async function loadRequestRows(offerScope: "all" | "open", requestFilter?
         expiresAt: offers.expiresAt,
         // When the offer last changed (sent, accepted, declined, expired): tells which answer is the latest.
         updatedAt: offers.updatedAt,
+        // The interpreter's answers when accepting (shown on the booking in Staffing).
+        travelRequested: offers.travelRequested,
+        travelMinutes: offers.travelMinutes,
+        availabilityNote: offers.availabilityNote,
       })
       .from(offers)
       .leftJoin(interpreters, eq(offers.interpreterId, interpreters.id))

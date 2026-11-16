@@ -26,6 +26,8 @@ import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { bucketInterpreterJobs, isLivePendingOffer } from "@/lib/interpreterJobBuckets";
 import { jobPlaceLines } from "@/lib/jobPlaceLines";
 import { OfferSummaryLines } from "@/components/interpreter/OfferSummaryLines";
+import { AcceptOfferDialog } from "@/components/interpreter/AcceptOfferDialog";
+import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 
 export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
@@ -113,13 +115,22 @@ export default function InterpreterHomePage() {
   const [isPending, startTransition] = React.useTransition();
   const [actingOfferId, setActingOfferId] = React.useState<string | null>(null);
 
+  // Accept first asks "Do you need travel time?" (AcceptOfferDialog); the offer is accepted with the answers.
+  const [acceptingOffer, setAcceptingOffer] = React.useState<{ id: string; title: string } | null>(null);
   const handleAcceptOffer = (offer: any) => {
+    setAcceptError(null);
+    setAcceptingOffer({ id: String(offer.id), title: String(offer.title || "this job") });
+  };
+  const confirmAccept = (answers: AcceptAnswersInput) => {
+    const offer = acceptingOffer;
+    if (!offer) return;
     setAcceptError(null);
     setActingOfferId(offer.id);
     startTransition(async () => {
       try {
-        await acceptJobOffer(offer.id);
+        await acceptJobOffer(offer.id, answers);
         setOffers(prev => prev.filter(o => o.id !== offer.id));
+        setAcceptingOffer(null);
       } catch (err: any) {
         console.error("[interpreter-home page] operation failed");
         setAcceptError(err?.message || "This offer has expired and can no longer be accepted.");
@@ -255,6 +266,16 @@ export default function InterpreterHomePage() {
   )}
 
   <VerificationBanners />
+
+  {acceptingOffer && (
+    <AcceptOfferDialog
+      title={acceptingOffer.title}
+      pending={isPending && actingOfferId === acceptingOffer.id}
+      error={acceptError}
+      onCancel={() => { setAcceptingOffer(null); setAcceptError(null); }}
+      onConfirm={confirmAccept}
+    />
+  )}
 
   <ScheduleBanners />
 

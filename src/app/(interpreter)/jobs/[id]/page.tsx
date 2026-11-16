@@ -21,6 +21,8 @@ import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { interpreterReference } from "@/utils/statusEngine";
 import { TeamContactsCard } from "@/components/interpreter/TeamContactsCard";
+import { AcceptOfferDialog } from "@/components/interpreter/AcceptOfferDialog";
+import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
@@ -1158,12 +1160,19 @@ export default function JobDetailPage() {
     return () => clearInterval(timer);
   }, []);
 
+  // Accept first asks "Do you need travel time?" (AcceptOfferDialog); the offer is accepted with the answers.
+  const [askingToAccept, setAskingToAccept] = useState(false);
   const handleAccept = () => {
+    setActionError(null);
+    setAskingToAccept(true);
+  };
+  const confirmAccept = (answers: AcceptAnswersInput) => {
     setActionError(null);
     setActingAction('accept');
     startTransition(async () => {
       try {
-        await acceptJobOffer(job!.id);
+        await acceptJobOffer(job!.id, answers);
+        setAskingToAccept(false);
       } catch (err: any) {
         console.error("[jobs/[id] page] operation failed");
         setActionError(err?.message || "This offer has expired because the scheduled appointment time has already ended.");
@@ -1338,6 +1347,16 @@ export default function JobDetailPage() {
         </div>
 
         {job.status === 'booked' && <UpdatedNotice update={job.detailsUpdated} endsAt={job.endsAt} />}
+
+        {askingToAccept && job.status === 'pending' && (
+          <AcceptOfferDialog
+            title={job.title || "this job"}
+            pending={actingAction === 'accept'}
+            error={actionError}
+            onCancel={() => { setAskingToAccept(false); setActionError(null); }}
+            onConfirm={confirmAccept}
+          />
+        )}
 
         <div className="space-y-4">
           {/* Agency messages + "Request clarification" (parity with the secure job-details page). */}

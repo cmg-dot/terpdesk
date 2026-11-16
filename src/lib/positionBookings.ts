@@ -17,6 +17,10 @@ export interface PositionBooking {
   interpreterId?: string;
   interpreterName: string;
   positionIndex?: number;
+  /** The interpreter's answers when accepting (null when not asked: assigned by staff, or accepted before Phase 23). */
+  travelRequested?: boolean | null;
+  travelMinutes?: number | null;
+  availabilityNote?: string | null;
 }
 
 export interface PositionFacts {

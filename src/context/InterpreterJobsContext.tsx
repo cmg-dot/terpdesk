@@ -6,6 +6,7 @@ import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { useGlobalState } from "@/context/GlobalContext";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
+import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 
 export interface Job {
   id: string;
@@ -66,7 +67,8 @@ interface InterpreterJobsContextType {
   jobs: Job[];
   /** Re-reads the interpreter's jobs from the server (the Jobs page's refresh button). */
   refreshJobs: () => Promise<void>;
-  acceptJobOffer: (jobId: string) => Promise<void>;
+  /** Accepts an offer with the interpreter's travel-time answer and optional availability note (lib/acceptAnswers.ts). */
+  acceptJobOffer: (jobId: string, answers: AcceptAnswersInput) => Promise<void>;
   declineOffer: (jobId: string) => Promise<void>;
   releaseJob: (jobId: string, reason?: string) => void;
   markJobReleased: (jobId: string) => void;
@@ -172,9 +174,9 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
     }
   }, [jobs, isMounted]);
 
-  const acceptJobOffer = async (jobId: string) => {
+  const acceptJobOffer = async (jobId: string, answers: AcceptAnswersInput) => {
     try {
-      const result = await updateOfferStatus(jobId, 'accepted');
+      const result = await updateOfferStatus(jobId, 'accepted', answers);
       // Expected refusals (busy-time conflict, expired, withdrawn) come back as { success: false, error }.
       // Raised here, in the browser, so the callers' existing error banners show the real message.
       if ('success' in result && !result.success) throw new Error(result.error);

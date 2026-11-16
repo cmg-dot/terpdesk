@@ -15,6 +15,8 @@ import { isActivePosition, positionLabel } from "@/lib/positions";
 import type { PositionId } from "@/lib/positions";
 import { staffingFacts, statusAfterBooking, statusAfterDecline } from "@/lib/staffing";
 import { logActivity } from "@/lib/requestActivity";
+import { offerAnswerColumns, parseAcceptAnswers } from "@/lib/acceptAnswers";
+import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 
 type OfferRecord = typeof offers.$inferSelect;
 
@@ -26,10 +28,15 @@ export type RespondToOfferResult = { success: true; offer: OfferRecord } | { suc
 
 export async function respondToOffer(
   offerId: string,
-  response: 'accept' | 'decline' | 'accepted' | 'declined'
+  response: 'accept' | 'decline' | 'accepted' | 'declined',
+  /** Required to accept: the travel-time answer and the optional availability note (lib/acceptAnswers.ts). */
+  answersInput?: AcceptAnswersInput
 ): Promise<RespondToOfferResult> {
   const { interpreterId: sessionInterpreterId } = await requireInterpreter();
   const normResponse = (response === 'accept' || response === 'accepted') ? 'accepted' : 'declined';
+  // Checked before anything is read or written: an accept without a travel-time answer changes nothing.
+  const answers = normResponse === 'accepted' ? parseAcceptAnswers(answersInput) : null;
+  if (answers && !answers.ok) return { success: false, error: answers.error };
 
   // 1. Fetch offer
   const [offer] = await db.select().from(offers).where(eq(offers.id, offerId));
@@ -119,7 +126,7 @@ export async function respondToOffer(
 
     // Only a still-pending, unexpired offer can be answered (an accepted job is handed back with "Give back").
     const [updatedOffer] = await tx.update(offers)
-      .set({ status: normResponse, updatedAt: now })
+      .set({ status: normResponse, updatedAt: now, ...(answers?.ok ? offerAnswerColumns(answers.answers) : {}) })
       .where(and(eq(offers.id, offerId), eq(offers.status, 'pending'), gt(offers.expiresAt, now)))
       .returning();
     if (!updatedOffer) return { ok: false, error: "This offer is no longer open. It may have expired, been withdrawn or already been answered." };

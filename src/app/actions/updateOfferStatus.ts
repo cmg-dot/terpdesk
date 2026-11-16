@@ -7,11 +7,12 @@ import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { staffingFacts, statusAfterWithdraw } from "@/lib/staffing";
 import { respondToOffer } from "./respondToOffer";
+import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 
-export async function updateOfferStatus(offerId: string, status: 'accepted' | 'declined' | 'withdrawn') {
+export async function updateOfferStatus(offerId: string, status: 'accepted' | 'declined' | 'withdrawn', answers?: AcceptAnswersInput) {
   if (status !== 'accepted' && status !== 'declined') await requireRole("agency");
   if (status === 'accepted' || status === 'declined') {
-    return await respondToOffer(offerId, status);
+    return await respondToOffer(offerId, status, answers);
   }
 
   // Update offer to withdrawn

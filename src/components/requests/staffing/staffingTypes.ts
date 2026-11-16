@@ -18,6 +18,10 @@ export interface StaffBooking {
   interpreterId?: string;
   interpreterName: string;
   positionIndex?: number;
+  /** The interpreter's answers when accepting (lib/acceptAnswers.ts); null / absent when not asked. */
+  travelRequested?: boolean | null;
+  travelMinutes?: number | null;
+  availabilityNote?: string | null;
 }
 
 /** The offer awaiting an answer in a position. */
