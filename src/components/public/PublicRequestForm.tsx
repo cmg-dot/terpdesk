@@ -1,0 +1,145 @@
+"use client";
+
+import { useState } from "react";
+import type { FormEvent, ReactNode } from "react";
+import { submitDemoPublicRequest } from "@/app/actions/demoPublicRequest";
+import { CustomSelect } from "@/components/ui/CustomSelect";
+
+const INPUT =
+  "w-full rounded-2xl bg-neutral-100 px-4 py-2.5 text-sm text-[var(--ink)] outline-none transition-colors focus:bg-neutral-200 focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)] disabled:opacity-60";
+const BUTTON =
+  "inline-flex w-full items-center justify-center rounded-full bg-[var(--forest)] px-6 py-3 text-sm font-medium text-white transition-colors hover:bg-[var(--forest-hover)] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)] focus:ring-offset-2 disabled:opacity-50";
+
+export interface PublicRequestOptions {
+  settings: readonly string[];
+  formats: readonly string[];
+  timeZones: readonly string[];
+  /** The hidden spam-trap field's name (lib/publicIntake.ts). */
+  honeypot: string;
+}
+
+type Values = Record<string, string>;
+
+const newSubmissionId = (): string => crypto.randomUUID();
+
+function Field({ label, name, error, children, hint }: { label: string; name: string; error?: string; hint?: string; children: ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label htmlFor={`book-${name}`} className="block text-xs font-medium text-[var(--sage)]">
+        {label}
+      </label>
+      {children}
+      {hint && !error && <p className="text-[11px] text-[var(--sage)]">{hint}</p>}
+      {error && <p className="text-xs text-red-700">{error}</p>}
+    </div>
+  );
+}
+
+/**
+ * "Request an Interpreter" on the demo agency website. Sends the public intake fields to the demo-only server action, which saves a
+ * draft for agency staff to review. The submission id makes a double click or a retry save one request, not two.
+ */
+export function PublicRequestForm({ settings, formats, timeZones, honeypot }: PublicRequestOptions) {
+  const initial = (): Values => ({ setting: settings[0], format: formats[0], timeZone: timeZones[0], submissionId: newSubmissionId() });
+  const [values, setValues] = useState<Values>(initial);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [formError, setFormError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
+  const [reference, setReference] = useState<string | null>(null);
+
+  const set = (name: string) => (value: string) => setValues((v) => ({ ...v, [name]: value }));
+  const text = (name: string, type = "text", autoComplete?: string) => (
+    <input id={`book-${name}`} type={type} autoComplete={autoComplete} value={values[name] ?? ""} onChange={(e) => set(name)(e.target.value)} disabled={pending} className={INPUT} />
+  );
+  const inPerson = values.format !== "Virtual";
+
+  const onSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (pending) return;
+    setPending(true);
+    setFormError(null);
+    try {
+      const result = await submitDemoPublicRequest(values);
+      if (result.success) {
+        setReference(result.reference);
+        setErrors({});
+      } else {
+        setFormError(result.error);
+        setErrors(Object.fromEntries((result.fields ?? []).map((f) => [f.field, f.message])));
+      }
+    } catch {
+      setFormError("Something went wrong. Please try again.");
+    } finally {
+      setPending(false);
+    }
+  };
+
+  if (reference !== null) {
+    return (
+      <div role="status" className="space-y-4 rounded-2xl bg-green-50 px-5 py-6 text-sm text-green-900">
+        <p className="text-base font-semibold">Thank you. Your request has been received.</p>
+        <p>{reference ? `Your reference is ${reference}. ` : ""}Our scheduling team will review it and confirm an interpreter with you.</p>
+        <button type="button" onClick={() => { setValues(initial()); setReference(null); }} className="font-medium text-[var(--forest)] underline underline-offset-2">
+          Submit another request
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={onSubmit} noValidate className="space-y-5">
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Your name" name="requesterName" error={errors.requesterName}>{text("requesterName", "text", "name")}</Field>
+        <Field label="Organization" name="requesterOrg" error={errors.requesterOrg}>{text("requesterOrg", "text", "organization")}</Field>
+        <Field label="Email" name="email" error={errors.email}>{text("email", "email", "email")}</Field>
+        <Field label="Phone" name="phone" error={errors.phone}>{text("phone", "tel", "tel")}</Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Setting" name="setting" error={errors.setting}>
+          <CustomSelect ariaLabel="Setting" options={settings} value={values.setting} onChange={set("setting")} disabled={pending} />
+        </Field>
+        <Field label="Format" name="format" error={errors.format}>
+          <CustomSelect ariaLabel="Format" options={formats} value={values.format} onChange={set("format")} disabled={pending} />
+        </Field>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Field label="Date" name="startDate" error={errors.startDate}>{text("startDate", "date")}</Field>
+        <Field label="Start time" name="startTime" error={errors.startTime}>{text("startTime", "time")}</Field>
+        <Field label="End time" name="endTime" error={errors.endTime}>{text("endTime", "time")}</Field>
+      </div>
+      <Field label="Time zone" name="timeZone" error={errors.timeZone}>
+        <CustomSelect ariaLabel="Time zone" options={timeZones} value={values.timeZone} onChange={set("timeZone")} disabled={pending} />
+      </Field>
+
+      {inPerson && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Venue" name="venue" error={errors.venue}>{text("venue")}</Field>
+          <Field label="Address" name="address" error={errors.address}>{text("address", "text", "street-address")}</Field>
+        </div>
+      )}
+
+      <Field label="What is the appointment for?" name="purpose" error={errors.purpose} hint="A short description is enough. Please do not include medical details.">
+        <textarea id="book-purpose" rows={3} value={values.purpose ?? ""} onChange={(e) => set("purpose")(e.target.value)} disabled={pending} className={INPUT} />
+      </Field>
+      <Field label="Communication preferences (optional)" name="commPreferences" error={errors.commPreferences}>
+        <textarea id="book-commPreferences" rows={2} value={values.commPreferences ?? ""} onChange={(e) => set("commPreferences")(e.target.value)} disabled={pending} className={INPUT} />
+      </Field>
+
+      {/* Spam trap: hidden from people and from screen readers. */}
+      <div aria-hidden="true" className="absolute -left-[10000px] h-px w-px overflow-hidden">
+        <input tabIndex={-1} autoComplete="off" name={honeypot} value={values[honeypot] ?? ""} onChange={(e) => set(honeypot)(e.target.value)} />
+      </div>
+
+      {formError && (
+        <p role="alert" className="rounded-xl bg-red-50 px-4 py-2.5 text-xs text-red-700">
+          {formError}
+        </p>
+      )}
+      <button type="submit" disabled={pending} className={BUTTON}>
+        {pending ? "Sending…" : "Request an interpreter"}
+      </button>
+    </form>
+  );
+}

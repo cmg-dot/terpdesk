@@ -1,17 +1,11 @@
 export const dynamic = "force-dynamic";
 
 import { NextResponse } from "next/server";
-import { revalidatePath } from "next/cache";
-import { sql } from "drizzle-orm";
-import { db } from "@/db";
-import { requests } from "@/db/schema";
 import { rejectUnlessIntakeAuthorized } from "@/lib/intakeAuth";
-import { summarizeJob } from "@/lib/jobSummary";
 import { logError } from "@/lib/logError";
-import { notifyAgencyAdmins } from "@/lib/notifications";
 import { buildPublicRequest, parsePublicIntake } from "@/lib/publicIntake";
 import type { FieldProblem } from "@/lib/publicIntake";
-import { logActivity } from "@/lib/requestActivity";
+import { announcePublicRequest, insertPublicRequest } from "@/lib/publicIntakeSave";
 import { formatReference } from "@/utils/statusEngine";
 
 /**
@@ -26,7 +20,6 @@ import { formatReference } from "@/utils/statusEngine";
  */
 
 const MAX_BODY_BYTES = 64 * 1024;
-const SOURCE_CHANNEL = "public_intake_form";
 
 type PublicIntakeResponse =
   | { success: true; id: string; reference: string; duplicate: boolean; ignoredFields?: string[] }
@@ -79,35 +72,7 @@ export async function POST(req: Request): Promise<NextResponse<PublicIntakeRespo
     const submissionId = parsed.data.submissionId;
 
     stage = "insert draft";
-
-    // One transaction. With a submissionId, a retry of the same submission (a timeout, a double click) returns the
-    // first request instead of creating a second; the advisory lock makes two retries at the same moment safe too.
-    const saved = await db.transaction(async (tx) => {
-      if (submissionId) {
-        await tx.execute(sql`SELECT pg_advisory_xact_lock(hashtext(${`public-intake:${submissionId}`}))`);
-        const [existing] = await tx
-          .select({ id: requests.id })
-          .from(requests)
-          .where(
-            sql`${requests.data} #>> '{source,channel}' = ${SOURCE_CHANNEL} AND ${requests.data} #>> '{source,submissionId}' = ${submissionId}`,
-          )
-          .limit(1);
-        if (existing) return { id: existing.id, duplicate: true };
-      }
-      const [row] = await tx
-        .insert(requests)
-        .values({
-          title: draft.title,
-          // 'draft' = awaiting agency review. Never a state job: the program is always General.
-          status: "draft",
-          isStateJob: false,
-          // The app reads createdAt as the appointment start (same as the agency form).
-          createdAt: new Date(draft.startsAt),
-          data: draft.data,
-        })
-        .returning({ id: requests.id });
-      return { id: row.id, duplicate: false };
-    });
+    const saved = await insertPublicRequest(draft, submissionId);
 
     const reference = formatReference(saved.id);
     const ignoredFields = parsed.ignoredFields.length > 0 ? parsed.ignoredFields : undefined;
@@ -116,18 +81,7 @@ export async function POST(req: Request): Promise<NextResponse<PublicIntakeRespo
     }
 
     stage = "after insert";
-    await logActivity({ requestId: saved.id, kind: "created", audience: "shared", message: "Request created", actorLabel: "Public intake form" });
-
-    // Tell staff there is something to review. Reference, date and generic setting only: nothing about the client.
-    const summary = summarizeJob({ id: saved.id, title: draft.title, createdAt: new Date(draft.startsAt), data: draft.data });
-    await notifyAgencyAdmins({
-      type: "job",
-      href: `/requests/${saved.id}`,
-      title: "New request from the public form",
-      message: `${reference} · ${summary.dateLabel} · ${summary.setting}. Review it before it goes live.`,
-    });
-
-    for (const path of ["/requests", "/dashboard", "/calendar"]) revalidatePath(path);
+    await announcePublicRequest(saved.id, draft, "Public intake form");
 
     // HIPAA: the id only. No names, dates, locations or notes.
     console.log("[Public Intake] Draft request created", { id: saved.id });

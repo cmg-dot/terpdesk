@@ -135,6 +135,9 @@ const shape = {
 
 export const ACCEPTED_FIELDS = Object.keys(shape);
 
+/** The demo booking page's hidden spam-trap field. A person never sees it; a form-filling bot does. Never one of the fields above. */
+export const HONEYPOT_FIELD = "companyWebsite";
+
 export interface ResolvedTimes {
   startsAt: string;
   endsAt: string;
