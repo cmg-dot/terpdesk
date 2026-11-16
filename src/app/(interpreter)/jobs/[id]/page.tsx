@@ -20,6 +20,7 @@ import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { interpreterReference } from "@/utils/statusEngine";
+import { TeamContactsCard } from "@/components/interpreter/TeamContactsCard";
 import { getIanaZone, parseInstantInZone, resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, scopedRequestStatus, showsStatePortal } from "@/utils/hoursState";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
@@ -1455,6 +1456,9 @@ export default function JobDetailPage() {
 
           {/* Actual Service Time Component */}
           <ServiceTimeBlock job={job} />
+
+          {/* Confirmed co-interpreters on a team job (name and email only). */}
+          {job.status === 'booked' && (job.positionCount ?? 1) > 1 && <TeamContactsCard offerId={job.id} />}
 
           {/* Card 4 - Staffing */}
           <div className="bg-white rounded-2xl border border-gray-200 border border-gray-200 p-6 ">
