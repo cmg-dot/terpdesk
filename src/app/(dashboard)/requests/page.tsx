@@ -2,117 +2,101 @@
 
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
-import React, { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, Suspense } from "react";
 import { CustomSelect } from "@/components/ui/CustomSelect";
 import Link from "next/link";
-import { useRequests } from "@/context/RequestsContext";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { Suspense } from "react";
-import { RefreshCw, Building2, MapPin, Users2 } from "lucide-react";
-import { getStaffingRatio, formatReference } from "@/utils/statusEngine";
-import { DEFAULT_STATUS_FILTER, STATUS_FILTER_OPTIONS, listCopy, matchesStatusFilter, requestStatusLabel, tabForFilter } from "@/lib/requestListFilter";
-import { RequestStatusBadge } from "@/components/requests/RequestStatusBadge";
+import { RefreshCw } from "lucide-react";
+import { formatReference } from "@/utils/statusEngine";
+import { DEFAULT_STATUS_FILTER, FILTER_VIEWS, STATUS_FILTER_OPTIONS, isStatusFilter, matchesStatusFilter } from "@/lib/requestListFilter";
+import type { StatusFilter } from "@/lib/requestListFilter";
+import { RequestListCard } from "@/components/requests/RequestListCard";
 import { useRequestList } from "@/hooks/useRequestList";
-import { asAppointment, asListed } from "@/lib/requestListRow";
-import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
-import { HappeningNowBadge } from "@/components/HappeningNowBadge";
-import { formatInTimeZone } from "date-fns-tz";
-import { getIanaZone } from "@/utils/timezone";
+import { useListTab } from "@/hooks/useListTab";
+import type { ListTab } from "@/hooks/useListTab";
+import { useMinuteClock } from "@/hooks/useMinuteClock";
+import { asListed } from "@/lib/requestListRow";
+import type { RequestListRow } from "@/lib/requestListRow";
+import { isAppointmentUpcoming, sortUpcomingWithHappeningNow } from "@/utils/happeningNow";
 
-const parseSafeDate = (dateVal: any) => {
-  if (!dateVal) return null;
-  let d = new Date(dateVal);
-  if (!isNaN(d.getTime())) return d;
-  if (typeof dateVal === 'string') {
-    d = new Date(dateVal.replace(' ', 'T'));
-    if (!isNaN(d.getTime())) return d;
-    if (/^\d+$/.test(dateVal)) {
-      d = new Date(parseInt(dateVal, 10));
-      if (!isNaN(d.getTime())) return d;
-    }
-  }
-  return null;
+/** The dashboard's links into this list (`/requests?filter=...`). */
+const FILTER_PARAMS: Record<string, StatusFilter> = {
+  "happening-now": "Happening now",
+  "needing-coverage": "Needing coverage",
+  "pending-offers": "Pending offers",
+  "staff-follow-up": "Staff follow-up",
+  "needs-replacement": "Needs replacement",
+  "partially-staffed": "Partially staffed",
 };
 
-const formatJobDate = (startsAt?: string, endsAt?: string, timeZone?: string) => {
-  if (!startsAt) return "Time not specified";
-  try {
-    const start = parseSafeDate(startsAt);
-    if (!start) return "Time not specified";
-    const safeZone = getIanaZone(timeZone);
-    const end = parseSafeDate(endsAt);
-    const dateStr = formatInTimeZone(start, safeZone, "EEE, MMM d");
-    const timeStart = formatInTimeZone(start, safeZone, "h:mm a");
-    const timeEnd = end
-      ? formatInTimeZone(end, safeZone, "h:mm a zzz")
-      : formatInTimeZone(start, safeZone, "h:mm a zzz");
-    return `${dateStr} · ${timeStart} – ${timeEnd}`;
-  } catch (e) {
-    return "Time not specified";
-  }
-};
+function ListSection({ title, note, empty, items, currentTime }: { title: string; note: string; empty: string; items: RequestListRow[]; currentTime: number }) {
+  return (
+    <div className="space-y-5 pb-12">
+      <div className="space-y-1 pl-1">
+        <h2 className="text-[19px] font-semibold text-[var(--ink)]">{title}</h2>
+        <p className="text-[14px] text-[var(--sage)]">{note}</p>
+      </div>
+      <div className="space-y-4">
+        {items.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">{empty}</p>}
+        <AnimatedPaginatedList
+          items={items}
+          itemsPerPage={5}
+          className="space-y-4"
+          getKey={(req) => req.id}
+          renderItem={(req) => <RequestListCard req={req} currentTime={currentTime} />}
+        />
+      </div>
+    </div>
+  );
+}
+
+function TabButton({ tab, active, count, onSelect }: { tab: ListTab; active: boolean; count: number; onSelect: (tab: ListTab) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onSelect(tab)}
+      className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${active ? "bg-[var(--pill)] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
+    >
+      {tab === "upcoming" ? "Upcoming" : "Past"} <span className="font-normal opacity-80">{count}</span>
+    </button>
+  );
+}
 
 function RequestsPageContent() {
-  const { requests } = useRequestList();
+  const { requests, loaded } = useRequestList();
   const searchParams = useSearchParams();
-  const filterParam = searchParams.get("filter");
-
-  const [currentTime, setCurrentTime] = useState<number>(Date.now());
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(Date.now());
-    }, 60000);
-    return () => clearInterval(timer);
-  }, []);
+  const currentTime = useMinuteClock();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [orgFilter, setOrgFilter] = useState("All organizations");
   const [formatFilter, setFormatFilter] = useState("All formats");
-
-  let initialStatus: string = DEFAULT_STATUS_FILTER;
-  if (filterParam === "happening-now") initialStatus = "Happening now";
-  else if (filterParam === "needing-coverage") initialStatus = "Needing coverage";
-  else if (filterParam === "pending-offers") initialStatus = "Pending offers";
-  else if (filterParam === "staff-follow-up") initialStatus = "Staff follow-up";
-  else if (filterParam === "needs-replacement") initialStatus = "Needs replacement";
-  else if (filterParam === "partially-staffed") initialStatus = "Partially staffed";
-
-  const [statusFilter, setStatusFilter] = useState(initialStatus);
-  const [activeTab, setActiveTab] = useState<'upcoming' | 'past'>(tabForFilter(initialStatus) ?? 'upcoming');
-  const chooseStatus = (value: string) => {
-    setStatusFilter(value);
-    const tab = tabForFilter(value);
-    if (tab) setActiveTab(tab);
-  };
-  const copy = listCopy(statusFilter);
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => FILTER_PARAMS[searchParams.get("filter") ?? ""] ?? DEFAULT_STATUS_FILTER);
+  const view = FILTER_VIEWS[statusFilter];
 
   const orgOptions = useMemo(() => {
     const orgs = new Set<string>();
-    requests.forEach(req => {
+    requests.forEach((req) => {
       const org = req.requester.org || req.client;
-      if (org && typeof org === 'string' && org.trim()) {
-        orgs.add(org.trim());
-      }
+      if (org && org.trim()) orgs.add(org.trim());
     });
     return ["All organizations", ...Array.from(orgs).sort()];
   }, [requests]);
 
   // Every status, count and name comes from the database (the lean rows), never from a copy the browser kept.
-  const filteredRequests = requests.filter(req => {
+  const filteredRequests = requests.filter((req) => {
     const searchLower = searchQuery.toLowerCase();
     const titleMatch = req.title.toLowerCase().includes(searchLower);
     const cleanRef = formatReference(req.id).toLowerCase();
     const refMatch = req.id.toLowerCase().includes(searchLower) || cleanRef.includes(searchLower);
     const orgMatch = req.requester.org?.toLowerCase().includes(searchLower) || false;
- 
     if (searchQuery && !titleMatch && !refMatch && !orgMatch) return false;
- 
+
     if (orgFilter !== "All organizations") {
       const org = req.requester.org || req.client || "Organization not provided";
       if (org.toLowerCase() !== orgFilter.toLowerCase()) return false;
     }
- 
+
     if (formatFilter !== "All formats") {
       const format = req.format || "Virtual";
       if (format !== formatFilter && !(formatFilter === "In Person" && format === "In person")) return false;
@@ -123,246 +107,80 @@ function RequestsPageContent() {
 
   const upcomingRequests = sortUpcomingWithHappeningNow(
     filteredRequests.filter((r) => isAppointmentUpcoming(r, currentTime)),
-    currentTime
+    currentTime,
   );
   const pastRequests = filteredRequests.filter((r) => !isAppointmentUpcoming(r, currentTime));
+  const [activeTab, setActiveTab] = useListTab(statusFilter, { upcoming: upcomingRequests.length, past: pastRequests.length }, loaded);
 
- return (
- <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-6 pt-2">
- {/* Header Row */}
- <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
- <div className="space-y-1.5">
- <h1 className="text-[32px] font-semibold tracking-tight text-[var(--ink)]">
- Requests & assignments
- </h1>
- <p className="text-[15px] text-[var(--sage)]">
- {copy.subtitle}
- </p>
- </div>
- <div className="flex items-center gap-3">
- <button onClick={() => window.location.reload()} className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 hover:bg-neutral-50 transition-colors">
- <RefreshCw className="h-[18px] w-[18px]" />
- </button>
- <Link href="/requests/new" className="flex items-center h-11 rounded-full bg-[var(--forest)] px-6 text-[14px] font-medium text-[var(--canvas)] transition-opacity hover:opacity-90 whitespace-nowrap shrink-0">
- New request
- </Link>
- </div>
- </div>
+  return (
+    <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-6 pt-2">
+      {/* Header Row */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-1.5">
+          <h1 className="text-[32px] font-semibold tracking-tight text-[var(--ink)]">Requests & assignments</h1>
+          <p className="text-[15px] text-[var(--sage)]">Every appointment your agency is staffing</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button onClick={() => window.location.reload()} className="flex h-11 w-11 items-center justify-center rounded-full border border-neutral-200 bg-white text-slate-600 hover:bg-neutral-50 transition-colors">
+            <RefreshCw className="h-[18px] w-[18px]" />
+          </button>
+          <Link href="/requests/new" className="flex items-center h-11 rounded-full bg-[var(--forest)] px-6 text-[14px] font-medium text-[var(--canvas)] transition-opacity hover:opacity-90 whitespace-nowrap shrink-0">
+            New request
+          </Link>
+        </div>
+      </div>
 
- <p className="text-[15px] text-[var(--sage)] pt-3 pb-2">
- Back-to-back appointments are allowed. Travel time is not checked.
- </p>
+      <p className="text-[15px] text-[var(--sage)] pt-3 pb-2">Back-to-back appointments are allowed. Travel time is not checked.</p>
 
- {/* Filters Group */}
-  <div className="space-y-3">
-  {/* Filter Pill */}
- <div className="rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-600 w-full">
- Active filter: <span className="font-semibold text-[var(--ink)]">{statusFilter}</span>
- </div>
+      {/* Filters Group */}
+      <div className="space-y-3">
+        {/* Agency Input */}
+        <div className="space-y-1.5 w-full">
+          <label className="pl-5 text-[13px] font-medium text-[var(--sage)]">Agency</label>
+          <div className="rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-600 border border-neutral-200/50">{DEFAULT_AGENCY_NAME}</div>
+        </div>
 
- {/* Agency Input */}
- <div className="space-y-1.5 w-full">
- <label className="pl-5 text-[13px] font-medium text-[var(--sage)]">Agency</label>
- <div className="rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-600 border border-neutral-200/50">
- {DEFAULT_AGENCY_NAME}
- </div>
- </div>
+        {/* Search / Filter Bar */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pb-2">
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search title, organization, reference..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[14px] text-slate-700 placeholder:text-[var(--sage)] border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.3)]"
+            />
+          </div>
+          <CustomSelect size="large" options={orgOptions} value={orgFilter} onChange={setOrgFilter} />
+          <CustomSelect size="large" options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
+          <CustomSelect size="large" options={STATUS_FILTER_OPTIONS} value={statusFilter} onChange={(value) => { if (isStatusFilter(value)) setStatusFilter(value); }} />
+        </div>
+      </div>
 
- {/* Search / Filter Bar */}
- <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pb-2">
- <div className="relative">
- <input 
- type="text" 
- placeholder="Search title, organization, reference..." 
- value={searchQuery}
- onChange={(e) => setSearchQuery(e.target.value)}
- className="w-full rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[14px] text-slate-700 placeholder:text-[var(--sage)] border border-neutral-200/50 outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.3)]"
- />
- </div>
- <CustomSelect size="large" options={orgOptions} value={orgFilter} onChange={setOrgFilter} />
- <CustomSelect size="large" options={["All formats", "In Person", "Virtual", "Hybrid - In person and Virtual"]} value={formatFilter} onChange={setFormatFilter} />
- <CustomSelect size="large" options={[...STATUS_FILTER_OPTIONS]} value={statusFilter} onChange={chooseStatus} />
- </div>
- </div>
-
- <p className="text-[13px] text-[var(--sage)] font-medium pl-2 pb-2">{filteredRequests.length} appointments</p>
-
- {/* Tab toggle: same pill layout as the interpreter Jobs page */}
- <div className="bg-[#F5F4F0] p-1 rounded-full flex w-full mb-2">
- <button
- type="button"
- onClick={() => setActiveTab("upcoming")}
- className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "upcoming" ? "bg-[var(--pill)] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
- >
- Upcoming <span className="font-normal opacity-80">{upcomingRequests.length}</span>
- </button>
- <button
- type="button"
- onClick={() => setActiveTab("past")}
- className={`flex-1 text-[13px] font-medium py-2 rounded-full flex items-center justify-center gap-1.5 transition-all ${activeTab === "past" ? "bg-[var(--pill)] text-white shadow-sm" : "text-[var(--sage)] hover:text-gray-700"}`}
- >
- Past <span className="font-normal opacity-80">{pastRequests.length}</span>
- </button>
- </div>
-
- {/* UPCOMING SECTION */}
- {activeTab === 'upcoming' && (
- <div className="space-y-5 pb-8">
- <h2 className="text-[19px] font-semibold text-[var(--ink)] pl-1">Upcoming</h2>
- <div className="space-y-4">
- {upcomingRequests.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">No upcoming requests match your filters.</p>}
- <AnimatedPaginatedList
- items={upcomingRequests}
- itemsPerPage={5}
- className="space-y-4"
- getKey={(req) => req.id}
- renderItem={(req) => {
- const org = req.requester.org || "Organization not provided";
- const setting = req.setting;
- const format = req.format || (req.isVirtual ? "Virtual" : "In person");
- const location = req.location || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
- const isCancelled = req.status === "Cancelled";
- const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(asAppointment(req));
- const statusLabel = requestStatusLabel(asListed(req));
- let staffingText = isCancelled ? "0 of 0 staffed" : `${bookedCount} of ${totalSlots} staffed`;
- if (bookedSlots.length > 0) {
-   staffingText += ` (${bookedSlots.map(s => s.interpreterName).join(', ')})`;
- }
-
- return (
- <Link
- href={`/requests/${req.id}`}
- key={req.id}
- className="block rounded-2xl border border-gray-200 bg-white p-5 border border-[#EBE8DF] hover:bg-gray-50 transition-colors cursor-pointer"
- >
- <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
- <div className="space-y-1">
- <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
- <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.timeZone)}</p>
- </div>
- <div className="flex flex-row flex-wrap items-center justify-end gap-2">
- {isAppointmentHappeningNow(req, currentTime) && (
-   <HappeningNowBadge size="sm" />
- )}
- <RequestStatusBadge status={statusLabel} />
- </div>
- </div>
-
- <div className="mt-4 flex flex-col md:flex-row gap-3 justify-between">
- {/* Col 1 */}
- <div className="flex items-start gap-3 w-full md:w-1/3">
- <Building2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
- <div className="flex flex-col gap-1">
- <span className="text-[13px] text-[var(--sage)]">{org}</span>
- <span className="text-[13px] text-slate-400">{setting}</span>
- </div>
- </div>
- {/* Col 2 */}
- <div className="flex items-start gap-3 w-full md:w-1/3">
- <MapPin className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
- <div className="flex flex-col gap-1">
- <span className="text-[13px] text-[var(--sage)]">
- {format} · {location}
- </span>
- <span className="text-[13px] text-slate-400 font-medium">{req.srn ? `SRN: ${req.srn}` : formatReference(req.id)}</span>
- </div>
- </div>
- {/* Col 3 */}
- <div className="flex items-start gap-3 w-full md:w-1/3">
- <Users2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
- <div className="flex flex-col gap-1">
- <span className="text-[13px] text-[var(--sage)]">{staffingText}</span>
- </div>
- </div>
- </div>
- </Link>
- )}}
- />
- </div>
- </div>
- )}
-
- {/* PAST SECTION */}
- {activeTab === 'past' && (
- <div className="space-y-5 pb-12">
- <div className="space-y-1 pl-1">
- <h2 className="text-[19px] font-semibold text-[var(--ink)]">{copy.pastHeading}</h2>
- <p className="text-[14px] text-[var(--sage)]">
- {copy.pastNote}
- </p>
- </div>
- 
- <div className="space-y-4">
- {pastRequests.length === 0 && <p className="text-[14px] text-[var(--sage)] pl-1">No past requests match your filters.</p>}
- <AnimatedPaginatedList
- items={pastRequests}
- itemsPerPage={5}
- className="space-y-4"
- getKey={(req) => req.id}
- renderItem={(req) => {
- const org = req.requester.org || "Organization not provided";
- const setting = req.setting;
- const format = req.format || (req.isVirtual ? "Virtual" : "In person");
- const location = req.location || (format.toLowerCase().includes('virtual') ? "Virtual" : "Location pending");
- const isCancelled = req.status === "Cancelled";
- const { bookedCount, totalSlots, bookedSlots } = getStaffingRatio(asAppointment(req));
- const statusLabel = requestStatusLabel(asListed(req));
- let staffingText = isCancelled ? "0 of 0 staffed" : `${bookedCount} of ${totalSlots} staffed`;
- if (bookedSlots.length > 0) {
-   staffingText += ` (${bookedSlots.map(s => s.interpreterName).join(', ')})`;
- }
-
- return (
- <Link
- href={`/requests/${req.id}`}
- key={req.id}
- className="block rounded-2xl border border-gray-200 bg-white p-5 border border-[#EBE8DF] hover:bg-gray-50 transition-colors cursor-pointer"
- >
- <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
- <div className="space-y-1">
- <h3 className="text-[17px] font-semibold text-[var(--ink)]">{req.title}</h3>
- <p className="text-[14px] text-[var(--sage)]">{formatJobDate(req.startsAt, req.endsAt, req.timeZone)}</p>
- </div>
- <div className="flex items-center gap-2">
- <RequestStatusBadge status={statusLabel} />
- </div>
- </div>
-
- <div className="mt-4 flex flex-col md:flex-row gap-3 justify-between">
- {/* Col 1 */}
- <div className="flex items-start gap-3 w-full md:w-1/3">
- <Building2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
- <div className="flex flex-col gap-1">
- <span className="text-[13px] text-[var(--sage)]">{org}</span>
- <span className="text-[13px] text-slate-400">{setting}</span>
- </div>
- </div>
- {/* Col 2 */}
- <div className="flex items-start gap-3 w-full md:w-1/3">
- <MapPin className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
- <div className="flex flex-col gap-1">
- <span className="text-[13px] text-[var(--sage)]">
- {format} · {location}
- </span>
- <span className="text-[13px] text-slate-400 font-medium">{req.srn ? `SRN: ${req.srn}` : formatReference(req.id)}</span>
- </div>
- </div>
- {/* Col 3 */}
- <div className="flex items-start gap-3 w-full md:w-1/3">
- <Users2 className="h-5 w-5 text-slate-400 shrink-0 mt-0.5" />
- <div className="flex flex-col gap-1">
- <span className="text-[13px] text-[var(--sage)]">{staffingText}</span>
- </div>
- </div>
- </div>
- </Link>
- )}}
- />
- </div>
- </div>
- )}
- </motion.div>
- );
+      {view.scope === "split" ? (
+        <>
+          {/* Tab toggle: same pill layout as the interpreter Jobs page */}
+          <div className="bg-[#F5F4F0] p-1 rounded-full flex w-full mb-2">
+            <TabButton tab="upcoming" active={activeTab === "upcoming"} count={upcomingRequests.length} onSelect={setActiveTab} />
+            <TabButton tab="past" active={activeTab === "past"} count={pastRequests.length} onSelect={setActiveTab} />
+          </div>
+          {activeTab === "upcoming" ? (
+            <ListSection title="Upcoming" note={view.upcomingNote} empty="No upcoming appointments match these filters." items={upcomingRequests} currentTime={currentTime} />
+          ) : (
+            <ListSection title="Past" note={view.pastNote} empty="No past appointments match these filters." items={pastRequests} currentTime={currentTime} />
+          )}
+        </>
+      ) : (
+        <ListSection
+          title={`${statusFilter} · ${filteredRequests.length}`}
+          note={view.note}
+          empty={view.empty}
+          items={view.scope === "upcoming" ? sortUpcomingWithHappeningNow(filteredRequests, currentTime) : filteredRequests}
+          currentTime={currentTime}
+        />
+      )}
+    </motion.div>
+  );
 }
 
 export default function RequestsPage() {

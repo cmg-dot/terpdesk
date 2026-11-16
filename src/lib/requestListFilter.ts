@@ -79,39 +79,31 @@ export function requestStatusLabel(req: ListedRequest): string {
   return req.isCompleted ? "Completed" : getStaffingLabel(req);
 }
 
+export const isStatusFilter = (value: string): value is StatusFilter => (STATUS_FILTER_OPTIONS as readonly string[]).includes(value);
+
 /**
- * Closed and cancelled jobs are never "upcoming", so choosing one of these filters opens the Past tab instead of
- * leaving the person on an empty Upcoming tab. Other filters keep whichever tab is open.
+ * How the Requests list lays out each filter.
+ *  - "split": jobs can sit on either side of their end time, so the list shows the Upcoming / Past toggle, with a note per tab.
+ *  - "upcoming" / "past": every job the filter lets through is on one side (Happening now and Needing coverage have not ended;
+ *    Staff follow-up has; cancelled, voided and returned jobs are closed whatever their date), so the toggle is hidden and the
+ *    list is one section titled with the filter. A single section lists everything the filter matched, so no job is ever hidden.
  */
-export function tabForFilter(filter: string): "past" | null {
-  return filter === "Completed" || filter === "Cancelled" || filter === "Voided" || filter === "Returned" ? "past" : null;
-}
+export type FilterView =
+  | { scope: "split"; upcomingNote: string; pastNote: string }
+  | { scope: "upcoming" | "past"; note: string; empty: string };
 
-export interface ListCopy {
-  subtitle: string;
-  pastHeading: string;
-  pastNote: string;
-}
-
-const DEFAULT_COPY: ListCopy = {
-  subtitle: "Upcoming appointments and unresolved past appointments",
-  pastHeading: "Past — unresolved",
-  pastNote: "These appointments still need coverage, an offer response, or access follow-up.",
+export const FILTER_VIEWS: Record<StatusFilter, FilterView> = {
+  "Active Appointments": { scope: "split", upcomingNote: "Appointments that haven't ended.", pastNote: "Ended appointments, not cancelled." },
+  "All appointments": { scope: "split", upcomingNote: "Everything that hasn't ended.", pastNote: "Ended, completed and cancelled appointments." },
+  "Happening now": { scope: "upcoming", note: "Booked appointments in progress right now.", empty: "Nothing is in progress right now." },
+  "Needing coverage": { scope: "upcoming", note: "Upcoming positions with no interpreter and no offer out.", empty: "Every upcoming position is covered or has an offer out." },
+  "Needs replacement": { scope: "split", upcomingNote: "An interpreter dropped and the position is open again.", pastNote: "Ended with a position still open." },
+  "Pending offers": { scope: "upcoming", note: "Offers waiting for an interpreter's answer.", empty: "No offers are waiting for an answer." },
+  "Partially staffed": { scope: "split", upcomingNote: "Some positions booked, some open.", pastNote: "Ended with some positions open." },
+  "Fully staffed": { scope: "split", upcomingNote: "Every position booked.", pastNote: "Ended with every position booked." },
+  "Staff follow-up": { scope: "past", note: "Ended appointments with a position flagged for follow-up.", empty: "Nothing needs follow-up." },
+  Completed: { scope: "past", note: "Closed appointments (job or billing marked completed).", empty: "No completed appointments match these filters." },
+  Cancelled: { scope: "past", note: "Cancelled appointments, kept for the record.", empty: "No cancelled appointments match these filters." },
+  Voided: { scope: "past", note: "Jobs that should never have existed (wrong form, duplicates). Kept for the record and not billed.", empty: "No voided appointments match these filters." },
+  Returned: { scope: "past", note: "Jobs the agency was unable to fill and returned to the state or requester. Kept for the record and not billed.", empty: "No returned appointments match these filters." },
 };
-
-export function listCopy(filter: string): ListCopy {
-  switch (filter) {
-    case "Completed":
-      return { subtitle: "Completed appointments", pastHeading: "Past — completed", pastNote: "Appointments that have taken place and are closed." };
-    case "Cancelled":
-      return { subtitle: "Cancelled appointments", pastHeading: "Cancelled", pastNote: "Appointments that were cancelled. They are kept here for the record." };
-    case "Voided":
-      return { subtitle: "Voided appointments", pastHeading: "Voided", pastNote: "Jobs that should never have existed (wrong form, duplicates). They are kept for the record and are not billed." };
-    case "Returned":
-      return { subtitle: "Returned appointments", pastHeading: "Returned", pastNote: "Jobs the agency was unable to fill and returned to the state or requester. They are kept for the record and are not billed." };
-    case "All appointments":
-      return { subtitle: "Every appointment: upcoming, past, completed and cancelled", pastHeading: "Past and cancelled", pastNote: "Every appointment that has already ended or was cancelled." };
-    default:
-      return DEFAULT_COPY;
-  }
-}
