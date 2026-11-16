@@ -32,7 +32,8 @@ export const SharedCredentialsSection = ({ credentials, timeZone }: { credential
                 <span className={neutralBadge}>{c.type}</span>
                 {status && <span className={`${badgeBase} ${status.className}`}>{status.label}</span>}
               </div>
-              {c.issuedBy && <p className="mt-1 text-[13px] text-gray-600">Issued by {c.issuedBy}</p>}
+              {c.issuedBy && <p className="mt-1 text-[13px] text-gray-600">{c.insuranceKind ? "Insurer" : "Issued by"} {c.issuedBy}</p>}
+              {c.coverageLimits && <p className="text-[13px] text-gray-600">Limits: {c.coverageLimits}</p>}
               {dates && <p className="text-[13px] text-gray-500">{dates}</p>}
               <CredentialFileLinks files={c.files} />
             </li>

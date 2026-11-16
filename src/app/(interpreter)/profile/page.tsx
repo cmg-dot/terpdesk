@@ -1,4 +1,6 @@
 import { getCredentials } from "@/app/actions/credentials";
+import { getMyInsurance } from "@/app/actions/insurance";
+import type { MyInsurance } from "@/lib/insurance";
 import { getMyProfile } from "@/app/actions/interpreterProfile";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
 import { logError } from "@/lib/logError";
@@ -14,10 +16,11 @@ export default async function MyProfilePage() {
   const result = await getMyProfile();
 
   let credentials: MyCredential[] = [];
+  let insurance: MyInsurance = { liability: null, commercial_auto: null };
   let websiteSharing: MyWebsiteSharing[] = [];
   if (result.success) {
     try {
-      credentials = await getCredentials();
+      [credentials, insurance] = await Promise.all([getCredentials(), getMyInsurance()]);
     } catch (err) {
       logError("MyProfilePage.credentials", err);
     }
@@ -39,6 +42,7 @@ export default async function MyProfilePage() {
         <ProfileTabs
           initialProfile={result.profile}
           initialCredentials={credentials}
+          initialInsurance={insurance}
           initialWebsiteSharing={websiteSharing}
         />
       ) : (

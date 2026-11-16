@@ -35,6 +35,10 @@ export interface SharedCredentialView {
   issuedBy: string;
   issueDate: string;
   expirationDate: string;
+  /** "liability" / "commercial_auto" for the dedicated insurance policies, else "". */
+  insuranceKind: string;
+  /** A policy's limits as the interpreter wrote them ("" when none). */
+  coverageLimits: string;
   /** Supporting files (private S3; opened through a short-lived signed link after the file authorization check). */
   files: CredentialFile[];
 }
@@ -111,6 +115,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       issuedBy: credentials.issuedBy,
       issueDate: credentials.issueDate,
       expirationDate: credentials.expirationDate,
+      insuranceKind: credentials.insuranceKind,
+      coverageLimits: credentials.coverageLimits,
     })
     .from(credentials)
     .where(and(eq(credentials.interpreterId, interpreterId), eq(credentials.isArchived, false)))
@@ -192,6 +198,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       issuedBy: c.issuedBy ?? "",
       issueDate: c.issueDate ?? "",
       expirationDate: c.expirationDate ?? "",
+      insuranceKind: c.insuranceKind ?? "",
+      coverageLimits: c.coverageLimits ?? "",
       files: filesByCredential.get(c.id) ?? [],
     })),
     sharesAvailability,

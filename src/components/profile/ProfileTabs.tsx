@@ -3,6 +3,8 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { CredentialsTab } from "@/components/profile/CredentialsTab";
+import { InsuranceSections } from "@/components/profile/InsuranceSections";
+import type { MyInsurance } from "@/lib/insurance";
 import { ProfileOverviewTab } from "@/components/profile/ProfileOverviewTab";
 import { VisibilitySharingTab } from "@/components/profile/VisibilitySharingTab";
 import type { MyCredential } from "@/lib/validation/credential";
@@ -20,15 +22,18 @@ const TABS: { id: ProfileTab; label: string }[] = [
 interface ProfileTabsProps {
   initialProfile: MyProfile;
   initialCredentials: MyCredential[];
+  /** The Liability and Commercial Auto policies. */
+  initialInsurance: MyInsurance;
   /** Website permission per connected agency. */
   initialWebsiteSharing: MyWebsiteSharing[];
 }
 
 /** Tab bar and animated panel for the "My Profile" page. The page's data lives here so tabs keep it while switching. */
-export const ProfileTabs = ({ initialProfile, initialCredentials, initialWebsiteSharing }: ProfileTabsProps) => {
+export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsurance, initialWebsiteSharing }: ProfileTabsProps) => {
   const [tab, setTab] = useState<ProfileTab>("overview");
   const [profile, setProfile] = useState<MyProfile>(initialProfile);
   const [credentials, setCredentials] = useState<MyCredential[]>(initialCredentials);
+  const [insurance, setInsurance] = useState<MyInsurance>(initialInsurance);
   const [websiteSharing, setWebsiteSharing] = useState<MyWebsiteSharing[]>(initialWebsiteSharing);
 
   return (
@@ -80,7 +85,9 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialWebsite
               credentials={credentials}
               onChange={setCredentials}
               timeZone={profile.timeZone}
-            />
+            >
+              <InsuranceSections insurance={insurance} onChange={setInsurance} timeZone={profile.timeZone} />
+            </CredentialsTab>
           )}
           {tab === "visibility" && (
             <VisibilitySharingTab profile={profile} sharing={websiteSharing} onSharingChange={setWebsiteSharing} />

@@ -7,6 +7,7 @@ import { useSession } from "next-auth/react";
 import { VerificationBanners } from "@/components/features/VerificationBanners";
 import { HoursOverdueBanner } from "@/components/interpreter/HoursOverdueBanner";
 import { ScheduleBanners } from "@/components/interpreter/ScheduleBanners";
+import { InsuranceWarningBanner } from "@/components/interpreter/InsuranceWarningBanner";
 import { getConnectedAgencyCount } from "@/app/actions/agencyConnections";
 import { Calendar, MapPin, Clock, X, AlertCircle } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
@@ -278,6 +279,8 @@ export default function InterpreterHomePage() {
   )}
 
   <ScheduleBanners />
+
+  <InsuranceWarningBanner />
 
   <HoursOverdueBanner />
 

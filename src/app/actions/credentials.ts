@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, eq } from "drizzle-orm";
+import { and, count, eq, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { credentials, files } from "@/db/schema";
@@ -113,7 +113,8 @@ export async function updateCredential(idInput: string, input: CredentialInput):
     const [updated] = await db
       .update(credentials)
       .set({ ...toColumns(parsed.data), updatedAt: new Date() })
-      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
+      // The dedicated insurance policies are edited in their own sections (actions/insurance.ts), never here.
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false), isNull(credentials.insuranceKind)))
       .returning();
     if (!updated) return { success: false, error: "This credential was not found. It may have been archived." };
 
