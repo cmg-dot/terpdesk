@@ -5,6 +5,8 @@ import { OfferBlockedNotice } from "@/components/requests/OfferBlockedNotice";
 import { OfferExpiryInput } from "@/components/requests/OfferExpiryInput";
 import { pastOfferNote } from "@/components/requests/ExpiredOfferNotice";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
+import { AutoBookAction } from "@/components/requests/staffing/AutoBookAction";
+import { useAutoBookEligibility } from "@/hooks/useAutoBookEligibility";
 import { offerBlock } from "@/lib/offerAvailability";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import type { PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
@@ -31,6 +33,8 @@ export function OfferComposer({ view, ctx, actions }: Props) {
   const recBlock = rec ? offerBlock(recFit, roster.find((i) => i.id === rec)?.name ?? 'This interpreter') : null;
   const recChecking = Boolean(rec) && !recFit && ctx.fitsLoading;
   const offerDisabled = !rec || isSending || Boolean(recBlock) || recChecking;
+  // Interpreters who allow this agency to auto-book them get a one-click Auto-book (AutoBookAction) and a note in the list.
+  const autoBook = useAutoBookEligibility(roster.map((i) => i.id));
 
   return (
     <fieldset
@@ -59,7 +63,7 @@ export function OfferComposer({ view, ctx, actions }: Props) {
             options={roster.map((interpreter) => ({
               id: interpreter.id,
               label: interpreter.name,
-              description: [interpreter.email, pastOfferNote(pastOffers, interpreter.id, ctx.isAppointmentFinished, ctx.nowMs)].filter(Boolean).join(' · ') || undefined,
+              description: [interpreter.email, autoBook[interpreter.id] ? 'Auto-book on' : '', pastOfferNote(pastOffers, interpreter.id, ctx.isAppointmentFinished, ctx.nowMs)].filter(Boolean).join(' · ') || undefined,
               trailing: <FitTrailing fit={ctx.fits[interpreter.id]} loading={ctx.fitsLoading} failed={Boolean(ctx.fitsError)} />,
             }))}
           />
@@ -69,6 +73,16 @@ export function OfferComposer({ view, ctx, actions }: Props) {
             recChecking
               ? <p role="status" className="mt-2 text-xs text-gray-500">Checking availability…</p>
               : <FitWarningNotice fit={recFit} />
+          )}
+          {rec && autoBook[rec] && (
+            <AutoBookAction
+              jobId={ctx.requestId}
+              positionIndex={posIdx}
+              interpreterId={rec}
+              interpreterName={roster.find((i) => i.id === rec)?.name ?? "This interpreter"}
+              available={recFit === "available"}
+              onBooked={(result) => actions.directlyAssigned(posIdx, result)}
+            />
           )}
           {ctx.fitsError && (
             <p className="mt-2 text-xs text-red-700" role="alert">

@@ -162,8 +162,8 @@ export default function AgenciesPage() {
             <ul className="list-disc pl-5 space-y-1.5 text-[14px] text-[var(--sage)] max-w-4xl">
               <li>Only appointments that sit entirely inside the availability you have provided, with no private busy time or accepted booking in the way — including work from other agencies.</li>
               <li>Only virtual appointments for now, because travel time is not checked yet. In-person work still comes to you as an offer you accept.</li>
-              <li>Only appointments starting at least the notice period you choose from now, using the server's own clock.</li>
-              <li>Turning this off, or changing the notice, applies to future bookings only. Jobs already booked stay booked.</li>
+              <li>The agency books you with one click and you are told in the app and by email; there is no offer to accept.</li>
+              <li>Turning this off applies to future bookings only. Jobs already booked stay booked.</li>
             </ul>
 
             <p className="text-[14px] text-[var(--sage)] max-w-4xl leading-relaxed mt-2">
