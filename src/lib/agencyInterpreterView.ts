@@ -17,6 +17,7 @@ import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";
 import { readPermission } from "@/lib/agencyPermissions";
 import { filesFor } from "@/lib/credentials";
+import { hasValidCommercialAuto } from "@/lib/insurance";
 import { areasFromLegacy } from "@/lib/serviceAreas";
 import { rateToText } from "@/lib/validation/interpreterRates";
 import type { InterpreterRatesInput } from "@/lib/validation/interpreterRates";
@@ -68,6 +69,8 @@ export interface AgencyInterpreterView {
   /** Present only when the interpreter chose "Agencies I am connected to". */
   contact: { workEmail: string; workPhone: string } | null;
   credentials: SharedCredentialView[];
+  /** A current commercial auto policy: in-person jobs pay +$10 ("Commercial Auto (+$10 in-person)"). */
+  commercialAuto: boolean;
   /** Free hours and private busy time are only included when the interpreter shares availability with this agency. */
   sharesAvailability: boolean;
   days: DayAvailability[];
@@ -169,6 +172,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
   }
 
   const contactShared = profile?.contactVisibility === "shared";
+  const autoPolicy = sharedCredentials.find((c) => c.insuranceKind === "commercial_auto");
   return {
     id: row.id,
     name: profile?.preferredName || row.name,
@@ -202,6 +206,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       coverageLimits: c.coverageLimits ?? "",
       files: filesByCredential.get(c.id) ?? [],
     })),
+    commercialAuto: hasValidCommercialAuto(autoPolicy?.expirationDate ? { expirationDate: autoPolicy.expirationDate } : null, timeZone),
     sharesAvailability,
     days: summarizeAvailability({ timeZone, rules, exceptions, busy, booked }, now, SUMMARY_DAYS),
   };

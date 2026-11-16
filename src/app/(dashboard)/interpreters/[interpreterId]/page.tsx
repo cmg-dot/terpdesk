@@ -8,6 +8,7 @@ import { EmailNotificationsToggle } from "@/components/interpreters/detail/Email
 import { InterpreterRatesCard } from "@/components/interpreters/detail/InterpreterRatesCard";
 import { SharedCredentialsSection } from "@/components/interpreters/detail/SharedCredentialsSection";
 import { InsuranceExpiry } from "@/components/profile/InsuranceExpiry";
+import { COMMERCIAL_AUTO_BADGE } from "@/lib/insurance";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ServiceAreaChips } from "@/components/profile/ServiceAreaChips";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
@@ -62,6 +63,11 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
             </span>
           </p>
           <p className="text-[12px] text-gray-500">{view.isRegistered ? "Registered app user" : "Shadow / external profile"}</p>
+          {view.commercialAuto && (
+            <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-medium text-emerald-800" data-commercial-auto="">
+              {COMMERCIAL_AUTO_BADGE}
+            </span>
+          )}
         </div>
         <EditInterpreterDetails
           interpreterId={view.id}

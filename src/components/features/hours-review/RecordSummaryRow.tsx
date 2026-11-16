@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check, ChevronDown, TriangleAlert } from "lucide-react";
 import { RecordStatusBadge } from "@/components/features/hours-review/RecordStatusBadge";
 import { summarizeRecord } from "@/lib/hoursReviewSummary";
+import { COMMERCIAL_AUTO_BADGE } from "@/lib/insurance";
 import { formatReference } from "@/utils/statusEngine";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
@@ -78,6 +79,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
               No signature
             </span>
           )}
+          {record.commercialAuto && <span className={`${CHIP} bg-emerald-50 text-emerald-800`}>{COMMERCIAL_AUTO_BADGE}</span>}
           <RecordStatusBadge state={record.state} closed={record.jobClosed} />
           <ChevronDown className={`h-5 w-5 flex-none text-[var(--forest)] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
           <span className="sr-only">{expanded ? "Hide details" : "Show details"}</span>

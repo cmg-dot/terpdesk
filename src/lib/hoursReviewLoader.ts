@@ -7,12 +7,19 @@ import type { SubmittedTimesheet } from "@/app/actions/getSubmittedTimesheets";
 import { toHoursRow } from "@/lib/hoursRequestRow";
 import type { HoursRequestRow } from "@/lib/hoursRequestRow";
 import { loadRequestRows } from "@/lib/requestRows";
+import { hasValidCommercialAuto } from "@/lib/insurance";
+import { commercialAutoExpirations } from "@/lib/insuranceStore";
 
 /** Everything the hours review merges into its records. */
 export interface HoursReviewData {
   requests: HoursRequestRow[];
   timesheets: SubmittedTimesheet[];
+  /** Interpreters on these records who hold a current commercial auto policy (in-person jobs show the +$10 badge). */
+  commercialAutoInterpreterIds: string[];
 }
+
+/** The agency's own zone judges whether a policy is still current on the review screen. */
+const REVIEW_ZONE = "America/Los_Angeles";
 
 /** The request statuses that can make a hours record by themselves (see mergeHoursRecords: `isEligibleStatus`). */
 const HOURS_STATUSES = ["awaiting_review", "correction_requested", "approved"];
@@ -48,5 +55,9 @@ export async function loadHoursReviewData(cachedRequestIds: readonly string[]): 
     loadRequestRows("open", hoursCandidates(cachedRequestIds)),
     getSubmittedTimesheets().catch((): SubmittedTimesheet[] => []),
   ]);
-  return { requests: mapped.map(toHoursRow), timesheets: submitted };
+  const rows = mapped.map(toHoursRow);
+  const people = [...rows.flatMap((r) => r.offers.map((o) => o.interpreterId ?? "")), ...submitted.map((t) => t.interpreterId ?? "")];
+  const autos = await commercialAutoExpirations(people).catch(() => new Map<string, string>());
+  const commercialAutoInterpreterIds = Array.from(autos).filter(([, date]) => hasValidCommercialAuto({ expirationDate: date }, REVIEW_ZONE)).map(([id]) => id);
+  return { requests: rows, timesheets: submitted, commercialAutoInterpreterIds };
 }

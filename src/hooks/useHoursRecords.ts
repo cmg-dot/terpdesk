@@ -38,8 +38,13 @@ export function useHoursRecords() {
         // The cached records name the jobs they are about, so the server includes those jobs: each cached record is then kept or
         // dropped by whether its job still exists, exactly as when every request was loaded.
         const cachedIds = Array.from(new Set(localRecords.map((r) => r.appointmentId).filter((id) => UUID_PATTERN.test(id))));
-        const { requests, timesheets } = await fetchHoursReviewData(cachedIds);
-        const merged = mergeHoursRecords({ localRecords, requests, timesheets });
+        const { requests, timesheets, commercialAutoInterpreterIds } = await fetchHoursReviewData(cachedIds);
+        // The +$10 commercial auto badge: a current policy, and only on an in-person job.
+        const autos = new Set(commercialAutoInterpreterIds);
+        const merged = mergeHoursRecords({ localRecords, requests, timesheets }).map((r) => ({
+          ...r,
+          commercialAuto: Boolean(r.inPerson && r.interpreterId && autos.has(r.interpreterId)),
+        }));
         setRecords(merged);
         if (typeof window !== "undefined") {
           localStorage.setItem(STORAGE_KEY, JSON.stringify(withoutSignatures(merged)));

@@ -22,8 +22,10 @@ export interface HoursRequestRow {
   serviceCompleted: boolean | null;
   requester: { org?: string };
   details: { timeZone: string };
+  /** An online job (no in-person +$10 for commercial auto). */
+  isVirtual?: boolean;
   /** The accepted offers only: they name who worked each position. */
-  offers: { positionIndex: number; status: string; state: string; interpreterName: string | null }[];
+  offers: { positionIndex: number; status: string; state: string; interpreterName: string | null; interpreterId?: string | null }[];
   data: HoursRequestData;
 }
 
@@ -83,6 +85,7 @@ export function toHoursRow(mapped: MappedRequest): HoursRequestRow {
     serviceCompleted: mapped.serviceCompleted,
     requester: typeof requester.org === "string" ? { org: requester.org } : {},
     details: { timeZone: String(mapped.details?.timeZone ?? "") },
+    isVirtual: Boolean(mapped.isVirtual),
     offers: mapped.offers
       .filter(isAccepted)
       .map((offer) => ({
@@ -90,6 +93,7 @@ export function toHoursRow(mapped: MappedRequest): HoursRequestRow {
         status: String(offer.status),
         state: String(offer.state),
         interpreterName: typeof offer.interpreterName === "string" ? offer.interpreterName : null,
+        interpreterId: typeof offer.interpreterId === "string" ? offer.interpreterId : null,
       })),
     data: hours,
   };

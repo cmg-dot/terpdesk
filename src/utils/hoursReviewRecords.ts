@@ -47,6 +47,11 @@ export interface ServiceRecord {
   /** IANA zone of the job. Times are always shown in it, never in the viewer's local zone. */
   timeZone?: string;
   travelLegs?: { fromLabel: string; toLabel: string; miles: number; roundTrip: boolean; countedMiles?: number }[];
+  /** Who worked it, and whether the job was in person: the commercial auto +$10 applies only in person. */
+  interpreterId?: string;
+  inPerson?: boolean;
+  /** The interpreter holds a current commercial auto policy and the job was in person (set by useHoursRecords). */
+  commercialAuto?: boolean;
 }
 
 /** The single definition of "awaiting review", shared by the dashboard metric and the review panel. A closed job never awaits review. */
@@ -133,6 +138,8 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             pdfPosition: hoursSub && !isStateJobRequest({ isStateJob: req.isStateJob, data: req.data }) ? pos : undefined,
             cancellationReason: hoursSub?.cancellationReason ?? null,
             travelLegs: Array.isArray(hoursSub?.legs) ? hoursSub.legs : undefined,
+            interpreterId: acceptedOffer?.interpreterId ?? undefined,
+            inPerson: req.isVirtual === false,
           };
 
           if (existingIdx > -1) {
@@ -198,6 +205,8 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
           signatureDataUrl: ts.signatureDataUrl,
           pdfPosition: owner && mirroredPosition && !ts.isOdhh && !isStateJobRequest({ isStateJob: owner.isStateJob, data: owner.data }) ? mirroredPosition : undefined,
           history: [],
+          interpreterId: ts.interpreterId,
+          inPerson: ts.isVirtual === false,
         };
         const idx = merged.findIndex(r => r.timesheetId === ts.timesheetId);
         if (idx > -1) merged[idx] = rec;

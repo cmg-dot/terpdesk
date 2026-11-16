@@ -40,11 +40,14 @@ export interface SubmittedTimesheet {
   mileageAdjustmentReason: string | null;
   cancellationReason: string | null;
   travelLegs: TimesheetTravelLeg[];
+  /** Who submitted it, and whether the job was online (for the commercial auto +$10 badge on in-person jobs). */
+  interpreterId?: string;
+  isVirtual?: boolean;
 }
 
 interface LooseData {
   intake?: { program?: string; odhhSrn?: string };
-  details?: { timeZone?: string; timezone?: string };
+  details?: { timeZone?: string; timezone?: string; format?: string };
   timeZone?: string;
   timezone?: string;
 }
@@ -57,6 +60,7 @@ export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
     .select({
       timesheetId: timesheets.id,
       requestId: timesheets.requestId,
+      interpreterId: timesheets.interpreterId,
       interpreterName: interpreterDisplayName,
       actualStart: timesheets.actualStartTime,
       actualEnd: timesheets.actualEndTime,
@@ -117,6 +121,8 @@ export async function getSubmittedTimesheets(): Promise<SubmittedTimesheet[]> {
       mileageAdjustmentReason: r.mileageAdjustmentReason,
       cancellationReason: r.cancellationReason,
       travelLegs: Array.isArray(r.travelLegs) ? r.travelLegs : [],
+      interpreterId: r.interpreterId,
+      isVirtual: /virtual/i.test(String(loose.details?.format ?? "")),
     };
   });
 }
