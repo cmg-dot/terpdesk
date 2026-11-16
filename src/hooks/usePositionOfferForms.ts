@@ -69,7 +69,7 @@ export function usePositionOfferForms({ requestId, request, ids, dbInterpreters,
     (id: PositionId) => {
       if (!request || edited.current[id]) return;
       const fields = defaultOfferExpiry(new Date(), parseSafeDate(request.startsAt));
-      // Appointment closer than 24 hours: no ready-made value (it would be refused), so staff type a shorter window.
+      // 24 hours, or the longest window that still ends before a sooner appointment; blank only when it starts within minutes.
       patch(id, { expiryHours: fields?.hours ?? "", expiryMinutes: fields?.minutes ?? "" });
     },
     [request, patch],
@@ -106,8 +106,11 @@ export function usePositionOfferForms({ requestId, request, ids, dbInterpreters,
 
     if (!form.recipient) return fail("Please select an interpreter to send the offer to.");
 
-    // The window is sent as minutes; the server turns it into the absolute deadline (this check just fails fast).
-    const expiry = checkOfferExpiry({ hours: form.expiryHours, minutes: form.expiryMinutes, now: new Date(), timeZone: resolveJobZone(request), startsAt: parseSafeDate(request?.startsAt) });
+    // The window is sent as minutes; the server turns it into the absolute deadline (this check just fails fast). A default staff
+    // did not touch is worked out again now, so a short-notice window filled in a while ago still ends before the start.
+    const now = new Date();
+    const fresh = edited.current[id] ? null : defaultOfferExpiry(now, parseSafeDate(request?.startsAt));
+    const expiry = checkOfferExpiry({ hours: fresh?.hours ?? form.expiryHours, minutes: fresh?.minutes ?? form.expiryMinutes, now, timeZone: resolveJobZone(request), startsAt: parseSafeDate(request?.startsAt) });
     if (!expiry.ok) return fail(expiry.message);
 
     const selected = dbInterpreters.find((i) => i.id === form.recipient);
@@ -136,9 +139,10 @@ export function usePositionOfferForms({ requestId, request, ids, dbInterpreters,
       await reload();
       const outcome = OFFER_OUTCOME[body.email ?? "sent"];
       toast(outcome);
-      // The next offer for this position starts from a fresh 24-hour default again.
+      // The next offer for this position starts from a fresh default again (24 hours, or shorter when the job is sooner).
       edited.current[id] = false;
-      patch(id, { errorMessage: "", successMessage: outcome, recipient: "", expiryHours: String(DEFAULT_OFFER_EXPIRY_HOURS), expiryMinutes: "0" });
+      patch(id, { errorMessage: "", successMessage: outcome, recipient: "" });
+      applyDefaultExpiry(id);
     } catch (error) {
       console.error("[Offer Dispatch] Error creating or sending offer:");
       fail(error instanceof Error ? error.message : "Failed to create offer. Please try again.");

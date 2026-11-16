@@ -12,15 +12,22 @@ export interface OfferExpiryFields {
   minutes: string;
 }
 
+/** Kept free before the appointment when a short-notice window is filled in, so the deadline still falls before the start when the
+ * form is sent a few minutes later (the server checks the same rule). */
+export const SHORT_NOTICE_BUFFER_MINUTES = 10;
+
 /**
- * The form's pre-filled response window: 24 hours. Null when 24 hours from `now` would not be before the appointment
- * starts, since the server refuses such a deadline; staff then type a shorter window instead of being handed a value
- * that can't be used.
+ * The form's pre-filled response window: 24 hours, or, when the appointment starts sooner, the longest window that still ends
+ * before it (SHORT_NOTICE_BUFFER_MINUTES ahead of the start), e.g. "5 h 50 min" for a job six hours away. Null only when the job
+ * starts within that buffer, where no window can be offered.
  */
 export function defaultOfferExpiry(now: Date, startsAt?: Date | null): OfferExpiryFields | null {
-  const expiresAt = offerExpiresAt(now, DEFAULT_OFFER_EXPIRY_HOURS * 60);
-  if (startsAt && !Number.isNaN(startsAt.getTime()) && expiresAt >= startsAt) return null;
-  return { hours: String(DEFAULT_OFFER_EXPIRY_HOURS), minutes: "0" };
+  const full: OfferExpiryFields = { hours: String(DEFAULT_OFFER_EXPIRY_HOURS), minutes: "0" };
+  if (!startsAt || Number.isNaN(startsAt.getTime())) return full;
+  if (offerExpiresAt(now, DEFAULT_OFFER_EXPIRY_HOURS * 60) < startsAt) return full;
+  const total = Math.floor((startsAt.getTime() - now.getTime()) / MINUTE_MS) - SHORT_NOTICE_BUFFER_MINUTES;
+  if (total < 1) return null;
+  return { hours: String(Math.floor(total / 60)), minutes: String(total % 60) };
 }
 
 /** The absolute deadline for an offer sent at `now` that must be answered within `totalMinutes`. */

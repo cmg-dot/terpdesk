@@ -87,7 +87,7 @@ export function OfferComposer({ view, ctx, actions }: Props) {
             disabled={offerLocked}
             onChange={(next) => actions.setExpiry(posIdx, next)}
           />
-          <p className="text-xs text-[var(--sage)] mt-2 mb-2">Defaults to 24 hours; it must end before the appointment starts. An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
+          <p className="text-xs text-[var(--sage)] mt-2 mb-2">Defaults to 24 hours, or to just before the appointment when it starts sooner; it must end before the appointment starts. An offer email with a secure zero-login magic link will be dispatched to the interpreter.</p>
           {errMsg && <p className="text-[#C23B22] text-sm mb-4">{errMsg}</p>}
           {successMsg && (
             <p className="text-[#059669] text-sm mb-4 font-medium flex items-center gap-1.5">
