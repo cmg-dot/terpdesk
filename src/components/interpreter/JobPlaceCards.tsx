@@ -5,13 +5,14 @@ import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { LinkifiedText, MeetingLinkAnchor } from "@/components/ui/LinkifiedText";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
+import { placeName } from "@/lib/jobPlaceLines";
 import { normalizeUrl } from "@/lib/linkify";
 
 /**
  * Where an interpreter goes, on the app's job page: the virtual meeting card, the on-site card, or both. A virtual job that
  * also has a place (an address, a room, a parking code) shows both, because people may attend in person. While the job is
- * only an offer, the meeting link, passcode, street address, room and parking are not even in the data (see
- * interpreterJobData.ts), so the cards say they come after acceptance.
+ * only an offer, the meeting link, passcode, parking, entrance and on-site contact are not even in the data (see
+ * interpreterJobData.ts), so the cards say they come after acceptance; the place itself (facility, room, address) is shown.
  */
 
 export interface PlaceJob {
@@ -115,24 +116,29 @@ function VirtualCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
 }
 
 function OnsiteCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
-  // Until the offer is accepted only the place's name is drawn, whatever the job object holds: the server does not send the
-  // rest (see interpreterJobData.ts), and this keeps the page from showing it even if it ever did.
-  const onsite = isOffer ? { venue: job.onsite?.venue ?? "" } : job.onsite ?? {};
-  const venue = /^virtual/i.test(onsite.venue ?? "") ? "" : onsite.venue ?? "";
-  const where = [venue, onsite.address].filter(Boolean).join(" · ") || (isOffer ? venue || "Location shared after you accept" : job.location);
+  // An offer shows where the job is (facility, room, building, floor, street address). Parking, entrance and the on-site contact
+  // wait for acceptance: the server does not send them (see interpreterJobData.ts), and this keeps the page from showing them
+  // even if it ever did.
+  const full = job.onsite ?? {};
+  const onsite: Record<string, string | undefined> = isOffer
+    ? { venue: full.venue, room: full.room, address: full.address, building: full.building, floor: full.floor }
+    : full;
+  const name = placeName(onsite);
+  const address = onsite.address ?? "";
   return (
     <CollapsibleCard cardId="onsite-location" title="On-site location details">
       <div className="space-y-3" data-place-card="onsite">
         <div className="flex items-center justify-between gap-3 p-3.5 bg-gray-50 rounded-xl border border-gray-100">
           <div className="min-w-0">
-            <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">{onsite.address ? "Venue / Address" : "Venue"}</span>
-            <span className="text-xs font-medium text-[var(--ink)] break-words">{where}</span>
+            <span className="block text-[11px] font-semibold text-[var(--sage)] uppercase tracking-wider mb-0.5">{address ? "Venue / Address" : "Venue"}</span>
+            {/* "Legacy Salmon Creek · Ocean 8": the facility with its room or unit, then the street address under it. */}
+            <span className="block text-sm font-semibold text-[var(--ink)] break-words">{name || address || job.location}</span>
+            {name && address && <span className="block text-xs text-[var(--ink)] break-words">{address}</span>}
           </div>
-          {where && onsite.address && <CopyButton text={where} label="address" />}
+          {address && <CopyButton text={[name, address].filter(Boolean).join(", ")} label="address" />}
         </div>
         {onsite.building && <Detail label="Building" value={onsite.building} />}
         {onsite.floor && <Detail label="Floor" value={onsite.floor} />}
-        {onsite.room && <Detail label="Room" value={onsite.room} />}
         {onsite.contact && <Detail label="Onsite Contact" value={`${onsite.contact}${onsite.contactMethod ? ` (${onsite.contactMethod})` : ""}`} />}
         {onsite.parking && (
           <div className="py-2 border-b border-gray-50 text-xs">
@@ -147,7 +153,7 @@ function OnsiteCard({ job, isOffer }: { job: PlaceJob; isOffer: boolean }) {
           </div>
         )}
         {isOffer && !job.isVirtual && (
-          <p className="text-[12px] text-[var(--sage)]">The street address, room and parking details are shared after you accept this offer.</p>
+          <p className="text-[12px] text-[var(--sage)]">Parking, entrance and the on-site contact are shared after you accept this offer.</p>
         )}
       </div>
     </CollapsibleCard>

@@ -12,14 +12,17 @@ import { hasPhysicalPlace } from "@/lib/jobPlace";
  *
  * Two levels of access:
  *  - "offer"  (a pending offer, or anything that is not a live booking): the schedule, format, a generic setting, the
- *    platform's name and the place's name only. No street address, building, room, floor, parking, entrance, contact,
- *    meeting link, meeting id, passcode or instructions: those are shared after the interpreter accepts.
+ *    platform's name and where to go: the facility, its building / floor / room and the street address, so the interpreter can
+ *    judge the trip before accepting (in the app only: emails never carry a place). No parking, entrance, on-site contact,
+ *    meeting link, meeting id, passcode, instructions, notes or client: those are shared after the interpreter accepts.
  *  - "booked" (an accepted booking): the above plus the full place, the virtual meeting details, the preparation notes and the
  *    client's name (details.deafParticipant). The prior-authorization number and every other staff-only key stay out.
+ *  - "closed" (declined, withdrawn, expired, given back or cancelled): as an offer, but the place's name only.
  */
 
 type Loose = Record<string, unknown>;
-export type JobAccess = "offer" | "booked";
+/** "closed": anything the interpreter no longer holds or can answer (declined, withdrawn, expired, cancelled): the place's name only. */
+export type JobAccess = "closed" | "offer" | "booked";
 
 const isObject = (value: unknown): value is Loose => typeof value === "object" && value !== null && !Array.isArray(value);
 const asObject = (value: unknown): Loose => (isObject(value) ? value : {});
@@ -28,8 +31,10 @@ const orNull = (value: unknown): string | null => text(value) || null;
 
 /** `details` fields the interpreter screens read for the schedule. */
 const SCHEDULE_KEYS = ["startDate", "startTime", "endDate", "endTime"] as const;
-/** `onsite` fields shared only after acceptance. */
-const PLACE_KEYS = ["address", "building", "floor", "room", "parking", "entrance", "contact", "contactMethod"] as const;
+/** `onsite` fields an offer shows too: where the job is. */
+const OFFER_PLACE_KEYS = ["address", "building", "floor", "room"] as const;
+/** `onsite` fields shared only after acceptance: how to get in, and who to meet. */
+const BOOKED_PLACE_KEYS = ["parking", "entrance", "contact", "contactMethod"] as const;
 
 export interface InterpreterJobView {
   setting: string;
@@ -81,17 +86,23 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
   const platform =
     text(details.platform) || text(data.platform) || (lower.includes("zoom") ? "Zoom" : lower.includes("teams") ? "Microsoft Teams" : lower.includes("meet.google") ? "Google Meet" : "Virtual");
 
-  const place = (key: (typeof PLACE_KEYS)[number]): string => (booked ? text(onsite[key]) : "");
   const onsiteView: Record<string, string> = { venue: venue || (isVirtual ? "Virtual" : "Location pending") };
-  for (const key of PLACE_KEYS) onsiteView[key] = place(key);
+  // A live offer for an in-person job shows where it is; a virtual offer's place (if it has one) waits for acceptance like the link,
+  // and a closed one shows only the place's name.
+  const showsPlace = booked || (access === "offer" && !isVirtual);
+  for (const key of OFFER_PLACE_KEYS) onsiteView[key] = showsPlace ? text(onsite[key]) : "";
+  for (const key of BOOKED_PLACE_KEYS) onsiteView[key] = booked ? text(onsite[key]) : "";
 
   const virtualLabel = platform ? `${platform} (Virtual)` : "Virtual";
-  const bookedPlace = venue ? (text(onsite.address) ? `${venue} · ${text(onsite.address)}` : venue) : text(onsite.address);
+  // "Legacy Salmon Creek · Ocean 8 · 2211 NE 139th St": the facility, its room, then the street address (in-person jobs only).
+  const fullPlace = isVirtual ? "" : [venue, text(onsite.room), text(onsite.address)].filter(Boolean).join(" · ");
   const location = isVirtual
     ? text(data.location) && booked ? text(data.location) : virtualLabel
     : booked
-      ? text(data.location) || bookedPlace || "Location pending"
-      : venue || "Location shared after you accept";
+      ? text(data.location) || fullPlace || "Location pending"
+      : showsPlace
+        ? fullPlace || "Location pending"
+        : venue || "Location pending";
 
   const schedule: Loose = {};
   for (const key of SCHEDULE_KEYS) if (text(details[key])) schedule[key] = text(details[key]);

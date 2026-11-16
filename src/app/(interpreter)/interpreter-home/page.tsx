@@ -23,6 +23,8 @@ import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo, findOwnServiceR
 import { td_availability_view } from "@/app/actions/availability";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { bucketInterpreterJobs, isLivePendingOffer } from "@/lib/interpreterJobBuckets";
+import { jobPlaceLines } from "@/lib/jobPlaceLines";
+import { OfferSummaryLines } from "@/components/interpreter/OfferSummaryLines";
 
 export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
@@ -395,19 +397,9 @@ export default function InterpreterHomePage() {
     <h3 className="text-[15px] font-medium text-[var(--ink)] mb-1">
     Offer received — {job.title}
     </h3>
-    <p className="text-[13px] text-[var(--sage)]">
-    Expires {(() => {
-      try {
-        const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
-        if (!endStr) return 'Date TBD';
-        const d = parseSafeDate(endStr);
-        if (!d) return 'Date TBD';
-        const tz = (job as any).details?.timeZone || job.timeZone;
-        return formatInTimeZone(d, getIanaZone(tz), "MMM d, yyyy");
-      } catch (e) {
-        return 'Date TBD';
-      }
-    })()} · Pending offers do not reserve time.
+    <OfferSummaryLines job={job} />
+    <p className="text-[12px] text-[var(--sage)] mt-1">
+    {job.offerExpiresAt ? `Respond by ${formatInTimeZone(new Date(job.offerExpiresAt), getIanaZone(job.details?.timeZone || job.timeZone), "EEE, MMM d · h:mm a zzz")} · ` : ""}Pending offers do not reserve time.
     </p>
     </div>
     </div>
@@ -465,9 +457,9 @@ export default function InterpreterHomePage() {
  getKey={(job) => job.id}
  renderItem={(job) => {
  const isHappening = isAppointmentHappeningNow(job, currentTime);
- const locationParts = (job.location || '').split("·");
- const locPrimary = (locationParts[0]?.trim() || (job.isVirtual ? "Virtual" : "Location pending"));
- const locSecondary = (locationParts[1]?.trim() || (job.isVirtual ? "Remote / Video" : (job.agencyName || DEFAULT_AGENCY_NAME)));
+ const place = jobPlaceLines(job);
+ const locPrimary = place.primary || (job.isVirtual ? "Virtual" : "Location pending");
+ const locSecondary = place.secondary || (job.isVirtual ? "Remote / Video" : (job.agencyName || DEFAULT_AGENCY_NAME));
 
  return (
  <Link
@@ -577,9 +569,9 @@ export default function InterpreterHomePage() {
  const hoursState = getJobHoursState(job, serviceRecords);
  const badgeInfo = getHoursBadgeInfo(hoursState);
  const isCorrection = hoursState === 'correction_requested';
- const locationParts = (job.location || '').split("·");
- const locPrimary = locationParts[0]?.trim() || job.location;
- const locSecondary = locationParts[1]?.trim();
+ const place = jobPlaceLines(job);
+ const locPrimary = place.primary || job.location;
+ const locSecondary = place.secondary;
 
  const record = findOwnServiceRecord(serviceRecords, job);
  const reviewMsg = record?.reviewMessage || (job.hoursSubmission as any)?.reviewMessage;

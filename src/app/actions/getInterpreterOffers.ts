@@ -89,7 +89,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
     // Everything the browser gets about the job is built by the allowlist in interpreterJobData.ts. Only a live booking
     // (accepted, and not cancelled below) gets the full place and the meeting credentials.
     const requestCancelled = Boolean(row.request.canceledAt) || /^cancel+ed$/i.test(row.request.status);
-    const job = interpreterJobView(rowData, row.offer.status === 'accepted' && !requestCancelled ? 'booked' : 'offer');
+    const access = requestCancelled ? 'closed' : row.offer.status === 'accepted' ? 'booked' : row.offer.status === 'pending' ? 'offer' : 'closed';
+    const job = interpreterJobView(rowData, access);
 
     // A cancelled appointment closes its offers (see cancelRequest). This also covers older cancellations that left the
     // offer 'accepted', so a cancelled job is never shown to the interpreter as Booked or Happening now.

@@ -6,6 +6,7 @@ import type { Job } from "@/context/InterpreterJobsContext";
 import type { ServiceRecord } from "@/hooks/useServiceRecords";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { jobDateLine } from "@/lib/interpreterJobDate";
+import { jobPlaceLines } from "@/lib/jobPlaceLines";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { settingLabel } from "@/lib/settingLabel";
 import { findOwnServiceRecord, getJobHoursState, showsStatePortal } from "@/utils/hoursState";
@@ -25,7 +26,7 @@ const text = (value: unknown): string => (typeof value === "string" ? value : ""
 
 /** One booking whose time has passed, with where its hours stand and the button to submit or view them. */
 export function CompletedJobCard({ job, serviceRecords }: { job: Job; serviceRecords: ServiceRecord[] }) {
-  const [primary, secondary] = (job.location || "").split("·").map((part) => part.trim());
+  const { primary, secondary } = jobPlaceLines(job);
   const hoursState = getJobHoursState(job, serviceRecords);
   const isCorrection = hoursState === "correction_requested";
   const usesStatePortal = showsStatePortal(job, hoursState);

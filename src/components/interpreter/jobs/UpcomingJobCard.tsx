@@ -8,6 +8,7 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { jobDateLine } from "@/lib/interpreterJobDate";
+import { jobPlaceLines } from "@/lib/jobPlaceLines";
 import { settingLabel } from "@/lib/settingLabel";
 import { isAppointmentHappeningNow } from "@/utils/happeningNow";
 import { getHoursBadgeInfo, getJobHoursState } from "@/utils/hoursState";
@@ -17,8 +18,8 @@ const PILL = "inline-flex h-6 items-center text-[11px] font-medium px-2.5 rounde
 /** One live offer or upcoming booking on the interpreter's Jobs page. */
 export function UpcomingJobCard({ job, now, serviceRecords }: { job: Job; now: number; serviceRecords: ServiceRecord[] }) {
   const isOffer = job.status === "pending";
-  const locationText = isOffer ? job.location || job.agencyName : job.location;
-  const [primary, secondary] = (locationText ?? "").split("·").map((part) => part.trim());
+  // "Facility · Room" over the street address, on an offer as on a booking (lib/jobPlaceLines.ts).
+  const { primary, secondary } = jobPlaceLines(job);
   const locPrimary = primary || (job.isVirtual ? "Virtual" : "Location pending");
   const locSecondary = secondary || (job.isVirtual ? "Remote / Video" : job.agencyName || DEFAULT_AGENCY_NAME);
   const isHappening = isAppointmentHappeningNow(job, now);
