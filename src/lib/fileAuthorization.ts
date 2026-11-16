@@ -1,7 +1,7 @@
 import { and, eq } from "drizzle-orm";
 import type { Session } from "next-auth";
 import { db } from "@/db";
-import { agencyInterpreters, credentialAgencyShares, credentials } from "@/db/schema";
+import { agencyInterpreters, credentials } from "@/db/schema";
 import type { SelectFile } from "@/db/schema";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { bookedRequestIds } from "@/lib/prepAccess";
@@ -12,8 +12,8 @@ import { bookedRequestIds } from "@/lib/prepAccess";
  *
  *  - linked to a job (prep material): agency staff of the uploading agency; an interpreter only if the agency
  *    shared it with interpreters AND they are booked on that job.
- *  - linked to a credential (supporting file): the interpreter who owns it; agency staff only while the credential
- *    is active, shared with the agency WITH supporting files included, and the interpreter is still connected.
+ *  - linked to a credential (supporting file): the interpreter who owns it; agency staff while the credential is active
+ *    and the interpreter is on the agency's roster (approved connection).
  *  - neither, uploaded by an interpreter (profile photo): that interpreter; agency staff of an agency the
  *    interpreter is connected to.
  *
@@ -57,13 +57,8 @@ export async function canViewFile(session: Session, file: SelectFile): Promise<b
     if (!credential) return false;
     if (interpreterId) return credential.interpreterId === interpreterId;
     if (!isAgency || credential.isArchived) return false;
-
-    const [share] = await db
-      .select({ includeFiles: credentialAgencyShares.includeFiles })
-      .from(credentialAgencyShares)
-      .where(and(eq(credentialAgencyShares.credentialId, file.linkedCredentialId), eq(credentialAgencyShares.agencyId, DEFAULT_AGENCY_ID)))
-      .limit(1);
-    return Boolean(share?.includeFiles) && (await connectedTo(DEFAULT_AGENCY_ID, credential.interpreterId));
+    // Active credentials of an interpreter on the agency's roster are always visible to its staff, files included.
+    return connectedTo(DEFAULT_AGENCY_ID, credential.interpreterId);
   }
 
   if (isProfilePhoto(file) && file.uploadedByInterpreterId) {

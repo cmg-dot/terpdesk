@@ -3,11 +3,11 @@
 import { and, count, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { credentialAgencyShares, credentials, files } from "@/db/schema";
+import { credentials, files } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/app/actions/availability";
 import { writeAuditLog } from "@/lib/audit";
 import { requireInterpreter } from "@/lib/auth/guards";
-import { connectedAgencyIds, filesFor, loadCredentials, sharesFor, toMyCredential } from "@/lib/credentials";
+import { filesFor, loadCredentials, toMyCredential } from "@/lib/credentials";
 import { logError } from "@/lib/logError";
 import { removeObjectsQuietly } from "@/lib/s3";
 import { credentialSchema } from "@/lib/validation/credential";
@@ -56,14 +56,14 @@ const toColumns = (d: z.output<typeof credentialSchema>) => ({
   notes: d.notes || null,
 });
 
-/** The signed-in interpreter's credentials (active and archived) with shares. Never accepts an id from the browser. */
+/** The signed-in interpreter's credentials (active and archived) with their files. Never accepts an id from the browser. */
 export async function getCredentials(): Promise<MyCredential[]> {
   const { interpreterId } = await requireInterpreter();
   await ensureAvailabilityTables();
   return loadCredentials(interpreterId);
 }
 
-/** Adds a credential to the signed-in interpreter's profile. New credentials are visible only to them. */
+/** Adds a credential to the signed-in interpreter's profile. Like every active credential, the agency they work with can see it. */
 export async function addCredential(input: CredentialInput): Promise<SaveCredentialResult> {
   const me = await sessionInterpreter();
   if (!me) return { success: false, error: NOT_LINKED };
@@ -92,14 +92,14 @@ export async function addCredential(input: CredentialInput): Promise<SaveCredent
       action: "credential_added",
       details: `credentialId=${created.id}; type=${created.type}`,
     });
-    return { success: true, credential: toMyCredential(created, []) };
+    return { success: true, credential: toMyCredential(created) };
   } catch (err) {
     logError("addCredential", err);
     return { success: false, error: "We could not save this credential. Please try again." };
   }
 }
 
-/** Edits one of the signed-in interpreter's own (active) credentials. Sharing is left as it was. */
+/** Edits one of the signed-in interpreter's own (active) credentials. */
 export async function updateCredential(idInput: string, input: CredentialInput): Promise<SaveCredentialResult> {
   const me = await sessionInterpreter();
   if (!me) return { success: false, error: NOT_LINKED };
@@ -123,19 +123,15 @@ export async function updateCredential(idInput: string, input: CredentialInput):
       action: "credential_updated",
       details: `credentialId=${updated.id}`,
     });
-    const shares = await sharesFor([updated.id], await connectedAgencyIds(me.interpreterId));
     const attached = await filesFor([updated.id]);
-    return { success: true, credential: toMyCredential(updated, shares.get(updated.id) ?? [], attached.get(updated.id) ?? []) };
+    return { success: true, credential: toMyCredential(updated, attached.get(updated.id) ?? []) };
   } catch (err) {
     logError("updateCredential", err);
     return { success: false, error: "We could not save this credential. Please try again." };
   }
 }
 
-/**
- * Soft delete: hides the credential from the profile and from every agency, but keeps the record.
- * Agency shares are cleared too, so reactivating it later never re-exposes it without the interpreter choosing to.
- */
+/** Soft delete: hides the credential (and its files) from every agency, but keeps the record. */
 export async function archiveCredential(idInput: string): Promise<ArchiveCredentialResult> {
   const me = await sessionInterpreter();
   if (!me) return { success: false, error: NOT_LINKED };
@@ -144,15 +140,11 @@ export async function archiveCredential(idInput: string): Promise<ArchiveCredent
 
   try {
     await ensureAvailabilityTables();
-    const archived = await db.transaction(async (tx) => {
-      const rows = await tx
-        .update(credentials)
-        .set({ isArchived: true, updatedAt: new Date() })
-        .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
-        .returning({ id: credentials.id });
-      if (rows.length > 0) await tx.delete(credentialAgencyShares).where(eq(credentialAgencyShares.credentialId, id.data));
-      return rows;
-    });
+    const archived = await db
+      .update(credentials)
+      .set({ isArchived: true, updatedAt: new Date() })
+      .where(and(eq(credentials.id, id.data), eq(credentials.interpreterId, me.interpreterId), eq(credentials.isArchived, false)))
+      .returning({ id: credentials.id });
     if (archived.length === 0) return { success: false, error: "This credential was not found. It may already be archived." };
 
     await writeAuditLog({
@@ -168,7 +160,7 @@ export async function archiveCredential(idInput: string): Promise<ArchiveCredent
   }
 }
 
-/** Brings an archived credential back to the active list. It starts private (only the interpreter sees it). */
+/** Brings an archived credential back to the active list (visible to the agency again). */
 export async function reactivateCredential(idInput: string): Promise<SaveCredentialResult> {
   const me = await sessionInterpreter();
   if (!me) return { success: false, error: NOT_LINKED };
@@ -199,7 +191,7 @@ export async function reactivateCredential(idInput: string): Promise<SaveCredent
       details: `credentialId=${restored.id}`,
     });
     const attached = await filesFor([restored.id]);
-    return { success: true, credential: toMyCredential(restored, [], attached.get(restored.id) ?? []) };
+    return { success: true, credential: toMyCredential(restored, attached.get(restored.id) ?? []) };
   } catch (err) {
     logError("reactivateCredential", err);
     return { success: false, error: "We could not reactivate this credential. Please try again." };
@@ -207,7 +199,7 @@ export async function reactivateCredential(idInput: string): Promise<SaveCredent
 }
 
 /**
- * Permanently removes a credential (and, through the database cascade, its agency shares). This cannot be undone,
+ * Permanently removes a credential (and, through the database cascade, its files' rows). This cannot be undone,
  * so only archived credentials qualify: an active one must be archived first.
  */
 export async function deleteCredentialPermanently(idInput: string): Promise<ArchiveCredentialResult> {

@@ -121,8 +121,9 @@ export const VisibilitySharingTab = ({ profile, sharing, onSharingChange }: Visi
       <section className="rounded-2xl border border-gray-200 bg-white p-6">
         <h2 className="text-lg font-semibold text-[var(--ink)]">Private sharing with agency staff</h2>
         <p className="mt-1 text-[13px] leading-relaxed text-gray-600">
-          Credentials, supporting files and contact details are shared privately with agency staff only, and are chosen
-          separately under the Credentials tab and in your contact details. Website permission never shares any of them.
+          Your active credentials, insurance and their supporting files are always visible to the staff of the agencies you work
+          with (archive one under the Credentials tab to hide it). Contact details are chosen in your contact details. Website
+          permission never shares any of them.
         </p>
       </section>
     </div>

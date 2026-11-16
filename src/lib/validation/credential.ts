@@ -35,18 +35,13 @@ export const credentialSchema = z
 export type CredentialInput = z.input<typeof credentialSchema>;
 export type CredentialField = keyof CredentialInput;
 
-/** One agency a credential is shared with. */
-export interface CredentialShare {
-  agencyId: string;
-  includeFiles: boolean;
-}
-
-/** A saved credential as the browser sees it (dates stay as yyyy-mm-dd text). */
+/**
+ * A saved credential as the browser sees it (dates stay as yyyy-mm-dd text). While active it is visible, with its supporting files,
+ * to the agency staff of every agency the interpreter is on the roster of; archiving hides it.
+ */
 export interface MyCredential {
-  /** Only agencies the interpreter is currently connected to. Always empty while archived. */
-  shares: CredentialShare[];
   isArchived: boolean;
-  /** Supporting files attached to this credential (private to the interpreter unless shared with files included). */
+  /** Supporting files attached to this credential (visible to the agency while the credential is active). */
   files: CredentialFile[];
   id: string;
   name: string;

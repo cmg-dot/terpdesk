@@ -3,7 +3,7 @@ import { expiryStatus, formatDay, neutralBadge, badgeBase } from "@/components/p
 import type { SharedCredentialView } from "@/lib/agencyInterpreterView";
 
 /**
- * "Qualifications they report": active credentials the interpreter chose to share with this agency.
+ * "Qualifications they report": every active credential on the interpreter's profile, with its files (always visible to the agency).
  * Expiry is judged in the interpreter's time zone (`timeZone`), not the agency's.
  */
 export const SharedCredentialsSection = ({ credentials, timeZone }: { credentials: SharedCredentialView[]; timeZone: string }) => (
@@ -16,8 +16,7 @@ export const SharedCredentialsSection = ({ credentials, timeZone }: { credential
 
     {credentials.length === 0 ? (
       <p className="rounded-xl bg-stone-50 px-4 py-3 text-[13px] text-gray-600">
-        This interpreter has not shared any credentials with your agency. Interpreters choose which credentials each
-        agency can see from their own profile.
+        This interpreter has not listed any credentials yet. Credentials they add to their profile appear here.
       </p>
     ) : (
       <ul className="space-y-3">

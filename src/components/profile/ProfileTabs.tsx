@@ -20,14 +20,12 @@ const TABS: { id: ProfileTab; label: string }[] = [
 interface ProfileTabsProps {
   initialProfile: MyProfile;
   initialCredentials: MyCredential[];
-  /** Agencies the interpreter is connected to; credentials can be shared with these. */
-  connectedAgencyIds: string[];
   /** Website permission per connected agency. */
   initialWebsiteSharing: MyWebsiteSharing[];
 }
 
 /** Tab bar and animated panel for the "My Profile" page. The page's data lives here so tabs keep it while switching. */
-export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgencyIds, initialWebsiteSharing }: ProfileTabsProps) => {
+export const ProfileTabs = ({ initialProfile, initialCredentials, initialWebsiteSharing }: ProfileTabsProps) => {
   const [tab, setTab] = useState<ProfileTab>("overview");
   const [profile, setProfile] = useState<MyProfile>(initialProfile);
   const [credentials, setCredentials] = useState<MyCredential[]>(initialCredentials);
@@ -81,7 +79,6 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, connectedAgenc
             <CredentialsTab
               credentials={credentials}
               onChange={setCredentials}
-              connectedAgencyIds={connectedAgencyIds}
               timeZone={profile.timeZone}
             />
           )}

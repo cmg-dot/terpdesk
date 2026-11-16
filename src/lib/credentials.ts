@@ -1,8 +1,8 @@
-import { and, asc, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, isNull } from "drizzle-orm";
 import { db } from "@/db";
-import { agencyInterpreters, credentialAgencyShares, credentials, files } from "@/db/schema";
+import { credentials, files } from "@/db/schema";
 import type { SelectCredential } from "@/db/schema";
-import type { CredentialShare, MyCredential } from "@/lib/validation/credential";
+import type { MyCredential } from "@/lib/validation/credential";
 import type { CredentialFile } from "@/lib/validation/file";
 
 /**
@@ -10,16 +10,7 @@ import type { CredentialFile } from "@/lib/validation/file";
  * SERVER ONLY: queries the database. Callers must pass the session's own interpreter id.
  */
 
-/** Agencies the interpreter is connected to right now (approved roster rows). Only these can see credentials. */
-export async function connectedAgencyIds(interpreterId: string): Promise<string[]> {
-  const rows = await db
-    .select({ agencyId: agencyInterpreters.agencyId })
-    .from(agencyInterpreters)
-    .where(and(eq(agencyInterpreters.interpreterId, interpreterId), eq(agencyInterpreters.status, "approved")));
-  return rows.map((r) => r.agencyId);
-}
-
-export const toMyCredential = (row: SelectCredential, shares: CredentialShare[], files: CredentialFile[] = []): MyCredential => ({
+export const toMyCredential = (row: SelectCredential, files: CredentialFile[] = []): MyCredential => ({
   id: row.id,
   name: row.name,
   type: row.type,
@@ -28,7 +19,6 @@ export const toMyCredential = (row: SelectCredential, shares: CredentialShare[],
   issueDate: row.issueDate ?? "",
   expirationDate: row.expirationDate ?? "",
   notes: row.notes ?? "",
-  shares,
   isArchived: row.isArchived,
   files,
 });
@@ -51,35 +41,16 @@ export async function filesFor(credentialIds: string[]): Promise<Map<string, Cre
   return byCredential;
 }
 
-/** Shares per credential, keeping only agencies the interpreter is still connected to. */
-export async function sharesFor(credentialIds: string[], connected: string[]): Promise<Map<string, CredentialShare[]>> {
-  const byCredential = new Map<string, CredentialShare[]>();
-  if (credentialIds.length === 0 || connected.length === 0) return byCredential;
-  const rows = await db
-    .select({
-      credentialId: credentialAgencyShares.credentialId,
-      agencyId: credentialAgencyShares.agencyId,
-      includeFiles: credentialAgencyShares.includeFiles,
-    })
-    .from(credentialAgencyShares)
-    .where(and(inArray(credentialAgencyShares.credentialId, credentialIds), inArray(credentialAgencyShares.agencyId, connected)));
-  for (const r of rows) {
-    const list = byCredential.get(r.credentialId) ?? [];
-    list.push({ agencyId: r.agencyId, includeFiles: r.includeFiles });
-    byCredential.set(r.credentialId, list);
-  }
-  return byCredential;
-}
-
-/** All of the interpreter's credentials (active and archived), by name, with their current shares. */
+/**
+ * All of the interpreter's credentials (active and archived), by name, with their files. The dedicated insurance policies
+ * (insurance_kind set) are not in this list: the profile shows them in their own sections.
+ */
 export async function loadCredentials(interpreterId: string): Promise<MyCredential[]> {
   const rows = await db
     .select()
     .from(credentials)
-    .where(eq(credentials.interpreterId, interpreterId))
+    .where(and(eq(credentials.interpreterId, interpreterId), isNull(credentials.insuranceKind)))
     .orderBy(asc(credentials.name));
-  const ids = rows.map((r) => r.id);
-  const shares = await sharesFor(ids, await connectedAgencyIds(interpreterId));
-  const fileMap = await filesFor(ids);
-  return rows.map((r) => toMyCredential(r, shares.get(r.id) ?? [], fileMap.get(r.id) ?? []));
+  const fileMap = await filesFor(rows.map((r) => r.id));
+  return rows.map((r) => toMyCredential(r, fileMap.get(r.id) ?? []));
 }

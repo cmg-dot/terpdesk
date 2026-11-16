@@ -18,8 +18,8 @@ interface CredentialFileUploadProps {
 
 /**
  * "Add a supporting file" for one credential. Choosing a file uploads it straight to S3 through a signed link and
- * attaches it to the credential. Files are private to the interpreter unless the credential is shared with an
- * agency with supporting files included.
+ * attaches it to the credential. Stored privately; the interpreter and the staff of the agencies they work with can open
+ * them while the credential is active.
  */
 export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: CredentialFileUploadProps) => {
   const inputId = useId();
@@ -132,8 +132,7 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
         <span className="text-[12px] text-gray-500">{atLimit ? `Limit of ${MAX_FILES_PER_CREDENTIAL} files reached` : "No file chosen"}</span>
       </label>
       <p className="text-[12px] text-gray-500">
-        PDF, JPEG or PNG, up to 10 MB. Files stay private to you unless you share this credential with an agency and
-        include supporting files.
+        PDF, JPEG or PNG, up to 10 MB. Stored privately: only you and your agency&apos;s staff can open them.
       </p>
       {error && <p role="alert" className="text-[12px] text-red-700">{error}</p>}
     </div>

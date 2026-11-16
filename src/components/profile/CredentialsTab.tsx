@@ -1,38 +1,30 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import type { Dispatch, SetStateAction } from "react";
-import { Award, Plus } from "lucide-react";
+import type { Dispatch, ReactNode, SetStateAction } from "react";
+import { Award, Building2, Plus } from "lucide-react";
 import { ArchivedCredentialCard } from "@/components/profile/ArchivedCredentialCard";
 import { CredentialCard } from "@/components/profile/CredentialCard";
 import { CredentialForm } from "@/components/profile/CredentialForm";
-import { useGlobalState } from "@/context/GlobalContext";
 import type { MyCredential } from "@/lib/validation/credential";
 
 interface CredentialsTabProps {
   /** Active and archived credentials together; the tab splits them. */
   credentials: MyCredential[];
-  /** A state setter, so rapid changes (e.g. optimistic sharing, then the server's answer) never use a stale list. */
+  /** A state setter, so rapid changes (e.g. an upload, then the server's answer) never use a stale list. */
   onChange: Dispatch<SetStateAction<MyCredential[]>>;
-  /** Agencies the interpreter is connected to (from approved roster rows). */
-  connectedAgencyIds: string[];
   /** The interpreter's profile time zone, for expiry badges. */
   timeZone: string;
+  /** Shown above the credentials (the dedicated insurance sections). */
+  children?: ReactNode;
 }
 
 const byName = (a: MyCredential, b: MyCredential) => a.name.localeCompare(b.name);
 
-/** "My Profile" Credentials tab: active credentials with sharing, and an Archived section when there are any. */
-export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, timeZone }: CredentialsTabProps) => {
-  const { agencies: knownAgencies } = useGlobalState();
+/** "My Profile" Credentials tab: who can see them, any sections passed in, active credentials, and an Archived section when there are any. */
+export const CredentialsTab = ({ credentials, onChange, timeZone, children }: CredentialsTabProps) => {
   // null = list view; "new" = add form; otherwise the id being edited.
   const [formFor, setFormFor] = useState<"new" | string | null>(null);
-
-  // Agencies are not stored in the database yet, so names come from the app's agency list.
-  const agencies = useMemo(
-    () => connectedAgencyIds.map((id) => ({ id, name: knownAgencies.find((a) => a.id === id)?.name ?? "Agency" })),
-    [connectedAgencyIds, knownAgencies],
-  );
 
   const active = useMemo(() => credentials.filter((c) => !c.isArchived), [credentials]);
   const archived = useMemo(() => credentials.filter((c) => c.isArchived), [credentials]);
@@ -69,12 +61,22 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, time
 
   return (
     <div className="space-y-8">
+      <p className="flex items-start gap-2.5 rounded-2xl border border-[#BCE1D1] bg-[var(--mint-pale)] px-4 py-3 text-[13px] leading-relaxed text-[var(--mint-pale-ink)]" data-credentials-visibility="">
+        <Building2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>
+          <span className="font-semibold">Visible to your agency.</span> Your active credentials and insurance, with their supporting files, can be seen by
+          the staff of the agencies you work with (never by other interpreters or the public). Archive a credential to hide it.
+        </span>
+      </p>
+
+      {children}
+
       {active.length === 0 ? (
         <div className="rounded-2xl border border-gray-200 bg-white p-10 text-center">
           <Award className="mx-auto mb-3 h-8 w-8 text-gray-300" aria-hidden="true" />
-          <h2 className="text-lg font-semibold text-[var(--ink)]">Nothing listed yet</h2>
+          <h2 className="text-lg font-semibold text-[var(--ink)]">No other credentials yet</h2>
           <p className="mx-auto mb-6 mt-1 max-w-md text-sm text-[var(--sage)]">
-            Add your certifications, qualifications, training and insurance so agencies know what you hold.
+            Add your certifications, qualifications and training so your agency knows what you hold.
           </p>
           {addButton}
         </div>
@@ -91,12 +93,9 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, time
               <CredentialCard
                 key={c.id}
                 credential={c}
-                agencies={agencies}
                 timeZone={timeZone}
                 onEdit={() => setFormFor(c.id)}
-                // Archiving clears the credential's shares on the server, so mirror that here.
-                onArchived={() => replace({ ...c, isArchived: true, shares: [] })}
-                onSharesChange={(shares) => onChange((list) => list.map((x) => (x.id === c.id ? { ...x, shares } : x)))}
+                onArchived={() => replace({ ...c, isArchived: true })}
                 onFilesChange={(files) => onChange((list) => list.map((x) => (x.id === c.id ? { ...x, files } : x)))}
               />
             ))}
@@ -111,7 +110,7 @@ export const CredentialsTab = ({ credentials, onChange, connectedAgencyIds, time
               Archived credentials ({archived.length})
             </h2>
             <p className="text-[13px] text-[var(--sage)]">
-              Hidden from you and from agencies. Reactivate one to use it again, or delete it for good.
+              Hidden from agencies. Reactivate one to use it again, or delete it for good.
             </p>
           </div>
           <ul className="space-y-4">

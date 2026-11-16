@@ -5,7 +5,6 @@ import {
   availabilityExceptions,
   availabilityRules,
   busyBlocks,
-  credentialAgencyShares,
   credentials,
   interpreterProfiles,
   interpreters,
@@ -36,7 +35,7 @@ export interface SharedCredentialView {
   issuedBy: string;
   issueDate: string;
   expirationDate: string;
-  /** Supporting files; empty unless the interpreter shared this credential with files included. */
+  /** Supporting files (private S3; opened through a short-lived signed link after the file authorization check). */
   files: CredentialFile[];
 }
 
@@ -102,7 +101,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
     .orderBy(desc(interpreterProfiles.updatedAt))
     .limit(1);
 
-  // Only active credentials this interpreter shared with THIS agency. Numbers, notes and files are not selected.
+  // Every ACTIVE credential of an interpreter on this agency's roster (the approved connection is checked above), with its files:
+  // visibility to the agency is not optional. Numbers and notes are not selected; archived credentials stay hidden.
   const sharedCredentials = await db
     .select({
       id: credentials.id,
@@ -111,14 +111,12 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       issuedBy: credentials.issuedBy,
       issueDate: credentials.issueDate,
       expirationDate: credentials.expirationDate,
-      includeFiles: credentialAgencyShares.includeFiles,
     })
     .from(credentials)
-    .innerJoin(credentialAgencyShares, eq(credentialAgencyShares.credentialId, credentials.id))
-    .where(and(eq(credentials.interpreterId, interpreterId), eq(credentials.isArchived, false), eq(credentialAgencyShares.agencyId, agencyId)))
+    .where(and(eq(credentials.interpreterId, interpreterId), eq(credentials.isArchived, false)))
     .orderBy(asc(credentials.name));
 
-  const filesByCredential = await filesFor(sharedCredentials.filter((c) => c.includeFiles).map((c) => c.id));
+  const filesByCredential = await filesFor(sharedCredentials.map((c) => c.id));
 
   const timeZone = getIanaZone(profile?.timeZone ?? "America/Los_Angeles");
   const { sharesAvailability } = await readPermission(agencyId, interpreterId);
@@ -194,8 +192,7 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       issuedBy: c.issuedBy ?? "",
       issueDate: c.issueDate ?? "",
       expirationDate: c.expirationDate ?? "",
-      // Supporting files travel only when the interpreter chose "Include supporting files" for this agency.
-      files: c.includeFiles ? (filesByCredential.get(c.id) ?? []) : [],
+      files: filesByCredential.get(c.id) ?? [],
     })),
     sharesAvailability,
     days: summarizeAvailability({ timeZone, rules, exceptions, busy, booked }, now, SUMMARY_DAYS),

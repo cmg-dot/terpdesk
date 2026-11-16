@@ -1,4 +1,3 @@
-import { getShareableAgencyIds } from "@/app/actions/credentialShares";
 import { getCredentials } from "@/app/actions/credentials";
 import { getMyProfile } from "@/app/actions/interpreterProfile";
 import { ProfileTabs } from "@/components/profile/ProfileTabs";
@@ -15,11 +14,10 @@ export default async function MyProfilePage() {
   const result = await getMyProfile();
 
   let credentials: MyCredential[] = [];
-  let connectedAgencyIds: string[] = [];
   let websiteSharing: MyWebsiteSharing[] = [];
   if (result.success) {
     try {
-      [credentials, connectedAgencyIds] = await Promise.all([getCredentials(), getShareableAgencyIds()]);
+      credentials = await getCredentials();
     } catch (err) {
       logError("MyProfilePage.credentials", err);
     }
@@ -41,7 +39,6 @@ export default async function MyProfilePage() {
         <ProfileTabs
           initialProfile={result.profile}
           initialCredentials={credentials}
-          connectedAgencyIds={connectedAgencyIds}
           initialWebsiteSharing={websiteSharing}
         />
       ) : (

@@ -1,33 +1,29 @@
 "use client";
 
 import { useState } from "react";
-import { Lock, Share2 } from "lucide-react";
+import { Building2 } from "lucide-react";
 import { archiveCredential } from "@/app/actions/credentials";
 import { CredentialFileUpload } from "@/components/profile/CredentialFileUpload";
-import { CredentialSharing } from "@/components/profile/CredentialSharing";
 import { actionButton, badgeBase, credentialLines, expiryStatus, neutralBadge } from "@/components/profile/credentialFormat";
-import type { CredentialShare, MyCredential } from "@/lib/validation/credential";
+import type { MyCredential } from "@/lib/validation/credential";
 import type { CredentialFile } from "@/lib/validation/file";
 
 interface CredentialCardProps {
   credential: MyCredential;
-  agencies: { id: string; name: string }[];
   /** The interpreter's profile time zone: expiry is judged against "today" there. */
   timeZone: string;
   onEdit: () => void;
   onArchived: () => void;
-  onSharesChange: (shares: CredentialShare[]) => void;
   onFilesChange: (files: CredentialFile[]) => void;
 }
 
-/** One credential in display mode: details and badges, actions, supporting files, and who can see it. */
-export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onArchived, onSharesChange, onFilesChange }: CredentialCardProps) => {
+/** One credential in display mode: details and badges, actions and supporting files. Active credentials are visible to the agency. */
+export const CredentialCard = ({ credential: c, timeZone, onEdit, onArchived, onFilesChange }: CredentialCardProps) => {
   const [confirmingArchive, setConfirmingArchive] = useState(false);
   const [archiving, setArchiving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const status = expiryStatus(c.expirationDate, timeZone);
-  const sharedCount = c.shares.length;
   const { details, dates } = credentialLines(c);
 
   const archive = async () => {
@@ -61,24 +57,17 @@ export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onAr
 
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           <span className={neutralBadge}>Self-reported</span>
-          {sharedCount === 0 ? (
-            <span className={neutralBadge}>
-              <Lock className="h-3 w-3" aria-hidden="true" />
-              Only me
-            </span>
-          ) : (
-            <span className={`${badgeBase} border-[#BCE1D1] bg-[var(--mint-pale)] text-[var(--mint-pale-ink)]`}>
-              <Share2 className="h-3 w-3" aria-hidden="true" />
-              Shared with {sharedCount} {sharedCount === 1 ? "agency" : "agencies"}
-            </span>
-          )}
+          <span className={`${badgeBase} border-[#BCE1D1] bg-[var(--mint-pale)] text-[var(--mint-pale-ink)]`}>
+            <Building2 className="h-3 w-3" aria-hidden="true" />
+            Visible to your agency
+          </span>
         </div>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
         {confirmingArchive ? (
           <div role="alertdialog" aria-label={`Archive ${c.name}?`} className="flex flex-wrap items-center gap-2">
-            <span className="text-[13px] text-gray-700">Archive this credential? Agencies will no longer see it, and its sharing is cleared.</span>
+            <span className="text-[13px] text-gray-700">Archive this credential? Agencies will no longer see it or its files.</span>
             <button type="button" onClick={archive} disabled={archiving} className="rounded-full bg-[var(--forest)] px-4 py-1.5 text-xs font-medium text-white hover:bg-[var(--forest-hover)] disabled:opacity-60">
               {archiving ? "Archiving…" : "Yes, archive"}
             </button>
@@ -96,8 +85,6 @@ export const CredentialCard = ({ credential: c, agencies, timeZone, onEdit, onAr
       {error && <p role="alert" className="text-[12px] text-red-700">{error}</p>}
 
       <CredentialFileUpload credentialId={c.id} files={c.files} onFilesChange={onFilesChange} />
-
-      <CredentialSharing credentialId={c.id} shares={c.shares} agencies={agencies} onSharesChange={onSharesChange} />
     </li>
   );
 };
