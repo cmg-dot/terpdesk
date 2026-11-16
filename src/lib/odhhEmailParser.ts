@@ -195,7 +195,19 @@ const isMimeArtifactLine = (line: string): boolean =>
   QUOTED_PRINTABLE_LINE_PATTERN.test(line) ||
   SIGNATURE_DELIMITER_PATTERN.test(line);
 /** A quoted-printable soft line break leaves a trailing "=" on the line; it is removed from kept text. */
-const stripSoftLineBreak = (line: string): string => line.replace(/[ \t]*=[ \t]*$/, "");
+export const stripSoftLineBreak = (line: string): string => line.replace(/[ \t]*=[ \t]*$/, "");
+/** A numbered section heading only ("5. PATIENT INFORMATION"), not any line in capitals. */
+const NUMBERED_SECTION_HEADER_PATTERN = /^[ \t]*\d{1,2}[.)][ \t]*[A-Z][A-Z0-9 \/&,'()-]{5,}/;
+/**
+ * A line that ends a multi-line "Label: value": blank, the next "Label:", a section heading, a rule or a MIME artifact. With
+ * `numberedHeadersOnly`, a line in capitals ("PARK IN THE VISITOR LOT") is part of the value and only a numbered heading ends it.
+ */
+export const endsLabelBlock = (line: string, opts: { numberedHeadersOnly?: boolean } = {}): boolean =>
+  line.trim() === "" ||
+  NEXT_LABEL_PATTERN.test(line) ||
+  RULE_LINE_PATTERN.test(line) ||
+  (opts.numberedHeadersOnly ? NUMBERED_SECTION_HEADER_PATTERN : SECTION_HEADER_PATTERN).test(line) ||
+  isMimeArtifactLine(line);
 
 /** Lambda may forward HTML bodies — flatten to plain text lines before matching. */
 export function normalizeEmailText(raw: string): string {
@@ -269,7 +281,7 @@ function extractNote(text: string): string | null {
   const parts = [stripSoftLineBreak(lines[start].match(NOTE_START_PATTERN)?.[1] ?? "").trim()];
   for (let i = start + 1; i < lines.length; i += 1) {
     const line = lines[i];
-    if (line.trim() === "" || NEXT_LABEL_PATTERN.test(line) || RULE_LINE_PATTERN.test(line) || SECTION_HEADER_PATTERN.test(line) || isMimeArtifactLine(line)) break;
+    if (endsLabelBlock(line)) break;
     parts.push(stripSoftLineBreak(line).trim());
   }
   const note = parts.join("\n").replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").trim().slice(0, MAX_NOTE_LENGTH);

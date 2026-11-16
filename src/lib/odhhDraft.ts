@@ -2,6 +2,7 @@ import type { RequestData } from "@/db/schema";
 import { FORMAT_LABELS, ODHH_PROGRAM, ODHH_TIME_ZONE_LABEL, type ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { contactMethodText, stateFlagsLine, type FormExtras } from "@/lib/odhhFormFields";
 import { liftMeetingFromNote } from "@/lib/odhhLocationParse";
+import { roomFromPlace } from "@/lib/odhhRoom";
 import { providerOneFromStateText } from "@/lib/providerOne";
 
 /**
@@ -12,6 +13,12 @@ import { providerOneFromStateText } from "@/lib/providerOne";
 
 /** Only the appointment note goes into the interpreter-visible preparation notes (the parser already caps it). */
 const MAX_PREP_NOTES_LENGTH = 1000;
+
+/** The private-notes line a numbers-only appointment note is kept under (the same words odhhEnrich.ts uses for the note). */
+export const NUMERIC_NOTE_LABEL = "Appointment note (state form):";
+
+/** "2272820": an Appointment Note of five or more digits and nothing else (spaces and dashes allowed between them). */
+export const isNumbersOnlyNote = (note: string | null | undefined): boolean => /^\d[\d \t-]{3,}\d$/.test((note ?? "").trim()) && ((note ?? "").match(/\d/g)?.length ?? 0) >= 5;
 
 export interface DraftInput {
   parsed: ParsedIntakeEmail;
@@ -37,12 +44,19 @@ export function buildDraftData(input: DraftInput): RequestData {
   // A "Comment:" line inside the client/employee section stays in that (private) block and is not copied into the
   // interpreter-visible preparation notes.
   const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
-  const prepNotes = noteAlreadyInBlock ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
+  // An Appointment Note that is only a number ("2272820") is the state's own reference, not guidance for the interpreter, and may
+  // identify the client: it goes to the agency-private notes, never the interpreter-visible preparation notes.
+  const numericNote = isNumbersOnlyNote(parsed.appointmentNote) ? (parsed.appointmentNote ?? "").trim() : null;
+  const prepNotes = noteAlreadyInBlock || numericNote ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
   const contactMethod = contactMethodText(extras);
-  // Agency-private notes: the state's flags first, then the whole of section 5 (gender, hearing identity, comments, ...).
-  const privateNotes = [stateFlagsLine(extras), parsed.clientInfoBlock ?? ""].filter(Boolean).join("\n\n");
-  // The room: the form's own Room line, else a short code the Location line held ("E1"). It is never the place's name.
-  const room = extras.room ?? parsed.locationCode;
+  // Agency-private notes: the state's flags first, then a numbers-only appointment note, then the whole of section 5 (gender,
+  // hearing identity, comments, ...).
+  const privateNotes = [stateFlagsLine(extras), numericNote ? `${NUMERIC_NOTE_LABEL} ${numericNote}` : "", parsed.clientInfoBlock ?? ""].filter(Boolean).join("\n\n");
+  // The room: the form's own Room line, else a short code the Location line held ("E1"), else a numbered unit written into the
+  // Location or Address line ("... Ocean 8"). It is never the place's name: a unit found in the venue is taken out of it.
+  const placeRoom = (extras.room ?? parsed.locationCode) ? null : roomFromPlace(parsed.venue, parsed.address);
+  const room = extras.room ?? parsed.locationCode ?? placeRoom?.room ?? null;
+  const venue = placeRoom?.room ? placeRoom.venue : parsed.venue ?? "";
   // A virtual job whose meeting invitation was pasted into the Directions & Parking note (no link on the meeting line): the link
   // goes to the meeting fields, so it is a button for the interpreter and not plain text in the parking card.
   const lifted = !parsed.meetingLink && parsed.format === "virtual" ? liftMeetingFromNote(extras.parking) : null;
@@ -82,7 +96,7 @@ export function buildDraftData(input: DraftInput): RequestData {
     // to "Agency-private notes" (requests.data.privateNotes), which interpreters never receive.
     ...(privateNotes ? { privateNotes } : {}),
     onsite: {
-      venue: parsed.venue ?? "",
+      venue,
       address: parsed.address ?? "",
       ...(extras.building ? { building: extras.building } : {}),
       ...(extras.floor ? { floor: extras.floor } : {}),
@@ -92,7 +106,7 @@ export function buildDraftData(input: DraftInput): RequestData {
       ...(extras.contactName ? { contact: extras.contactName } : {}),
       ...(contactMethod ? { contactMethod } : {}),
     },
-    overview: { location: parsed.venue ?? parsed.address ?? (parsed.format === "virtual" ? "Virtual" : "TBD"), status: "Unfilled / draft" },
+    overview: { location: venue || parsed.address || (parsed.format === "virtual" ? "Virtual" : "TBD"), status: "Unfilled / draft" },
     // One-time requester for this job: the ODHH requestor from the email. `oneTime` stops the edit page from swapping in
     // a saved client's default contact (it matches saved clients by organisation name). The organization is the form's
     // "Billing Organization Name" (DVR, Seattle Children's, ...), and "WA ODHH" only when the form names none.

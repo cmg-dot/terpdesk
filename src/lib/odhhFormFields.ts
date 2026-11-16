@@ -1,4 +1,4 @@
-import { EMPTY_VALUE, cleanValue, labelPattern, normalizeEmailText, parseEmailAddress, parsePhoneNumber, sectionLines } from "@/lib/odhhEmailParser";
+import { EMPTY_VALUE, cleanValue, endsLabelBlock, labelPattern, normalizeEmailText, parseEmailAddress, parsePhoneNumber, sectionLines, stripSoftLineBreak } from "@/lib/odhhEmailParser";
 
 /**
  * More of what the state's request form says, beyond the schedule and the venue: the appointment setting, the billing
@@ -46,8 +46,10 @@ const FLOOR = labelPattern(["Floor"]);
 const ROOM = labelPattern(["Room"]);
 const REQUESTED_INTERPRETER = labelPattern(["Specific[ \\t]+Interpreter[ \\t]+Requested"]);
 const BOOKING_PERIOD = labelPattern(["Booking[ \\t]+Period"]);
-// Only the form's own label ("Direction & Parking Note"): a bare "Parking:" elsewhere in a forwarded email is not this field.
-const PARKING_NOTE = labelPattern(["Directions?[ \\t]*(?:&|&amp;|and)[ \\t]*Parking(?:[ \\t]+Notes?)?", "Parking[ \\t]+(?:&|and)[ \\t]+Directions?"]);
+// Only the form's own label ("Direction & Parking Note"): a bare "Parking:" elsewhere in a forwarded email is not this field. The
+// value may be empty on the label's line and start on the next one.
+const PARKING_NOTE_START = /^[ \t]*(?:Directions?[ \t]*(?:&|&amp;|and)[ \t]*Parking(?:[ \t]+Notes?)?|Parking[ \t]+(?:&|and)[ \t]+Directions?)[ \t]*:[ \t]*(.*)$/i;
+const MAX_PARKING_NOTE = 1000;
 /** The form prints these two as "Public - No" (a dash, not a colon). */
 const yesNoLine = (label: string): RegExp => new RegExp(String.raw`^[ \t]*${label}[ \t]*[-:–—][ \t]*(Yes|No)\b`, "im");
 const PUBLIC_LINE = yesNoLine("Public");
@@ -88,6 +90,23 @@ const wrappedValue = (text: string, pattern: RegExp): string | undefined => {
   return next !== "" && next.length <= 80 && !next.includes(":") ? `${value.trim()} ${next}` : value;
 };
 
+/**
+ * The Direction & Parking note in full: the label's line and every line under it up to a blank line, the next "Label:", a section
+ * heading or a rule (the form wraps a long note over several lines, and a gate code or a second paragraph of directions sits there).
+ */
+const parkingNote = (text: string): string | null => {
+  const lines = text.split("\n");
+  const start = lines.findIndex((line) => PARKING_NOTE_START.test(line));
+  if (start < 0) return null;
+  const parts = [stripSoftLineBreak(PARKING_NOTE_START.exec(lines[start])?.[1] ?? "")];
+  // With an empty label line the note simply starts on the next one; a blank line or another label still ends it. Directions are
+  // often typed in capitals, so only a numbered heading ends the note, not any line in capitals.
+  for (let i = start + 1; i < lines.length && !endsLabelBlock(lines[i], { numberedHeadersOnly: true }); i += 1) parts.push(stripSoftLineBreak(lines[i]));
+  // Line breaks are kept (cleanValue would join the lines and cut the note at 300 characters); spacing inside a line is squashed.
+  const note = parts.map((part) => part.replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, "").replace(/[ \t]+/g, " ").trim()).filter(Boolean).join("\n").slice(0, MAX_PARKING_NOTE);
+  return note && !EMPTY_VALUE.test(note) ? note : null;
+};
+
 export function parseFormExtras(rawContent: string): FormExtras {
   const text = normalizeEmailText(rawContent);
   const location = sectionLines(text, LOCATION_HEADER);
@@ -109,7 +128,7 @@ export function parseFormExtras(rawContent: string): FormExtras {
     preAuthorizationRequired: PRE_AUTHORIZATION.test(text),
     crucialAppointment: CRUCIAL_APPOINTMENT.test(text),
     bookingPeriod: real(text.match(BOOKING_PERIOD)?.[1]),
-    parking: real(wrappedValue(text, PARKING_NOTE)),
+    parking: parkingNote(text),
     isPublic: yesNo(text.match(PUBLIC_LINE)),
     isMixedGroup: yesNo(text.match(MIXED_GROUP_LINE)),
   };
