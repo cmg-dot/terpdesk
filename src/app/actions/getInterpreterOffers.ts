@@ -120,6 +120,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       endsAt,
       status: effectiveOfferStatus,
       expiredAt: row.offer.status === 'expired' ? (row.offer.updatedAt ? row.offer.updatedAt.toISOString() : endsAt) : null,
+      // The offer's own response deadline: a pending offer past it can no longer be accepted, so the lists hide it.
+      offerExpiresAt: row.offer.expiresAt.toISOString(),
       requestStatus: row.request.status,
       // Team jobs: request-wide status/travel describe both positions, so the UI must not use them for this
       // interpreter's hours (see scopedRequestStatus).

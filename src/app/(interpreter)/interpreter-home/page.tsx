@@ -22,6 +22,7 @@ import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord } from "@/utils/hoursState";
 import { td_availability_view } from "@/app/actions/availability";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
+import { bucketInterpreterJobs, isLivePendingOffer } from "@/lib/interpreterJobBuckets";
 
 export default function InterpreterHomePage() {
   const { jobs, acceptJobOffer } = useInterpreterJobs();
@@ -36,7 +37,6 @@ export default function InterpreterHomePage() {
   const [offers, setOffers] = React.useState<any[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
   const [serviceRecords, setServiceRecords] = React.useState<any[]>([]);
-  const [dismissedExpiredOfferIds, setDismissedExpiredOfferIds] = React.useState<string[]>([]);
   const [acceptError, setAcceptError] = React.useState<string | null>(null);
   const [profileTimezone, setProfileTimezone] = React.useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -69,14 +69,6 @@ export default function InterpreterHomePage() {
         if (stored) {
           try {
             setServiceRecords(JSON.parse(stored));
-          } catch (e) {
-            console.error("[interpreter-home page] operation failed");
-          }
-        }
-        const dismissed = localStorage.getItem('terpdesk_dismissed_expired_offers');
-        if (dismissed) {
-          try {
-            setDismissedExpiredOfferIds(JSON.parse(dismissed));
           } catch (e) {
             console.error("[interpreter-home page] operation failed");
           }
@@ -118,16 +110,6 @@ export default function InterpreterHomePage() {
   const [isPending, startTransition] = React.useTransition();
   const [actingOfferId, setActingOfferId] = React.useState<string | null>(null);
 
-  const handleDismissExpiredOffer = (offerId: string) => {
-    setDismissedExpiredOfferIds(prev => {
-      const next = [...prev, offerId];
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('terpdesk_dismissed_expired_offers', JSON.stringify(next));
-      }
-      return next;
-    });
-  };
-
   const handleAcceptOffer = (offer: any) => {
     setAcceptError(null);
     setActingOfferId(offer.id);
@@ -147,29 +129,16 @@ export default function InterpreterHomePage() {
     });
   };
 
-  const visibleAppointments = jobs.filter((job) => job.status !== "declined" && job.status !== "released" && job.status !== "cancelled").length;
+  // Upcoming only: live offers and bookings still ahead (lib/interpreterJobBuckets.ts), never past or closed jobs.
+  const upcomingAppointments = bucketInterpreterJobs(jobs, currentTime).upcoming.length;
   const upcomingBookedJobs = jobs.filter((job) => job.status === "booked" && isAppointmentUpcoming(job, currentTime));
   const sortedUpcomingBookings = sortUpcomingWithHappeningNow(upcomingBookedJobs, currentTime);
   const upcomingBookings = sortedUpcomingBookings.length;
   const happeningNowJobs = upcomingBookedJobs.filter(job => isAppointmentHappeningNow(job, currentTime));
 
-  // Active pending offers: only non-expired pending offers whose end time has not passed
-  const pendingOffersList = offers.filter(o => {
-    if (o.status !== 'pending') return false;
-    const endMs = o.endsAt ? new Date(o.endsAt).getTime() : 0;
-    if (endMs && currentTime > endMs) return false;
-    return true;
-  });
+  // Offers that can still be answered: pending, before their response deadline, appointment not over. Nothing else is listed.
+  const pendingOffersList = offers.filter(o => isLivePendingOffer(o, currentTime));
   const pendingOffers = pendingOffersList.length;
-
-  // Recently expired offers
-  const expiredOffersList = offers.filter(o => {
-    if (o.status === 'expired') return true;
-    const endMs = o.endsAt ? new Date(o.endsAt).getTime() : 0;
-    if (o.status === 'pending' && endMs && currentTime > endMs) return true;
-    return false;
-  });
-  const visibleExpiredOffers = expiredOffersList.filter(o => !dismissedExpiredOfferIds.includes(o.id));
 
   const hoursToSubmitJobs = jobs.filter((job) => isJobNeedingHours(job, serviceRecords, currentTime));
   const sortedHoursToSubmitJobs = [...hoursToSubmitJobs].sort((a, b) => {
@@ -314,10 +283,10 @@ export default function InterpreterHomePage() {
  <div className="grid grid-cols-2 md:grid-cols-4 gap-y-8 gap-x-6">
  <div className="flex flex-col">
  <span className="text-[10px] font-semibold tracking-wider text-[var(--sidebar-muted)] mb-2 uppercase">
- Visible appointments
+ Upcoming appointments
  </span>
  <span className="text-[28px] font-medium tracking-tight text-white leading-none">
- {visibleAppointments}
+ {upcomingAppointments}
  </span>
  </div>
 
@@ -381,45 +350,6 @@ export default function InterpreterHomePage() {
   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pt-2">
   {/* Left Column (2/3) */}
   <div className="lg:col-span-2 space-y-6">
-
-  {/* Dismissible Notice(s) for Recently Expired Offers */}
-  {visibleExpiredOffers.length > 0 && (
-    <div className="space-y-3">
-      {visibleExpiredOffers.map(expiredOffer => {
-        const timeZone = expiredOffer.timeZone || (expiredOffer as any).details?.timeZone;
-        const formattedDate = formatJobDate(expiredOffer.startsAt, expiredOffer.endsAt, timeZone);
-        return (
-          <div
-            key={expiredOffer.id}
-            className="bg-amber-50/90 border border-amber-300 text-amber-950 rounded-2xl p-4 shadow-sm flex items-start justify-between gap-4 transition-all"
-          >
-            <div className="flex items-start gap-3">
-              <div className="w-8 h-8 rounded-full bg-amber-100 flex items-center justify-center text-amber-800 shrink-0 mt-0.5 border border-amber-200">
-                <Clock className="w-4 h-4" />
-              </div>
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800">Offer Expired</span>
-                  <span className="bg-amber-200/70 text-amber-900 text-[10px] font-semibold px-2 py-0.5 rounded-full border border-amber-300/50">Removed from active</span>
-                </div>
-                <p className="text-[14px] text-amber-950 font-normal leading-relaxed">
-                  Offer expired: &lsquo;<span className="font-semibold">{expiredOffer.title}</span>&rsquo; ({formattedDate}) ended before a response was submitted and has been removed from your active offers.
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => handleDismissExpiredOffer(expiredOffer.id)}
-              className="text-amber-700 hover:text-amber-950 hover:bg-amber-200/60 p-1.5 rounded-full transition-colors shrink-0 cursor-pointer"
-              title="Dismiss notification"
-            >
-              <X className="w-4 h-4" />
-            </button>
-          </div>
-        );
-      })}
-    </div>
-  )}
 
   {/* Your Offers */}
   <div className="bg-white rounded-2xl border border-gray-200 p-6 border border-gray-200">

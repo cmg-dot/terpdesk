@@ -23,6 +23,8 @@ export interface Job {
   hasAutoFill?: boolean;
   startsAt?: string;
   endsAt?: string;
+  /** The offer's response deadline (lib/interpreterJobBuckets.ts hides a pending offer past it). */
+  offerExpiresAt?: string | null;
   serviceRecordState?: 'not_started' | 'submitted' | 'approved';
   program?: string;
   isStateJob?: boolean;
@@ -62,6 +64,8 @@ export interface Job {
 
 interface InterpreterJobsContextType {
   jobs: Job[];
+  /** Re-reads the interpreter's jobs from the server (the Jobs page's refresh button). */
+  refreshJobs: () => Promise<void>;
   acceptJobOffer: (jobId: string) => Promise<void>;
   declineOffer: (jobId: string) => Promise<void>;
   releaseJob: (jobId: string, reason?: string) => void;
@@ -97,6 +101,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           isVirtual: o.isVirtual ?? true,
           startsAt: o.startsAt,
           endsAt: o.endsAt,
+          offerExpiresAt: o.offerExpiresAt,
           program: o.program,
           isStateJob: (o as any).isStateJob === true,
           onsiteSignatureRequired: (o as any).onsiteSignatureRequired === true,
@@ -259,7 +264,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
   if (!isMounted) return null;
 
   return (
-    <InterpreterJobsContext.Provider value={{ jobs, acceptJobOffer, declineOffer, releaseJob, markJobReleased, submitHours }}>
+    <InterpreterJobsContext.Provider value={{ jobs, refreshJobs: reloadJobs, acceptJobOffer, declineOffer, releaseJob, markJobReleased, submitHours }}>
       {children}
     </InterpreterJobsContext.Provider>
   );
