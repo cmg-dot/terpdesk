@@ -9,7 +9,7 @@ export interface RequestedMatch {
 }
 
 interface Props {
-  /** The interpreter the state's form asks for, as it wrote the name. */
+  /** The interpreter the request asks for (the state's form, or the demo website's form), as it wrote the name. */
   requestedName: string;
   /** Who on the roster that name belongs to; null when nobody (or more than one person) fits. */
   match: RequestedMatch | null;
@@ -25,8 +25,8 @@ interface Props {
 }
 
 /**
- * "Requested: Kimberly Page" above the booking controls, with one click to choose them in the offer picker. It is a preference
- * from the state, not a booking: choosing only fills the picker, and staff still send the offer (or book directly).
+ * "Requested: Kimberly Page" above the booking controls, with one click to choose them in the offer picker. It is a preference,
+ * not a booking: choosing only fills the picker, and staff still send the offer (or book directly).
  */
 export function RequestedInterpreterBadge({ requestedName, match, alreadyBooked, openPosition, showPosition, openOrdinal, onSelect }: Props) {
   return (
@@ -50,7 +50,7 @@ export function RequestedInterpreterBadge({ requestedName, match, alreadyBooked,
           Select {match.name}{showPosition ? ` for Position ${openOrdinal ?? openPosition}` : ""}
         </button>
       )}
-      <span className="text-xs text-amber-800">A request from the state, not a booking.</span>
+      <span className="text-xs text-amber-800">A preference, not a booking.</span>
     </div>
   );
 }

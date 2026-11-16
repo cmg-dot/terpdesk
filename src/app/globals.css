@@ -64,6 +64,41 @@ body {
 }
 
 /*
+ * The demo deployment's sample agency website (/book, "Evergreen Interpreting Group"). Scoped to its root element so nothing
+ * here reaches the app. Gold is for accents, and for text only on the dark greens (on cream it is too faint to read).
+ *   ev-gold        buttons and accents on forest           ev-cream / ev-line: page background / card edges
+ *   ev-night/pine/mist  the hero's sky, from top to horizon
+ */
+[data-site="evergreen"] {
+  --ev-gold: #C8A252;
+  --ev-gold-hover: #D6B46A;
+  --ev-gold-rgb: 200 162 82;
+  --ev-cream: #F9F8F4;
+  --ev-line: #E7E2D4;
+  --ev-night: #06231E;
+  --ev-pine: #1D4A3F;
+  --ev-mist: #3B5B4A;
+}
+[data-site="evergreen"] .ev-serif {
+  font-family: var(--font-ev-serif), Georgia, "Times New Roman", serif;
+}
+[data-site="evergreen"] .ev-hero-sky {
+  background:
+    radial-gradient(ellipse 55% 40% at 70% 82%, rgb(var(--ev-gold-rgb) / 0.3), transparent 70%),
+    radial-gradient(ellipse 40% 30% at 15% 10%, rgb(255 255 255 / 0.06), transparent 70%),
+    linear-gradient(180deg, var(--ev-night) 0%, var(--forest) 45%, var(--ev-pine) 75%, var(--ev-mist) 100%);
+}
+/* The header's anchor links glide to their section, unless the visitor asks for less motion. */
+html:has([data-site="evergreen"]) {
+  scroll-behavior: smooth;
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has([data-site="evergreen"]) {
+    scroll-behavior: auto;
+  }
+}
+
+/*
  * Slim scrollbar for the coloured sidebars: a 4px transparent track and a rounded thumb in translucent white (it suits
  * every theme's sidebar) that only shows while the pointer is over the sidebar and brightens under the pointer, so
  * Windows Chromium never draws its 12-15px grey gutter. Chrome, Edge and Safari use the ::-webkit

@@ -41,7 +41,11 @@ export async function submitDemoPublicRequest(input: Record<string, string>): Pr
     const parsed = parsePublicIntake(fields);
     if (!parsed.ok) return { success: false, error: "Some fields are missing or not valid.", fields: parsed.fields };
 
-    const draft = buildPublicRequest(parsed.data);
+    const built = buildPublicRequest(parsed.data);
+    // The page's "Request <name>" buttons name a demo roster interpreter. The name also goes where the request page's "Requested:"
+    // badge reads it, so staff can choose that interpreter in one click. Demo only: the public intake API keeps it on the requester.
+    const requested = parsed.data.prefInterpreter;
+    const draft = requested ? { ...built, data: { ...built.data, intake: { ...built.data.intake, requestedInterpreter: requested } } } : built;
     const saved = await insertPublicRequest(draft, parsed.data.submissionId);
     if (!saved.duplicate) {
       await announcePublicRequest(saved.id, draft, "Website request form");

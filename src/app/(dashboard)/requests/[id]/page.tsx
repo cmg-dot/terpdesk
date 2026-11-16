@@ -489,7 +489,7 @@ export default function AssignmentDetailPage() {
  },
  details: foundRequest.details || { setting: settingLabel(foundRequest.setting), purpose: "Routine checkup", format: foundRequest.format || "In person", timeZone: "Pacific Time — Seattle, Los Angeles", deafParticipant: "1", peopleNeeding: "1", commPreferences: "ASL", qualifications: "Medical certified" },
  onsite: foundRequest.onsite || { venue: foundRequest.location || "Location pending", address: "", building: "", parking: "", entrance: "", contact: "", contactMethod: "" },
- requester: foundRequest.requester || { name: "Ralph Chrysler Silva", org: "Freshflow", email: "ralphchryslersilva65@gmail.com", phone: "09218648143", prefContact: "Text message", reqInterpreter: "No preference", teamSuggested: "Team suggested", billOrg: "Organization on file", billContact: "Billing Dept", billEmail: "ralphchryslersilva65@gmail.com", poNumber: "PO-9921" },
+ requester: foundRequest.requester || { name: "", org: "", email: "", phone: "", prefContact: "", reqInterpreter: "", teamSuggested: "", billOrg: "", billContact: "", billEmail: "", poNumber: "" },
  prepNotes: foundRequest.prepNotes || "Please arrive 15 minutes early.",
  privateNotes: foundRequest.privateNotes || "Client requested experienced medical terp.",
  activity: foundRequest.activity || "created · Avery North · Mon, Sep 28 · 3:37 AM GMT+8"
