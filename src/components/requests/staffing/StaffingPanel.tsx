@@ -61,7 +61,7 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
   const openPosition: Position | null = positions.find((p) => !p.accepted && !p.activeOffer && !p.offerLocked)?.posIdx ?? null;
 
   return (
-    <div className="bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 border border-gray-200/50 shadow-none mb-4">
+    <div id="staffing" className="scroll-mt-24 bg-white rounded-2xl border border-gray-200 p-6 sm:p-8 border border-gray-200/50 shadow-none mb-4">
       <h2 className="text-[18px] font-medium text-[var(--ink)] mb-4">Staffing</h2>
       <p className="text-sm text-[var(--sage)] mb-1">Pending offers do not reserve time.</p>
       <p className="text-sm text-[var(--sage)] mb-6">Back-to-back appointments are allowed. Travel time is not checked.</p>

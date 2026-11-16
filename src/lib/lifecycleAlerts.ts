@@ -158,6 +158,8 @@ export async function alertInterpreter(params: {
       href,
       title: copy.title,
       message: `${interpreterContext(ctx)}. ${copy.line} ${copy.action(true)}`,
+      // A cancelled booking also shows on the interpreter's schedule banner.
+      ...(params.event === "booking_cancelled" ? { kind: "booking_cancelled" as const } : {}),
     });
 
     if (!person?.email) return;

@@ -89,7 +89,8 @@ export async function bookInterpreterDirectly(tx: DbTx, params: DirectAssignPara
 
   const [booked] = await tx
     .insert(offers)
-    .values({ requestId, interpreterId, status: "accepted", expiresAt: Number.isNaN(end.getTime()) ? new Date(now.getTime() + THIRTY_DAYS_MS) : end })
+    // Booked by staff: nothing for the agency's "accepted" banner to announce.
+    .values({ requestId, interpreterId, status: "accepted", agencyAcknowledgedAt: now, expiresAt: Number.isNaN(end.getTime()) ? new Date(now.getTime() + THIRTY_DAYS_MS) : end })
     .returning({ id: offers.id });
 
   const slotReplacements: Record<string, boolean> = { ...(isRecord(data.slotReplacements) ? (data.slotReplacements as Record<string, boolean>) : {}), [positionIndex]: false };

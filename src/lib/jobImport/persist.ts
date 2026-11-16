@@ -45,7 +45,7 @@ async function write(tx: Tx, jobs: readonly PlannedJob[]): Promise<JobsOutcome> 
   }
   const bookings = records.flatMap((r, i) => r.offers.map((o) => ({ ...o, requestId: r.requestId, expiresAt: new Date(fresh[i].endsAt) })));
   for (const batch of chunked(bookings)) {
-    await tx.insert(offers).values(batch.map((o) => ({ id: o.id, requestId: o.requestId, interpreterId: o.interpreterId, status: "accepted", expiresAt: o.expiresAt })));
+    await tx.insert(offers).values(batch.map((o) => ({ id: o.id, requestId: o.requestId, interpreterId: o.interpreterId, status: "accepted", expiresAt: o.expiresAt, agencyAcknowledgedAt: new Date() })));
   }
   for (const batch of chunked(records)) {
     await tx.insert(requestActivity).values(

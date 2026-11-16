@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { RefreshCw } from "lucide-react";
 import { HoursOverdueBanner } from "@/components/interpreter/HoursOverdueBanner";
+import { ScheduleBanners } from "@/components/interpreter/ScheduleBanners";
 import { CancelledJobCard } from "@/components/interpreter/jobs/CancelledJobCard";
 import { CompletedJobCard } from "@/components/interpreter/jobs/CompletedJobCard";
 import { UpcomingJobCard } from "@/components/interpreter/jobs/UpcomingJobCard";
@@ -80,6 +81,7 @@ export default function InterpreterJobsPage() {
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased">
+      <ScheduleBanners />
       <HoursOverdueBanner />
 
       <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 mb-8 pt-4">

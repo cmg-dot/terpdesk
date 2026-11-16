@@ -70,9 +70,10 @@ export async function assignInterpreterDirectly(input: AssignInterpreterDirectly
   }
   await notifyInterpreter(interpreterId, {
     type: "job",
-    href: "/jobs",
+    href: `/jobs/${outcome.offerId}`,
     title: "You have been assigned to a job",
     message: "Your agency booked you for a job. Open it to see the details.",
+    kind: "booking_added",
   });
   const email = await sendBookingConfirmation({ requestId: jobId, interpreterId, positionNumber: positionIndex, kind: "assigned" });
 

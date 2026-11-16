@@ -199,6 +199,11 @@ export const notifications = pgTable('notifications', {
   // Optional in-app path to open when the notification is clicked.
   href: varchar('href', { length: 300 }),
   isRead: boolean('is_read').notNull().default(false),
+  // What it is about ("booking_added", "booking_cancelled"): the interpreter's top banner shows these kinds (0012_phase23.sql).
+  // NULL = an ordinary bell notice.
+  kind: varchar('kind', { length: 40 }),
+  // When it was closed on that banner; the bell still lists it.
+  bannerDismissedAt: timestamp('banner_dismissed_at', { withTimezone: true }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 }, (t) => ({
   userReadCreatedIdx: index('notifications_user_read_created_idx').on(t.userId, t.isRead, t.createdAt),
@@ -293,6 +298,13 @@ export const offers = pgTable('offers', {
   expiresAt: timestamp('expires_at').notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
+  // Given by the interpreter when accepting (0012_phase23.sql): "Do you need travel time?" and how much, and an optional
+  // partial-availability note. NULL = not asked (accepted before Phase 23, or assigned by staff).
+  travelRequested: boolean('travel_requested'),
+  travelMinutes: integer('travel_minutes'),
+  availabilityNote: varchar('availability_note', { length: 500 }),
+  // When staff dismissed the "accepted" action banner for this booking.
+  agencyAcknowledgedAt: timestamp('agency_acknowledged_at', { withTimezone: true }),
 });
 
 export const timesheetStatusValues = ['pending', 'submitted', 'approved', 'rejected'] as const;
@@ -553,6 +565,10 @@ export const credentials = pgTable('credentials', {
   notes: text('notes'),
   // Soft delete: archived credentials are hidden from the profile and from agencies, but kept.
   isArchived: boolean('is_archived').notNull().default(false),
+  // 'liability' / 'commercial_auto' for the two dedicated insurance sections (one active each, 0012_phase23.sql); NULL otherwise.
+  insuranceKind: varchar('insurance_kind', { length: 30 }),
+  // The policy limits as written ("$1,000,000 / $2,000,000").
+  coverageLimits: varchar('coverage_limits', { length: 200 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => ({

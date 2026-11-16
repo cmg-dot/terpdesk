@@ -68,7 +68,7 @@ export async function assignPendingVerification(
         const label = person?.label ?? "Interpreter";
         const offerId = randomUUID();
         const expiresAt = pending.actualEnd ? new Date(pending.actualEnd) : new Date(Date.now() + THIRTY_DAYS_MS);
-        await tx.insert(offers).values({ id: offerId, requestId, interpreterId, status: "accepted", expiresAt });
+        await tx.insert(offers).values({ id: offerId, requestId, interpreterId, status: "accepted", expiresAt, agencyAcknowledgedAt: new Date() });
 
         const replacements = isRecord(locked.data.slotReplacements) ? (locked.data.slotReplacements as Record<string, boolean>) : {};
         const updatedSlots = rebuildSlots({ ids, existing: slots, replacements, booking: { position, offerId, interpreterId, interpreterName: label } });

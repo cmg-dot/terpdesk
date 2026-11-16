@@ -133,6 +133,8 @@ async function runEnsureAvailabilityTables(): Promise<void> {
       );
       CREATE INDEX IF NOT EXISTS credentials_interpreter_idx ON credentials (interpreter_id);
       ALTER TABLE credentials ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT false;
+      ALTER TABLE credentials ADD COLUMN IF NOT EXISTS insurance_kind VARCHAR(30);
+      ALTER TABLE credentials ADD COLUMN IF NOT EXISTS coverage_limits VARCHAR(200);
 
       CREATE TABLE IF NOT EXISTS credential_agency_shares (
         id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
