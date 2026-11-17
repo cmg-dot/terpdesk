@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 interface ErrorScreenProps {
   error: Error & { digest?: string };
@@ -15,6 +16,14 @@ interface ErrorScreenProps {
  * so it can be copied to support (it describes the code failure, never contains page data).
  */
 export function ErrorScreen({ error, reset, area }: ErrorScreenProps) {
+  const router = useRouter();
+  const [retrying, startRetry] = useTransition();
+  // reset() alone only re-renders what the browser already has; refreshing first re-reads the page from the server too.
+  const retry = () => startRetry(() => {
+    router.refresh();
+    reset();
+  });
+
   useEffect(() => {
     // HIPAA: the error object is not printed (a message can quote data). The digest links it to the server log.
     console.error(`[${area}] page error`, { name: error.name, digest: error.digest });
@@ -29,10 +38,11 @@ export function ErrorScreen({ error, reset, area }: ErrorScreenProps) {
       <div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row">
         <button
           type="button"
-          onClick={reset}
-          className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)]"
+          onClick={retry}
+          disabled={retrying}
+          className="rounded-full bg-[var(--forest)] px-6 py-2.5 text-sm font-medium text-white hover:bg-[var(--forest-hover)] disabled:opacity-60"
         >
-          Try again
+          {retrying ? "Trying again…" : "Try again"}
         </button>
         <button
           type="button"

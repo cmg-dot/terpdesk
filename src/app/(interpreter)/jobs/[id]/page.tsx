@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, ChevronDown, ChevronRight, MapPin, Building2, Video, Lock } from "lucide-react";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
+import type { Job } from "@/context/InterpreterJobsContext";
 import { JobPrepMaterials } from "@/components/prep/JobPrepMaterials";
 import { format } from "date-fns";
 import { formatInTimeZone, fromZonedTime } from "date-fns-tz";
@@ -331,7 +332,16 @@ function VersionHistoryAuditLog({
   );
 }
 
-function ServiceTimeBlock({ job }: { job: any }) {
+/**
+ * "Actual service time" appears only on a booking. Accepting an offer turns this job into a booking while the page stays open, so
+ * the guard mounts BookedServiceTime fresh at that moment: its hooks always run in the same order (React #310 otherwise).
+ */
+function ServiceTimeBlock({ job }: { job: Job }) {
+  if (job.status !== 'booked') return null;
+  return <BookedServiceTime job={job} />;
+}
+
+function BookedServiceTime({ job }: { job: any }) {
   // The signed-in interpreter's own name (from their session), used on the hours record and its history.
   const { currentUser } = useGlobalState();
   const interpreterName = currentUser.name?.trim() ?? '';
@@ -443,8 +453,6 @@ function ServiceTimeBlock({ job }: { job: any }) {
     window.addEventListener('storage', loadRecord);
     return () => window.removeEventListener('storage', loadRecord);
   }, [job.id, job.requestId, job.requestStatus, (job as any).hoursSubmission?.status, (job as any).hoursSubmission?.submittedAt]);
-
-  if (job.status !== 'booked') return null;
 
   const { startsAt: resolvedStartsAt, endsAt: resolvedEndsAt } = resolveRequestTimes(job);
   const startsAtMs = new Date(resolvedStartsAt).getTime();

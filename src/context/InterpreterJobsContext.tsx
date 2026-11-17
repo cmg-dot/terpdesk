@@ -192,6 +192,9 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
       await reloadJobs();
       throw err;
     }
+    // The flip above shows "Booked" at once. The booking's details (meeting link, parking, client, prep and booking notes) are
+    // never sent with an offer, so they are read now instead of on the next sync.
+    await reloadJobs();
   };
 
   const declineOffer = async (jobId: string) => {

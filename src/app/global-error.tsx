@@ -2,9 +2,10 @@
 
 /**
  * Last resort for an error in the root layout itself (it replaces the whole document, so it brings its own
- * <html> and <body>). Page-level errors are handled by the error.tsx files next to each layout.
+ * <html> and <body>). Page-level errors are handled by the error.tsx files next to each layout, and app/error.tsx catches the
+ * section layouts. "Try again" reloads the page: with the root layout gone, re-rendering in place (reset) cannot recover.
  */
-export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+export default function GlobalError({ error }: { error: Error & { digest?: string } }) {
   return (
     <html lang="en">
       <body style={{ fontFamily: "system-ui, sans-serif", background: "#F9F8F4", margin: 0 }}>
@@ -13,7 +14,7 @@ export default function GlobalError({ error, reset }: { error: Error & { digest?
           <p style={{ color: "#6b7280", fontSize: 14 }}>Your data is safe. Please try again.</p>
           <button
             type="button"
-            onClick={reset}
+            onClick={() => window.location.reload()}
             style={{ background: "#0B3B32", color: "#fff", border: 0, borderRadius: 999, padding: "10px 24px", fontSize: 14, cursor: "pointer" }}
           >
             Try again
