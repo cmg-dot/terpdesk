@@ -161,6 +161,8 @@ export async function mirrorTimesheetApproval(
   timesheetId: string,
   approvedMileage: number,
   mileageAdjustmentReason: string | null = null,
+  /** The travel minutes staff confirmed (billing); null leaves the record without one. */
+  approvedTravelMinutes: number | null = null,
 ): Promise<void> {
   const [req] = await tx.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).for("update");
   if (!req) return;
@@ -176,6 +178,7 @@ export async function mirrorTimesheetApproval(
     status: "approved",
     approvedMileage,
     mileageAdjustmentReason,
+    ...(approvedTravelMinutes !== null ? { approvedTravelMinutes } : {}),
     reviewMessage: null,
     history: [
       ...history,
@@ -186,7 +189,11 @@ export async function mirrorTimesheetApproval(
         actor: "Agency Staff",
         timestamp: new Date().toISOString(),
         version: Number(current.version ?? 1),
-        details: { approvedMileage, ...(mileageAdjustmentReason ? { mileageAdjustmentReason } : {}) },
+        details: {
+          approvedMileage,
+          ...(mileageAdjustmentReason ? { mileageAdjustmentReason } : {}),
+          ...(approvedTravelMinutes !== null ? { approvedTravelMinutes } : {}),
+        },
       },
     ],
   };

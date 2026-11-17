@@ -1,4 +1,4 @@
-import { isOdhhProgram, isStateProgram } from "@/lib/stateJob";
+import { isStateProgram } from "@/lib/stateJob";
 
 /**
  * Billing minimums: a job is billed for at least 1.5 hours (State) or 2 hours (Non-state), however short the service.
@@ -27,17 +27,14 @@ export interface BillingTierSource {
 }
 
 /**
- * State = ODHH, or a request flagged as a state job. Non-state = everything else: HCA / Apple Health and private jobs.
- *
- * NOTE: `requests.is_state_job` is also true for Apple Health (HCA) jobs, because they are routed to a state portal for
- * their hours. They are billed at the NON-state minimum here, so the program is checked before the flag.
+ * State = ODHH or Apple Health (HCA), or a request flagged as a state job. Non-state = everything else (private jobs).
+ * Kari confirmed (Phase 6) that Apple Health jobs follow the State rules: the 1.5-hour minimum, not the Non-state 2 hours.
  *
  * TODO(bulk import): once the imported jobs carry a definitive State / Non-state value (a payer or client type), map it
  * here. This function is the only place that decides the tier.
  */
 export function billingTierOf(job: BillingTierSource): BillingTier {
-  if (job.isOdhh === true || isOdhhProgram(job.program)) return "state";
-  if (isStateProgram(job.program)) return "non_state";
+  if (job.isOdhh === true || isStateProgram(job.program)) return "state";
   return job.isStateJob === true ? "state" : "non_state";
 }
 

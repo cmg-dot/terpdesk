@@ -14,6 +14,7 @@ const SECONDARY = "w-full sm:w-auto bg-white border border-gray-300 text-gray-70
  */
 export function ReviewActions({ record, review }: { record: ServiceRecord; review: ReviewActionsState }) {
   const correctionId = useId();
+  const travelId = useId();
   if (record.jobClosed) {
     return (
       <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700" data-closed-job-note>
@@ -50,6 +51,23 @@ export function ReviewActions({ record, review }: { record: ServiceRecord; revie
         showValueError={review.showMileageError}
         showReasonError={review.showReasonError}
       />
+      {review.asksTravel && (
+        <div className="mb-5">
+          <label className="block text-xs text-gray-600 mb-2" htmlFor={travelId}>
+            Travel time to approve, in minutes (submitted: {record.reportedTravelMinutes ?? 0} min)
+          </label>
+          <input
+            id={travelId}
+            type="text"
+            inputMode="numeric"
+            value={review.travelToApprove}
+            onChange={(e) => review.setTravelToApprove(e.target.value)}
+            aria-invalid={review.showTravelError}
+            className="w-full sm:w-[200px] bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow"
+          />
+          {review.showTravelError && <p className="text-[#C23B22] text-xs mt-1">Enter whole minutes, from 0 to 1440.</p>}
+        </div>
+      )}
       {review.isCorrecting && (
         <div className="mb-5">
           <label htmlFor={correctionId} className="block text-xs text-gray-600 mb-2">Message to the interpreter (required to request a correction)</label>

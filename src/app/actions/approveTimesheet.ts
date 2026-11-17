@@ -25,6 +25,8 @@ const approveSchema = z.object({
   approvedMileage: z.coerce.number().finite().min(0).max(2000),
   // Required (checked below) when the approved mileage differs from what was reported.
   mileageAdjustmentReason: mileageAdjustmentReasonSchema.optional(),
+  // Billing: the travel minutes staff confirm (sent only where billing is switched on).
+  approvedTravelMinutes: z.number().int().min(0).max(1440).optional(),
 });
 
 export type ApproveTimesheetResult =
@@ -83,7 +85,7 @@ export async function approveTimesheet(input: z.input<typeof approveSchema>): Pr
         });
       if (!row) return null;
       // Keep the interpreter app's copy of these hours (requests.data.hoursSubmissions) in step.
-      await mirrorTimesheetApproval(tx, row.requestId, timesheetId, approvedMileage, reason);
+      await mirrorTimesheetApproval(tx, row.requestId, timesheetId, approvedMileage, reason, parsed.data.approvedTravelMinutes ?? null);
       // Team jobs: the request is 'completed' only once every booked position is approved; until then it stays in
       // review, so the other interpreter's job never shows as approved because of this approval.
       const everyoneApproved = await allBookedPositionsApproved(tx, row.requestId);

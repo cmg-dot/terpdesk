@@ -1,5 +1,6 @@
 import { Home, LayoutGrid, Calendar, Users, Building, Globe, Inbox, CreditCard, Settings } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { BILLING_ENABLED } from "@/lib/billing/enabled";
 
 /** The agency workspace's pages, in sidebar order. Shared by the desktop sidebar (and the mobile menu if it adopts it). */
 export interface AgencyNavItem {
@@ -20,7 +21,8 @@ export const AGENCY_NAV: readonly AgencyNavItem[] = [
   { href: "/clients", label: "Organizations", icon: Building },
   { href: "/website-requests", label: "Website requests", icon: Globe },
   { href: "/inbox", label: "Inbox", icon: Inbox, trailing: "inboxCount" },
-  { href: "/billing", label: "Billing", icon: CreditCard, trailing: "later" },
+  // "Later" only where billing is still switched off (production until sign-off).
+  { href: "/billing", label: "Billing", icon: CreditCard, ...(BILLING_ENABLED ? {} : { trailing: "later" as const }) },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 

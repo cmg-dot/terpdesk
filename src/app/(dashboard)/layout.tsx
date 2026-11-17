@@ -28,6 +28,7 @@ import { MobileBrand } from "@/components/agency/SidebarBrand";
 import { IdleTimeoutGuard } from "@/components/auth/IdleTimeoutGuard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
+import { BILLING_ENABLED } from "@/lib/billing/enabled";
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -128,7 +129,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                       <CreditCard className="h-5 w-5" />
                       Billing
                     </div>
-                    <span className="text-[11px] uppercase tracking-wider text-slate-400">Later</span>
+                    {!BILLING_ENABLED && <span className="text-[11px] uppercase tracking-wider text-slate-400">Later</span>}
                   </Link>
                   <Link href="/settings" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/settings') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Settings className="h-5 w-5" />

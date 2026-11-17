@@ -20,6 +20,8 @@ const approveHoursSchema = z.object({
   approvedMileage: z.number().finite().min(0).max(MAX_TOTAL_MILES),
   positionIndex: positionIdSchema,
   mileageAdjustmentReason: mileageAdjustmentReasonSchema.optional(),
+  // Billing: the travel minutes staff confirm (sent only where billing is switched on).
+  approvedTravelMinutes: z.number().int().min(0).max(1440).optional(),
 });
 
 export type ApproveHoursResult = { success: true } | { success: false; error: string };
@@ -29,9 +31,10 @@ export async function approveHours(
   approvedMileage: number,
   positionIndex: PositionId = 1,
   mileageAdjustmentReason?: string,
+  approvedTravelMinutes?: number,
 ): Promise<ApproveHoursResult> {
   await requireRole("agency");
-  const parsed = approveHoursSchema.safeParse({ requestId, approvedMileage, positionIndex: positionIndex || 1, mileageAdjustmentReason });
+  const parsed = approveHoursSchema.safeParse({ requestId, approvedMileage, positionIndex: positionIndex || 1, mileageAdjustmentReason, approvedTravelMinutes });
   if (!parsed.success) return { success: false, error: "Enter a valid, non-negative mileage." };
 
   let approvedText = "Position 1";
@@ -69,6 +72,7 @@ export async function approveHours(
       details: {
         approvedMileage,
         ...(adjustmentReason ? { mileageAdjustmentReason: adjustmentReason } : {}),
+        ...(parsed.data.approvedTravelMinutes !== undefined ? { approvedTravelMinutes: parsed.data.approvedTravelMinutes } : {}),
       }
     };
 
@@ -78,6 +82,7 @@ export async function approveHours(
       status: 'approved',
       approvedMileage,
       mileageAdjustmentReason: adjustmentReason,
+      ...(parsed.data.approvedTravelMinutes !== undefined ? { approvedTravelMinutes: parsed.data.approvedTravelMinutes } : {}),
       approvedAt: new Date().toISOString(),
       reviewMessage: null,
       history: [...existingHistory, approveHistoryEntry],

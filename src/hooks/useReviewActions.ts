@@ -4,6 +4,7 @@ import { useState } from "react";
 import { approveHours, requestHoursCorrection } from "@/app/actions/reviewHours";
 import { approveTimesheet } from "@/app/actions/approveTimesheet";
 import { needsMileageReason } from "@/components/features/MileageApprovalField";
+import { BILLING_ENABLED } from "@/lib/billing/enabled";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 const APPROVE_FAILED = "We could not approve these hours. Nothing was changed. Please try again.";
@@ -26,6 +27,10 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
   const [isSendingCorrection, setIsSendingCorrection] = useState(false);
 
   const [mileageToApprove, setMileageToApprove] = useState(record.reportedMileage.toString());
+  // Billing: the travel minutes to confirm, prefilled from the window the interpreter submitted (asked only where billing is on).
+  const asksTravel = BILLING_ENABLED && typeof record.reportedTravelMinutes === "number";
+  const [travelToApprove, setTravelToApprove] = useState(String(record.reportedTravelMinutes ?? 0));
+  const [showTravelError, setShowTravelError] = useState(false);
   const [showMileageError, setShowMileageError] = useState(false);
   const [adjustmentReason, setAdjustmentReason] = useState("");
   const [showReasonError, setShowReasonError] = useState(false);
@@ -59,6 +64,12 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
       setShowReasonError(true);
       return;
     }
+    const travelMinutes = asksTravel ? Number(travelToApprove) : undefined;
+    if (travelMinutes !== undefined && (!/^\d{1,4}$/.test(travelToApprove.trim()) || travelMinutes > 1440)) {
+      setShowTravelError(true);
+      return;
+    }
+    setShowTravelError(false);
     setShowSignatureError(false);
     setShowMileageError(false);
     setShowReasonError(false);
@@ -67,8 +78,8 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
 
     try {
       const result = record.timesheetId
-        ? await approveTimesheet({ timesheetId: record.timesheetId, approvedMileage: mileageNum, mileageAdjustmentReason: reason })
-        : await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1, reason);
+        ? await approveTimesheet({ timesheetId: record.timesheetId, approvedMileage: mileageNum, mileageAdjustmentReason: reason, approvedTravelMinutes: travelMinutes })
+        : await approveHours(record.appointmentId, mileageNum, record.positionIndex || 1, reason, travelMinutes);
       if (!result.success) {
         setApproveError(result.error);
         setIsApproving(false);
@@ -172,6 +183,10 @@ export function useReviewActions(record: ServiceRecord, onUpdate: (r: ServiceRec
     setAdjustmentReason,
     showReasonError,
     setShowReasonError,
+    asksTravel,
+    travelToApprove,
+    setTravelToApprove,
+    showTravelError,
     isApproving,
     approveError,
     handleApprove,

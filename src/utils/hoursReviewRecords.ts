@@ -52,6 +52,15 @@ export interface ServiceRecord {
   inPerson?: boolean;
   /** The interpreter holds a current commercial auto policy and the job was in person (set by useHoursRecords). */
   commercialAuto?: boolean;
+  /** Minutes of the travel window the interpreter submitted; null when they gave none (no fallback to the booking's times). */
+  reportedTravelMinutes?: number | null;
+}
+
+/** Whole minutes from a submitted travel start to its end; null unless both are real times in order. */
+export function travelWindowMinutes(start: unknown, end: unknown): number | null {
+  const a = typeof start === "string" ? Date.parse(start) : NaN;
+  const b = typeof end === "string" ? Date.parse(end) : NaN;
+  return Number.isFinite(a) && Number.isFinite(b) && b > a ? Math.round((b - a) / 60000) : null;
 }
 
 /** The single definition of "awaiting review", shared by the dashboard metric and the review panel. A closed job never awaits review. */
@@ -140,6 +149,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             travelLegs: Array.isArray(hoursSub?.legs) ? hoursSub.legs : undefined,
             interpreterId: acceptedOffer?.interpreterId ?? undefined,
             inPerson: req.isVirtual === false,
+            reportedTravelMinutes: travelWindowMinutes(hoursSub?.travelStartTime, hoursSub?.travelEndTime),
           };
 
           if (existingIdx > -1) {
@@ -207,6 +217,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
           history: [],
           interpreterId: ts.interpreterId,
           inPerson: ts.isVirtual === false,
+          reportedTravelMinutes: travelWindowMinutes(ts.travelStart, ts.travelEnd),
         };
         const idx = merged.findIndex(r => r.timesheetId === ts.timesheetId);
         if (idx > -1) merged[idx] = rec;
