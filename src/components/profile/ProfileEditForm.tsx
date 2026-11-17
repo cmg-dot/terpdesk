@@ -6,6 +6,7 @@ import { updateMyProfile } from "@/app/actions/interpreterProfile";
 import { Field, FormCard as Card, inputClass } from "@/components/profile/formParts";
 import { ProfilePhotoPicker } from "@/components/profile/ProfilePhotoPicker";
 import { Dropdown } from "@/components/ui/Dropdown";
+import { IconInput } from "@/components/ui/IconInput";
 import { ServiceAreasInput } from "@/components/profile/ServiceAreasInput";
 import { CONTACT_VISIBILITY_OPTIONS, PROFILE_TIME_ZONES, interpreterProfileSchema } from "@/lib/validation/interpreterProfile";
 import type { InterpreterProfileField, InterpreterProfileInput, MyProfile } from "@/lib/validation/interpreterProfile";
@@ -188,7 +189,16 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
           hint="The date your liability insurance expires. Agencies you are connected to can see it."
           error={errors.liabilityInsuranceExpiration}
         >
-          <input type="date" className={inputClass} {...text("liabilityInsuranceExpiration")} />
+          <IconInput
+            kind="date"
+            clearable
+            id="profile-liabilityInsuranceExpiration"
+            value={values.liabilityInsuranceExpiration}
+            aria-invalid={Boolean(errors.liabilityInsuranceExpiration)}
+            aria-describedby={errors.liabilityInsuranceExpiration ? "profile-liabilityInsuranceExpiration-error" : undefined}
+            onChange={(e) => setValues((v) => ({ ...v, liabilityInsuranceExpiration: e.target.value }))}
+            className={inputClass}
+          />
         </Field>
       </Card>
 

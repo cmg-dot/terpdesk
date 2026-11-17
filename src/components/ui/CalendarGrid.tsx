@@ -17,6 +17,8 @@ interface Props {
   today?: string;
   onPick: (key: string) => void;
   onDone: () => void;
+  /** Optional dates: a "Clear" button (shown while a day is chosen) that empties the field. */
+  onClear?: () => void;
   /**
    * For dates far from today (a birth date): the month name becomes a button that opens a "choose a year" list, and a calendar with no day
    * chosen yet opens on that list. Off by default, so every other date field is exactly as before.
@@ -31,7 +33,7 @@ const navButton = "rounded-full p-1.5 text-[var(--forest)] transition-colors hov
  * primary emerald, today is ringed, and hovering a day gives it a soft emerald wash. Keyboard: arrows move by a day or a
  * week, PageUp / PageDown by a month (Shift for a year), Home / End to the start / end of the week, Enter picks.
  */
-export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, onDone, yearPicker = false }: Props) => {
+export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, onDone, onClear, yearPicker = false }: Props) => {
   const today = todayOverride ?? todayKey();
   const start = parseDateKey(value) ? value : today;
   // The day the keyboard is on (the only tab stop in the grid); the grid shows the month that contains it.
@@ -163,9 +165,16 @@ export const CalendarGrid = ({ value, min, max, today: todayOverride, onPick, on
         >
           Today
         </button>
-        <button type="button" onClick={onDone} className="rounded-full bg-[var(--forest)] px-4 py-1 text-[13px] font-medium text-white hover:bg-[var(--forest-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] focus-visible:ring-offset-1">
-          Done
-        </button>
+        <div className="flex items-center gap-1">
+          {onClear && value && (
+            <button type="button" onClick={onClear} className="rounded-full px-3 py-1 text-[13px] font-medium text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]">
+              Clear
+            </button>
+          )}
+          <button type="button" onClick={onDone} className="rounded-full bg-[var(--forest)] px-4 py-1 text-[13px] font-medium text-white hover:bg-[var(--forest-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] focus-visible:ring-offset-1">
+            Done
+          </button>
+        </div>
       </div>
     </div>
   );

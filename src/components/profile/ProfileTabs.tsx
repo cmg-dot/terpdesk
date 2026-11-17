@@ -86,7 +86,13 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
               onChange={setCredentials}
               timeZone={profile.timeZone}
             >
-              <InsuranceSections insurance={insurance} onChange={setInsurance} timeZone={profile.timeZone} />
+              <InsuranceSections
+                insurance={insurance}
+                onChange={setInsurance}
+                timeZone={profile.timeZone}
+                // Otherwise the Overview keeps the old date, and saving it there would overwrite the policy's.
+                onLiabilityDate={(date) => setProfile((p) => ({ ...p, liabilityInsuranceExpiration: date }))}
+              />
             </CredentialsTab>
           )}
           {tab === "visibility" && (

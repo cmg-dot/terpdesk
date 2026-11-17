@@ -5,6 +5,8 @@ import type { ChangeEvent, FormEvent } from "react";
 import { addCredential, updateCredential } from "@/app/actions/credentials";
 import { Field, FormCard, inputClass } from "@/components/profile/formParts";
 import { Dropdown } from "@/components/ui/Dropdown";
+import { IconInput } from "@/components/ui/IconInput";
+import type { PickerChangeEvent } from "@/components/ui/IconInput";
 import { plainOptions } from "@/lib/dropdown";
 import { CREDENTIAL_TYPES, credentialSchema } from "@/lib/validation/credential";
 import type { CredentialField, CredentialInput, MyCredential } from "@/lib/validation/credential";
@@ -52,6 +54,15 @@ export const CredentialForm = ({ initial, onSaved, onCancel }: CredentialFormPro
     "aria-describedby": errors[field] ? `credential-${field}-error` : undefined,
     onChange: (e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) =>
       setValues((v) => ({ ...v, [field]: e.target.value })),
+  });
+
+  /** The same wiring for the calendar picker, which hands back `target.value` like the date input it replaced. */
+  const dateBind = (field: "issueDate" | "expirationDate") => ({
+    id: `credential-${field}`,
+    value: values[field],
+    "aria-invalid": Boolean(errors[field]),
+    "aria-describedby": errors[field] ? `credential-${field}-error` : undefined,
+    onChange: (e: PickerChangeEvent) => setValues((v) => ({ ...v, [field]: e.target.value })),
   });
 
   const onSubmit = async (e: FormEvent) => {
@@ -112,10 +123,10 @@ export const CredentialForm = ({ initial, onSaved, onCancel }: CredentialFormPro
           <input type="text" className={inputClass} {...bind("credentialNumber")} />
         </Field>
         <Field id="credential-issueDate" label="Issue date (optional)" error={errors.issueDate}>
-          <input type="date" className={inputClass} {...bind("issueDate")} />
+          <IconInput kind="date" clearable className={inputClass} {...dateBind("issueDate")} />
         </Field>
         <Field id="credential-expirationDate" label="Expiration date (optional)" hint="Leave blank if it doesn't expire." error={errors.expirationDate}>
-          <input type="date" className={inputClass} {...bind("expirationDate")} />
+          <IconInput kind="date" clearable className={inputClass} {...dateBind("expirationDate")} />
         </Field>
         <Field id="credential-notes" label="Notes (optional)" error={errors.notes} className="md:col-span-2">
           <textarea rows={3} className={inputClass} {...bind("notes")} />

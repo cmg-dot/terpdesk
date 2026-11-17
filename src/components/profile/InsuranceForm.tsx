@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { saveInsurance } from "@/app/actions/insurance";
 import { actionButton } from "@/components/profile/credentialFormat";
+import { IconInput } from "@/components/ui/IconInput";
 import { INSURANCE_LABEL, insuranceSchema } from "@/lib/insurance";
 import type { InsuranceField, InsuranceKind, InsurancePolicy, MyInsurance } from "@/lib/insurance";
 
@@ -14,8 +15,8 @@ interface Props {
   onSaved: (insurance: MyInsurance) => void;
 }
 
-const INPUT = "mt-1 w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)]";
-const FIELDS: { key: InsuranceField; label: string; type?: string; placeholder?: string }[] = [
+const BOX = "w-full rounded-xl border border-gray-200 bg-white px-3 py-2 text-sm text-[var(--ink)] outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.2)] aria-[invalid=true]:border-red-400";
+const FIELDS: { key: InsuranceField; label: string; type?: "date"; placeholder?: string }[] = [
   { key: "insurer", label: "Insurance company" },
   { key: "policyNumber", label: "Policy number (optional)" },
   { key: "coverageLimits", label: "Policy limits (optional)", placeholder: "e.g. $1,000,000 per occurrence / $2,000,000 aggregate" },
@@ -62,20 +63,41 @@ export function InsuranceForm({ kind, initial, onCancel, onSaved }: Props) {
     <form onSubmit={submit} noValidate className="space-y-3">
       <h3 className="text-[15px] font-semibold text-[var(--ink)]">{initial ? "Edit" : "Add"} {INSURANCE_LABEL[kind].toLowerCase()}</h3>
       <div className="grid gap-3 sm:grid-cols-2">
-        {FIELDS.map((f) => (
-          <label key={f.key} className="block text-xs font-medium text-[var(--sage)]">
-            {f.label}
-            <input
-              type={f.type ?? "text"}
-              value={values[f.key]}
-              placeholder={f.placeholder}
-              onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
-              aria-invalid={Boolean(errors[f.key])}
-              className={INPUT}
-            />
-            {errors[f.key] && <span className="mt-1 block text-[11px] text-red-700">{errors[f.key]}</span>}
-          </label>
-        ))}
+        {FIELDS.map((f) => {
+          const id = `insurance-${kind}-${f.key}`;
+          const error = errors[f.key];
+          const set = (value: string) => setValues((v) => ({ ...v, [f.key]: value }));
+          return (
+            <div key={f.key} className="text-xs font-medium text-[var(--sage)]">
+              <label htmlFor={id}>{f.label}</label>
+              {f.type === "date" ? (
+                // The app's calendar picker (no earliest date: an expired policy can be recorded, and then warns).
+                <IconInput
+                  kind="date"
+                  id={id}
+                  value={values[f.key]}
+                  onChange={(e) => set(e.target.value)}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? `${id}-error` : undefined}
+                  className={BOX}
+                  wrapperClassName="relative mt-1 w-full min-w-0"
+                />
+              ) : (
+                <input
+                  id={id}
+                  type="text"
+                  value={values[f.key]}
+                  placeholder={f.placeholder}
+                  onChange={(e) => set(e.target.value)}
+                  aria-invalid={Boolean(error)}
+                  aria-describedby={error ? `${id}-error` : undefined}
+                  className={`mt-1 ${BOX}`}
+                />
+              )}
+              {error && <span id={`${id}-error`} className="mt-1 block text-[11px] text-red-700">{error}</span>}
+            </div>
+          );
+        })}
       </div>
       {formError && <p role="alert" className="text-[12px] text-red-700">{formError}</p>}
       <div className="flex gap-2">

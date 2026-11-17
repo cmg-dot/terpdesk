@@ -31,6 +31,8 @@ interface IconInputProps {
   max?: string;
   /** Dates only: a "choose a year" list in the calendar, for dates far from today such as a birth date. */
   yearPicker?: boolean;
+  /** Dates only: a "Clear" button in the calendar, for optional dates (the field goes back to ""). */
+  clearable?: boolean;
   id?: string;
   placeholder?: string;
   "aria-label"?: string;
@@ -54,6 +56,7 @@ export function IconInput({
   min,
   max,
   yearPicker = false,
+  clearable = false,
   id,
   placeholder,
   "aria-label": ariaLabel,
@@ -91,6 +94,14 @@ export function IconInput({
               close();
             }}
             onDone={close}
+            onClear={
+              clearable
+                ? () => {
+                    emit("");
+                    close();
+                  }
+                : undefined
+            }
           />
         ) : (
           <TimeSelector value={value} onPick={emit} onDone={close} />
