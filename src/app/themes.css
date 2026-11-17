@@ -184,6 +184,22 @@
   display: none;
 }
 
+/*
+ * terpDESK's own owl (components/brand): drawn bare with a forest wordmark on light surfaces. Dark Mode's page is dark, so there
+ * the bare owl gets the cream circle it has on the sidebars, and the wordmark turns light.
+ */
+:root[data-theme="dark"] .brand-mark-bare {
+  border-radius: 9999px;
+  background-color: #FAF9F5;
+}
+:root[data-theme="dark"] .brand-mark-bare > svg {
+  width: 82%;
+  height: 82%;
+}
+:root[data-theme="dark"] .brand-wordmark-light {
+  color: #F3F4F6;
+}
+
 /* Under the full-bleed ASL banner the workspace label needs no extra gap, only the block's own padding. */
 :root[data-theme="asl_professionals"] .brand-gap {
   margin-top: 0;

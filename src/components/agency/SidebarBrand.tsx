@@ -1,16 +1,15 @@
 import Image from "next/image";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 import { AGENCY_LOGO_SRC, DEFAULT_AGENCY_NAME } from "@/lib/agency";
 
 /**
  * The brand at the top of the agency navigation. Both brands are rendered and CSS shows one (see .brand-default /
  * .brand-asl in themes.css), so picking a theme in Settings swaps them instantly, with no flash and no client state.
  *   BrandCard      ASL Professionals on the desktop sidebar: a compact ivory card holding the logo, label beneath
- *   TerpdeskBrand  the default theme's mark and name (desktop sidebar, `dark`, or mobile menu, `light`)
+ *   TerpdeskBrand  the other themes' owl and name (desktop sidebar, `dark`, or mobile menu, `light`)
  *   MobileBrand    both, for the cream mobile menu header
  */
 type Tone = "dark" | "light";
-
-const TERPDESK_TEXT: Record<Tone, string> = { dark: "text-white", light: "text-[var(--forest)]" };
 
 /** The official artwork is plum on transparent, so it always sits on a light surface. Height is capped, width follows the ratio. */
 const AgencyLogoImage = () => (
@@ -34,12 +33,10 @@ export const BrandCard = () => (
   </div>
 );
 
+/** The owl on the sidebar sits on its cream circle; in the menu it is drawn bare on the page (BrandMark). */
 export const TerpdeskBrand = ({ tone }: { tone: Tone }) => (
   <div className="brand-default">
-    <div className="mb-1 flex items-center gap-3">
-      <Image src="/terpdesk-mark.png" alt="terpDESK Logo" width={32} height={32} className="h-8 w-8 rounded-full object-contain" priority />
-      <span className={`text-[22px] font-semibold ${TERPDESK_TEXT[tone]}`}>terpDESK</span>
-    </div>
+    <BrandLockup tone={tone === "dark" ? "onDark" : "onLight"} markClassName="h-8 w-8" className="mb-1" />
     {tone === "dark" && <span className="text-[13px] text-[var(--sidebar-muted)]">{DEFAULT_AGENCY_NAME}</span>}
   </div>
 );

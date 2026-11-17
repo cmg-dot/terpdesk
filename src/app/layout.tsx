@@ -14,13 +14,12 @@ const inter = Inter({ subsets: ["latin"] });
 // prerendered at build time.
 export const dynamic = "force-dynamic";
 
+// Browser and home-screen icons come from the App Router icon files next to this layout (favicon.ico, icon1.svg, icon2.png at
+// 512 px, apple-icon.png): the terpDESK owl on a cream circle. Next writes their <link> tags itself; the numbers let both the SVG
+// and the PNG be listed (with one name, only one of them was).
 export const metadata: Metadata = {
   title: "terpDESK",
   description: "Your interpreting business. One place.",
-  icons: {
-    icon: { url: "/terpdesk-mark.png", type: "image/png" },
-    apple: "/terpdesk-mark.png",
-  },
 };
 
 export default async function RootLayout({

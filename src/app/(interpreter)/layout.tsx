@@ -1,7 +1,6 @@
 "use client";
 
 import React from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -16,6 +15,7 @@ import {
   Menu,
   X,
 } from "lucide-react";
+import { BrandLockup } from "@/components/brand/BrandLockup";
 import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { motion, AnimatePresence } from "framer-motion";
@@ -45,17 +45,7 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
       {/* Sidebar (stays in view while the page scrolls with the browser's own scrollbar) */}
       <aside className="hidden md:flex sticky top-0 h-screen self-start w-64 flex-col bg-[var(--forest)] text-white shrink-0">
         <div className="flex flex-col p-5 pb-2">
-          <div className="flex items-center gap-3 mb-1">
-            <Image
-              src="/terpdesk-mark.png"
-              alt="terpDESK Logo"
-              width={32}
-              height={32}
-              className="w-8 h-8 rounded-full object-contain bg-white p-1"
-              priority
-            />
-            <span className="text-white font-semibold text-[22px]">terpDESK</span>
-          </div>
+          <BrandLockup tone="onDark" markClassName="h-8 w-8" className="mb-1" />
           <span className="text-[13px] text-[var(--sidebar-muted)] whitespace-nowrap tracking-tight">Your interpreting business. One place.</span>
           <span className="mt-5 text-[14px] font-medium text-white">Interpreter workspace</span>
         </div>
@@ -144,17 +134,7 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
           >
             {/* Header (Logo & Close) */}
             <div className="flex justify-between items-center p-6 border-b border-neutral-100 shrink-0">
-              <div className="flex items-center gap-3">
-                <Image
-                  src="/terpdesk-mark.png"
-                  alt="terpDESK Logo"
-                  width={32}
-                  height={32}
-                  className="w-8 h-8 rounded-lg object-contain bg-white p-1"
-                  priority
-                />
-                <span className="text-[var(--forest)] font-semibold text-[22px]">terpDESK</span>
-              </div>
+              <BrandLockup tone="onLight" markClassName="h-8 w-8" />
               <button 
                 onClick={() => setIsMenuOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
