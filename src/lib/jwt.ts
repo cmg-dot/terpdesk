@@ -32,9 +32,10 @@ function getJwtSecret(): string {
   return secret;
 }
 
+/** `expiresIn`: seconds (lib/offerDeadline.ts offerLinkLifetimeSeconds: until the offer's deadline), or a span such as "48h". */
 export function generateOfferToken(
   payload: OfferTokenPayload,
-  expiresIn: string = "48h"
+  expiresIn: number | string = "48h"
 ): string {
   const secret = getJwtSecret();
   const options: SignOptions = {

@@ -8,6 +8,7 @@ import { getBaseUrl } from "@/lib/baseUrl";
 import { buildOfferEmail } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import { generateOfferToken } from "@/lib/jwt";
+import { offerDeadlineLabel, offerLinkLifetimeSeconds } from "@/lib/offerDeadline";
 import { sendEmail } from "@/lib/timesheetEmail";
 import { positionIdSchema } from "@/lib/validation/position";
 
@@ -60,23 +61,28 @@ export async function POST(req: Request) {
 
     // Bind the link to the offer that was just created (the newest pending one for this interpreter on this request).
     const [offer] = await db
-      .select({ id: offers.id })
+      .select({ id: offers.id, expiresAt: offers.expiresAt })
       .from(offers)
       .where(and(eq(offers.requestId, body.requestId), eq(offers.interpreterId, body.interpreterId), eq(offers.status, "pending")))
       .orderBy(desc(offers.createdAt))
       .limit(1);
 
-    const token = generateOfferToken({
-      interpreterId: body.interpreterId,
-      requestId: body.requestId,
-      ...(body.positionNumber ? { positionNumber: body.positionNumber } : {}),
-      ...(offer ? { offerId: offer.id } : {}),
-    });
+    // The link lasts as long as the offer can be answered (lib/offerDeadline.ts), and the email names that deadline.
+    const token = generateOfferToken(
+      {
+        interpreterId: body.interpreterId,
+        requestId: body.requestId,
+        ...(body.positionNumber ? { positionNumber: body.positionNumber } : {}),
+        ...(offer ? { offerId: offer.id } : {}),
+      },
+      offerLinkLifetimeSeconds(offer?.expiresAt),
+    );
     const appUrl = getBaseUrl();
     const acceptUrl = `${appUrl}/api/offers/response?token=${token}&action=accept`;
     const declineUrl = `${appUrl}/api/offers/response?token=${token}&action=decline`;
 
-    const email = buildOfferEmail(summarizeJob(request, body.positionNumber), acceptUrl, declineUrl);
+    const summary = summarizeJob(request, body.positionNumber);
+    const email = buildOfferEmail(summary, acceptUrl, declineUrl, offerDeadlineLabel(offer?.expiresAt, summary.timeZone));
     // The offer is already saved; `email` says whether it was emailed or held back ("muted" / "suppressed").
     const outcome = await sendEmail(interpreter.email, email.subject, email.html, email.text);
     return NextResponse.json({ success: true, email: outcome });

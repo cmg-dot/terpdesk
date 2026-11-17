@@ -863,7 +863,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const state = await resolveOfferLinkState(payload);
-    if (state.kind === "pending") return renderOfferConfirmPage({ token, action, summary: state.summary });
+    if (state.kind === "pending") return renderOfferConfirmPage({ token, action, summary: state.summary, expiresAt: state.expiresAt });
     if (state.kind === "already_accepted" && action === "accept") {
       return renderHtmlCard({
         status: "accepted",

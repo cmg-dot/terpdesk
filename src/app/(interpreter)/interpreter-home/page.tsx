@@ -26,6 +26,7 @@ import { td_availability_view } from "@/app/actions/availability";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { bucketInterpreterJobs, isLivePendingOffer } from "@/lib/interpreterJobBuckets";
 import { jobPlaceLines } from "@/lib/jobPlaceLines";
+import { offerDeadlineLabel } from "@/lib/offerDeadline";
 import { OfferSummaryLines } from "@/components/interpreter/OfferSummaryLines";
 import { AcceptOfferDialog } from "@/components/interpreter/AcceptOfferDialog";
 import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
@@ -426,7 +427,10 @@ export default function InterpreterHomePage() {
     </h3>
     <OfferSummaryLines job={job} />
     <p className="text-[12px] text-[var(--sage)] mt-1">
-    {job.offerExpiresAt ? `Respond by ${formatInTimeZone(new Date(job.offerExpiresAt), getIanaZone(job.details?.timeZone || job.timeZone), "EEE, MMM d · h:mm a zzz")} · ` : ""}Pending offers do not reserve time.
+    {(() => {
+      const deadline = offerDeadlineLabel(job.offerExpiresAt, job.details?.timeZone || job.timeZone);
+      return deadline ? `Respond by ${deadline} · ` : "";
+    })()}Pending offers do not reserve time.
     </p>
     </div>
     </div>

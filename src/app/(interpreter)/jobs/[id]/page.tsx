@@ -21,6 +21,7 @@ import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
 import { interpreterReference } from "@/utils/statusEngine";
+import { offerDeadlineLabel } from "@/lib/offerDeadline";
 import { TeamContactsCard } from "@/components/interpreter/TeamContactsCard";
 import { BookingNotesCard } from "@/components/interpreter/BookingNotesCard";
 import { AcceptOfferDialog } from "@/components/interpreter/AcceptOfferDialog";
@@ -1561,10 +1562,10 @@ export default function JobDetailPage() {
                       </span>
                     </div>
                     <p className="text-[13px] text-[var(--sage)]">
-                      Response due {(() => {
-                         const startStr = (job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : job.startsAt;
-                         const tz = (job as any).details?.timeZone || job.timeZone;
-                         return startStr ? formatJobDate(startStr, undefined, tz) : 'soon';
+                      {/* The offer's own deadline (offers.expires_at), not the appointment time. */}
+                      {(() => {
+                        const deadline = offerDeadlineLabel(job.offerExpiresAt, job.details?.timeZone || job.timeZone);
+                        return deadline ? `Respond by ${deadline}` : 'No response deadline on file';
                       })()}
                     </p>
                   </div>

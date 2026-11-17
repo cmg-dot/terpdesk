@@ -28,7 +28,7 @@ export async function confirmPageWithProblem(token: string, problem: string): Pr
   if (!payload) return null;
   try {
     const state = await resolveOfferLinkState(payload);
-    return state.kind === "pending" ? renderOfferConfirmPage({ token, action: "accept", summary: state.summary, error: problem }) : null;
+    return state.kind === "pending" ? renderOfferConfirmPage({ token, action: "accept", summary: state.summary, expiresAt: state.expiresAt, error: problem }) : null;
   } catch (err) {
     logError("Offer Response answers", err);
     return null;

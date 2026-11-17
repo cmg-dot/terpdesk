@@ -1,13 +1,12 @@
 "use client";
 
 import { Lock } from "lucide-react";
-import { formatInTimeZone } from "date-fns-tz";
 import { DirectAssignPanel } from "@/components/requests/DirectAssignPanel";
 import { ExpiredOfferNotice } from "@/components/requests/ExpiredOfferNotice";
 import { CollapsiblePreviousOffers } from "@/components/requests/staffing/CollapsiblePreviousOffers";
 import { OfferComposer } from "@/components/requests/staffing/OfferComposer";
 import type { PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
-import { mapSafeZone, parseSafeDate } from "@/lib/requestDetailsFormat";
+import { offerDeadlineLabel } from "@/lib/offerDeadline";
 
 interface Props {
   view: PositionView;
@@ -40,15 +39,7 @@ export function OpenPosition({ view, ctx, actions }: Props) {
             <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full text-xs font-semibold capitalize">{activeOffer.state || activeOffer.status}</span>
           </div>
           <p className="text-sm text-[var(--sage)] mt-2 mb-4">
-            Response due {(() => {
-              try {
-                const d = parseSafeDate(activeOffer.expiresAt);
-                if (!d) return 'Unknown';
-                return formatInTimeZone(d, mapSafeZone(ctx.apptTimeZone), 'MM/dd/yyyy h:mm:ss a');
-              } catch (e) {
-                return 'Unknown';
-              }
-            })()}
+            Response due {offerDeadlineLabel(activeOffer.expiresAt, ctx.apptTimeZone) ?? "not set"}
           </p>
           <button
             type="button"

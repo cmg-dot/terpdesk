@@ -41,11 +41,15 @@ export const summaryText = (s: JobSummary, opts: { withReference?: boolean } = {
 /** How an interpreter email names its job: "Job offer · Tue, Nov 18". */
 export const interpreterEmailTitle = (prefix: string, s: JobSummary): string => `${prefix} · ${s.shortDate}`;
 
-/** The offer email: restricted details plus Accept / Decline links. */
-export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string): { subject: string; html: string; text: string } {
+/**
+ * The offer email: restricted details plus Accept / Decline links. `deadline` is the offer's response deadline in the job's zone
+ * (lib/offerDeadline.ts); the links last exactly that long.
+ */
+export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string, deadline: string | null): { subject: string; html: string; text: string } {
   const locationNote = s.isVirtual
     ? "The meeting link is shared after you accept."
     : "The exact location is shared after you accept.";
+  const respond = deadline ? `Please respond by ${deadline}.` : "Please respond as soon as you can.";
   const html = buildTerpDeskEmail({
     title: interpreterEmailTitle("Job offer", s),
     preheader: `A new interpreting job offer for ${s.dateLabel}. Please respond promptly.`,
@@ -57,7 +61,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
         <p style="margin:20px 0 12px;">${emailButton("Accept job offer", acceptUrl)}</p>
         <p style="margin:0;">${emailSecondaryButton("Decline offer", declineUrl)}</p>
       `)}
-      <p style="margin:0;font-size:13px;color:#6B7280;">No password is needed. This link is valid for 48 hours.</p>`,
+      <p style="margin:0;font-size:13px;color:#6B7280;">No password is needed. ${escapeHtml(respond)}</p>`,
   });
   const text = [
     "You have a new interpreting job offer.",
@@ -69,7 +73,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
     `Accept: ${acceptUrl}`,
     `Decline: ${declineUrl}`,
     "",
-    "No password is needed. This link is valid for 48 hours.",
+    `No password is needed. ${respond}`,
   ].join("\n");
   return { subject: `${interpreterEmailTitle("Job offer", s)} - terpDESK`, html, text };
 }

@@ -14,14 +14,14 @@ import type { OfferTokenPayload } from "@/lib/jwt";
  *  - blocked:          expired token (already rejected earlier), offer expired / replaced / withdrawn / declined,
  *                      request cancelled, or the position taken by someone else
  *  - already_accepted: this same offer was already accepted by this interpreter (a repeat visit)
- *  - pending:          still open and answerable; carries the restricted summary for the confirm page
+ *  - pending:          still open and answerable; carries the restricted summary and the offer's response deadline for the confirm page
  *
  * SERVER ONLY: queries the database.
  */
 export type OfferLinkState =
   | { kind: "blocked" }
   | { kind: "already_accepted"; summary: JobSummary }
-  | { kind: "pending"; summary: JobSummary };
+  | { kind: "pending"; summary: JobSummary; expiresAt: Date };
 
 export async function resolveOfferLinkState(payload: OfferTokenPayload, now: Date = new Date()): Promise<OfferLinkState> {
   const [request] = await db.select().from(requests).where(eq(requests.id, payload.requestId)).limit(1);
@@ -46,6 +46,9 @@ export async function resolveOfferLinkState(payload: OfferTokenPayload, now: Dat
   );
   if (takenByOther) return { kind: "blocked" };
 
-  const open = mine.some((o) => o.status === "pending" && o.expiresAt.getTime() > now.getTime());
-  return open ? { kind: "pending", summary } : { kind: "blocked" };
+  const open = mine.filter((o) => o.status === "pending" && o.expiresAt.getTime() > now.getTime());
+  if (open.length === 0) return { kind: "blocked" };
+  // An unbound (older) link can match more than one open offer: the latest deadline is the one still worth naming.
+  const expiresAt = new Date(Math.max(...open.map((o) => o.expiresAt.getTime())));
+  return { kind: "pending", summary, expiresAt };
 }

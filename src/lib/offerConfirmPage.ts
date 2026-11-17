@@ -1,6 +1,7 @@
 import { escapeHtml } from "@/lib/emailTemplate";
 import type { JobSummary } from "@/lib/jobSummary";
 import { MAX_AVAILABILITY_NOTE } from "@/lib/acceptAnswers";
+import { offerDeadlineLabel } from "@/lib/offerDeadline";
 
 /**
  * The page an Accept / Decline email link opens. It changes nothing by itself: the button posts to the same
@@ -26,11 +27,13 @@ const acceptQuestions = (): string => `
       <input name="availabilityNote" maxlength="${MAX_AVAILABILITY_NOTE}" placeholder="e.g. Available 10:00-11:00 AM only" style="${FIELD}font-weight:400;">
     </label>`;
 
-export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary; error?: string }): Response {
+export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary; expiresAt: Date; error?: string }): Response {
   const { token, action, summary: s } = params;
   const accepting = action === "accept";
+  const deadline = offerDeadlineLabel(params.expiresAt, s.timeZone);
   // No reference: the page is opened from an email link, so it shows what the email does (the APT reference is staff-only).
   const rows: [string, string][] = [
+    ...(deadline ? [["Respond by", deadline] satisfies [string, string]] : []),
     ["Assignment", s.emailTitle],
     ["Date", s.dateLabel],
     ["Time", s.timeLabel],

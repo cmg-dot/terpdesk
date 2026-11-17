@@ -4,6 +4,7 @@ import { useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { formatInTimeZone } from "date-fns-tz";
 import type { PastOffer } from "@/components/requests/ExpiredOfferNotice";
+import { offerDeadlineLabel } from "@/lib/offerDeadline";
 import { mapSafeZone, parseSafeDate } from "@/lib/requestDetailsFormat";
 
 /** "Previous offers (n)": the offers that ended without a booking, folded away until asked for. */
@@ -50,6 +51,7 @@ export function CollapsiblePreviousOffers({
             const deadlinePassed = !Number.isNaN(deadlineMs) && Date.now() > deadlineMs;
             const isExpired = rawState === 'expired' || (rawState === 'pending' && (isAppointmentFinished || deadlinePassed));
             const displayState = isExpired ? 'expired' : rawState;
+            const deadline = offerDeadlineLabel(offer.expiresAt, apptTz);
 
             let badgeClass = "bg-white border border-gray-200 text-gray-600";
             if (isExpired) {
@@ -70,17 +72,17 @@ export function CollapsiblePreviousOffers({
                 </div>
                 <div className="text-xs sm:text-sm text-[var(--sage)] pl-6 mt-1 text-wrap">
                   {isExpired ? (
-                    <span>{isAppointmentFinished ? 'Expired · Appointment ended before response was submitted' : 'Expired · No response before the offer deadline'}</span>
+                    <span>
+                      {isAppointmentFinished
+                        ? 'Expired · Appointment ended before response was submitted'
+                        : `Expired · No response before the offer deadline${deadline ? ` (${deadline})` : ''}`}
+                    </span>
                   ) : (
                     <span>
+                      {/* When it was declined, withdrawn or given back (the offer's last change), never its response deadline. */}
                       {displayState.charAt(0).toUpperCase() + displayState.slice(1)} {(() => {
-                        try {
-                          const d = parseSafeDate(offer.expiresAt);
-                          if (!d) return '';
-                          return formatInTimeZone(d, mapSafeZone(apptTz), 'MMM d, h:mm a');
-                        } catch (e) {
-                          return '';
-                        }
+                        const d = parseSafeDate(offer.updatedAt);
+                        return d ? formatInTimeZone(d, mapSafeZone(apptTz), 'MMM d, h:mm a') : '';
                       })()}
                     </span>
                   )}
