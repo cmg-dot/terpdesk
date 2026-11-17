@@ -1,6 +1,8 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { interpreters, requests, users } from "@/db/schema";
+import { acceptAnswersText } from "@/lib/acceptedOfferAlert";
+import type { AcceptAnswerColumns } from "@/lib/acceptedOfferAlert";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, escapeHtml } from "@/lib/emailTemplate";
@@ -84,6 +86,8 @@ export async function alertAgency(params: {
   positionNumber?: number;
   /** Where the alert links in the app (defaults to the request page). */
   href?: string;
+  /** offer_accepted: the interpreter's travel answer and availability note, added to the bell (never to the email). */
+  answers?: AcceptAnswerColumns;
 }): Promise<void> {
   try {
     const ctx = await loadContext(params.requestId, params.positionNumber);
@@ -91,12 +95,15 @@ export async function alertAgency(params: {
     const copy = AGENCY_COPY[params.event];
     const name = (await getInterpreterDisplayName(params.interpreterId).catch(() => null)) || "An interpreter";
     const href = params.href ?? `/requests/${params.requestId}`;
+    const accepted = params.event === "offer_accepted";
+    const answers = accepted && params.answers ? acceptAnswersText(params.answers) : "";
 
     await notifyAgencyAdmins({
       type: "job",
-      href,
+      // An acceptance opens straight on the job's Staffing section.
+      href: accepted && !params.href ? `${href}#staffing` : href,
       title: copy.title,
-      message: `${name} ${copy.did} ${staffContext(ctx)}. ${copy.next}`,
+      message: [`${name} ${copy.did} ${staffContext(ctx)}. ${copy.next}`, answers].filter(Boolean).join(" "),
     });
 
     const url = `${getBaseUrl()}${href}`;

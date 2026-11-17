@@ -303,7 +303,7 @@ export const offers = pgTable('offers', {
   travelRequested: boolean('travel_requested'),
   travelMinutes: integer('travel_minutes'),
   availabilityNote: varchar('availability_note', { length: 500 }),
-  // When staff dismissed the "accepted" action banner for this booking.
+  // When staff were shown the "Offer accepted" toast for this booking.
   agencyAcknowledgedAt: timestamp('agency_acknowledged_at', { withTimezone: true }),
 });
 

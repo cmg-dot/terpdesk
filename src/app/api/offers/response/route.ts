@@ -682,7 +682,7 @@ async function processResponse(token: string | null, actionParam: string | undef
       await logActivity({ requestId, interpreterId, audience: "shared", kind: "offer_accepted", message: `Offer accepted · booked for ${positionText}`, actorLabel: "Interpreter (email link)" });
 
       // Agency: in-app notification + email, with the job's reference, date and location.
-      await alertAgency({ event: "offer_accepted", requestId, interpreterId, positionNumber: positionIndex });
+      await alertAgency({ event: "offer_accepted", requestId, interpreterId, positionNumber: positionIndex, answers: claimed });
       // Booked: send the confirmation with the secure full-details link.
       await sendBookingConfirmation({ requestId, interpreterId, positionNumber: positionIndex });
 

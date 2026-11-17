@@ -14,7 +14,7 @@ import { requestReference, srnOf } from "@/utils/statusEngine";
 const MAX_ALERTS = 10;
 
 /**
- * Bookings staff have not looked at yet (an interpreter accepted an offer): newest first, for the agency's top action banner. A job
+ * Bookings staff have not looked at yet (an interpreter accepted an offer): newest first, for the agency's "Offer accepted" toasts. A job
  * that has since been cancelled is left out. Agency staff only; empty on error.
  */
 export async function getAcceptedOfferAlerts(): Promise<AcceptedOfferAlert[]> {
@@ -63,7 +63,7 @@ export async function getAcceptedOfferAlerts(): Promise<AcceptedOfferAlert[]> {
   }
 }
 
-/** Dismisses the banner for the given accepted offers (one, or all shown). Agency staff only. */
+/** Marks the given accepted offers seen (their toast is on screen), so they do not pop up again. Agency staff only. */
 export async function acknowledgeAcceptedOffers(offerIdsInput: string[]): Promise<{ success: boolean }> {
   try {
     await requireRole("agency");

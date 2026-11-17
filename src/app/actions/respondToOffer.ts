@@ -212,6 +212,7 @@ export async function respondToOffer(
     requestId: offer.requestId,
     interpreterId: offer.interpreterId,
     positionNumber: posIdx,
+    answers: updatedOffer,
   });
   await logActivity({
     requestId: offer.requestId,
