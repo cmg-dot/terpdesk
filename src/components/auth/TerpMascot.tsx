@@ -11,6 +11,7 @@ import type { MascotMood, MascotPoses } from "@/lib/mascotPoses";
 import { BADGE, BADGE_FLOAT, CARD_FLIP, GREEN_FACE, PULSE, RED_FACE, SCREEN, SCREEN_GLASS, SCREEN_GLOW, SHIMMER } from "@/lib/mascotProps";
 import { LEFT_WING, RIGHT_WING } from "@/lib/mascotWings";
 import type { WingPoses } from "@/lib/mascotWings";
+import { OWL_SHAPES as S } from "@/lib/owlGeometry";
 
 const MOVING = { body: BODY, eyes: EYES, peekingEye: PEEKING_EYE, brows: BROWS, badge: BADGE, float: BADGE_FLOAT, flip: CARD_FLIP, screen: SCREEN, glass: SCREEN_GLASS, glow: SCREEN_GLOW, green: GREEN_FACE, red: RED_FACE, pulse: PULSE, shimmer: SHIMMER };
 type PoseSet = typeof MOVING;
@@ -48,22 +49,21 @@ export const TerpMascot = ({ className }: { className?: string }) => {
     // overflow visible: a pointing wing reaches past the owl's own box.
     <motion.svg ref={svgRef} viewBox="0 0 200 220" overflow="visible" className={className} aria-hidden="true" focusable="false" initial="idle" animate={mounted ? mood : "drawn"} data-mascot-mood={mood}>
       <motion.g variants={poses.body}>
-        <path d="M58 86 L53 54 L84 70 Z M142 86 L147 54 L116 70 Z" fill={OWL.forest} stroke={OWL.forest} strokeWidth={10} strokeLinejoin="round" />
-        <ellipse cx={100} cy={138} rx={72} ry={78} fill={OWL.forest} />
-        <ellipse cx={100} cy={180} rx={46} ry={33} fill={OWL.sage} />
+        <path d={S.ears} fill={OWL.forest} stroke={OWL.forest} strokeWidth={S.earStroke} strokeLinejoin="round" />
+        <ellipse {...S.body} fill={OWL.forest} />
+        <ellipse {...S.belly} fill={OWL.sage} />
         <motion.g style={{ x: gaze.faceX, y: gaze.faceY, rotate: gaze.faceTilt }} data-mascot-face>
-          <circle cx={76} cy={108} r={30} fill={OWL.cream} />
-          <circle cx={124} cy={108} r={30} fill={OWL.cream} />
-          <motion.path variants={poses.brows} d="M62 94 L86 87 M138 94 L114 87" fill="none" stroke={OWL.forest} strokeWidth={4.5} strokeLinecap="round" data-mascot-brows />
-          {[78, 122].map((x) => (
+          {S.eyeDiscs.map((disc) => <circle key={disc.cx} {...disc} r={S.eyeDiscR} fill={OWL.cream} />)}
+          <motion.path variants={poses.brows} d={S.brows} fill="none" stroke={OWL.forest} strokeWidth={4.5} strokeLinecap="round" data-mascot-brows />
+          {S.pupilX.map((x) => (
             <motion.g key={x} variants={x > 100 ? poses.peekingEye : poses.eyes} data-mascot-eye={x > 100 ? "right" : "left"}>
               <motion.g style={{ x: gaze.eyeX, y: gaze.eyeY }} data-mascot-pupil>
-                <circle cx={x} cy={110} r={13} fill={OWL.forest} />
-                <circle cx={x + 4} cy={105} r={4.5} fill="#FFFFFF" />
+                <circle cx={x} cy={S.pupilY} r={S.pupilR} fill={OWL.forest} />
+                <circle cx={x + S.shine.dx} cy={S.pupilY + S.shine.dy} r={S.shine.r} fill="#FFFFFF" />
               </motion.g>
             </motion.g>
           ))}
-          <path d="M91 127 Q100 122 109 127 Q105 137 100 142 Q95 137 91 127 Z" fill={OWL.amber} />
+          <path d={S.beak} fill={OWL.amber} />
         </motion.g>
 
         <MascotTablet poses={poses} clipId={clipId} mood={mood} />

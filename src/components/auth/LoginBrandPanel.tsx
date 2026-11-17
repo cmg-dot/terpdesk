@@ -26,7 +26,7 @@ export const LoginBrandPanel = ({ copy }: { copy: string }) => (
       <p className="mt-5 max-w-md text-base leading-relaxed text-[var(--tint-ink)]">{copy}</p>
     </div>
 
-    {/* Only the bottom 8% of the owl dips below the panel, so the tablet's label stays in view even at the low point of its float. */}
+    {/* Only the bottom 8% of the owl dips below the panel, so the whole tablet stays in view even at the low point of its float. */}
     <div className="pointer-events-none absolute bottom-0 left-12 z-20 w-[280px] translate-y-[8%] xl:left-16 xl:w-[330px]">
       <TerpMascot className="h-auto w-full drop-shadow-[0_18px_24px_rgba(11,59,50,0.18)]" />
       {/* Beside the owl's head, where its pointing wing aims; clear of the headline above. */}

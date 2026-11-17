@@ -1,10 +1,11 @@
 import type { TargetAndTransition } from "framer-motion";
 import { MOVE } from "@/lib/mascotPoses";
 import type { MascotMood, MascotPoses } from "@/lib/mascotPoses";
+import { WING_REST } from "@/lib/owlGeometry";
 
 /**
  * The owl's wings, one pose per mood (pure constants; MascotWing in MascotParts.tsx only draws). Each wing is one smooth,
- * rounded teardrop: its root (the shoulder) at its own (0, 0), its tip WING_LENGTH below. A pose places the root, turns the
+ * rounded teardrop: its root (the shoulder) at its own (0, 0), its tip WING_LENGTH (lib/owlGeometry.ts) below. A pose places the root, turns the
  * wing about it and may scale it; the wave is a turn about the same root, on top of the pose. Measures are in the 200 x 220
  * viewBox, for the LEFT wing; the right wing is drawn mirrored.
  *   idle / email / success   left wing holds the tablet's edge; right wing raised in a wave (idle, success) or resting (email)
@@ -13,8 +14,6 @@ import type { MascotMood, MascotPoses } from "@/lib/mascotPoses";
  *   mfa / mfaError           both wings hold the security card's edges
  *   wrongPortal              right wing points at the speech bubble
  */
-export const WING_LENGTH = 46;
-
 interface WingPose {
   x: number;
   y: number;
@@ -22,7 +21,8 @@ interface WingPose {
   scale: number;
 }
 
-const REST: WingPose = { x: 34, y: 128, rotate: 14, scale: 1 };
+/** By the owl's side (shared with the static logo, lib/owlGeometry.ts). */
+const REST: WingPose = WING_REST;
 /** Tip on the left edge of the tablet / card in front of the lower chest. */
 const HOLD: WingPose = { x: 34, y: 150, rotate: -66, scale: 0.92 };
 /** Raised up and out from the shoulder, ready to wave (the right wing, drawn mirrored). */

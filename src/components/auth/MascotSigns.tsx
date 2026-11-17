@@ -44,11 +44,20 @@ const InterpretHand = ({ turn }: { turn: 1 | -1 }) => {
   );
 };
 
-/** The sign icons, drawn about (0, 0) in a box about 20 units wide. */
-const SIGNS: readonly { label: string; icon: ReactNode }[] = [
+/** A sign's drawn extent (strokes included), in its own units about (0, 0): measured in the browser, plus half of each stroke. */
+interface Box {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/** The sign icons, drawn about (0, 0). `label` names the card (data-asl-card); it is not drawn. */
+const SIGNS: readonly { label: string; box: Box; icon: ReactNode }[] = [
   {
     // An open hand, waving.
     label: "HELLO",
+    box: { x: -10.8, y: -12.3, w: 24.1, h: 20.3 },
     icon: (
       <>
         {PALM}
@@ -60,6 +69,7 @@ const SIGNS: readonly { label: string; icon: ReactNode }[] = [
   {
     // The ILY handshape: thumb, index and little finger up, the middle two folded.
     label: "ILY",
+    box: { x: -11.3, y: -11.3, w: 17.3, h: 19.3 },
     icon: (
       <>
         {PALM}
@@ -70,6 +80,7 @@ const SIGNS: readonly { label: string; icon: ReactNode }[] = [
   {
     // INTERPRET: the interpreter symbol, two F-hands whose thumb-and-index rings meet in the middle, fingers up-right and down-left.
     label: "INTERPRET",
+    box: { x: -16.6, y: -12.7, w: 33.2, h: 25.4 },
     icon: (
       <g transform={`scale(${EMBLEM_SCALE})`}>
         <InterpretHand turn={1} />
@@ -82,12 +93,25 @@ const SIGNS: readonly { label: string; icon: ReactNode }[] = [
 ];
 
 const FADE = { initial: { opacity: 0 }, animate: { opacity: 1, transition: { duration: 0.4 } }, exit: { opacity: 0, transition: { duration: 0.3 } } };
-const LABEL = { x: 100, y: 177.5, textAnchor: "middle" as const, fontSize: 6.2, fontWeight: 700, letterSpacing: 0.8 };
+
+/** The screen's glass (MascotTablet: 54 x 36 at (73, 145)) and the room a sign may fill: 5 units clear top and bottom, 6 at the sides. */
+const GLASS_CENTRE = { x: 100, y: 163 };
+const FIT = { w: 42, h: 26 };
+/** No sign is drawn larger than this, so the small hands do not swell past the others. */
+const MAX_SCALE = 1.3;
+
+/** Centres a sign on the glass and scales it to fill the room it has (strokes scale with it, so its lines stay in proportion). */
+const placeSign = (box: Box): string => {
+  const scale = Math.min(MAX_SCALE, FIT.w / box.w, FIT.h / box.h);
+  const cx = box.x + box.w / 2;
+  const cy = box.y + box.h / 2;
+  return `translate(${GLASS_CENTRE.x} ${GLASS_CENTRE.y}) scale(${scale.toFixed(3)}) translate(${(-cx).toFixed(2)} ${(-cy).toFixed(2)})`;
+};
 
 /**
  * The tablet's screen content: while idle or typing the email it cycles through three ASL sign cards (HELLO, ILY, INTERPRET),
- * crossfading every few seconds; on success it shows the welcome: a check that draws itself and "WELCOME TO terpDESK" (on the
- * screen's deep forest glass, see SCREEN_GLASS). The timer only runs while the cards are on show.
+ * each centred and filling the screen, crossfading every few seconds; on success it shows the welcome: a check that draws itself
+ * and "WELCOME TO terpDESK" (on the screen's deep forest glass, see SCREEN_GLASS). The timer only runs while the cards are on show.
  */
 export const MascotSigns = ({ mood }: { mood: MascotMood }) => {
   const [index, setIndex] = useState(0);
@@ -126,8 +150,7 @@ export const MascotSigns = ({ mood }: { mood: MascotMood }) => {
         </motion.g>
       ) : (
         <motion.g key={sign.label} {...FADE} data-asl-card={sign.label}>
-          <g transform="translate(100 159) scale(0.9)">{sign.icon}</g>
-          <text {...LABEL} fill={OWL.forest}>{sign.label}</text>
+          <g transform={placeSign(sign.box)}>{sign.icon}</g>
         </motion.g>
       )}
     </AnimatePresence>
