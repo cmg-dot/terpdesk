@@ -8,6 +8,8 @@ import { logStateJobHours } from "@/app/actions/logStateJobHours";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type { SearchableOption } from "@/components/ui/SearchableSelect";
 import { stateJobOptionDescription, stateJobOptionLabel } from "@/lib/pendingStateJobOption";
+import { EMPTY_TRAVEL, StateReceiptExtras, filledTravelLegs } from "@/components/features/StateReceiptExtras";
+import type { TravelLegInput } from "@/components/features/StateReceiptExtras";
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,7 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
   const [hoursEdited, setHoursEdited] = useState(false);
   const [totalMiles, setTotalMiles] = useState("");
   const [otherFees, setOtherFees] = useState("");
+  const [travel, setTravel] = useState<TravelLegInput[]>(EMPTY_TRAVEL);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
   const [isPending, setIsPending] = useState(false);
@@ -66,6 +69,7 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
     setHoursEdited(false);
     setTotalMiles("");
     setOtherFees("");
+    setTravel(EMPTY_TRAVEL);
     setError(null);
     setDone(false);
   };
@@ -101,6 +105,8 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
     e.preventDefault();
     const job = jobs?.find((j) => optionKey(j) === selected);
     if (!job || isPending) return;
+    const legs = filledTravelLegs(travel);
+    if (!legs.ok) return setError(legs.error);
     setError(null);
     setIsPending(true);
     try {
@@ -112,6 +118,7 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
         serviceHours: Number(serviceHours),
         totalMiles: Number(totalMiles) || 0,
         otherFees: Number(otherFees) || 0,
+        travel: legs.legs,
       });
       if (result.success) {
         setDone(true);
@@ -230,38 +237,17 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
                 />
               </div>
 
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                <div>
-                  <label htmlFor="state-miles" className={labelClass}>
-                    Total Miles
-                  </label>
-                  <input
-                    id="state-miles"
-                    type="number"
-                    min="0"
-                    step="0.1"
-                    value={totalMiles}
-                    onChange={(e) => setTotalMiles(e.target.value)}
-                    disabled={isPending || !selectedJob}
-                    className={inputClass}
-                  />
-                </div>
-                <div>
-                  <label htmlFor="state-fees" className={labelClass}>
-                    Other Fees (Parking, Ferry, etc.) in USD
-                  </label>
-                  <input
-                    id="state-fees"
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    value={otherFees}
-                    onChange={(e) => setOtherFees(e.target.value)}
-                    disabled={isPending || !selectedJob}
-                    className={inputClass}
-                  />
-                </div>
-              </div>
+              <StateReceiptExtras
+                disabled={isPending || !selectedJob}
+                inputClass={inputClass}
+                labelClass={labelClass}
+                totalMiles={totalMiles}
+                onTotalMiles={setTotalMiles}
+                otherFees={otherFees}
+                onOtherFees={setOtherFees}
+                travel={travel}
+                onTravel={setTravel}
+              />
 
               {error && (
                 <p role="alert" className="rounded-xl bg-red-50 px-4 py-2.5 text-xs text-red-700">

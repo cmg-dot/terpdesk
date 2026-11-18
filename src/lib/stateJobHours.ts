@@ -7,6 +7,8 @@ import type { DbTx } from "@/lib/positionClaim";
 import { mirrorTimesheetSubmission } from "@/lib/timesheetSync";
 import { hashToken } from "@/lib/timesheetToken";
 import type { StoredSignature } from "@/lib/verificationSignature";
+import { MAX_TRAVEL_WINDOWS, isTravelWindow } from "@/lib/travelWindows";
+import type { TravelWindow } from "@/lib/travelWindows";
 
 /**
  * Records hours for a state (ODHH / Apple Health) job.
@@ -41,6 +43,8 @@ export interface StateJobHoursInput {
   end: Date | null;
   serviceHours: number;
   totalMiles: number;
+  /** Travel there and back (the report's legs, or what staff typed from the receipt); empty when none. */
+  travelWindows?: TravelWindow[];
   note: string;
   review?: ReviewSubmission;
 }
@@ -48,6 +52,7 @@ export interface StateJobHoursInput {
 /** The new timesheet's id, or null when this interpreter already has a timesheet on the job (nothing is changed). */
 export async function recordStateJobHours(input: StateJobHoursInput, exec: DbTx = db as unknown as DbTx): Promise<{ id: string } | null> {
   const { requestId, interpreterId, start, end, serviceHours, totalMiles, note, review } = input;
+  const travel = (input.travelWindows ?? []).filter(isTravelWindow).slice(0, MAX_TRAVEL_WINDOWS);
   const now = new Date();
   // `exec` is the database, or an open transaction (a savepoint then), so a caller can make this part of a bigger all-or-nothing step.
   return exec.transaction(async (tx) => {
@@ -76,6 +81,9 @@ export async function recordStateJobHours(input: StateJobHoursInput, exec: DbTx 
         // From the verified state receipt: approved as reported. For a review the agency confirms the mileage itself.
         approvedMileage: review ? null : totalMiles.toFixed(1),
         travelLegs: [],
+        // The row holds one window (the first leg); every leg is kept on the request below.
+        travelStartTime: travel[0] ? new Date(travel[0].start) : null,
+        travelEndTime: travel[0] ? new Date(travel[0].end) : null,
         serviceNote: note,
         serviceCompleted: review?.serviceCompleted ?? null,
         cancellationReason: review?.cancellationReason ?? null,
@@ -85,6 +93,17 @@ export async function recordStateJobHours(input: StateJobHoursInput, exec: DbTx 
         submittedAt: now,
       })
       .returning();
+
+    // Staff-only, keyed by timesheet: every travel leg (billing pays them; Hours review shows them). Written before the mirror below,
+    // which reads the request afresh and keeps it.
+    if (travel.length > 0) {
+      await tx.execute(sql`
+        UPDATE requests
+        SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{travelWindows}',
+          coalesce(data -> 'travelWindows', '{}'::jsonb) || jsonb_build_object(${row.id}::text, ${JSON.stringify(travel)}::jsonb))
+        WHERE id = ${requestId}
+      `);
+    }
 
     if (!review) {
       await tx.update(requests).set({ status: "completed", updatedAt: now }).where(eq(requests.id, requestId));

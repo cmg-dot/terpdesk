@@ -70,6 +70,7 @@ export async function loadLedgers(agencyId: string, range: { start: string; end:
     .where(and(inArray(offers.requestId, ids), inArray(offers.status, ["accepted", "cancelled"])));
   const sheetRows = await db
     .select({
+      id: timesheets.id,
       requestId: timesheets.requestId,
       interpreterId: timesheets.interpreterId,
       status: timesheets.status,

@@ -20,15 +20,15 @@ describe("evening travel split", () => {
 
   it("keeps the window's share when staff approved a different number of minutes", () => {
     const w = window("2026-10-15T17:00", "2026-10-15T19:00");
-    assert.deepEqual(splitTravel(120, w, ZONE, { ...EVENING, rateSet: true }), { dayMinutes: 60, eveningMinutes: 60 });
-    assert.deepEqual(splitTravel(60, w, ZONE, { ...EVENING, rateSet: true }), { dayMinutes: 30, eveningMinutes: 30 });
+    assert.deepEqual(splitTravel(120, [w], ZONE, { ...EVENING, rateSet: true }), { dayMinutes: 60, eveningMinutes: 60 });
+    assert.deepEqual(splitTravel(60, [w], ZONE, { ...EVENING, rateSet: true }), { dayMinutes: 30, eveningMinutes: 30 });
   });
 
   it("is all day travel without an evening rate, an evening window or a submitted window", () => {
     const w = window("2026-10-15T17:00", "2026-10-15T19:00");
-    assert.deepEqual(splitTravel(120, w, ZONE, { ...EVENING, rateSet: false }), { dayMinutes: 120, eveningMinutes: 0 });
-    assert.deepEqual(splitTravel(120, w, ZONE, { startMinute: null, endMinute: null, rateSet: true }), { dayMinutes: 120, eveningMinutes: 0 });
-    assert.deepEqual(splitTravel(120, null, ZONE, { ...EVENING, rateSet: true }), { dayMinutes: 120, eveningMinutes: 0 });
+    assert.deepEqual(splitTravel(120, [w], ZONE, { ...EVENING, rateSet: false }), { dayMinutes: 120, eveningMinutes: 0 });
+    assert.deepEqual(splitTravel(120, [w], ZONE, { startMinute: null, endMinute: null, rateSet: true }), { dayMinutes: 120, eveningMinutes: 0 });
+    assert.deepEqual(splitTravel(120, [], ZONE, { ...EVENING, rateSet: true }), { dayMinutes: 120, eveningMinutes: 0 });
   });
 });
 
@@ -37,7 +37,7 @@ describe("travel on the ledger", () => {
 
   it("State job: travel billed and paid at the job's rate, evening minutes at the evening rate", () => {
     const l = jobLedger(
-      job({ positions: [position({ workedMinutes: 120, travelMinutes: 120, travelWindow: window("2026-10-15T17:00", "2026-10-15T19:00"), rates: rates({ stateCents: 6000, eveningCents: 7500 }) })] }),
+      job({ positions: [position({ workedMinutes: 120, travelMinutes: 120, travelWindows: [window("2026-10-15T17:00", "2026-10-15T19:00")], rates: rates({ stateCents: 6000, eveningCents: 7500 }) })] }),
       evening,
     );
     const pay = amounts(l.positions[0].pay);
@@ -56,7 +56,7 @@ describe("travel on the ledger", () => {
 
   it("Non-state: the client is billed its own rate for evening travel; the interpreter is paid the evening rate", () => {
     const l = jobLedger(
-      job({ category: "non_state", positions: [position({ workedMinutes: 120, travelMinutes: 60, travelWindow: window("2026-10-15T18:00", "2026-10-15T19:00"), rates: rates({ nonStateCents: 6800, eveningCents: 8000 }) })] }),
+      job({ category: "non_state", positions: [position({ workedMinutes: 120, travelMinutes: 60, travelWindows: [window("2026-10-15T18:00", "2026-10-15T19:00")], rates: rates({ nonStateCents: 6800, eveningCents: 8000 }) })] }),
       evening,
     );
     assert.equal(amounts(l.positions[0].bill).travel_evening, 9500);

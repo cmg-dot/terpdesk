@@ -69,7 +69,7 @@ export interface AgencyInterpreterView {
   /** Present only when the interpreter chose "Agencies I am connected to". */
   contact: { workEmail: string; workPhone: string } | null;
   credentials: SharedCredentialView[];
-  /** A current commercial auto policy: in-person jobs pay +$10 ("Commercial Auto (+$10 in-person)"). */
+  /** A current commercial auto policy: in-person State and Apple Health jobs pay +$10 (COMMERCIAL_AUTO_BADGE). */
   commercialAuto: boolean;
   /** Free hours and private busy time are only included when the interpreter shares availability with this agency. */
   sharesAvailability: boolean;

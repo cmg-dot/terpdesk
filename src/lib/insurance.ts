@@ -6,7 +6,8 @@ import { getIanaZone } from "@/utils/timezone";
 
 /**
  * The two dedicated insurance policies on an interpreter's profile: Liability (expected of everyone) and Commercial Auto (optional;
- * an in-person job pays +$10 with it). Each is a credential row with `insurance_kind` set (one active of each kind, 0012_phase23.sql),
+ * an in-person State or Apple Health job pays +$10 with it). Staff record the commercial auto policy themselves for a profile with no
+ * login (actions/staffInsurance.ts). Each is a credential row with `insurance_kind` set (one active of each kind, 0012_phase23.sql),
  * so it reuses the credential's private S3 files and is visible to the agency like every active credential. Pure (shared by the
  * browser and the server).
  */
@@ -19,8 +20,11 @@ export const INSURANCE_LABEL: Record<InsuranceKind, string> = {
   commercial_auto: "Commercial auto insurance",
 };
 
-/** The badge an active, unexpired commercial auto policy earns (in-person jobs only). */
-export const COMMERCIAL_AUTO_BADGE = "Commercial Auto (+$10 in-person)";
+/** The badge an active, unexpired commercial auto policy earns: +$10 on in-person State (ODHH) and Apple Health (HCA) jobs, as billing pays it. */
+export const COMMERCIAL_AUTO_BADGE = "Commercial Auto (+$10 in-person State/HCA)";
+
+/** What the +$10 is for, in the interpreter's and staff's words. */
+export const COMMERCIAL_AUTO_PAYOUT = "With current commercial auto coverage, in-person State (ODHH) and Apple Health (HCA) assignments pay +$10.";
 
 /** Warn this many days before a policy expires. */
 export const INSURANCE_WARNING_DAYS = 30;
@@ -33,6 +37,16 @@ export const insuranceSchema = z.object({
   expirationDate: optionalDate("expiration date").refine((v) => v !== "", "Enter the expiration date."),
 });
 export type InsuranceInput = z.input<typeof insuranceSchema>;
+
+/** Staff recording a commercial auto policy for an interpreter with no login: the expiration date is what billing needs. */
+export const staffCommercialAutoSchema = z.object({
+  interpreterId: z.string().uuid(),
+  expirationDate: optionalDate("expiration date").refine((v) => v !== "", "Enter the expiration date."),
+  coverageLimits: z.string().trim().max(200, "Coverage limits must be 200 characters or fewer."),
+  insurer: z.string().trim().max(150, "Insurer must be 150 characters or fewer."),
+});
+export type StaffCommercialAutoInput = z.input<typeof staffCommercialAutoSchema>;
+export type StaffCommercialAutoField = Exclude<keyof StaffCommercialAutoInput, "interpreterId">;
 export type InsuranceField = Exclude<keyof InsuranceInput, "kind">;
 
 export interface InsurancePolicy {

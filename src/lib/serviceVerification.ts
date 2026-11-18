@@ -1,6 +1,5 @@
 import { randomUUID } from "crypto";
 import { and, eq, isNull, sql } from "drizzle-orm";
-import { formatInTimeZone } from "date-fns-tz";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -9,7 +8,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 import { logError } from "@/lib/logError";
 import { missingVerificationFields, parseServiceVerification, reportsNoService } from "@/lib/odhhVerificationParser";
-import type { ParsedServiceVerification, VerificationHints } from "@/lib/odhhVerificationParser";
+import type { VerificationHints } from "@/lib/odhhVerificationParser";
 import type { DbTx } from "@/lib/positionClaim";
 import { logActivity } from "@/lib/requestActivity";
 import { removeObjectsQuietly } from "@/lib/s3";
@@ -20,7 +19,8 @@ import { verificationNote } from "@/lib/verificationPending";
 import type { PendingVerification } from "@/lib/verificationPending";
 import { appendPendingVerification, reportIdFor, resolveBookedInterpreter } from "@/lib/verificationPendingStore";
 import { isStateJobRequest } from "@/lib/stateJob";
-import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezone";
+import { computeTimes, computeTravelWindows } from "@/lib/verificationTimes";
+import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
 /**
  * Applies an ODHH "SERVICE VERIFICATION" email (the state's receipt, which acts as the timesheet) to the existing
@@ -85,23 +85,6 @@ interface LooseData {
   details?: { timeZone?: string; timezone?: string };
   timeZone?: string;
   timezone?: string;
-}
-
-const MAX_SHIFT_HOURS = 24;
-const FUTURE_TOLERANCE_MS = 10 * 60_000;
-
-function computeTimes(parsed: ParsedServiceVerification, appointmentStartsAt: string, zone: string): { start: Date; end: Date } | string {
-  const appointmentDate = formatInTimeZone(new Date(appointmentStartsAt), zone, "yyyy-MM-dd");
-  const startDate = parsed.startDate ?? appointmentDate;
-  const endDate = parsed.endDate ?? startDate;
-  const start = new Date(wallClockToUtc(`${startDate}T${parsed.startTime}:00`, zone));
-  const end = new Date(wallClockToUtc(`${endDate}T${parsed.endTime}:00`, zone));
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return "The actual start or end time could not be understood.";
-  const hours = (end.getTime() - start.getTime()) / 3_600_000;
-  if (!(hours > 0)) return "The actual end time must be after the actual start time.";
-  if (hours > MAX_SHIFT_HOURS) return "The actual service time cannot be longer than 24 hours.";
-  if (end.getTime() > Date.now() + FUTURE_TOLERANCE_MS) return "The actual end time is in the future.";
-  return { start, end };
 }
 
 /** What the intake webhook answers for a service verification (the Lambda reads `outcome`). */
@@ -169,6 +152,8 @@ export async function processServiceVerification(
 
   const serviceHours = times ? Math.round(((times.end.getTime() - times.start.getTime()) / 3_600_000) * 100) / 100 : 0;
   const totalMiles = parsed.totalMiles ?? 0;
+  // Travel there and back, as the report gives it; billing pays these minutes (and splits evening ones).
+  const travelWindows = computeTravelWindows(parsed, startsAt, zone, times?.start ?? null);
 
   // Keep the receipt on the request (staff-only) whatever happens next, as a record and for manual follow-up.
   const record = {
@@ -224,6 +209,7 @@ export async function processServiceVerification(
       cancellation: parsed.cancellation,
       cancelledBy: parsed.cancelledBy,
       comments: parsed.comments,
+      travelWindows,
       signature: stored,
     };
     const added = await appendPendingVerification(exec, requestId, entry);
@@ -253,6 +239,7 @@ export async function processServiceVerification(
       end: times?.end ?? null,
       serviceHours,
       totalMiles,
+      travelWindows,
       note: verificationNote(parsed),
       review: {
         timesheetId,

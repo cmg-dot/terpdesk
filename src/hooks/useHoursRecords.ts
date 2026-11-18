@@ -39,11 +39,11 @@ export function useHoursRecords() {
         // dropped by whether its job still exists, exactly as when every request was loaded.
         const cachedIds = Array.from(new Set(localRecords.map((r) => r.appointmentId).filter((id) => UUID_PATTERN.test(id))));
         const { requests, timesheets, commercialAutoInterpreterIds } = await fetchHoursReviewData(cachedIds);
-        // The +$10 commercial auto badge: a current policy, and only on an in-person job.
+        // The +$10 commercial auto badge: a current policy, on an in-person State or Apple Health job (as billing pays it).
         const autos = new Set(commercialAutoInterpreterIds);
         const merged = mergeHoursRecords({ localRecords, requests, timesheets }).map((r) => ({
           ...r,
-          commercialAuto: Boolean(r.inPerson && r.interpreterId && autos.has(r.interpreterId)),
+          commercialAuto: Boolean(r.inPerson && r.stateJob && r.interpreterId && autos.has(r.interpreterId)),
         }));
         setRecords(merged);
         if (typeof window !== "undefined") {

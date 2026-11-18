@@ -1,5 +1,6 @@
 import { sameInterpreterName } from "@/lib/odhhVerificationParser";
 import type { StoredSignature } from "@/lib/verificationSignature";
+import type { TravelWindow } from "@/lib/travelWindows";
 
 /**
  * A service-verification report that could not be tied to ONE booked interpreter on its own. It is kept on the request
@@ -31,6 +32,8 @@ export interface PendingVerification {
   cancellation: string | null;
   cancelledBy: string | null;
   comments: string | null;
+  /** The report's travel legs (there and back); absent on reports parked before travel was read. */
+  travelWindows?: TravelWindow[];
   /** Already in the private bucket; null when the email carried none or storage was unavailable. */
   signature: StoredSignature | null;
 }

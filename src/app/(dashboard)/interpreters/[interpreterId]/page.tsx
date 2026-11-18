@@ -8,7 +8,9 @@ import { EmailNotificationsToggle } from "@/components/interpreters/detail/Email
 import { InterpreterRatesCard } from "@/components/interpreters/detail/InterpreterRatesCard";
 import { SharedCredentialsSection } from "@/components/interpreters/detail/SharedCredentialsSection";
 import { InsuranceExpiry } from "@/components/profile/InsuranceExpiry";
+import { StaffCommercialAutoCard } from "@/components/interpreters/detail/StaffCommercialAutoCard";
 import { COMMERCIAL_AUTO_BADGE } from "@/lib/insurance";
+import type { InsurancePolicy } from "@/lib/insurance";
 import { ProfileAvatar } from "@/components/profile/ProfileAvatar";
 import { ServiceAreaChips } from "@/components/profile/ServiceAreaChips";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
@@ -37,6 +39,10 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
   if (!view) notFound();
 
   const zoneLabel = PROFILE_TIME_ZONES.find((z) => z.value === view.timeZone)?.label ?? view.timeZone;
+  const auto = view.credentials.find((c) => c.insuranceKind === "commercial_auto");
+  const autoPolicy: InsurancePolicy | null = auto
+    ? { credentialId: auto.id, kind: "commercial_auto", insurer: auto.issuedBy, policyNumber: "", coverageLimits: auto.coverageLimits, expirationDate: auto.expirationDate, files: auto.files }
+    : null;
   const formats = [view.takesInPerson && "In person", view.takesVirtual && "Virtual"].filter(Boolean).join(" · ");
   const location = [view.city, view.stateOrRegion].filter(Boolean).join(", ");
 
@@ -96,6 +102,9 @@ export default async function AgencyInterpreterPage({ params }: { params: { inte
       </section>
 
       <InterpreterRatesCard interpreterId={view.id} initial={view.rates} />
+
+      {/* No login: staff record the commercial auto policy (the +$10 on in-person State / HCA jobs). With a login, the interpreter does. */}
+      {!view.isRegistered && <StaffCommercialAutoCard interpreterId={view.id} name={view.name} timeZone={view.timeZone} initial={autoPolicy} />}
 
       <section className="rounded-2xl border border-gray-200 bg-white p-6">
         <h2 className="mb-2 text-lg font-semibold text-[var(--ink)]">Contact</h2>

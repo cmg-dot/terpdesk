@@ -98,7 +98,7 @@ export function positionLedger(job: JobFacts, position: PositionFacts, settings:
     ? minimumApplied ? `Service (${stateRules ? STATE_MINIMUM_HOURS : NON_STATE_MINIMUM_HOURS} hr minimum)` : "Service"
     : "Late cancellation (scheduled time)";
 
-  const travel = splitTravel(paid ? position.travelMinutes : 0, position.travelWindow, job.timeZone, {
+  const travel = splitTravel(paid ? position.travelMinutes : 0, position.travelWindows, job.timeZone, {
     startMinute: settings.eveningStartMinute,
     endMinute: settings.eveningEndMinute,
     rateSet: position.rates.eveningCents !== null,

@@ -11,6 +11,7 @@ import type { BusinessCalendar } from "@/lib/billing/businessCalendar";
 import { zonedDate } from "@/lib/billing/calendarDays";
 import { detectKingCounty } from "@/lib/billing/kingCounty";
 import { asObject, minutesBetween, num, str, workedMinutesOf } from "@/lib/billing/loose";
+import { readTravelWindows, totalTravelMinutes } from "@/lib/travelWindows";
 import type { BillingSettings, ClientBilling, InterpreterRates, JobFacts, JobOutcome, PositionFacts, TimeWindow } from "@/lib/billing/types";
 
 /**
@@ -34,6 +35,7 @@ export interface RawOffer {
   updatedAt: Date;
 }
 export interface RawTimesheet {
+  id: string;
   interpreterId: string;
   status: string;
   actualStartTime: Date | null;
@@ -143,7 +145,9 @@ export function jobFacts(req: RawRequest, offers: readonly RawOffer[], sheets: r
       : sheetApproved && sheet
         ? workedMinutesOf(sheet.actualStartTime, sheet.actualEndTime, sheet.breakMinutes, sheet.billableHours)
         : null;
-    const window = windowOf(slot.travelStartTime, slot.travelEndTime) ?? (sheet ? windowOf(sheet.travelStartTime, sheet.travelEndTime) : null);
+    // Every leg a state verification (or staff, from the receipt) recorded for this timesheet; else the single window on file.
+    const single = windowOf(slot.travelStartTime, slot.travelEndTime) ?? (sheet ? windowOf(sheet.travelStartTime, sheet.travelEndTime) : null);
+    const windows = readTravelWindows(data, str(slot.timesheetId) || sheet?.id) ?? (single ? [single] : []);
     const approvedTravel = num(slot.approvedTravelMinutes);
     const miles = slotApproved ? num(slot.approvedMileage) : sheetApproved && sheet ? num(sheet.approvedMileage) : null;
     const until = ctx.commercialAutoUntil.get(interpreterId);
@@ -155,8 +159,8 @@ export function jobFacts(req: RawRequest, offers: readonly RawOffer[], sheets: r
       hoursState,
       workedMinutes: worked,
       approvedMiles: miles ?? 0,
-      travelMinutes: approvedTravel ?? (window ? Math.round(minutesBetween(window.start, window.end)) : 0),
-      travelWindow: window,
+      travelMinutes: approvedTravel ?? totalTravelMinutes(windows),
+      travelWindows: windows,
       commercialAuto: Boolean(until && until >= serviceDate),
       rates: ctx.rates.get(interpreterId) ?? NO_RATES,
       hasVerificationPdf: pdfEligible && hasSlot && Boolean(str(slot.actualStartTime)),

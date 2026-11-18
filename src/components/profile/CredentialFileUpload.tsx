@@ -4,16 +4,29 @@ import { useId, useState } from "react";
 import type { ChangeEvent } from "react";
 import { FileText, Paperclip, Trash2 } from "lucide-react";
 import { deleteCredentialFile, presignCredentialFile, saveCredentialFile } from "@/app/actions/credentialFiles";
+import type { DeleteCredentialFileResult, PresignCredentialFileResult, SaveCredentialFileResult } from "@/app/actions/credentialFiles";
 import { openStoredFile } from "@/lib/openFile";
 import { CREDENTIAL_FILE_TYPES, MAX_CREDENTIAL_FILE_BYTES, MAX_FILES_PER_CREDENTIAL, formatFileSize } from "@/lib/validation/file";
 import type { CredentialFile } from "@/lib/validation/file";
 import { uploadToStorage } from "@/lib/uploadToStorage";
+
+/** The three steps of an upload, and deleting one: the interpreter's own by default; staff pass theirs (actions/staffInsuranceFiles.ts). */
+export interface CredentialFileActions {
+  presign: (input: { credentialId: string; fileName: string; fileType: string; fileSize: number }) => Promise<PresignCredentialFileResult>;
+  save: (input: { credentialId: string; key: string; fileName: string }) => Promise<SaveCredentialFileResult>;
+  remove: (fileId: string) => Promise<DeleteCredentialFileResult>;
+}
+
+const OWN_ACTIONS: CredentialFileActions = { presign: presignCredentialFile, save: saveCredentialFile, remove: deleteCredentialFile };
 
 interface CredentialFileUploadProps {
   credentialId: string;
   files: CredentialFile[];
   /** Receives the new list after every add or delete. */
   onFilesChange: (files: CredentialFile[]) => void;
+  actions?: CredentialFileActions;
+  /** Who can open the files, as the reader is told (defaults to the interpreter's wording). */
+  privacyNote?: string;
 }
 
 /**
@@ -21,7 +34,7 @@ interface CredentialFileUploadProps {
  * attaches it to the credential. Stored privately; the interpreter and the staff of the agencies they work with can open
  * them while the credential is active.
  */
-export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: CredentialFileUploadProps) => {
+export const CredentialFileUpload = ({ credentialId, files, onFilesChange, actions = OWN_ACTIONS, privacyNote }: CredentialFileUploadProps) => {
   const inputId = useId();
   const [busy, setBusy] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -39,7 +52,7 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
     setBusy(true);
     try {
       setStatus("Preparing upload…");
-      const presign = await presignCredentialFile({ credentialId, fileName: file.name, fileType: file.type, fileSize: file.size });
+      const presign = await actions.presign({ credentialId, fileName: file.name, fileType: file.type, fileSize: file.size });
       if (!presign.success) return setError(presign.error);
 
       setStatus("Uploading…");
@@ -47,7 +60,7 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
       if (!put.ok) return setError(put.message);
 
       setStatus("Saving…");
-      const saved = await saveCredentialFile({ credentialId, key: presign.key, fileName: file.name });
+      const saved = await actions.save({ credentialId, key: presign.key, fileName: file.name });
       if (!saved.success) return setError(saved.error);
       onFilesChange([saved.file, ...files]);
     } catch {
@@ -69,7 +82,7 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
     setBusy(true);
     setError(null);
     try {
-      const result = await deleteCredentialFile(fileId);
+      const result = await actions.remove(fileId);
       if (result.success) {
         onFilesChange(files.filter((f) => f.id !== fileId));
         setConfirmingId(null);
@@ -132,7 +145,7 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange }: Cre
         <span className="text-[12px] text-gray-500">{atLimit ? `Limit of ${MAX_FILES_PER_CREDENTIAL} files reached` : "No file chosen"}</span>
       </label>
       <p className="text-[12px] text-gray-500">
-        PDF, JPEG or PNG, up to 10 MB. Stored privately: only you and your agency&apos;s staff can open them.
+        PDF, JPEG or PNG, up to 10 MB. {privacyNote ?? "Stored privately: only you and your agency's staff can open them."}
       </p>
       {error && <p role="alert" className="text-[12px] text-red-700">{error}</p>}
     </div>

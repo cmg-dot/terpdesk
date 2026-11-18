@@ -30,20 +30,21 @@ export interface TravelSplit {
 }
 
 /**
- * Splits the approved travel minutes. When staff approved less (or more) than the submitted window, the evening share keeps the
- * window's proportion. No window, no evening window or no evening rate: it is all day travel.
+ * Splits the approved travel minutes. When staff approved less (or more) than the submitted windows hold, the evening share keeps
+ * the windows' proportion. No window, no evening window or no evening rate: it is all day travel.
  */
 export function splitTravel(
   approvedMinutes: number,
-  window: TimeWindow | null,
+  windows: readonly TimeWindow[],
   zone: string,
   evening: { startMinute: number | null; endMinute: number | null; rateSet: boolean },
 ): TravelSplit {
   const total = Math.max(0, Math.round(approvedMinutes));
-  if (total === 0 || !window || evening.startMinute === null || evening.endMinute === null || !evening.rateSet) return { dayMinutes: total, eveningMinutes: 0 };
-  const windowMinutes = (Date.parse(window.end) - Date.parse(window.start)) / 60000;
+  const { startMinute, endMinute } = evening;
+  if (total === 0 || windows.length === 0 || startMinute === null || endMinute === null || !evening.rateSet) return { dayMinutes: total, eveningMinutes: 0 };
+  const windowMinutes = windows.reduce((n, w) => n + Math.max(0, (Date.parse(w.end) - Date.parse(w.start)) / 60000), 0);
   if (!Number.isFinite(windowMinutes) || windowMinutes <= 0) return { dayMinutes: total, eveningMinutes: 0 };
-  const inEvening = eveningMinutesIn(window, zone, evening.startMinute, evening.endMinute);
+  const inEvening = windows.reduce((n, w) => n + eveningMinutesIn(w, zone, startMinute, endMinute), 0);
   const eveningMinutes = Math.min(total, Math.round((total * inEvening) / windowMinutes));
   return { dayMinutes: total - eveningMinutes, eveningMinutes };
 }

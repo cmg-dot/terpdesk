@@ -9,6 +9,7 @@ import {
   to24HourTime,
   toIsoDate,
 } from "@/lib/odhhEmailParser";
+import type { WallClockLeg } from "@/lib/travelWindows";
 
 /**
  * Parser for ODHH "SERVICE VERIFICATION" emails: the state's own receipt for a finished appointment, which acts as
@@ -68,6 +69,8 @@ export interface ParsedServiceVerification {
   interpreterId: string | null;
   interpreterName: string | null;
   interpreterCredentials: string | null;
+  /** Every travel leg the report fills in ("Travel Start Time" / "Travel End Time", there and back), in order; empty when none. */
+  travel: WallClockLeg[];
 }
 
 const ACTUAL_START = labelPattern(["Actual[ \\t]+Start(?:[ \\t]+Time)?", "Actual[ \\t]+Time[ \\t]+In"]);
@@ -96,6 +99,10 @@ const INTERPRETER_LINE = labelPattern(["Interpreter"]);
 const INTERPRETER_VALUE = /^(?:(\d{1,8})[ \t]*[-–—][ \t]*)?(.+?)[ \t]*(?:\(([^()]*)\))?$/;
 const MAX_INTERPRETER_NAME = 100;
 
+// The report lists "Travel Start Time:" / "Travel End Time:" once per leg (there, then back); an unused leg is left blank.
+const TRAVEL_START_ALL = /^[ \t]*Travel[ \t]+Start(?:[ \t]+Time)?[ \t]*:[ \t]*(.*?)[ \t]*$/gim;
+const TRAVEL_END_ALL = /^[ \t]*Travel[ \t]+(?:End|Stop)(?:[ \t]+Time)?[ \t]*:[ \t]*(.*?)[ \t]*$/gim;
+
 const MAX_MILES = 2000;
 const MAX_FEES = 10000;
 const DATE_IN_VALUE = /(\d{1,2}\/\d{1,2}\/\d{2,4})/;
@@ -109,6 +116,19 @@ function parseDateTimeValue(value: string | null): { date: string | null; time: 
   const dateText = value.match(DATE_IN_VALUE)?.[1];
   const timeText = value.match(TIME_IN_VALUE)?.[1];
   return { date: dateText ? toIsoDate(dateText) : null, time: timeText ? to24HourTime(timeText) : null };
+}
+
+/** The filled-in travel legs: the Nth start paired with the Nth end; a leg missing either time is left out. */
+function parseTravelLegs(text: string): WallClockLeg[] {
+  const starts = Array.from(text.matchAll(TRAVEL_START_ALL), (m) => parseDateTimeValue(cleanValue(m[1])));
+  const ends = Array.from(text.matchAll(TRAVEL_END_ALL), (m) => parseDateTimeValue(cleanValue(m[1])));
+  const legs: WallClockLeg[] = [];
+  for (let i = 0; i < Math.min(starts.length, ends.length); i += 1) {
+    const s = starts[i];
+    const e = ends[i];
+    if (s.time && e.time) legs.push({ startDate: s.date, startTime: s.time, endDate: e.date, endTime: e.time });
+  }
+  return legs;
 }
 
 function parseMiles(value: string | null): number | null {
@@ -179,6 +199,7 @@ export function parseServiceVerification(rawContent: string, hints: Verification
     interpreterId: interpreter.id,
     interpreterName: interpreter.name,
     interpreterCredentials: interpreter.credentials,
+    travel: parseTravelLegs(text),
   };
 }
 

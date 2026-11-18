@@ -6,7 +6,7 @@ import { removeInsurance } from "@/app/actions/insurance";
 import { CredentialFileUpload } from "@/components/profile/CredentialFileUpload";
 import { InsuranceForm } from "@/components/profile/InsuranceForm";
 import { actionButton, badgeBase, expiryStatus, formatDay } from "@/components/profile/credentialFormat";
-import { COMMERCIAL_AUTO_BADGE, INSURANCE_LABEL, hasValidCommercialAuto } from "@/lib/insurance";
+import { COMMERCIAL_AUTO_BADGE, COMMERCIAL_AUTO_PAYOUT, INSURANCE_LABEL, hasValidCommercialAuto } from "@/lib/insurance";
 import type { InsuranceKind, InsurancePolicy, MyInsurance } from "@/lib/insurance";
 import type { CredentialFile } from "@/lib/validation/file";
 
@@ -20,7 +20,7 @@ interface Props {
 
 const INTRO: Record<InsuranceKind, string> = {
   liability: "Professional liability coverage. Your agency checks it is current before booking you.",
-  commercial_auto: "Optional. With current commercial auto coverage, in-person jobs pay +$10.",
+  commercial_auto: `Optional. ${COMMERCIAL_AUTO_PAYOUT}`,
 };
 
 /** One dedicated policy on the Credentials tab: its details, expiry, document upload, and edit / remove. */

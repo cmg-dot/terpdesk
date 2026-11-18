@@ -45,6 +45,8 @@ export interface HoursRequestData {
   slots?: null[];
   void?: unknown;
   timeZone?: unknown;
+  /** Each state timesheet's travel legs (lib/travelWindows.ts), keyed by timesheet id. */
+  travelWindows?: unknown;
 }
 
 type Loose = Record<string, unknown>;
@@ -66,7 +68,7 @@ export function toHoursRow(mapped: MappedRequest): HoursRequestRow {
   const data = asRecord(mapped.data);
   const slots = data.slots;
   const hours: HoursRequestData = {
-    ...pick(data, ["hoursSubmissions", "hoursSubmission", "retiredPositions", "offerPositions", "void", "timeZone", ...COUNT_KEYS]),
+    ...pick(data, ["hoursSubmissions", "hoursSubmission", "retiredPositions", "offerPositions", "void", "timeZone", "travelWindows", ...COUNT_KEYS]),
     intake: pick(asRecord(data.intake), ["program", "odhhSrn", ...COUNT_KEYS]),
     details: pick(asRecord(data.details), ["timeZone", ...COUNT_KEYS]),
   };

@@ -12,9 +12,14 @@ export function RecordDetails({ record }: { record: ServiceRecord }) {
   const zone = getIanaZone(record.timeZone);
   const formattedActual = formatDateTimeRangeInZone(record.actualStart, record.actualEnd, zone);
   const formattedScheduled = formatDateTimeRangeInZone(record.scheduledStart, record.scheduledEnd, zone);
-  const formattedTravel = record.travelStart && record.travelEnd
-    ? formatDateTimeRangeInZone(record.travelStart, record.travelEnd, zone)
-    : "None reported";
+  // Every leg a state verification reported (there and back), else the one window on file.
+  const formattedTravel = record.travelWindows?.length
+    ? record.travelWindows.map((w) => formatDateTimeRangeInZone(w.start, w.end, zone)).join(" · ")
+    : record.travelStart && record.travelEnd
+      ? formatDateTimeRangeInZone(record.travelStart, record.travelEnd, zone)
+      : "None reported";
+  // ODHH and Apple Health are both state jobs: travel and service completion, never an unpaid break.
+  const stateJob = Boolean(record.isOdhh || record.stateJob);
 
   const serviceMinutes = serviceMinutesOf(record);
   const serviceTime = formatHoursMinutes(serviceMinutes);
@@ -28,12 +33,12 @@ export function RecordDetails({ record }: { record: ServiceRecord }) {
             <div className="text-[var(--ink)]">{formattedScheduled}</div>
           </div>
 
-          {record.isOdhh ? (
+          {stateJob ? (
             <>
-              <div>
+              <div data-travel-time="">
                 <div className="text-[var(--sage)] mb-1 flex items-center justify-between">
-                  <span>Travel time</span>
-                  {record.travelStart && (
+                  <span>Travel time{record.reportedTravelMinutes ? ` (${formatHoursMinutes(record.reportedTravelMinutes)})` : ""}</span>
+                  {(record.travelStart || record.travelWindows?.length) && (
                     <CopyButton text={formattedTravel} label="travel time" />
                   )}
                 </div>
@@ -83,7 +88,7 @@ export function RecordDetails({ record }: { record: ServiceRecord }) {
             </div>
             <div className="text-[var(--ink)]">{serviceTime}</div>
           </div>
-          <BillableTimeRow workedMinutes={serviceMinutes} isOdhh={Boolean(record.isOdhh)} />
+          <BillableTimeRow workedMinutes={serviceMinutes} isOdhh={stateJob} />
           <div>
             <div className="text-[var(--sage)] mb-1">Mileage approved by the agency</div>
             <div className="text-[var(--ink)]">{record.state === 'approved' && record.approvedMileage != null ? `${(record.approvedMileage ?? 0).toFixed(1)} mi` : 'Not approved yet'}</div>

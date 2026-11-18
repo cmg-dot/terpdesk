@@ -60,9 +60,10 @@ export interface PositionFacts {
   /** Worked minutes (actual end - start - break) from the approved hours; null when there are none. */
   workedMinutes: number | null;
   approvedMiles: number;
-  /** Travel minutes: approved at review (approvedTravelMinutes), else the travel window the interpreter submitted. */
+  /** Travel minutes: approved at review (approvedTravelMinutes), else the minutes in the submitted travel windows. */
   travelMinutes: number;
-  travelWindow: TimeWindow | null;
+  /** The submitted travel windows (there and back on a state verification; one from an in-app form); empty when none. */
+  travelWindows: TimeWindow[];
   /** A current commercial auto policy on the service date. */
   commercialAuto: boolean;
   rates: InterpreterRates;

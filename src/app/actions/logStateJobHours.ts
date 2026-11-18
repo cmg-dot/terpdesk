@@ -9,6 +9,7 @@ import { writeAuditLog } from "@/lib/audit";
 import { NOT_ALLOWED_MESSAGE, requireRole } from "@/lib/auth/guards";
 import { isStateJobRequest } from "@/lib/stateJob";
 import { recordStateJobHours } from "@/lib/stateJobHours";
+import { isTravelWindow, totalTravelMinutes } from "@/lib/travelWindows";
 import { getIanaZone, resolveRequestTimes, wallClockToUtc } from "@/utils/timezone";
 
 const LOCAL_DATETIME = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/;
@@ -21,6 +22,11 @@ const logSchema = z.object({
   serviceHours: z.coerce.number().positive("Service hours must be more than 0.").max(24, "Service hours cannot exceed 24."),
   totalMiles: z.coerce.number().min(0, "Miles cannot be negative.").max(2000, "Miles look too high.").default(0),
   otherFees: z.coerce.number().min(0, "Fees cannot be negative.").max(10000, "Fees look too high.").default(0),
+  // Travel from the receipt: up to two legs (there and back), each a start and an end in the job's zone.
+  travel: z
+    .array(z.object({ start: z.string().regex(LOCAL_DATETIME, "Enter a valid travel start."), end: z.string().regex(LOCAL_DATETIME, "Enter a valid travel end.") }))
+    .max(2, "Enter at most two travel legs.")
+    .default([]),
 });
 
 export type LogStateJobHoursInput = z.input<typeof logSchema>;
@@ -48,7 +54,7 @@ export async function logStateJobHours(input: LogStateJobHoursInput): Promise<Lo
 
   const parsed = logSchema.safeParse(input);
   if (!parsed.success) return fail(parsed.error.issues[0]?.message ?? "Invalid details.");
-  const { requestId, interpreterId, actualStartTime, actualEndTime, serviceHours, totalMiles, otherFees } = parsed.data;
+  const { requestId, interpreterId, actualStartTime, actualEndTime, serviceHours, totalMiles, otherFees, travel } = parsed.data;
 
   try {
     const [request] = await db.select().from(requests).where(eq(requests.id, requestId)).limit(1);
@@ -72,6 +78,8 @@ export async function logStateJobHours(input: LogStateJobHoursInput): Promise<Lo
     const elapsedHours = (end.getTime() - start.getTime()) / 3_600_000;
     if (!(elapsedHours > 0)) return fail("End time must be after start time.");
     if (serviceHours > elapsedHours + 1 / 60) return fail("Service hours cannot be longer than the time between start and end.");
+    const travelWindows = travel.map((leg) => ({ start: wallClockToUtc(`${leg.start}:00`, zone), end: wallClockToUtc(`${leg.end}:00`, zone) }));
+    if (!travelWindows.every(isTravelWindow)) return fail("Each travel leg must end after it starts, within 12 hours.");
 
     const created = await recordStateJobHours({
       requestId,
@@ -80,6 +88,7 @@ export async function logStateJobHours(input: LogStateJobHoursInput): Promise<Lo
       end,
       serviceHours,
       totalMiles,
+      travelWindows,
       // timesheets has no fees column, so extra fees are recorded in the note.
       note: otherFees > 0 ? `Logged by agency from state receipt. Additional fees: $${otherFees.toFixed(2)}` : "Logged by agency from state receipt.",
     });
@@ -89,7 +98,7 @@ export async function logStateJobHours(input: LogStateJobHoursInput): Promise<Lo
       userId: session.user.id,
       userEmail: session.user.email ?? null,
       action: "state_job_hours_logged",
-      details: `timesheetId=${created.id}; requestId=${requestId}; interpreterId=${interpreterId}; serviceHours=${serviceHours.toFixed(2)}; totalMiles=${totalMiles.toFixed(1)}; otherFees=${otherFees.toFixed(2)}`,
+      details: `timesheetId=${created.id}; requestId=${requestId}; interpreterId=${interpreterId}; serviceHours=${serviceHours.toFixed(2)}; totalMiles=${totalMiles.toFixed(1)}; otherFees=${otherFees.toFixed(2)}; travelMinutes=${totalTravelMinutes(travelWindows)}`,
     });
 
     revalidatePath("/hours-review");

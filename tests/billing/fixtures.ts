@@ -21,7 +21,7 @@ export const position = (overrides: Partial<PositionFacts> = {}): PositionFacts 
   workedMinutes: 60,
   approvedMiles: 0,
   travelMinutes: 0,
-  travelWindow: null,
+  travelWindows: [],
   commercialAuto: false,
   rates: rates(),
   hasVerificationPdf: false,

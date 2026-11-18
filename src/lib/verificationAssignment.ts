@@ -10,6 +10,7 @@ import { recordStateJobHours } from "@/lib/stateJobHours";
 import type { VerificationEffects } from "@/lib/serviceVerification";
 import { signatureUrlFor } from "@/lib/verificationSignature";
 import { verificationNote } from "@/lib/verificationPending";
+import { isTravelWindow } from "@/lib/travelWindows";
 import type { PendingVerification } from "@/lib/verificationPending";
 import { removePendingVerification } from "@/lib/verificationPendingStore";
 
@@ -106,6 +107,7 @@ export async function assignPendingVerification(
           end,
           serviceHours,
           totalMiles: pending.totalMiles,
+          travelWindows: (pending.travelWindows ?? []).filter(isTravelWindow),
           note: verificationNote(pending),
           review: {
             timesheetId,
