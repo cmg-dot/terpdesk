@@ -5,12 +5,15 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
+import { BillingPeriodCard } from "@/components/dashboard/BillingPeriodCard";
 import { DashboardStatsCard } from "@/components/dashboard/DashboardStatsCard";
 import { LiveAppointmentBanner } from "@/components/dashboard/LiveAppointmentBanner";
 import { NeedsAttentionSection } from "@/components/dashboard/NeedsAttentionSection";
 import { UpcomingBookingsSection } from "@/components/dashboard/UpcomingBookingsSection";
+import { useDashboardBilling } from "@/hooks/useDashboardBilling";
 import { useDashboardSummary } from "@/hooks/useDashboardSummary";
 import { useMinuteClock } from "@/hooks/useMinuteClock";
+import { BILLING_ENABLED } from "@/lib/billing/enabled";
 import { dashboardViewOf } from "@/lib/dashboardView";
 
 export default function DashboardPage() {
@@ -21,6 +24,9 @@ export default function DashboardPage() {
   // the few jobs listed come from the server (see fetchDashboardSummary).
   const nowMs = useMinuteClock();
   const lists = useMemo(() => dashboardViewOf(summary, nowMs), [summary, nowMs]);
+  // The billing card: only where billing is on, and only if this database can answer (null = tables not migrated: no card, full width).
+  const { billing, failed: billingFailed } = useDashboardBilling();
+  const showBillingCard = BILLING_ENABLED && billing !== null;
 
   return (
     <motion.div initial={summary ? false : { opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2">
@@ -46,20 +52,18 @@ export default function DashboardPage() {
       {failed && <p role="alert" className="text-sm text-red-700">We could not load your dashboard figures. They will be tried again in a moment.</p>}
       <DashboardStatsCard counts={summary?.counts ?? null} />
 
+      {/* With the billing card: the two lists stacked beside it. Without it: the lists share the full width, side by side from xl up. */}
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-        <div className="lg:col-span-2 space-y-8">
+        <div className={showBillingCard ? "space-y-8 lg:col-span-2" : "space-y-8 lg:col-span-3 xl:grid xl:grid-cols-2 xl:items-start xl:gap-8 xl:space-y-0"}>
           <NeedsAttentionSection jobs={lists.needsAttention} total={lists.needsAttentionTotal} laterCount={lists.needsAttentionLaterCount} />
           <UpcomingBookingsSection jobs={lists.upcoming} liveCount={lists.upcomingHappeningNowCount} nowMs={nowMs} />
         </div>
 
-        <div className="lg:col-span-1">
-          <div className="rounded-2xl border border-gray-200 bg-white p-8 border border-neutral-100/50 h-full max-h-[400px]">
-            <h2 className="mb-4 text-[17px] font-semibold text-[var(--ink)]">Unavailable in this test workspace</h2>
-            <p className="text-[15px] leading-relaxed text-[var(--sage)]">
-              Billing, payments and integrations are unavailable. Notifications appear inside the app, and you can turn on optional email notices in Settings. Nothing is texted or pushed to your device.
-            </p>
+        {showBillingCard && (
+          <div className="lg:col-span-1">
+            <BillingPeriodCard billing={billing ?? undefined} failed={billingFailed} hoursAwaitingReview={summary?.counts.hoursAwaitingReview ?? null} />
           </div>
-        </div>
+        )}
       </div>
     </motion.div>
   );
