@@ -5,3 +5,7 @@ node_modules
 *.tsbuildinfo
 __pycache__/
 *.pyc
+
+# Local data exports (interpreter rates/emails, historical jobs) - never commit
+*.xlsx
+*.xls
