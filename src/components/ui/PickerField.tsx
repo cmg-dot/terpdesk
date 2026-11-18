@@ -142,7 +142,7 @@ export function PickerField({ popoverLabel, text, placeholder, icon, className, 
         // pl-11 (pl-8 compact) clears the icon, as it did on the input this replaces.
         className={`${className} ${compact ? "pl-8" : "pl-11"} block truncate text-left`}
       >
-        {text !== "" ? text : <span className="text-gray-400">{placeholder}</span>}
+        {text !== "" ? text : <span className="text-[var(--placeholder)]">{placeholder}</span>}
       </button>
       <AnimatePresence>
         {open && anchor && (

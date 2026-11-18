@@ -4,7 +4,6 @@ import { useMemo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useSession } from "next-auth/react";
-import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { BillingPeriodCard } from "@/components/dashboard/BillingPeriodCard";
 import { DashboardStatsCard } from "@/components/dashboard/DashboardStatsCard";
 import { LiveAppointmentBanner } from "@/components/dashboard/LiveAppointmentBanner";
@@ -31,13 +30,6 @@ export default function DashboardPage() {
   return (
     <motion.div initial={summary ? false : { opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }} className="mx-auto max-w-[1200px] space-y-10 pt-2">
       <LiveAppointmentBanner jobs={lists.happeningNow} />
-
-      <div className="space-y-6">
-        <div className="space-y-1.5 w-full">
-          <label className="pl-5 text-[13px] font-medium text-[var(--sage)]">Agency</label>
-          <div className="rounded-full bg-[#F3F2EE] px-6 py-3.5 text-[15px] text-slate-600 border border-neutral-200/50">{DEFAULT_AGENCY_NAME}</div>
-        </div>
-      </div>
 
       <div className="flex flex-col md:flex-row items-start md:items-end justify-between gap-6 md:gap-0">
         <div className="space-y-2">

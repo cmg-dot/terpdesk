@@ -11,7 +11,7 @@ interface Props {
   hoursAwaitingReview: number | null;
 }
 
-const buttonClass = "inline-flex items-center rounded-full px-4 py-2.5 text-sm font-medium transition-opacity focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)]";
+const buttonClass = "inline-flex min-h-11 items-center rounded-full px-4 py-2.5 text-sm font-medium transition-opacity focus:outline-none focus:ring-2 focus:ring-[rgb(var(--forest-rgb)/0.5)]";
 
 /** The dashboard's right column when billing is on: the pay period Billing opens on, its dates, and what to do next. Dates only. */
 export function BillingPeriodCard({ billing, failed, hoursAwaitingReview }: Props) {
@@ -25,14 +25,14 @@ export function BillingPeriodCard({ billing, failed, hoursAwaitingReview }: Prop
         : "No hours are waiting for review.";
   return (
     <section aria-labelledby="billing-period-heading" className="rounded-2xl border border-gray-200 bg-white p-6" data-dashboard-billing="">
-      <h2 id="billing-period-heading" className="text-[13px] font-semibold uppercase tracking-wider text-[var(--sage)]">
+      <h2 id="billing-period-heading" className="text-[17px] font-semibold text-[var(--ink)]">
         Billing period
       </h2>
       {failed && <p role="alert" className="mt-3 text-sm text-red-700">We could not load the pay period. It will be tried again when you return to this page.</p>}
       {!billing && !failed && <p className="mt-3 text-sm text-[var(--sage)]">Loading…</p>}
       {billing && (
         <>
-          <p className="mt-2 text-[22px] font-semibold tracking-tight text-[var(--ink)]">{periodLabel(billing)}</p>
+          <p className="mt-1 text-[15px] font-medium tabular-nums text-[var(--ink)]">{periodLabel(billing)}</p>
           <dl className="mt-4 space-y-3 text-[14px]">
             <div>
               <dt className="text-[13px] text-[var(--sage)]">Invoices due</dt>
@@ -43,7 +43,7 @@ export function BillingPeriodCard({ billing, failed, hoursAwaitingReview }: Prop
                     {billing.cutoffPassed && <span className="ml-2 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800">Passed</span>}
                   </>
                 ) : (
-                  <Link href="/billing?tab=rules" className="font-medium text-[var(--forest)] hover:underline">
+                  <Link href="/billing?tab=rules" className="-my-3 inline-block py-3 font-medium text-[var(--accent-text)] hover:underline">
                     No cutoff saved
                   </Link>
                 )}

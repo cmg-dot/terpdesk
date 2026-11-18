@@ -3,7 +3,7 @@
 const CARD = "mt-6 rounded-2xl border border-gray-200 bg-white p-6";
 
 export const BillingDeferred = () => (
-  <div className="mx-auto max-w-[1200px] space-y-6 p-6 pb-24 antialiased">
+  <div className="mx-auto max-w-[1200px] space-y-6 pt-2 antialiased">
     <div className={CARD}>
       <h2 className="mb-3 text-lg font-semibold text-[var(--ink)]">This workflow is deferred</h2>
       <p className="max-w-4xl text-[15px] leading-relaxed text-gray-600">
@@ -14,7 +14,7 @@ export const BillingDeferred = () => (
 );
 
 export const BillingNotReady = () => (
-  <div className="mx-auto max-w-[1200px] space-y-6 p-6 pb-24 antialiased">
+  <div className="mx-auto max-w-[1200px] space-y-6 pt-2 antialiased">
     <div className={CARD}>
       <h2 className="mb-3 text-lg font-semibold text-[var(--ink)]">Billing is not set up yet</h2>
       <p className="max-w-3xl text-[15px] leading-relaxed text-gray-600">

@@ -25,7 +25,7 @@ export function HolidaysEditor({ holidays, nextYear }: { holidays: Holiday[]; ne
   };
 
   return (
-    <RuleCard title="Holidays" note="Not counted as business days when a cancellation's notice is measured. Seeded with WA state holidays as observed.">
+    <RuleCard id="rules-holidays" title="Holidays" note="Not counted as business days when a cancellation's notice is measured. Seeded with WA state holidays as observed.">
       <div className="mb-5 space-y-4">
         {years.map((year) => (
           <div key={year}>
@@ -42,7 +42,8 @@ export function HolidaysEditor({ holidays, nextYear }: { holidays: Holiday[]; ne
                       aria-label={`Remove ${h.label} ${h.date}`}
                       disabled={remover.pending}
                       onClick={() => void remover.run(() => removeHoliday({ date: h.date }))}
-                      className="rounded-full px-2 py-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-800"
+                      // On a phone the button's box is 44px (the negative margins keep the chip its size).
+                      className="rounded-full px-2 py-0.5 text-gray-600 hover:bg-gray-100 hover:text-gray-800 max-sm:-my-2 max-sm:flex max-sm:min-h-11 max-sm:min-w-11 max-sm:items-center max-sm:justify-center"
                     >
                       ×
                     </button>

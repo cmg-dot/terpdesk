@@ -24,9 +24,9 @@ export function AttentionList({ items }: { items: AttentionItem[] }) {
     >
       <ul className="space-y-1.5 border-t border-amber-200 pt-3">
         {items.map((item, i) => (
-          <li key={`${item.requestId}-${i}`} className="flex flex-wrap gap-x-2 text-amber-900">
+          <li key={`${item.requestId}-${i}`} className="flex flex-wrap gap-x-2 text-amber-900 max-sm:items-center">
             <span className="tabular-nums">{dayLabel(item.serviceDate)}</span>
-            <Link href={`/requests/${item.requestId}`} className="font-medium underline-offset-2 hover:underline">
+            <Link href={`/requests/${item.requestId}`} className="font-medium underline-offset-2 hover:underline max-sm:inline-flex max-sm:min-h-11 max-sm:items-center">
               {item.reference}
             </Link>
             <span>· {item.who}:</span>

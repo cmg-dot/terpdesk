@@ -52,7 +52,21 @@
   --mint-line: rgb(var(--mint-line-rgb));
   --mint-ink: rgb(var(--mint-ink-rgb));
   --ink: #0f172a;
-  --sage: #64748b;
+  /* Secondary text. 5.8:1 on the page, 5.3:1 on the tinted rows (the old #64748b was 4.5 and 4.0). */
+  --sage: #556274;
+  /* Text that carries the brand colour (links, the active tab, quiet buttons): the brand itself, lifted to a light tint in Dark Mode. */
+  --accent-text: var(--forest);
+  /* Placeholder text in fields (date and time pickers, rate boxes). */
+  --placeholder: #566376;
+
+  /* Dashboard surfaces and accents that were hard-coded hex, so Dark Mode can re-point them (themes.css). */
+  --row: #EFECE5;
+  --row-hover: #E8E4DB;
+  --banner: #F8F7F4;
+  --banner-edge: #EBE8DF;
+  --date-ink: #A0522D;
+  --stats: var(--forest);
+  --stats-label: var(--sidebar-muted);
 
   --background: var(--canvas);
   --foreground: #0f172a;

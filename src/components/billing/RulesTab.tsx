@@ -4,6 +4,7 @@ import { HolidaysEditor } from "@/components/billing/HolidaysEditor";
 import { InterpreterRatesTable } from "@/components/billing/InterpreterRatesTable";
 import { PayScheduleEditor } from "@/components/billing/PayScheduleEditor";
 import { RuleCard } from "@/components/billing/rulesParts";
+import { RulesNav } from "@/components/billing/RulesNav";
 import { SettingsForm } from "@/components/billing/SettingsForm";
 import { BUSINESS_ZONE } from "@/lib/billing/businessCalendar";
 import type { Holiday } from "@/lib/billing/holidays";
@@ -45,13 +46,14 @@ export function RulesTab({ settings, periods, holidays, clients, interpreters, n
   const lastYear = holidays.reduce((y, h) => Math.max(y, Number(h.date.slice(0, 4))), Number(formatInTimeZone(now, BUSINESS_ZONE, "yyyy")));
   return (
     <div className="space-y-6">
+      <RulesNav />
       <SettingsForm initial={formSettings(settings)} />
-      <PayScheduleEditor periods={periods} cutoffParts={cutoffParts} currentYear={formatInTimeZone(now, BUSINESS_ZONE, "yyyy")} />
+      <PayScheduleEditor periods={periods} cutoffParts={cutoffParts} today={formatInTimeZone(now, BUSINESS_ZONE, "yyyy-MM-dd")} />
       <HolidaysEditor holidays={holidays} nextYear={lastYear + 1} />
-      <RuleCard title="Organization rates (Non-state)" note="Each organization's hourly rate and rounding step. Empty uses the defaults above (Tacoma Schools $85 in 15-minute steps, Yakima Schools $99).">
+      <RuleCard id="rules-organizations" title="Organization rates (Non-state)" note="Each organization's hourly rate and rounding step. Empty uses the defaults above (Tacoma Schools $85 in 15-minute steps, Yakima Schools $99).">
         <ClientTermsTable rows={clients} defaultRate={centsToInput(settings.defaultClientRateCents)} defaultRounding={String(settings.nonStateRoundingMinutes)} />
       </RuleCard>
-      <RuleCard title="Interpreter rates" note="State and King County rates are billed and paid on State and HCA jobs; the Non-state rate is paid on Non-state jobs. Evening travel applies inside the evening window.">
+      <RuleCard id="rules-interpreters" title="Interpreter rates" note="State and King County rates are billed and paid on State and HCA jobs; the Non-state rate is paid on Non-state jobs. Evening travel applies inside the evening window.">
         <InterpreterRatesTable rows={interpreters} />
       </RuleCard>
     </div>

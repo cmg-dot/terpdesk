@@ -37,7 +37,7 @@ interface Props {
 /** "Needs attention": jobs that need someone, the imminent ones first (see lib/needsAttention.ts). */
 export const NeedsAttentionSection = ({ jobs, total, laterCount }: Props) => (
   <section className="space-y-5">
-    <h2 className="text-lg font-semibold text-[var(--ink)] px-2">Needs attention</h2>
+    <h2 className="text-[17px] font-semibold text-[var(--ink)] px-2">Needs attention</h2>
 
     <div className="space-y-2.5">
       {jobs.length === 0 && <p className="text-sm text-[var(--sage)]">Nothing needs your attention right now.</p>}
@@ -49,7 +49,7 @@ export const NeedsAttentionSection = ({ jobs, total, laterCount }: Props) => (
         renderItem={(job) => {
           const { dotColor, btnLabel } = cardStyle(job);
           return (
-            <Link href={`/requests/${job.id}`} key={job.id} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-[#EFECE5] px-6 py-3.5 hover:bg-[#e8e4db] transition-colors cursor-pointer">
+            <Link href={`/requests/${job.id}`} key={job.id} className="flex items-center justify-between rounded-2xl border border-gray-200 bg-[var(--row)] px-6 py-3.5 hover:bg-[var(--row-hover)] transition-colors cursor-pointer">
               <div className="flex items-start gap-3">
                 <div className={`mt-[7px] h-2 w-2 shrink-0 rounded-full ${dotColor}`}></div>
                 <div className="flex flex-col">

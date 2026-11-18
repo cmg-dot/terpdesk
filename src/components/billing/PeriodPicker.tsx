@@ -30,7 +30,7 @@ export function PeriodPicker({ periods, selected, tab }: { periods: PeriodOption
       label="Pay period"
       layout="stacked"
       variant="form"
-      className="w-[19rem] max-w-full"
+      className="w-[19rem] max-w-full max-sm:[&>button]:min-h-11"
       options={options}
       value={selected}
       onChange={(id) => router.push(`/billing?tab=${tab}&period=${encodeURIComponent(id)}`)}

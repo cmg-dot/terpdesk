@@ -6,16 +6,12 @@ import type { RequestListRow } from "@/lib/requestListRow";
 export const LiveAppointmentBanner = ({ jobs }: { jobs: readonly RequestListRow[] }) => {
   if (jobs.length === 0) {
     return (
-      <div className="bg-[#F8F7F4] border border-[#EBE8DF] text-[var(--ink)] rounded-2xl p-4 sm:p-5 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
-          <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-stone-400"></span>
-          <div>
-            <div className="flex items-center gap-2 mb-0.5">
-              <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--sage)]">Live Appointment Status</span>
-            </div>
-            <p className="text-[14px] text-gray-600 font-medium">No active bookings right now</p>
-          </div>
-        </div>
+      <div className="flex items-center gap-3 rounded-2xl border border-[var(--banner-edge)] bg-[var(--banner)] px-4 py-3 text-[var(--ink)] sm:px-5">
+        <span className="h-2.5 w-2.5 shrink-0 rounded-full bg-stone-400"></span>
+        <p className="text-sm font-medium text-slate-600">
+          <span className="mr-2 text-xs font-bold uppercase tracking-wider text-[var(--sage)]">Live Appointment Status</span>
+          No active bookings right now
+        </p>
       </div>
     );
   }
@@ -30,8 +26,8 @@ export const LiveAppointmentBanner = ({ jobs }: { jobs: readonly RequestListRow[
         </span>
         <div>
           <div className="flex items-center gap-2 mb-0.5">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-300">Live Appointment Status</span>
-            <span className="bg-emerald-500/30 text-emerald-200 text-[11px] font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">Happening now</span>
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-300">Live Appointment Status</span>
+            <span className="bg-emerald-500/30 text-emerald-200 text-xs font-semibold px-2 py-0.5 rounded-full border border-emerald-400/30">Happening now</span>
           </div>
           <p className="text-[15px] font-semibold text-white">{only ? only.title : `${jobs.length} active appointments in progress`}</p>
           {only ? (
@@ -47,7 +43,7 @@ export const LiveAppointmentBanner = ({ jobs }: { jobs: readonly RequestListRow[
       <div className="flex items-center gap-2.5 w-full sm:w-auto">
         <Link
           href={only ? `/requests/${only.id}` : `/requests?filter=happening-now`}
-          className="w-full sm:w-auto inline-flex items-center justify-center bg-white text-[var(--forest-soft)] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
+          className="w-full sm:w-auto inline-flex min-h-11 items-center justify-center bg-white text-[var(--accent-text)] font-semibold px-5 py-2.5 rounded-full text-sm hover:bg-emerald-50 transition-colors shadow-sm"
         >
           {only ? "Open active booking →" : "View live requests →"}
         </Link>

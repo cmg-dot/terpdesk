@@ -30,7 +30,8 @@ export default async function BillingPage({ searchParams }: { searchParams: { ta
   const [clients, interpreters] = tab === "rules" ? await Promise.all([loadClientTerms(), loadInterpreterRates(DEFAULT_AGENCY_ID)]) : [[], []];
 
   return (
-    <div className="mx-auto w-full max-w-[1100px] space-y-6 px-4 pb-24 pt-6 antialiased sm:px-6">
+    // The dashboard layout already pads the sides and the bottom (and clears the phone's bottom nav), so only the width and rhythm are set here.
+    <div className="mx-auto w-full max-w-[1200px] space-y-6 pt-2 antialiased">
       <BillingHeader tab={tab} period={view.period} periods={periods} totals={view.totals} />
       {tab === "payroll" && <PayrollTab groups={view.payroll} attention={view.attention} periodId={view.period.id} />}
       {tab === "invoices" && <InvoicesTab groups={view.invoices} attention={view.attention} settings={view.settings} periodId={view.period.id} />}

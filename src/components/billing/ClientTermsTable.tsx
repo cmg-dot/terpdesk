@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import { setClientBilling } from "@/app/actions/billingRates";
-import { quietButton, ruleInput } from "@/components/billing/rulesParts";
+import { quietButton, rowSaveButton, tableInput } from "@/components/billing/rulesParts";
 import { Dropdown } from "@/components/ui/Dropdown";
 import type { DropdownOption } from "@/lib/dropdown";
 import { useBillingAction } from "@/hooks/useBillingAction";
@@ -34,7 +34,7 @@ function ClientTermsLine({ row, defaultRate, defaultRounding }: { row: ClientTer
           value={rate}
           onChange={(e) => setRate(e.target.value)}
           aria-invalid={Boolean(fieldErrors.rate)}
-          className={ruleInput}
+          className={tableInput}
         />
       </td>
       <td className="w-44 py-2 pr-3">
@@ -42,7 +42,7 @@ function ClientTermsLine({ row, defaultRate, defaultRounding }: { row: ClientTer
           id={`${rowId}-rounding`}
           ariaLabel={`${row.name} rounding`}
           variant="field"
-          className="w-full"
+          className="w-full max-sm:[&>button]:min-h-11"
           options={[{ value: "", label: `Default (${defaultRounding} min)` }, ...ROUNDING]}
           value={rounding}
           onChange={(next) => {
@@ -51,7 +51,7 @@ function ClientTermsLine({ row, defaultRate, defaultRounding }: { row: ClientTer
         />
       </td>
       <td className="py-2 text-right">
-        <button type="button" disabled={pending || !dirty} className={quietButton} onClick={() => void run(() => setClientBilling({ clientId: row.id, rate, roundingMinutes: rounding }))}>
+        <button type="button" disabled={pending || !dirty} className={pending ? quietButton : rowSaveButton} onClick={() => void run(() => setClientBilling({ clientId: row.id, rate, roundingMinutes: rounding }))}>
           {pending ? "Saving…" : "Save"}
         </button>
         {(error || (saved && !dirty)) && <div className={`mt-1 text-xs ${error ? "text-red-700" : "text-emerald-700"}`}>{error ?? "Saved."}</div>}

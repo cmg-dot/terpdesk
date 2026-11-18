@@ -41,7 +41,7 @@ export function PayrollCard({ group, open, onOpenChange }: { group: PayrollGroup
         <div key={`${r.requestId}-${r.positionId}`} className="space-y-2 px-5 py-4" data-payroll-row={r.reference}>
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm">
             <span className="w-24 shrink-0 font-medium tabular-nums text-[var(--ink)]">{dayLabel(r.serviceDate)}</span>
-            <Link href={`/requests/${r.requestId}`} className="font-medium text-[var(--forest)] hover:underline">
+            <Link href={`/requests/${r.requestId}`} className="-my-3 inline-block py-3 font-medium text-[var(--accent-text)] hover:underline">
               {r.reference}
             </Link>
             <span className="text-[var(--sage)]">· {r.placeLabel}</span>

@@ -9,7 +9,7 @@ const FEE_KINDS: ReadonlySet<LineItem["kind"]> = new Set<LineItem["kind"]>(["ven
 
 /**
  * One side (pay or bill) of a position: the item (a fee as its pill), quantity × rate, and the amount, right-aligned in tabular
- * numerals so a column of amounts lines up; the subtotal in emerald under a rule.
+ * numerals so a column of amounts lines up; the subtotal in emerald under a rule (when there is more than one line to add up).
  */
 export function LineTable({ lines, total, totalLabel = "Total" }: { lines: LineItem[]; total?: number; totalLabel?: string }) {
   if (lines.length === 0) return <p className="text-sm text-[var(--sage)]">Nothing to pay or bill.</p>;
@@ -27,7 +27,8 @@ export function LineTable({ lines, total, totalLabel = "Total" }: { lines: LineI
             </td>
           </tr>
         ))}
-        {total !== undefined && (
+        {/* A single line already is the total: repeating it under a rule only adds a third copy of the number. */}
+        {total !== undefined && lines.length > 1 && (
           <tr className="border-t border-gray-200">
             <td className="pt-2 font-semibold text-[var(--ink)]" colSpan={2}>
               {totalLabel}

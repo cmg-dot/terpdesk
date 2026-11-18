@@ -16,14 +16,19 @@ const STATS: readonly Stat[] = [
   { label: "HOURS AWAITING REVIEW", href: "/hours-review", value: (c) => c.hoursAwaitingReview },
 ];
 
-/** The dark card of six figures. `counts` is null until the first read arrives (each figure shows a dash, never a made-up zero). */
+/** The dark card of six figures, three across and two down. `counts` is null until the first read arrives (each figure shows a dash, never a made-up zero). */
 export const DashboardStatsCard = ({ counts }: { counts: DashboardCounts | null }) => (
-  <div className="rounded-2xl border border-gray-200 bg-[var(--forest)] p-8 text-white ">
-    <p className="mb-8 text-xs font-medium text-[var(--sidebar-muted)]">Upcoming appointments and unresolved past appointments</p>
-    <div className="grid grid-cols-2 md:grid-cols-4 gap-y-10 gap-x-6">
+  <div className="rounded-2xl border border-gray-200 bg-[var(--stats)] p-6 text-white sm:p-7">
+    <p className="mb-6 text-xs font-medium text-[var(--stats-label)]">Upcoming appointments and unresolved past appointments</p>
+    {/* -mx-3 / -mb-3 cancel the links' own padding, so their text lines up with the line above and the card's padding below. */}
+    <div className="-mx-3 -mb-3 grid grid-cols-2 gap-x-4 gap-y-3 md:grid-cols-3">
       {STATS.map((stat) => (
-        <Link key={stat.label} href={stat.href} className="flex flex-col gap-2 text-left hover:opacity-75 transition-opacity cursor-pointer">
-          <span className="text-[11px] font-semibold tracking-widest text-[var(--sidebar-muted)]">{stat.label}</span>
+        <Link
+          key={stat.label}
+          href={stat.href}
+          className="flex flex-col gap-2 rounded-xl p-3 text-left transition-colors hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+        >
+          <span className="text-xs font-semibold tracking-wider text-[var(--stats-label)]">{stat.label}</span>
           <span className="text-[28px] font-medium leading-none">{counts ? stat.value(counts) : "—"}</span>
         </Link>
       ))}

@@ -51,14 +51,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           {/* Main Content Area */}
           <main className="flex min-w-0 flex-1 flex-col">
             {/* Header */}
-            <header className="flex items-center justify-between px-4 md:px-8 py-5 sticky top-0 z-40 bg-[var(--canvas)]">
-              <div className="text-sm text-slate-500">
-                {userName} · Agency
+            <header className="flex items-center justify-between gap-3 px-4 md:px-8 py-5 sticky top-0 z-40 bg-[var(--canvas)]">
+              <div className="min-w-0 truncate text-sm text-slate-600">
+                {userName}
+                <span className="hidden sm:inline"> · Agency</span>
               </div>
-              <div className="flex items-center gap-4 md:gap-6">
+              {/* Each control keeps its look but has a 44px hit area (the -m / p pair), and the gap keeps the areas from overlapping. */}
+              <div className="flex shrink-0 items-center gap-6">
                 <NotificationBell />
-                <SignOutButton className="text-sm text-slate-500 hover:text-slate-700" />
-                <button onClick={() => setIsMenuOpen(true)} className="md:hidden text-slate-500 hover:text-slate-700 ml-1">
+                <SignOutButton className="-m-3 p-3 text-sm text-slate-600 hover:text-slate-800" />
+                <button onClick={() => setIsMenuOpen(true)} aria-label="Open menu" className="-m-3 p-3 text-slate-600 hover:text-slate-800 md:hidden">
                   <Menu className="h-5 w-5" />
                 </button>
               </div>
@@ -155,25 +157,25 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
           {/* Mobile Bottom Navigation */}
           <nav className="fixed bottom-0 left-0 w-full bg-[var(--canvas)] border-t border-neutral-200 flex justify-between items-center px-2 py-2 md:hidden z-40 pb-[env(safe-area-inset-bottom,0.5rem)]">
-            <Link href="/dashboard" className={`flex flex-col items-center justify-center rounded-2xl px-5 py-2 ${pathname === '/dashboard' ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
+            <Link href="/dashboard" className={`flex flex-col items-center justify-center rounded-2xl px-5 py-2 ${pathname === '/dashboard' ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-600'}`}>
               <Home className="h-5 w-5 mb-1" />
-              <span className="text-[10px] font-medium">Home</span>
+              <span className="text-[11px] font-medium">Home</span>
             </Link>
-            <Link href="/requests" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/requests') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
+            <Link href="/requests" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/requests') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-600'}`}>
               <LayoutGrid className="h-5 w-5 mb-1" />
-              <span className="text-[10px] font-medium">Requests</span>
+              <span className="text-[11px] font-medium">Requests</span>
             </Link>
-            <Link href="/calendar" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/calendar') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
+            <Link href="/calendar" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/calendar') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-600'}`}>
               <Calendar className="h-5 w-5 mb-1" />
-              <span className="text-[10px] font-medium">Calendar</span>
+              <span className="text-[11px] font-medium">Calendar</span>
             </Link>
-            <Link href="/interpreters" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/interpreters') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
+            <Link href="/interpreters" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/interpreters') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-600'}`}>
               <Users className="h-5 w-5 mb-1" />
-              <span className="text-[10px] font-medium">Terps</span>
+              <span className="text-[11px] font-medium">Terps</span>
             </Link>
-            <Link href="/billing" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/billing') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
+            <Link href="/billing" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/billing') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-600'}`}>
               <CreditCard className="h-5 w-5 mb-1" />
-              <span className="text-[10px] font-medium">Billing</span>
+              <span className="text-[11px] font-medium">Billing</span>
             </Link>
           </nav>
         </div>

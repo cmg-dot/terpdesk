@@ -67,7 +67,7 @@ export function NotificationBell() {
   return (
     <div className="relative" ref={menuRef}>
       <button
-        className="relative text-slate-500 hover:text-slate-700 mt-1"
+        className="relative -mx-3 -mb-3 -mt-2 p-3 text-slate-600 hover:text-slate-800"
         // The agency banner's "+N more" opens the bell through this.
         data-notification-bell=""
         onClick={() => {
@@ -82,7 +82,7 @@ export function NotificationBell() {
       >
         <Bell className="h-5 w-5" />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#9E3929] px-1 text-[10px] font-bold text-white">
+          <span className="absolute right-0.5 top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-[#9E3929] px-1 text-xs font-bold leading-none text-white">
             {unreadCount > 99 ? "99+" : unreadCount}
           </span>
         )}

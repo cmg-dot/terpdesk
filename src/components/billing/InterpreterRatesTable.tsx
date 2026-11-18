@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { setEveningRate } from "@/app/actions/billingRates";
 import { updateInterpreterRates } from "@/app/actions/interpreterRates";
-import { quietButton, ruleInput } from "@/components/billing/rulesParts";
+import { quietButton, rowSaveButton, tableInput } from "@/components/billing/rulesParts";
 import { useBillingAction } from "@/hooks/useBillingAction";
 import type { BillingActionResult } from "@/lib/billing/actionGuard";
 import { sameAmount } from "@/lib/billing/money";
@@ -41,12 +41,12 @@ function RateLine({ row }: { row: InterpreterRateRow }) {
             value={values[c.field]}
             onChange={(e) => setValues((v) => ({ ...v, [c.field]: e.target.value }))}
             aria-invalid={Boolean(fieldErrors[c.field])}
-            className={ruleInput}
+            className={tableInput}
           />
         </td>
       ))}
       <td className="py-2 text-right">
-        <button type="button" disabled={pending || !dirty} className={quietButton} onClick={() => void run(() => saveRow(row.id, values, !sameAmount(values.eveningRate, row.eveningRate)))}>
+        <button type="button" disabled={pending || !dirty} className={pending ? quietButton : rowSaveButton} onClick={() => void run(() => saveRow(row.id, values, !sameAmount(values.eveningRate, row.eveningRate)))}>
           {pending ? "Saving…" : "Save"}
         </button>
         {(error || (saved && !dirty)) && <div className={`mt-1 text-xs ${error ? "text-red-700" : "text-emerald-700"}`}>{error ?? "Saved."}</div>}

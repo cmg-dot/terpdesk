@@ -46,7 +46,7 @@ export function SettingsForm({ initial }: { initial: BillingSettingsInput }) {
   );
 
   return (
-    <RuleCard title="Fees, rounding and business hours" note="State and HCA: 1.5 hr minimum and the 1.5x first hour (+0.5 hr) are fixed rules. Non-state: 2 hr minimum.">
+    <RuleCard id="rules-fees" title="Fees, rounding and business hours" note="State and HCA: 1.5 hr minimum and the 1.5x first hour (+0.5 hr) are fixed rules. Non-state: 2 hr minimum.">
       <form onSubmit={onSubmit} noValidate className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {FIELDS.map((f) => (
@@ -57,33 +57,36 @@ export function SettingsForm({ initial }: { initial: BillingSettingsInput }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <RuleField id="bs-nonStateRoundingMinutes" label="Non-state rounding (after 2 hr)" hint="Default step; an organization can use 15 minutes." error={fieldErrors.nonStateRoundingMinutes}>
-            <Dropdown id="bs-nonStateRoundingMinutes" variant="field" className="w-full" options={NON_STATE_ROUNDING} value={values.nonStateRoundingMinutes} onChange={set("nonStateRoundingMinutes")} />
+            <Dropdown id="bs-nonStateRoundingMinutes" variant="field" className="w-full max-sm:[&>button]:min-h-11" options={NON_STATE_ROUNDING} value={values.nonStateRoundingMinutes} onChange={set("nonStateRoundingMinutes")} />
           </RuleField>
           <RuleField id="bs-stateRoundingMinutes" label="State / HCA rounding" hint="Service time is rounded up to this step." error={fieldErrors.stateRoundingMinutes}>
-            <Dropdown id="bs-stateRoundingMinutes" variant="field" className="w-full" options={STATE_ROUNDING} value={values.stateRoundingMinutes} onChange={set("stateRoundingMinutes")} />
+            <Dropdown id="bs-stateRoundingMinutes" variant="field" className="w-full max-sm:[&>button]:min-h-11" options={STATE_ROUNDING} value={values.stateRoundingMinutes} onChange={set("stateRoundingMinutes")} />
           </RuleField>
           <RuleField id="bs-cancelNoticeBusinessDays" label="Cancellation notice (business days)" hint="Less notice than this makes a cancellation billable." error={fieldErrors.cancelNoticeBusinessDays}>
             {input("cancelNoticeBusinessDays")}
           </RuleField>
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Two columns wide, like the evening window, so a time box always has room for "5:00 PM". */}
-          <div className="grid grid-cols-2 gap-2 lg:col-span-2">
-            <RuleField id="bs-businessDayStart" label="Business day from (Pacific)" error={fieldErrors.businessDayStart}>
+          {/* Each range is one group with one legend (two columns wide, so a time box always has room for "5:00 PM"). */}
+          <fieldset className="grid grid-cols-2 gap-x-2 gap-y-1 lg:col-span-2">
+            <legend className="mb-1 text-xs font-medium text-gray-600">Business day (Pacific)</legend>
+            <RuleField id="bs-businessDayStart" label="From" error={fieldErrors.businessDayStart}>
               {time("businessDayStart")}
             </RuleField>
-            <RuleField id="bs-businessDayEnd" label="to" error={fieldErrors.businessDayEnd}>
+            <RuleField id="bs-businessDayEnd" label="To" error={fieldErrors.businessDayEnd}>
               {time("businessDayEnd")}
             </RuleField>
-          </div>
-          <div className="grid grid-cols-2 gap-2 lg:col-span-2">
-            <RuleField id="bs-eveningStart" label="Evening travel from" hint="Leave both empty for no evening split." error={fieldErrors.eveningStart}>
+          </fieldset>
+          <fieldset className="grid grid-cols-2 gap-x-2 gap-y-1 lg:col-span-2">
+            <legend className="mb-1 text-xs font-medium text-gray-600">Evening travel window (optional)</legend>
+            <RuleField id="bs-eveningStart" label="From" error={fieldErrors.eveningStart}>
               {time("eveningStart", true)}
             </RuleField>
-            <RuleField id="bs-eveningEnd" label="to" hint="May end the next morning." error={fieldErrors.eveningEnd}>
+            <RuleField id="bs-eveningEnd" label="To" error={fieldErrors.eveningEnd}>
               {time("eveningEnd", true)}
             </RuleField>
-          </div>
+            <p className="col-span-2 text-xs text-[var(--sage)]">Leave both empty for no evening split. It may end the next morning.</p>
+          </fieldset>
         </div>
         <div className="flex flex-wrap items-center gap-4">
           <button type="submit" disabled={pending} className={primaryButton}>

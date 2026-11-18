@@ -35,7 +35,7 @@ export function PayrollTab({ groups, attention, periodId }: { groups: PayrollGro
             <button
               type="button"
               onClick={() => setOpen(allOpen ? new Set() : new Set(groups.map((g) => g.interpreterId)))}
-              className="rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-[var(--forest)] transition-colors hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-[var(--mint)]"
+              className="rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-[var(--accent-text)] transition-colors hover:border-[rgb(var(--forest-rgb)/0.4)] hover:bg-[var(--mint)] max-sm:min-h-11"
             >
               {allOpen ? "Collapse all" : "Expand all"}
             </button>
