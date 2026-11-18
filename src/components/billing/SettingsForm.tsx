@@ -4,7 +4,10 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { saveBillingSettings } from "@/app/actions/billingSettings";
 import { RuleCard, RuleField, SaveStatus, primaryButton, ruleInput } from "@/components/billing/rulesParts";
+import { Dropdown } from "@/components/ui/Dropdown";
+import { IconInput } from "@/components/ui/IconInput";
 import { useBillingAction } from "@/hooks/useBillingAction";
+import type { DropdownOption } from "@/lib/dropdown";
 import type { BillingSettingsField, BillingSettingsInput } from "@/lib/validation/billing";
 
 const FIELDS: { field: BillingSettingsField; label: string; hint: string }[] = [
@@ -14,7 +17,16 @@ const FIELDS: { field: BillingSettingsField; label: string; hint: string }[] = [
   { field: "defaultClientRate", label: "Default organization rate ($/hour)", hint: "Non-state jobs, unless the organization has its own rate below." },
 ];
 
-const SELECT = `${ruleInput} pr-8`;
+const NON_STATE_ROUNDING: DropdownOption[] = [
+  { value: "30", label: "30 minutes" },
+  { value: "15", label: "15 minutes" },
+];
+const STATE_ROUNDING: DropdownOption[] = [
+  { value: "15", label: "15 minutes" },
+  { value: "30", label: "30 minutes" },
+  { value: "1", label: "No rounding" },
+];
+type TimeField = "businessDayStart" | "businessDayEnd" | "eveningStart" | "eveningEnd";
 
 /** The agency's billing settings. Every total on the other tabs follows these. */
 export function SettingsForm({ initial }: { initial: BillingSettingsInput }) {
@@ -25,16 +37,12 @@ export function SettingsForm({ initial }: { initial: BillingSettingsInput }) {
     e.preventDefault();
     void run(() => saveBillingSettings(values));
   };
-  const input = (field: BillingSettingsField, type = "text") => (
-    <input
-      id={`bs-${field}`}
-      type={type}
-      inputMode={type === "text" ? "decimal" : undefined}
-      value={values[field]}
-      onChange={(e) => set(field)(e.target.value)}
-      aria-invalid={Boolean(fieldErrors[field])}
-      className={ruleInput}
-    />
+  const input = (field: BillingSettingsField) => (
+    <input id={`bs-${field}`} type="text" inputMode="decimal" value={values[field]} onChange={(e) => set(field)(e.target.value)} aria-invalid={Boolean(fieldErrors[field])} className={ruleInput} />
+  );
+  // The app's time selector (hour / minute / AM-PM); the evening pair is optional, so it can be cleared.
+  const time = (field: TimeField, clearable = false) => (
+    <IconInput kind="time" id={`bs-${field}`} value={values[field]} onChange={(e) => set(field)(e.target.value)} clearable={clearable} placeholder="Not set" aria-invalid={Boolean(fieldErrors[field])} className={ruleInput} />
   );
 
   return (
@@ -49,17 +57,10 @@ export function SettingsForm({ initial }: { initial: BillingSettingsInput }) {
         </div>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <RuleField id="bs-nonStateRoundingMinutes" label="Non-state rounding (after 2 hr)" hint="Default step; an organization can use 15 minutes." error={fieldErrors.nonStateRoundingMinutes}>
-            <select id="bs-nonStateRoundingMinutes" value={values.nonStateRoundingMinutes} onChange={(e) => set("nonStateRoundingMinutes")(e.target.value)} className={SELECT}>
-              <option value="30">30 minutes</option>
-              <option value="15">15 minutes</option>
-            </select>
+            <Dropdown id="bs-nonStateRoundingMinutes" variant="field" className="w-full" options={NON_STATE_ROUNDING} value={values.nonStateRoundingMinutes} onChange={set("nonStateRoundingMinutes")} />
           </RuleField>
           <RuleField id="bs-stateRoundingMinutes" label="State / HCA rounding" hint="Service time is rounded up to this step." error={fieldErrors.stateRoundingMinutes}>
-            <select id="bs-stateRoundingMinutes" value={values.stateRoundingMinutes} onChange={(e) => set("stateRoundingMinutes")(e.target.value)} className={SELECT}>
-              <option value="15">15 minutes</option>
-              <option value="30">30 minutes</option>
-              <option value="1">No rounding</option>
-            </select>
+            <Dropdown id="bs-stateRoundingMinutes" variant="field" className="w-full" options={STATE_ROUNDING} value={values.stateRoundingMinutes} onChange={set("stateRoundingMinutes")} />
           </RuleField>
           <RuleField id="bs-cancelNoticeBusinessDays" label="Cancellation notice (business days)" hint="Less notice than this makes a cancellation billable." error={fieldErrors.cancelNoticeBusinessDays}>
             {input("cancelNoticeBusinessDays")}
@@ -69,18 +70,18 @@ export function SettingsForm({ initial }: { initial: BillingSettingsInput }) {
           {/* Two columns wide, like the evening window, so a time box always has room for "5:00 PM". */}
           <div className="grid grid-cols-2 gap-2 lg:col-span-2">
             <RuleField id="bs-businessDayStart" label="Business day from (Pacific)" error={fieldErrors.businessDayStart}>
-              {input("businessDayStart", "time")}
+              {time("businessDayStart")}
             </RuleField>
             <RuleField id="bs-businessDayEnd" label="to" error={fieldErrors.businessDayEnd}>
-              {input("businessDayEnd", "time")}
+              {time("businessDayEnd")}
             </RuleField>
           </div>
           <div className="grid grid-cols-2 gap-2 lg:col-span-2">
             <RuleField id="bs-eveningStart" label="Evening travel from" hint="Leave both empty for no evening split." error={fieldErrors.eveningStart}>
-              {input("eveningStart", "time")}
+              {time("eveningStart", true)}
             </RuleField>
             <RuleField id="bs-eveningEnd" label="to" hint="May end the next morning." error={fieldErrors.eveningEnd}>
-              {input("eveningEnd", "time")}
+              {time("eveningEnd", true)}
             </RuleField>
           </div>
         </div>

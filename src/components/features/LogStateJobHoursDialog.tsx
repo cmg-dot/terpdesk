@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { getPendingStateJobs } from "@/app/actions/getPendingStateJobs";
 import type { PendingStateJob } from "@/app/actions/getPendingStateJobs";
 import { logStateJobHours } from "@/app/actions/logStateJobHours";
+import { DateTimeInput } from "@/components/ui/DateTimeInput";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type { SearchableOption } from "@/components/ui/SearchableSelect";
 import { stateJobOptionDescription, stateJobOptionLabel } from "@/lib/pendingStateJobOption";
@@ -192,27 +193,13 @@ export const LogStateJobHoursDialog = ({ onLogged }: { onLogged?: () => void }) 
                   <label htmlFor="state-start" className={labelClass}>
                     Actual start
                   </label>
-                  <input
-                    id="state-start"
-                    type="datetime-local"
-                    value={start}
-                    onChange={(e) => onTimeChange("start", e.target.value)}
-                    disabled={isPending || !selectedJob}
-                    className={inputClass}
-                  />
+                  <DateTimeInput id="state-start" label="Actual start" value={start} onChange={(v) => onTimeChange("start", v)} disabled={isPending || !selectedJob} className={inputClass} />
                 </div>
                 <div>
                   <label htmlFor="state-end" className={labelClass}>
                     Actual end
                   </label>
-                  <input
-                    id="state-end"
-                    type="datetime-local"
-                    value={end}
-                    onChange={(e) => onTimeChange("end", e.target.value)}
-                    disabled={isPending || !selectedJob}
-                    className={inputClass}
-                  />
+                  <DateTimeInput id="state-end" label="Actual end" value={end} onChange={(v) => onTimeChange("end", v)} disabled={isPending || !selectedJob} className={inputClass} />
                 </div>
               </div>
               {selectedJob && <p className="-mt-3 ml-2 text-xs text-gray-500">Times are in {selectedJob.timeZone.replace(/_/g, " ")}.</p>}

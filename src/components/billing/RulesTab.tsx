@@ -46,7 +46,7 @@ export function RulesTab({ settings, periods, holidays, clients, interpreters, n
   return (
     <div className="space-y-6">
       <SettingsForm initial={formSettings(settings)} />
-      <PayScheduleEditor periods={periods} cutoffParts={cutoffParts} />
+      <PayScheduleEditor periods={periods} cutoffParts={cutoffParts} currentYear={formatInTimeZone(now, BUSINESS_ZONE, "yyyy")} />
       <HolidaysEditor holidays={holidays} nextYear={lastYear + 1} />
       <RuleCard title="Organization rates (Non-state)" note="Each organization's hourly rate and rounding step. Empty uses the defaults above (Tacoma Schools $85 in 15-minute steps, Yakima Schools $99).">
         <ClientTermsTable rows={clients} defaultRate={centsToInput(settings.defaultClientRateCents)} defaultRounding={String(settings.nonStateRoundingMinutes)} />

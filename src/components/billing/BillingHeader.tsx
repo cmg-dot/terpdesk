@@ -2,7 +2,7 @@ import Link from "next/link";
 import { PeriodPicker } from "@/components/billing/PeriodPicker";
 import type { PeriodOption } from "@/components/billing/PeriodPicker";
 import { cutoffLabel, dayLabel, periodLabel } from "@/lib/billing/format";
-import { formatCents } from "@/lib/billing/money";
+import { Total } from "@/components/billing/Money";
 import type { LedgerTotals } from "@/lib/billing/ledger";
 import type { PayPeriod } from "@/lib/billing/payPeriods";
 
@@ -15,10 +15,11 @@ export type BillingTab = (typeof BILLING_TABS)[number]["id"];
 
 export const parseTab = (value: string | undefined): BillingTab => BILLING_TABS.find((t) => t.id === value)?.id ?? "payroll";
 
-const Tile = ({ label, value, note }: { label: string; value: string; note?: string }) => (
-  <div className="rounded-2xl border border-gray-200 bg-white px-5 py-4">
+/** A summary tile: money tiles carry an emerald total and a soft emerald edge; a count stays neutral. */
+const Tile = ({ label, cents, count, note }: { label: string; cents?: number; count?: number; note?: string }) => (
+  <div className={`rounded-2xl border bg-white px-5 py-4 ${cents !== undefined ? "money-tile border-emerald-200" : "border-gray-200"}`} data-billing-tile={label}>
     <div className="text-xs font-medium uppercase tracking-wide text-[var(--sage)]">{label}</div>
-    <div className="mt-1 text-2xl font-semibold tabular-nums text-[var(--ink)]">{value}</div>
+    <div className="mt-1">{cents !== undefined ? <Total cents={cents} size="xl" /> : <span className="text-2xl font-semibold tabular-nums text-[var(--ink)]">{count}</span>}</div>
     {note && <div className="mt-0.5 text-xs text-[var(--sage)]">{note}</div>}
   </div>
 );
@@ -42,9 +43,9 @@ export function BillingHeader({ tab, period, periods, totals }: { tab: BillingTa
       </div>
       {tab !== "rules" && (
         <div className="grid gap-3 sm:grid-cols-3">
-          <Tile label="Interpreter pay" value={formatCents(totals.payCents)} note={`${totals.interpreters} interpreter${totals.interpreters === 1 ? "" : "s"}`} />
-          <Tile label="To invoice" value={formatCents(totals.billCents)} note="State, HCA and organizations" />
-          <Tile label="Jobs" value={String(totals.jobs)} note="with approved hours or a billable outcome" />
+          <Tile label="Interpreter pay" cents={totals.payCents} note={`${totals.interpreters} interpreter${totals.interpreters === 1 ? "" : "s"}`} />
+          <Tile label="To invoice" cents={totals.billCents} note="State, HCA and organizations" />
+          <Tile label="Jobs" count={totals.jobs} note="with approved hours or a billable outcome" />
         </div>
       )}
       <nav className="flex gap-1 overflow-x-auto border-b border-gray-200" aria-label="Billing sections">

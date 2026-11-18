@@ -200,6 +200,52 @@
   color: #F3F4F6;
 }
 
+/*
+ * Billing money is a fixed semantic emerald in every theme (components/billing/Money.tsx). On Dark Mode's dark cards the pale pills
+ * would glare, so they become a soft tint with light text; the payer badges keep their hue the same way.
+ */
+:root[data-theme="dark"] .money-total {
+  color: #6EE7B7;
+}
+:root[data-theme="dark"] .money-pill {
+  background-color: rgb(16 185 129 / 0.14);
+  border-color: rgb(52 211 153 / 0.35);
+  color: #6EE7B7;
+}
+:root[data-theme="dark"] .money-tile {
+  border-color: rgb(52 211 153 / 0.35);
+}
+:root[data-theme="dark"] .billing-badge.bg-blue-50 {
+  background-color: rgb(59 130 246 / 0.16);
+  border-color: rgb(96 165 250 / 0.35);
+  color: #BFDBFE;
+}
+:root[data-theme="dark"] .billing-badge.bg-purple-50 {
+  background-color: rgb(168 85 247 / 0.16);
+  border-color: rgb(192 132 252 / 0.35);
+  color: #E9D5FF;
+}
+:root[data-theme="dark"] .billing-badge.bg-amber-50 {
+  background-color: rgb(245 158 11 / 0.16);
+  border-color: rgb(251 191 36 / 0.35);
+  color: #FDE68A;
+}
+/* The amber "needs attention" banner and notes: a soft amber tint with light amber text, not a cream slab. */
+:root[data-theme="dark"] .billing-attention {
+  background-color: rgb(245 158 11 / 0.12);
+  border-color: rgb(251 191 36 / 0.35);
+}
+:root[data-theme="dark"] .billing-attention,
+:root[data-theme="dark"] .billing-attention .text-amber-900 {
+  color: #FDE68A;
+}
+:root[data-theme="dark"] .billing-attention .text-amber-700 {
+  color: #FBBF24;
+}
+:root[data-theme="dark"] .billing-attention .border-amber-200 {
+  border-color: rgb(251 191 36 / 0.3);
+}
+
 /* Under the full-bleed ASL banner the workspace label needs no extra gap, only the block's own padding. */
 :root[data-theme="asl_professionals"] .brand-gap {
   margin-top: 0;

@@ -10,6 +10,8 @@ interface Props {
   value: string;
   onPick: (value: string) => void;
   onDone: () => void;
+  /** Optional times: a "Clear" button (shown while a time is chosen) that empties the field. */
+  onClear?: () => void;
 }
 
 const optionClass = (selected: boolean): string =>
@@ -25,7 +27,7 @@ const DEFAULT_PARTS: TimeParts = { hour12: 9, minute: 0, pm: false };
  * closes it. The chosen value is solid primary emerald and hovering gives a soft emerald wash. A minute that is not on a
  * 5-minute step (a time typed in elsewhere) is kept in the list, so opening the selector never loses it.
  */
-export const TimeSelector = ({ value, onPick, onDone }: Props) => {
+export const TimeSelector = ({ value, onPick, onDone, onClear }: Props) => {
   const current = toTimeParts(value);
   const parts = current ?? DEFAULT_PARTS;
   const root = useRef<HTMLDivElement>(null);
@@ -71,7 +73,12 @@ export const TimeSelector = ({ value, onPick, onDone }: Props) => {
           ))}
         </div>
       </div>
-      <div className="mt-2 flex justify-end border-t border-gray-200 pt-2">
+      <div className="mt-2 flex items-center justify-end gap-1 border-t border-gray-200 pt-2">
+        {onClear && value && (
+          <button type="button" onClick={onClear} className="rounded-full px-3 py-1 text-[13px] font-medium text-gray-600 hover:bg-gray-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)]">
+            Clear
+          </button>
+        )}
         <button type="button" onClick={onDone} className="rounded-full bg-[var(--forest)] px-4 py-1 text-[13px] font-medium text-white hover:bg-[var(--forest-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] focus-visible:ring-offset-1">
           Done
         </button>

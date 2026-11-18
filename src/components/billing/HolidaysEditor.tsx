@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { addHoliday, addStateHolidays, removeHoliday } from "@/app/actions/billingSettings";
 import { RuleCard, RuleField, SaveStatus, primaryButton, quietButton, ruleInput } from "@/components/billing/rulesParts";
+import { IconInput } from "@/components/ui/IconInput";
 import { useBillingAction } from "@/hooks/useBillingAction";
 import { dayLabel } from "@/lib/billing/format";
 import type { Holiday } from "@/lib/billing/holidays";
@@ -54,7 +55,7 @@ export function HolidaysEditor({ holidays, nextYear }: { holidays: Holiday[]; ne
       <form onSubmit={onSubmit} noValidate className="flex flex-wrap items-end gap-3">
         <div className="w-44">
           <RuleField id="hol-date" label="Date" error={adder.fieldErrors.date}>
-            <input id="hol-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className={ruleInput} />
+            <IconInput kind="date" id="hol-date" value={date} onChange={(e) => setDate(e.target.value)} className={ruleInput} />
           </RuleField>
         </div>
         <div className="w-64">

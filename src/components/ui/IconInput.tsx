@@ -31,7 +31,7 @@ interface IconInputProps {
   max?: string;
   /** Dates only: a "choose a year" list in the calendar, for dates far from today such as a birth date. */
   yearPicker?: boolean;
-  /** Dates only: a "Clear" button in the calendar, for optional dates (the field goes back to ""). */
+  /** A "Clear" button in the calendar or the time selector, for optional values (the field goes back to ""). */
   clearable?: boolean;
   id?: string;
   placeholder?: string;
@@ -104,7 +104,19 @@ export function IconInput({
             }
           />
         ) : (
-          <TimeSelector value={value} onPick={emit} onDone={close} />
+          <TimeSelector
+            value={value}
+            onPick={emit}
+            onDone={close}
+            onClear={
+              clearable
+                ? () => {
+                    emit("");
+                    close();
+                  }
+                : undefined
+            }
+          />
         )
       }
     </PickerField>

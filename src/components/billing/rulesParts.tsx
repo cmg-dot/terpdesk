@@ -10,11 +10,16 @@ export const primaryButton =
 
 export const quietButton = "rounded-full border border-gray-200 bg-white px-4 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-60";
 
-export const RuleCard = ({ title, note, children }: { title: string; note?: string; children: ReactNode }) => (
+/** A Rates & rules card: title, a note, and an optional action at the top right (e.g. "Add pay period"). */
+export const RuleCard = ({ title, note, action, children }: { title: string; note?: string; action?: ReactNode; children: ReactNode }) => (
   <section className="rounded-2xl border border-gray-200 bg-white p-6">
-    <h2 className="text-lg font-semibold text-[var(--ink)]">{title}</h2>
-    {note && <p className="mb-4 mt-1 text-[13px] text-[var(--sage)]">{note}</p>}
-    {!note && <div className="mb-4" />}
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+      <div className="min-w-0">
+        <h2 className="text-lg font-semibold text-[var(--ink)]">{title}</h2>
+        {note && <p className="mt-1 text-[13px] text-[var(--sage)]">{note}</p>}
+      </div>
+      {action}
+    </div>
     {children}
   </section>
 );

@@ -1,5 +1,7 @@
 "use client";
 
+import { DateTimeInput } from "@/components/ui/DateTimeInput";
+
 /**
  * The rest of a state receipt in "Log State Job Hours": total miles, other fees, and travel there and back (the report's two
  * "Travel Start / Travel End" pairs). Travel is optional; a leg needs both its start and its end.
@@ -62,13 +64,13 @@ export function StateReceiptExtras({ disabled, inputClass, labelClass, totalMile
               <label htmlFor={`state-travel-${i}-start`} className={labelClass}>
                 {LEG_NAMES[i]}: start
               </label>
-              <input id={`state-travel-${i}-start`} type="datetime-local" value={leg.start} onChange={(e) => setLeg(i, "start", e.target.value)} disabled={disabled} className={inputClass} />
+              <DateTimeInput id={`state-travel-${i}-start`} label={`${LEG_NAMES[i]} start`} value={leg.start} onChange={(v) => setLeg(i, "start", v)} disabled={disabled} clearable className={inputClass} />
             </div>
             <div>
               <label htmlFor={`state-travel-${i}-end`} className={labelClass}>
                 {LEG_NAMES[i]}: end
               </label>
-              <input id={`state-travel-${i}-end`} type="datetime-local" value={leg.end} onChange={(e) => setLeg(i, "end", e.target.value)} disabled={disabled} className={inputClass} />
+              <DateTimeInput id={`state-travel-${i}-end`} label={`${LEG_NAMES[i]} end`} value={leg.end} onChange={(v) => setLeg(i, "end", v)} disabled={disabled} clearable className={inputClass} />
             </div>
           </div>
         ))}

@@ -1,14 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { setClientBilling } from "@/app/actions/billingRates";
 import { quietButton, ruleInput } from "@/components/billing/rulesParts";
+import { Dropdown } from "@/components/ui/Dropdown";
+import type { DropdownOption } from "@/lib/dropdown";
 import { useBillingAction } from "@/hooks/useBillingAction";
 import { sameAmount } from "@/lib/billing/money";
 import type { ClientTermsRow } from "@/lib/billing/rulesData";
 
+const ROUNDING: DropdownOption[] = [
+  { value: "30", label: "30 minutes" },
+  { value: "15", label: "15 minutes" },
+];
+const isRounding = (v: string): v is ClientTermsRow["roundingMinutes"] => v === "" || v === "15" || v === "30";
+
 /** One organization: its own hourly rate and rounding step for Non-state jobs (empty = the agency defaults). */
 function ClientTermsLine({ row, defaultRate, defaultRounding }: { row: ClientTermsRow; defaultRate: string; defaultRounding: string }) {
+  const rowId = useId();
   const [rate, setRate] = useState(row.rate);
   const [rounding, setRounding] = useState(row.roundingMinutes);
   const { run, pending, error, fieldErrors, saved } = useBillingAction();
@@ -29,11 +38,17 @@ function ClientTermsLine({ row, defaultRate, defaultRounding }: { row: ClientTer
         />
       </td>
       <td className="w-44 py-2 pr-3">
-        <select aria-label={`${row.name} rounding`} value={rounding} onChange={(e) => setRounding(e.target.value as ClientTermsRow["roundingMinutes"])} className={ruleInput}>
-          <option value="">Default ({defaultRounding} min)</option>
-          <option value="30">30 minutes</option>
-          <option value="15">15 minutes</option>
-        </select>
+        <Dropdown
+          id={`${rowId}-rounding`}
+          ariaLabel={`${row.name} rounding`}
+          variant="field"
+          className="w-full"
+          options={[{ value: "", label: `Default (${defaultRounding} min)` }, ...ROUNDING]}
+          value={rounding}
+          onChange={(next) => {
+            if (isRounding(next)) setRounding(next);
+          }}
+        />
       </td>
       <td className="py-2 text-right">
         <button type="button" disabled={pending || !dirty} className={quietButton} onClick={() => void run(() => setClientBilling({ clientId: row.id, rate, roundingMinutes: rounding }))}>
