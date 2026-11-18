@@ -697,7 +697,7 @@ export default function NewRequestPage() {
  <input type="text" className={inputClass} value={formData.commPreferences} onChange={(e) => handleChange("commPreferences", e.target.value)} />
  </Field>
  <Field label="Setting">
- <CustomSelect options={["Choose a setting", "Education", "Medical", "Workplace", "Legal", "Community", "Other"]} value={formData.setting} onChange={(val) => handleChange("setting", val)} />
+ <CustomSelect options={["Choose a setting", "Education", "Medical", "Mental Health", "Workplace", "Legal", "Community", "Other"]} value={formData.setting} onChange={(val) => handleChange("setting", val)} />
  </Field>
  </div>
 

@@ -2,6 +2,8 @@ import { settingLabel } from "@/lib/settingLabel";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
 import { readInterpreterNotes } from "@/lib/interpreterNotes";
 import type { InterpreterNotes } from "@/lib/interpreterNotes";
+import { isMentalHealthJob } from "@/lib/mentalHealth";
+import { sanitizeOfferNotes } from "@/lib/offerNotes";
 
 /**
  * What an interpreter's browser may receive about a job. The raw `requests.data` holds staff-only material (the client's
@@ -15,8 +17,9 @@ import type { InterpreterNotes } from "@/lib/interpreterNotes";
  * Two levels of access:
  *  - "offer"  (a pending offer, or anything that is not a live booking): the schedule, format, a generic setting, the
  *    platform's name and where to go: the facility, its building / floor / room and the street address, so the interpreter can
- *    judge the trip before accepting (in the app only: emails never carry a place). No parking, entrance, on-site contact,
- *    meeting link, meeting id, passcode, instructions, notes or client: those are shared after the interpreter accepts.
+ *    judge the trip before accepting (in the app only: emails never carry a place); the appointment notes scrubbed of the
+ *    client's details (offerNotes) and a mental health yes / no. No parking, entrance, on-site contact, meeting link, meeting
+ *    id, passcode, instructions, notes as written or client: those are shared after the interpreter accepts.
  *  - "booked" (an accepted booking): the above plus the full place, the virtual meeting details, the preparation notes and the
  *    client's name (details.deafParticipant). The prior-authorization number and every other staff-only key stay out.
  *  - "closed" (declined, withdrawn, expired, given back or cancelled): as an offer, but the place's name only.
@@ -50,6 +53,13 @@ export interface InterpreterJobView {
   virtualInstructions: string | null;
   /** The agency's preparation notes for interpreters (never the agency-private notes). Shared once booked. */
   prepNotes: string;
+  /**
+   * The same notes on a live offer, scrubbed of the client's details first (lib/offerNotes.ts), so the interpreter can decide before
+   * accepting. "" when booked (they get `prepNotes` as written) or closed.
+   */
+  offerNotes: string;
+  /** A mental health appointment (lib/mentalHealth.ts): only the yes / no, never the billing modifier. False once closed. */
+  mentalHealth: boolean;
   /** The agency's pinned booking notes for the team (lib/interpreterNotes.ts). Shared once booked; null otherwise. */
   interpreterNotes: InterpreterNotes | null;
   /** The state form's "Public" and "Mixed Group" answers (null when it did not say): the job brief, not a person's details. */
@@ -126,6 +136,16 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
     passcode: booked ? orNull(passcode) : null,
     virtualInstructions: booked ? orNull(instructions) : null,
     prepNotes: booked ? text(data.prepNotes) : "",
+    offerNotes:
+      access === "offer"
+        ? sanitizeOfferNotes(text(data.prepNotes), {
+            clientName: text(details.deafParticipant),
+            clientDob: text(intake.clientDob),
+            providerOne: text(intake.providerOneNumber),
+            priorAuth: text(intake.priorAuthNumber),
+          })
+        : "",
+    mentalHealth: access !== "closed" && isMentalHealthJob(data),
     interpreterNotes: booked ? readInterpreterNotes(data) : null,
     clientName: booked ? orNull(details.deafParticipant) : null,
     groupFlags: {

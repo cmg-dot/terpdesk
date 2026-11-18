@@ -7,6 +7,9 @@ import { useSession } from "next-auth/react";
 import { VerificationBanners } from "@/components/features/VerificationBanners";
 import { HoursOverdueBanner } from "@/components/interpreter/HoursOverdueBanner";
 import { ScheduleBanners } from "@/components/interpreter/ScheduleBanners";
+import { OfferNotes } from "@/components/interpreter/OfferNotes";
+import { OfferTags } from "@/components/interpreter/OfferTags";
+import { ClarificationButton } from "@/components/jobDetails/ClarificationButton";
 import { InsuranceWarningBanner } from "@/components/interpreter/InsuranceWarningBanner";
 import { getConnectedAgencyCount } from "@/app/actions/agencyConnections";
 import { Calendar, MapPin, Clock, X, AlertCircle } from "lucide-react";
@@ -426,6 +429,9 @@ export default function InterpreterHomePage() {
     Offer received — {job.title}
     </h3>
     <OfferSummaryLines job={job} />
+    {/* Before accepting: mental health, solo or team, and the notes (scrubbed of the client's details on the server). */}
+    <OfferTags mentalHealth={job.mentalHealth === true} positionCount={job.positionCount} className="mt-2" />
+    <OfferNotes notes={job.offerNotes} compact />
     <p className="text-[12px] text-[var(--sage)] mt-1">
     {(() => {
       const deadline = offerDeadlineLabel(job.offerExpiresAt, job.details?.timeZone || job.timeZone);
@@ -434,7 +440,8 @@ export default function InterpreterHomePage() {
     </p>
     </div>
     </div>
-    <div className="flex gap-2 shrink-0 md:w-auto w-full">
+    <div className="flex flex-wrap gap-2 shrink-0 md:w-auto w-full">
+      <ClarificationButton target={{ kind: "app", offerId: job.id }} label="Ask a question" compact />
       <Link
         href={`/jobs/${job.id}`}
         className="text-[13px] font-medium text-gray-700 hover:text-[var(--ink)] bg-white border border-gray-200 rounded-full px-4 py-2 text-center transition-colors flex-1 md:flex-none"

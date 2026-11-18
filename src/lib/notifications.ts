@@ -11,13 +11,20 @@ import { logError } from "@/lib/logError";
 export const SCHEDULE_BANNER_KINDS = ["booking_added", "booking_cancelled"] as const;
 export type ScheduleBannerKind = (typeof SCHEDULE_BANNER_KINDS)[number];
 
+/**
+ * Notices agency staff also see on the persistent banner at the top of their workspace (components/agency/AgencyBanners.tsx): an
+ * interpreter accepted an offer, or asked a question. Each staff member closes their own.
+ */
+export const AGENCY_BANNER_KINDS = ["offer_accepted", "offer_question"] as const;
+export type AgencyBannerKind = (typeof AGENCY_BANNER_KINDS)[number];
+
 export interface NotificationInput {
   title: string;
   /** No PHI: never put client names, appointment details or notes here. */
   message: string;
   type: NotificationType;
   href?: string;
-  kind?: ScheduleBannerKind;
+  kind?: ScheduleBannerKind | AgencyBannerKind;
 }
 
 /**

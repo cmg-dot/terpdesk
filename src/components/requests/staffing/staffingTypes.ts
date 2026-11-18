@@ -82,6 +82,8 @@ export interface StaffingContext {
   /** A started or finished appointment: its booking can no longer be removed. */
   isBookingLocked: boolean;
   isStateJob: boolean;
+  /** Staff marked this state job's booking as confirmed on the ODHH portal (intake.odhhConfirmed). */
+  odhhConfirmed: boolean;
   /** The job's start (and end) as the page resolves them, for the timesheet button. */
   startsAtIso: string;
   endsAtIso: string;

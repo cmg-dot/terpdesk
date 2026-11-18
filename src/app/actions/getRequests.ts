@@ -30,7 +30,11 @@ export async function fetchLiveRequestById(id: string) {
     status: offers.status,
     expiresAt: offers.expiresAt,
     // When the offer last changed (sent, accepted, declined, expired): tells which answer is the latest.
-    updatedAt: offers.updatedAt
+    updatedAt: offers.updatedAt,
+    // The interpreter's answers when accepting (Staffing's callout), as the list loader (requestRows.ts) reads them.
+    travelRequested: offers.travelRequested,
+    travelMinutes: offers.travelMinutes,
+    availabilityNote: offers.availabilityNote,
   })
   .from(offers)
   .leftJoin(interpreters, eq(offers.interpreterId, interpreters.id))
@@ -93,7 +97,10 @@ export async function fetchLiveRequestById(id: string) {
     state: o.state,
     status: o.status,
     expiresAt: o.expiresAt.toISOString(),
-    updatedAt: o.updatedAt.toISOString()
+    updatedAt: o.updatedAt.toISOString(),
+    travelRequested: o.travelRequested,
+    travelMinutes: o.travelMinutes,
+    availabilityNote: o.availabilityNote,
   }));
 
   return mapRequestRow(row, mappedOffers);

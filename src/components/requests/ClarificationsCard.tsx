@@ -7,6 +7,8 @@ interface Clarification {
   interpreterName?: string;
   question: string;
   askedAt: string;
+  /** Asked on a pending offer, before the interpreter accepted or declined. */
+  beforeAccepting?: boolean;
 }
 
 const isClarification = (v: unknown): v is Clarification => {
@@ -15,7 +17,7 @@ const isClarification = (v: unknown): v is Clarification => {
 };
 
 /**
- * Agency request page: questions booked interpreters sent from their job-details page ("Request clarification"),
+ * Agency request page: questions interpreters sent ("Request clarification" once booked, "Ask a question" on a pending offer),
  * newest first. Shown only here (never emailed), because a question may mention the client. Hidden when there are none.
  * Rendered at the top of the page in a highlighted callout so staff notice it immediately.
  */
@@ -27,8 +29,9 @@ export function ClarificationsCard({ clarifications }: { clarifications: unknown
 
   return (
     <section
+      id="questions"
       aria-labelledby="interpreter-questions-heading"
-      className="mb-6 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8 space-y-3"
+      className="mb-6 scroll-mt-24 rounded-2xl border-2 border-amber-300 bg-amber-50 p-6 shadow-sm sm:p-8 space-y-3"
     >
       <h2 id="interpreter-questions-heading" className="flex items-center gap-2 text-[18px] font-semibold text-amber-950">
         <MessageCircleQuestion className="h-5 w-5 text-amber-700" aria-hidden="true" />
@@ -39,8 +42,13 @@ export function ClarificationsCard({ clarifications }: { clarifications: unknown
         {items.map((c) => (
           <li key={c.id} className="py-3">
             <p className="whitespace-pre-line text-[15px] text-gray-800">{c.question}</p>
-            <p className="mt-1 text-xs text-[var(--sage)]">
-              {c.interpreterName || "Interpreter"} · {new Date(c.askedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+            <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-[var(--sage)]">
+              <span>
+                {c.interpreterName || "Interpreter"} · {new Date(c.askedAt).toLocaleString(undefined, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}
+              </span>
+              {c.beforeAccepting === true && (
+                <span className="rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-900" data-before-accepting="">Asked before accepting</span>
+              )}
             </p>
           </li>
         ))}

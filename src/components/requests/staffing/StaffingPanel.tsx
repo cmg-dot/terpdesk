@@ -7,6 +7,7 @@ import { BillingModifierField } from "@/components/requests/staffing/BillingModi
 import { ClientDobField } from "@/components/requests/staffing/ClientDobField";
 import { OdhhPortalLinksRow, OdhhRebookBanner } from "@/components/requests/staffing/OdhhPortalLinks";
 import type { OdhhIds } from "@/components/requests/staffing/OdhhPortalLinks";
+import { OdhhConfirmControl } from "@/components/requests/staffing/OdhhConfirmControl";
 import { ProviderOneField } from "@/components/requests/staffing/ProviderOneField";
 import { PositionStaffing } from "@/components/requests/staffing/PositionStaffing";
 import { RequestedInterpreterBadge } from "@/components/requests/staffing/RequestedInterpreterBadge";
@@ -43,6 +44,8 @@ interface Props {
   odhh: OdhhIds | null;
   /** The job's booking notes for its interpreters (lib/interpreterNotes.ts) and the save hook; omitted = the field is not shown. */
   interpreterNotes?: { value: string; onSaved: (text: string) => void };
+  /** A state job: what to do once its ODHH portal confirmation is saved (ctx.odhhConfirmed holds the current answer). */
+  onOdhhConfirmedSaved?: (confirmed: boolean) => void;
 }
 
 /**
@@ -50,7 +53,7 @@ interface Props {
  * one (send an offer, or book directly). When the state asked for a particular interpreter, that request sits above the controls
  * with a one-click way to choose them.
  */
-export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved, providerOne, providerOneSuggested, onProviderOneSaved, odhh, interpreterNotes }: Props) {
+export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, fullRoster, clientName, onClientSaved, priorAuth, onPriorAuthSaved, clientDob, onClientDobSaved, billingModifier, onBillingModifierSaved, providerOne, providerOneSuggested, onProviderOneSaved, odhh, interpreterNotes, onOdhhConfirmedSaved }: Props) {
   const requested = requestedInterpreter?.trim() || null;
   const match = useMemo(() => {
     if (!requested) return null;
@@ -81,6 +84,11 @@ export function StaffingPanel({ positions, ctx, actions, requestedInterpreter, f
       </div>
 
       {odhh && <OdhhPortalLinksRow ids={odhh} />}
+
+      {/* Someone is booked on a state job: confirm it on the ODHH portal, and record that it was done. */}
+      {odhh && onOdhhConfirmedSaved && positions.some((p) => p.accepted) && (
+        <OdhhConfirmControl requestId={ctx.requestId} srn={odhh.srn} confirmed={ctx.odhhConfirmed} onSaved={onOdhhConfirmedSaved} />
+      )}
 
       {interpreterNotes && <InterpreterNotesField requestId={ctx.requestId} value={interpreterNotes.value} onSaved={interpreterNotes.onSaved} />}
 

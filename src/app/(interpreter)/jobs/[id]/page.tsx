@@ -17,6 +17,8 @@ import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadg
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { JobPlaceCards } from "@/components/interpreter/JobPlaceCards";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
+import { OfferNotes } from "@/components/interpreter/OfferNotes";
+import { OfferTags } from "@/components/interpreter/OfferTags";
 import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
 import { CopyButton } from "@/components/ui/CopyButton";
@@ -1358,6 +1360,9 @@ export default function JobDetailPage() {
 
         {job.status === 'booked' && <UpdatedNotice update={job.detailsUpdated} endsAt={job.endsAt} />}
 
+        {/* Before accepting: a mental health appointment, and solo or team. */}
+        {job.status === 'pending' && !isJobExpired && <OfferTags mentalHealth={job.mentalHealth} positionCount={job.positionCount} className="mb-4" />}
+
         {askingToAccept && job.status === 'pending' && (
           <AcceptOfferDialog
             title={job.title || "this job"}
@@ -1369,9 +1374,9 @@ export default function JobDetailPage() {
         )}
 
         <div className="space-y-4">
-          {/* Agency messages + "Request clarification" (parity with the secure job-details page). */}
-          {job.status === 'booked' && (
-            <JobQuestionsAndMessages offerId={job.id} timeZone={(job as any).details?.timeZone || job.timeZone} />
+          {/* Agency messages + a question for the agency: "Request clarification" once booked, "Ask a question" on a live offer. */}
+          {(job.status === 'booked' || (job.status === 'pending' && !isJobExpired)) && (
+            <JobQuestionsAndMessages offerId={job.id} timeZone={job.details?.timeZone || job.timeZone} pending={job.status === 'pending'} />
           )}
           
           {/* Overview Card */}
@@ -1472,11 +1477,14 @@ export default function JobDetailPage() {
           {job.status === 'booked' && <BookingNotesCard notes={job.interpreterNotes} timeZone={getIanaZone(job.details?.timeZone || job.timeZone)} />}
 
           {/* Card 2 */}
-          <CollapsibleCard cardId="preparation-notes" title="Preparation notes">
-            {job.status === 'booked' && job.prepNotes ? (
+          {/* A live offer shows the notes scrubbed of the client's details (the server did it); a booking shows them as written. */}
+          <CollapsibleCard cardId="preparation-notes" title={job.status === 'pending' ? "Appointment notes" : "Preparation notes"}>
+            {job.status === 'pending' && !isJobExpired ? (
+              <OfferNotes notes={job.offerNotes} />
+            ) : job.status === 'booked' && job.prepNotes ? (
               <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700"><LinkifiedText text={job.prepNotes} /></p>
             ) : (
-              <p className="text-[14px] text-[var(--sage)]">No preparation notes yet.</p>
+              <p className="text-[14px] text-[var(--sage)]">{job.status === 'booked' ? "The agency has not added notes for this job." : "No notes for this job."}</p>
             )}
           </CollapsibleCard>
 

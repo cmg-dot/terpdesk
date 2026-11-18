@@ -14,7 +14,15 @@ const MAX = 500;
  */
 export type ClarificationTarget = { kind: "link"; token: string } | { kind: "app"; offerId: string };
 
-export function ClarificationButton({ target }: { target: ClarificationTarget }) {
+interface Props {
+  target: ClarificationTarget;
+  /** The button's words ("Ask a question" on a pending offer). */
+  label?: string;
+  /** Home's offer card: a small button that sits beside Review / Accept. */
+  compact?: boolean;
+}
+
+export function ClarificationButton({ target, label = "Request clarification", compact = false }: Props) {
   const [open, setOpen] = useState(false);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
@@ -46,7 +54,8 @@ export function ClarificationButton({ target }: { target: ClarificationTarget })
   };
 
   return (
-    <div className="flex flex-col items-center gap-2">
+    // Compact (Home's offer card): its own full-width row on a phone, beside Review / Accept from 768px up.
+    <div className={compact ? "flex w-full flex-col items-stretch gap-1 md:w-auto" : "flex flex-col items-center gap-2"}>
       <button
         type="button"
         onClick={() => {
@@ -54,13 +63,17 @@ export function ClarificationButton({ target }: { target: ClarificationTarget })
           setError(null);
           setOpen(true);
         }}
-        className="inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+        className={
+          compact
+            ? "inline-flex items-center justify-center gap-1.5 rounded-full border border-gray-200 bg-white px-4 py-2 text-[13px] font-medium text-gray-700 transition-colors hover:text-[var(--ink)]"
+            : "inline-flex items-center gap-2 rounded-full border border-gray-300 bg-white px-5 py-2.5 text-sm font-medium text-gray-800 hover:bg-gray-50"
+        }
       >
         <MessageCircleQuestion className="h-4 w-4" aria-hidden="true" />
-        Request clarification
+        {label}
       </button>
       {sent && (
-        <p role="status" className="text-sm font-medium text-emerald-700">
+        <p role="status" className={`${compact ? "text-xs" : "text-sm"} font-medium text-emerald-700`}>
           Your question was sent to the agency. They&apos;ll get back to you.
         </p>
       )}
@@ -71,9 +84,9 @@ export function ClarificationButton({ target }: { target: ClarificationTarget })
             <DialogTitle>Ask the agency a question</DialogTitle>
             <DialogDescription>For example: &quot;What is the suite number?&quot; The agency will reply directly.</DialogDescription>
           </DialogHeader>
-          <label htmlFor="clarification-question" className="sr-only">Your question</label>
+          <label htmlFor={`clarification-question-${target.kind === "app" ? target.offerId : "link"}`} className="sr-only">Your question</label>
           <textarea
-            id="clarification-question"
+            id={`clarification-question-${target.kind === "app" ? target.offerId : "link"}`}
             rows={4}
             maxLength={MAX}
             value={question}

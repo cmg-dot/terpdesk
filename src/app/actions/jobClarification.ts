@@ -1,15 +1,16 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { offers } from "@/db/schema";
+import { offers, requests } from "@/db/schema";
 import { requireInterpreter, NOT_ALLOWED_MESSAGE } from "@/lib/auth/guards";
 import { cleanQuestion, submitClarification } from "@/lib/clarifications";
 import type { ClarificationResult } from "@/lib/clarifications";
 import { resolveJobDetailsLink } from "@/lib/jobDetailsAccess";
 import { logError } from "@/lib/logError";
-import { formatReference } from "@/utils/statusEngine";
+import { formatReference, srnOf } from "@/utils/statusEngine";
+import { resolveRequestTimes } from "@/utils/timezone";
 
 export type { ClarificationResult };
 
@@ -37,7 +38,10 @@ export async function requestJobClarification(input: { token: string; question: 
   }
 }
 
-/** The same, from the signed-in app. Only for the interpreter's own accepted booking (session-scoped). */
+/**
+ * The same, from the signed-in app (session-scoped): the interpreter's own booking, or their own offer while it can still be answered
+ * (pending, before its response deadline, on a job that is not cancelled and not over), so they can ask before accepting or declining.
+ */
 export async function requestJobClarificationInApp(input: { offerId: string; question: string }): Promise<ClarificationResult> {
   let interpreterId: string;
   try {
@@ -49,15 +53,24 @@ export async function requestJobClarificationInApp(input: { offerId: string; que
   if (!parsed.success) return { success: false, error: parsed.error.issues[0]?.message ?? "Invalid question." };
   try {
     const [own] = await db
-      .select({ requestId: offers.requestId })
+      .select({ requestId: offers.requestId, status: offers.status, expiresAt: offers.expiresAt, requestStatus: requests.status, canceledAt: requests.canceledAt, createdAt: requests.createdAt, data: requests.data })
       .from(offers)
-      .where(and(eq(offers.id, parsed.data.offerId), eq(offers.interpreterId, interpreterId), eq(offers.status, "accepted")))
+      .innerJoin(requests, eq(requests.id, offers.requestId))
+      .where(and(eq(offers.id, parsed.data.offerId), eq(offers.interpreterId, interpreterId), inArray(offers.status, ["accepted", "pending"])))
       .limit(1);
-    if (!own) return { success: false, error: "You can only ask about a job you're booked on." };
+    const now = Date.now();
+    const cancelled = Boolean(own?.canceledAt) || /^cancel+ed$/i.test(own?.requestStatus ?? "");
+    const liveOffer =
+      own?.status === "pending" && !cancelled && own.expiresAt.getTime() > now && Date.parse(resolveRequestTimes({ createdAt: own.createdAt, data: own.data }).endsAt) > now;
+    if (!own || cancelled || (own.status === "pending" && !liveOffer)) {
+      return { success: false, error: "You can only ask about a job you're booked on, or an offer you can still accept." };
+    }
     return await submitClarification({
       requestId: own.requestId,
       interpreterId,
       reference: formatReference(own.requestId),
+      srn: srnOf(own.data),
+      beforeAccepting: own.status === "pending",
       question: parsed.data.question,
     });
   } catch (err) {

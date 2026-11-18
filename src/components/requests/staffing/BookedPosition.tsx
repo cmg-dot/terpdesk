@@ -7,7 +7,7 @@ import { InterpreterLinkButtons } from "@/components/requests/InterpreterLinkBut
 import { ResendDetailsButton } from "@/components/requests/ResendDetailsButton";
 import { CollapsiblePreviousOffers } from "@/components/requests/staffing/CollapsiblePreviousOffers";
 import type { PositionView, StaffBooking, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
-import { travelLabel } from "@/lib/acceptedOfferAlert";
+import { AcceptAnswersCallout } from "@/components/requests/staffing/AcceptAnswersCallout";
 
 interface Props {
   view: PositionView;
@@ -70,17 +70,8 @@ export function BookedPosition({ view, booking, ctx, actions }: Props) {
             )}
           </div>
         </div>
-        {(booking.travelRequested != null || booking.availabilityNote) && (
-          <div className="mt-3 flex flex-wrap gap-2 text-xs" data-accept-answers="">
-            {booking.travelRequested === true && (
-              <span className="rounded-full bg-amber-100 px-2.5 py-1 font-medium text-amber-900">Travel time requested: {travelLabel(booking.travelMinutes ?? 0)}</span>
-            )}
-            {booking.travelRequested === false && <span className="rounded-full bg-white px-2.5 py-1 text-[var(--sage)]">No travel time</span>}
-            {booking.availabilityNote && (
-              <span className="rounded-full bg-white px-2.5 py-1 text-[var(--ink)]">Availability: &ldquo;{booking.availabilityNote}&rdquo;</span>
-            )}
-          </div>
-        )}
+        {/* Their travel answer and note: prominent until a state job is confirmed on the ODHH portal; always on other jobs. */}
+        <AcceptAnswersCallout booking={booking} prominent={!ctx.isStateJob || !ctx.odhhConfirmed} />
       </div>
 
       {pastOffers.length > 0 && (

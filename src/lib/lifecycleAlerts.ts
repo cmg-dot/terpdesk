@@ -100,6 +100,8 @@ export async function alertAgency(params: {
 
     await notifyAgencyAdmins({
       type: "job",
+      // An acceptance is also a banner at the top of every staff member's workspace, until each of them closes or opens it.
+      ...(accepted ? { kind: "offer_accepted" as const } : {}),
       // An acceptance opens straight on the job's Staffing section.
       href: accepted && !params.href ? `${href}#staffing` : href,
       title: copy.title,

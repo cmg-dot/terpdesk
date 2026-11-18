@@ -352,6 +352,11 @@ export default function AssignmentDetailPage() {
     }
   }, [id]);
 
+  // The interpreter-fit check reads only these from the request.
+  const fitKey = foundRequest
+    ? [foundRequest.id, foundRequest.startsAt, foundRequest.endsAt, foundRequest.details?.timeZone || foundRequest.details?.timezone || foundRequest.timeZone || foundRequest.data?.details?.timeZone || foundRequest.data?.timeZone || ""].join("|")
+    : "";
+
   useEffect(() => {
     if (!foundRequest || dbInterpreters.length === 0) {
       setInterpreterFitMap({});
@@ -406,7 +411,10 @@ export default function AssignmentDetailPage() {
     return () => {
       isCurrent = false;
     };
-  }, [foundRequest, dbInterpreters, currentUser?.agency_id]);
+    // Only what the check depends on (the job and its times): a Staffing save that changes anything else on the request must not
+    // re-run it, because server actions run one at a time and the next save would wait behind this roster-wide lookup.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fitKey, dbInterpreters, currentUser?.agency_id]);
 
 
  const handleCancelAppointment = () => {
@@ -614,6 +622,7 @@ export default function AssignmentDetailPage() {
    isAppointmentFinished,
    isBookingLocked,
    isStateJob: isStateJobRequest({ isStateJob: foundRequest?.isStateJob, data: foundRequest?.data }),
+   odhhConfirmed: foundRequest?.data?.intake?.odhhConfirmed === true,
    startsAtIso: reqStartsAt,
    endsAtIso: reqEndsAt,
    startsAt: parseSafeDate(foundRequest?.startsAt),
@@ -783,7 +792,7 @@ export default function AssignmentDetailPage() {
  <OriginalFormCard requestId={String(foundRequest?.id || id)} srn={requestSrnValue} />
 
  {/* Staffing and booking, directly under the form. */}
- {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} clientDob={textOf(foundRequest?.data?.intake?.clientDob)} onClientDobSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), clientDob: value } } } : prev))} billingModifier={asBillingModifier(foundRequest?.data?.intake?.billingModifier)} onBillingModifierSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), billingModifier: value } } } : prev))}  providerOne={textOf(foundRequest?.data?.intake?.providerOneNumber)} providerOneSuggested={providerOneOnForm} onProviderOneSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), providerOneNumber: value } } } : prev))} odhh={isStateRequest ? { srn: textOf(foundRequest?.data?.intake?.odhhSrn), accessCode: textOf(foundRequest?.data?.intake?.odhhAccessCode) } : null} interpreterNotes={{ value: readInterpreterNotes(foundRequest?.data)?.text ?? "", onSaved: (text: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), interpreterNotes: text ? { text, updatedAt: new Date().toISOString() } : null } } : prev)) }} />}
+ {!isCancelled && <StaffingPanel positions={positionViews} ctx={staffingCtx} actions={staffingActions} requestedInterpreter={requestedInterpreterName} fullRoster={fullRoster} clientName={textOf(foundRequest?.details?.deafParticipant)} onClientSaved={(name: string) => setFoundRequest((prev: any) => (prev ? { ...prev, details: { ...(prev.details || {}), deafParticipant: name } } : prev))} priorAuth={textOf(foundRequest?.data?.intake?.priorAuthNumber)} onPriorAuthSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), priorAuthNumber: value } } } : prev))} clientDob={textOf(foundRequest?.data?.intake?.clientDob)} onClientDobSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), clientDob: value } } } : prev))} billingModifier={asBillingModifier(foundRequest?.data?.intake?.billingModifier)} onBillingModifierSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), billingModifier: value } } } : prev))}  providerOne={textOf(foundRequest?.data?.intake?.providerOneNumber)} providerOneSuggested={providerOneOnForm} onProviderOneSaved={(value: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), providerOneNumber: value } } } : prev))} odhh={isStateRequest ? { srn: textOf(foundRequest?.data?.intake?.odhhSrn), accessCode: textOf(foundRequest?.data?.intake?.odhhAccessCode) } : null} interpreterNotes={{ value: readInterpreterNotes(foundRequest?.data)?.text ?? "", onSaved: (text: string) => setFoundRequest((prev: any) => (prev ? { ...prev, data: { ...(prev.data || {}), interpreterNotes: text ? { text, updatedAt: new Date().toISOString() } : null } } : prev)) }} onOdhhConfirmedSaved={(confirmed: boolean) => setFoundRequest((prev: typeof foundRequest) => (prev ? { ...prev, data: { ...(prev.data || {}), intake: { ...(prev.data?.intake || {}), odhhConfirmed: confirmed } } } : prev))} />}
 
  {!isCancelled && !isStateRequest && (
  <OnsiteSignatureSetting

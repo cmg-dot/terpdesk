@@ -68,6 +68,8 @@ export function NotificationBell() {
     <div className="relative" ref={menuRef}>
       <button
         className="relative text-slate-500 hover:text-slate-700 mt-1"
+        // The agency banner's "+N more" opens the bell through this.
+        data-notification-bell=""
         onClick={() => {
           if (!isOpen) {
             refresh();

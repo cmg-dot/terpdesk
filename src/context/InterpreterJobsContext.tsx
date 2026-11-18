@@ -56,6 +56,10 @@ export interface Job {
   credentialsLocked?: boolean;
   /** The agency's preparation notes, once the interpreter is booked. */
   prepNotes?: string;
+  /** A live offer's appointment notes, scrubbed of the client's details on the server (lib/offerNotes.ts). */
+  offerNotes?: string;
+  /** A mental health appointment (the yes / no only). */
+  mentalHealth?: boolean;
   /** The agency's pinned booking notes for the team, once the interpreter is booked. */
   interpreterNotes?: InterpreterNotes | null;
   /** The state form's Public / Mixed Group answers (null when it did not say). */
@@ -129,6 +133,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           clientName: o.clientName || null,
           credentialsLocked: o.credentialsLocked,
           prepNotes: o.prepNotes,
+          offerNotes: o.offerNotes,
+          mentalHealth: o.mentalHealth === true,
           interpreterNotes: o.interpreterNotes,
           groupFlags: o.groupFlags,
           agencyName: o.agencyName || DEFAULT_AGENCY_NAME,

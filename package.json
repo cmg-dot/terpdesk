@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "seed:demo": "tsx scripts/seed-demo-agency.ts",
+    "test": "node --import tsx --test \"tests/**/*.test.ts\"",
     "test:billing": "node --import tsx --test \"tests/billing/*.test.ts\""
   },
   "dependencies": {

@@ -8,10 +8,10 @@ import { ClarificationButton } from "@/components/jobDetails/ClarificationButton
 import { getIanaZone } from "@/utils/timezone";
 
 /**
- * App job page (booked jobs): the agency's messages to this interpreter and "Request clarification" — the same as the
- * secure job-details page offers.
+ * App job page: the agency's messages to this interpreter and a question to the agency — "Request clarification" on a booking (the
+ * same as the secure job-details page offers), "Ask a question" on a pending offer, before accepting or declining.
  */
-export function JobQuestionsAndMessages({ offerId, timeZone }: { offerId: string; timeZone?: string }) {
+export function JobQuestionsAndMessages({ offerId, timeZone, pending = false }: { offerId: string; timeZone?: string; pending?: boolean }) {
   const [messages, setMessages] = useState<AgencyMessage[] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,8 +40,12 @@ export function JobQuestionsAndMessages({ offerId, timeZone }: { offerId: string
         <AgencyMessageList messages={messages} timeZone={getIanaZone(timeZone)} />
       )}
       <div className="mt-6 border-t border-gray-100 pt-5 text-center">
-        <p className="mb-3 text-[13px] text-[var(--sage)]">Something unclear? Ask the agency a short question about this booking.</p>
-        <ClarificationButton target={{ kind: "app", offerId }} />
+        <p className="mb-3 text-[13px] text-[var(--sage)]">
+          {pending
+            ? "Not sure yet? Ask the agency a short question before you accept or decline. The offer stays open."
+            : "Something unclear? Ask the agency a short question about this booking."}
+        </p>
+        <ClarificationButton target={{ kind: "app", offerId }} label={pending ? "Ask a question" : "Request clarification"} />
       </div>
     </div>
   );

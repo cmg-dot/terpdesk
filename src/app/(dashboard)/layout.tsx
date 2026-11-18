@@ -23,7 +23,7 @@ import { NotificationBell } from "@/components/NotificationBell";
 import { CountBadge } from "@/components/ui/CountBadge";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
 import { AgencySidebar } from "@/components/agency/AgencySidebar";
-import { AcceptedOfferToasts } from "@/components/agency/AcceptedOfferToasts";
+import { AgencyBanners } from "@/components/agency/AgencyBanners";
 import { MobileBrand } from "@/components/agency/SidebarBrand";
 import { IdleTimeoutGuard } from "@/components/auth/IdleTimeoutGuard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
@@ -66,7 +66,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
             {/* Scrollable Page Content Container */}
             <div className="px-4 md:px-8 pb-24 md:pb-12">
-              <AcceptedOfferToasts />
+              {/* Offers accepted and interpreters' questions, until each staff member opens or closes them. */}
+              <AgencyBanners />
               {children}
             </div>
           </main>
