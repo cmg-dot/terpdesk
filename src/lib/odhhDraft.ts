@@ -4,6 +4,7 @@ import { contactMethodText, stateFlagsLine, type FormExtras } from "@/lib/odhhFo
 import { liftVirtualMeeting } from "@/lib/odhhMeetingLift";
 import { PREP_ID_LABEL, scrubPrepIds } from "@/lib/odhhPrepScrub";
 import { roomFromPlace } from "@/lib/odhhRoom";
+import { parentOrganization } from "@/lib/stateOrganization";
 import { teamRequest } from "@/lib/odhhTeam";
 import { withPositionCount } from "@/lib/positions";
 import { providerOneFromStateText } from "@/lib/providerOne";
@@ -127,7 +128,8 @@ export function buildDraftData(input: DraftInput): RequestData {
     // a saved client's default contact (it matches saved clients by organisation name). The organization is the form's
     // "Billing Organization Name" (DVR, Seattle Children's, ...), and "WA ODHH" only when the form names none.
     requester: {
-      org: extras.billingOrganization ?? "WA ODHH",
+      // The billing organization, else an organization named as the Requestor Location (stateOrganization.ts), else the program.
+      org: parentOrganization(extras) ?? "WA ODHH",
       oneTime: true,
       ...(extras.billingOrganization ? { billOrg: extras.billingOrganization } : {}),
       ...(extras.billingContactName ? { billContact: extras.billingContactName } : {}),

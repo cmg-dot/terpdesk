@@ -11,6 +11,11 @@ export interface FormExtras {
   setting: string | null;
   /** Who the job is for ("Billing Organization Name"). */
   billingOrganization: string | null;
+  /**
+   * "Requestor Location" in section 1: usually the requester's city ("Olympia"), sometimes the organization itself ("Seattle Children's
+   * Hospital") when the billing organization is left blank. See stateOrganization.ts for when it counts as the organization.
+   */
+  requestorLocation: string | null;
   building: string | null;
   floor: string | null;
   room: string | null;
@@ -41,6 +46,7 @@ export interface FormExtras {
 const APPOINTMENT_SETTING = labelPattern(["Appointment[ \\t]+Setting"]);
 const PLAIN_SETTING = labelPattern(["Setting"]);
 const BILLING_ORG = labelPattern(["Billing[ \\t]+Organization(?:[ \\t]+Name)?"]);
+const REQUESTOR_LOCATION = labelPattern(["Request(?:o|e)r[ \\t]+Location"]);
 const BUILDING = labelPattern(["Building"]);
 const FLOOR = labelPattern(["Floor"]);
 const ROOM = labelPattern(["Room"]);
@@ -114,6 +120,7 @@ export function parseFormExtras(rawContent: string): FormExtras {
   return {
     setting: real(text.match(APPOINTMENT_SETTING)?.[1]) ?? real(text.match(PLAIN_SETTING)?.[1]),
     billingOrganization: real(wrappedValue(text, BILLING_ORG)),
+    requestorLocation: real(text.match(REQUESTOR_LOCATION)?.[1]),
     building: real(text.match(BUILDING)?.[1]),
     floor: real(text.match(FLOOR)?.[1]),
     room: real(text.match(ROOM)?.[1]),

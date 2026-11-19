@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { jobHeadline } from "@/lib/jobHeadline";
 import type { RequestWhere } from "@/lib/requestSummary";
 
 interface Props {
@@ -28,7 +29,8 @@ const VALUE = "mt-0.5 break-words font-medium text-[var(--ink)]";
  * on a phone the three facts stack, and on a small tablet the location takes its own row.
  */
 export const RequestHeadline = ({ organization, title, srn, idLabel, idValue, whenText, where, repeatsText, badges }: Props) => {
-  const headline = organization ?? title;
+  // A state job reads "ODHH <SRN> - <parent organization>" (lib/jobHeadline.ts); the clinic stays in the Location below.
+  const headline = srn?.trim() ? jobHeadline({ srn, organization, venue: where.virtual ? null : where.parts[0], title }) : organization ?? title;
   // The job title is secondary once the organization leads; skip it when it only repeats the SRN ("ODHH SRN #…").
   const showTitle = organization !== null && title.trim() !== "" && title !== organization && !/SRN\s*#/i.test(title);
   const srnText = srn?.trim() ?? "";

@@ -3,6 +3,7 @@ import { hasPhysicalPlace } from "@/lib/jobPlace";
 import { readInterpreterNotes } from "@/lib/interpreterNotes";
 import type { InterpreterNotes } from "@/lib/interpreterNotes";
 import { isMentalHealthJob } from "@/lib/mentalHealth";
+import { realOrganization } from "@/lib/jobHeadline";
 import { scrubOfferNotes } from "@/lib/offerNotes";
 
 /**
@@ -66,6 +67,11 @@ export interface InterpreterJobView {
   interpreterNotes: InterpreterNotes | null;
   /** The state form's "Public" and "Mixed Group" answers (null when it did not say): the job brief, not a person's details. */
   groupFlags: { isPublic: boolean | null; isMixedGroup: boolean | null };
+  /**
+   * The organization the job is for ("Seattle Children's Hospital", "University of Washington - DECOD"): requester.org only, never the
+   * requester's or billing contact's name, email or phone. Null when none is on file (a program placeholder such as "WA ODHH" is none).
+   */
+  organization: string | null;
   /** The client's name (details.deafParticipant). Shared ONLY with an interpreter who is booked on the job: null on an offer. */
   clientName: string | null;
   /** An offer for a job that has meeting credentials, which stay on the server until the offer is accepted. */
@@ -157,6 +163,7 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
       isPublic: typeof intake.isPublic === "boolean" ? intake.isPublic : null,
       isMixedGroup: typeof intake.isMixedGroup === "boolean" ? intake.isMixedGroup : null,
     },
+    organization: realOrganization(text(asObject(data.requester).org)),
     credentialsLocked: !booked && isVirtual && Boolean(link || meetingId || passcode),
     details: { ...schedule, setting, format, timeZone, platform: isVirtual ? platform : orNull(details.platform), ...virtualFields },
     onsite: onsiteView,

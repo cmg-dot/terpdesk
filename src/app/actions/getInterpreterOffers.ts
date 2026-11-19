@@ -14,6 +14,11 @@ import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { BILLING_ENABLED } from "@/lib/billing/enabled";
 import { loadCancellationRules } from "@/lib/cancellationSubmission";
 import { cancellationOf } from "@/lib/interpreterCancellation";
+import { jobHeadline } from "@/lib/jobHeadline";
+
+type Loose = Record<string, unknown>;
+const asLoose = (value: unknown): Loose => (value && typeof value === "object" && !Array.isArray(value) ? (value as Loose) : {});
+const textOf = (value: unknown): string => (typeof value === "string" ? value : "");
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
 export async function fetchInterpreterOffers(_interpreterEmail?: string) {
@@ -46,12 +51,13 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
         row.offer.status = 'expired';
 
         // Sync cached offers inside requests.data if present
-        const rowData = (row.request.data as any) || {};
+        const rowData = asLoose(row.request.data);
         let modifiedData = false;
         if (Array.isArray(rowData.offers)) {
-          rowData.offers = rowData.offers.map((o: any) =>
-            o.id === row.offer.id ? { ...o, status: 'expired', state: 'expired', expiredAt: now.toISOString() } : o
-          );
+          rowData.offers = rowData.offers.map((o: unknown) => {
+            const cached = asLoose(o);
+            return cached.id === row.offer.id ? { ...cached, status: 'expired', state: 'expired', expiredAt: now.toISOString() } : o;
+          });
           modifiedData = true;
         }
 
@@ -65,14 +71,14 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
           await db.update(requests)
             .set({
               status: newReqStatus,
-              data: modifiedData ? rowData : row.request.data,
+              data: modifiedData ? (rowData as typeof row.request.data) : row.request.data,
               updatedAt: now
             })
             .where(eq(requests.id, row.request.id));
           row.request.status = newReqStatus;
         } else if (modifiedData) {
           await db.update(requests)
-            .set({ data: rowData, updatedAt: now })
+            .set({ data: rowData as typeof row.request.data, updatedAt: now })
             .where(eq(requests.id, row.request.id));
         }
       }
@@ -88,9 +94,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
   const cancellationRules = hasCancelledBooking ? await loadCancellationRules() : null;
 
   return offersData.map(row => {
-    const rowData = (row.request.data as any) || {};
-    const details = rowData.details || {};
-    const onsite = rowData.onsite || {};
+    const rowData = asLoose(row.request.data);
+    const details = asLoose(rowData.details);
 
     const { startsAt, endsAt } = resolveRequestTimes(row.request);
 
@@ -124,7 +129,8 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       positionOrdinal: positionOrdinal(rowData, posIdx),
       positionCount: positionCount(rowData),
       detailsUpdated,
-      title: row.request.title,
+      // "ODHH 202787460 - Seattle Children's Hospital" on a state job, the same header the agency sees (lib/jobHeadline.ts).
+      title: jobHeadline({ srn: job.data.intake.odhhSrn, organization: job.organization, venue: job.onsite.venue, title: row.request.title }),
       startsAt,
       endsAt,
       status: effectiveOfferStatus,
@@ -137,11 +143,12 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       isTeamJob,
       agencyName: DEFAULT_AGENCY_NAME,
       interpreterId: row.offer.interpreterId,
-      program: rowData?.intake?.program || "General",
+      program: textOf(asLoose(rowData.intake).program) || "General",
       isStateJob: isStateJobRequest(row.request),
       // Whether the form must collect the on-site contact's sign-off (always false for a state job); the server checks it again on submit.
       onsiteSignatureRequired: isOnsiteSignatureRequired(row.request),
-      timeZone: details.timeZone || "America/Los_Angeles",
+      timeZone: textOf(details.timeZone) || "America/Los_Angeles",
+      organization: job.organization,
       hoursSubmission: hoursSub,
       // Request-level columns are a single-position legacy field; never shown on a team job (each position's own
       // values are in hoursSubmission).

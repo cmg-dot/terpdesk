@@ -5,6 +5,7 @@ import { auditLogs, users } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { getInterpreterDisplayName } from "@/lib/displayName";
+import { questionHref } from "@/lib/clarificationThread";
 import { buildTerpDeskEmail, emailActionCard, emailButton } from "@/lib/emailTemplate";
 import { notifyAgencyAdmins } from "@/lib/notifications";
 import { logActivity } from "@/lib/requestActivity";
@@ -72,7 +73,8 @@ export async function submitClarification(params: {
   await notifyAgencyAdmins({
     type: "job",
     kind: "offer_question",
-    href: `/requests/${requestId}#questions`,
+    // Names the question, so the banner's "Answer question" opens this one (see clarificationReply.ts).
+    href: questionHref(requestId, entry.id),
     title: before ? "Question before accepting" : "Question about a booking",
     message: before
       ? `${name} asked a question about the offer for ${inApp} before accepting. Open the request to read and answer it.`

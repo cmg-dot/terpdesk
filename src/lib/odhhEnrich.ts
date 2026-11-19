@@ -147,14 +147,22 @@ export function planEnrichment(existing: ExistingJob, form: Bag): EnrichmentPlan
     next.location = place;
   }
 
-  // Notes: only into the agency-private notes, and only by adding what is not there yet (the state's flags and section 5),
-  // never by changing what staff wrote. The appointment note goes in only when the private notes are empty. It is not
-  // copied into preparation notes here: a booked interpreter may already have read them.
+  // The appointment note fills BLANK preparation notes, exactly as a new job from this form gets them (odhhDraft.ts: a numbers-only
+  // note, one inside the client section and a bare 8-digit number never reach them). Notes already written are never changed, so
+  // nothing a booked interpreter has read is rewritten. Offers still see them scrubbed of the client's details (offerNotes.ts).
+  const note = text(form.prepNotes);
+  const prepFilled = note !== "" && text(existing.data.prepNotes) === "";
+  if (prepFilled) {
+    next.prepNotes = form.prepNotes;
+    changed.push("prepNotes");
+  }
+
+  // The agency-private notes: only by adding what is not there yet (the state's flags and section 5), never by changing what staff
+  // wrote. The appointment note is kept there only when it did not go to the preparation notes and the private notes are empty.
   const currentPrivate = text(existing.data.privateNotes);
   const block = text(form.privateNotes);
-  const note = text(form.prepNotes);
   const additions = [
-    !currentPrivate && note ? `Appointment note (state form): ${note}` : "",
+    !currentPrivate && note && !prepFilled ? `Appointment note (state form): ${note}` : "",
     block && !currentPrivate.includes(block) ? block : "",
   ].filter(Boolean);
   if (additions.length > 0) {
