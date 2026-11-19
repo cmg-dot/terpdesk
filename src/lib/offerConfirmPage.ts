@@ -1,11 +1,13 @@
 import { escapeHtml } from "@/lib/emailTemplate";
 import type { JobSummary } from "@/lib/jobSummary";
+import type { OfferPlace } from "@/lib/offerPlace";
 import { MAX_AVAILABILITY_NOTE } from "@/lib/acceptAnswers";
 import { offerDeadlineLabel } from "@/lib/offerDeadline";
 
 /**
  * The page an Accept / Decline email link opens. It changes nothing by itself: the button posts to the same
- * address, and only that POST books or declines. Shows the restricted summary only (no address, program or notes).
+ * address, and only that POST books or declines. Shows the restricted summary plus what the app's offer view shows before accepting
+ * (the header, and an in-person job's clinic and street address); never the client, notes, parking or meeting codes.
  */
 const FIELD = "width:100%;box-sizing:border-box;border:1px solid #e2e8f0;border-radius:10px;padding:9px 10px;font-size:14px;margin-top:4px;";
 
@@ -27,14 +29,30 @@ const acceptQuestions = (): string => `
       <input name="availabilityNote" maxlength="${MAX_AVAILABILITY_NOTE}" placeholder="e.g. Available 10:00-11:00 AM only" style="${FIELD}font-weight:400;">
     </label>`;
 
-export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary; expiresAt: Date; error?: string }): Response {
+/** The header and the place, as the app's offer view shows them (lib/offerPlace.ts). The email itself never carries them. */
+const placeBlock = (p: OfferPlace): string => {
+  const where = p.virtual
+    ? `<div style="font-size:14px;font-weight:600;">Virtual${p.platform && p.platform.toLowerCase() !== "virtual" ? ` · ${escapeHtml(p.platform)}` : ""}</div>
+      <div style="font-size:13px;color:#475569;">The meeting link and codes are shared after you accept.</div>`
+    : p.placeName || p.address
+      ? `${p.placeName ? `<div data-offer-place="name" style="font-size:14px;font-weight:600;">${escapeHtml(p.placeName)}</div>` : ""}
+      ${p.address ? `<div data-offer-place="address" style="font-size:13px;color:#334155;">${escapeHtml(p.address)}</div>` : ""}`
+      : `<div style="font-size:14px;color:#475569;">Location pending</div>`;
+  return `<h2 data-offer-headline style="margin:0 0 10px;font-size:17px;line-height:1.35;">${escapeHtml(p.headline)}</h2>
+    <div style="margin:0 0 16px;padding:12px 14px;border-radius:12px;background:#F8FAF9;border:1px solid #E3EBE7;">
+      <div style="font-size:11px;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px;">${p.virtual ? "Format" : "Location"}</div>
+      ${where}
+    </div>`;
+};
+
+export function renderOfferConfirmPage(params: { token: string; action: "accept" | "decline"; summary: JobSummary & { offerPlace?: OfferPlace }; expiresAt: Date; error?: string }): Response {
   const { token, action, summary: s } = params;
   const accepting = action === "accept";
   const deadline = offerDeadlineLabel(params.expiresAt, s.timeZone);
-  // No reference: the page is opened from an email link, so it shows what the email does (the APT reference is staff-only).
+  // No APT reference (it is staff-only). The header and the place match the app's offer view; the email itself carries neither.
   const rows: [string, string][] = [
     ...(deadline ? [["Respond by", deadline] satisfies [string, string]] : []),
-    ["Assignment", s.emailTitle],
+    ...(s.offerPlace ? [] : [["Assignment", s.emailTitle] satisfies [string, string]]),
     ["Date", s.dateLabel],
     ["Time", s.timeLabel],
     ["Format", s.format],
@@ -59,9 +77,10 @@ export function renderOfferConfirmPage(params: { token: string; action: "accept"
     <h1 style="margin:0 0 6px;font-size:20px;">${accepting ? "Accept this job offer?" : "Decline this job offer?"}</h1>
     <p style="margin:0 0 16px;font-size:14px;color:#475569;">${
       accepting
-        ? "Nothing is booked until you confirm below. The exact location and preparation details are shared after you accept."
+        ? "Nothing is booked until you confirm below. Parking, the on-site contact and preparation details are shared after you accept."
         : "Nothing changes until you confirm below."
     }</p>
+    ${s.offerPlace ? placeBlock(s.offerPlace) : ""}
     <table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #f1f5f9;">${rowsHtml}</table>
     <form method="POST" action="/api/offers/response" style="margin-top:20px;">
       <input type="hidden" name="token" value="${escapeHtml(token)}">

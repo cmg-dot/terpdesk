@@ -5,6 +5,8 @@ import { offers, requests } from "@/db/schema";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { JobSummary } from "@/lib/jobSummary";
 import type { OfferTokenPayload } from "@/lib/jwt";
+import { offerPlaceOf } from "@/lib/offerPlace";
+import type { OfferPlace } from "@/lib/offerPlace";
 
 /**
  * What an Accept / Decline link means RIGHT NOW, read-only. Opening a link only ever calls this: nothing is written,
@@ -18,10 +20,13 @@ import type { OfferTokenPayload } from "@/lib/jwt";
  *
  * SERVER ONLY: queries the database.
  */
+/** The restricted summary plus what the app's offer view also shows before accepting: the header and the place (lib/offerPlace.ts). */
+export type OfferLinkSummary = JobSummary & { offerPlace: OfferPlace };
+
 export type OfferLinkState =
   | { kind: "blocked" }
-  | { kind: "already_accepted"; summary: JobSummary }
-  | { kind: "pending"; summary: JobSummary; expiresAt: Date };
+  | { kind: "already_accepted"; summary: OfferLinkSummary }
+  | { kind: "pending"; summary: OfferLinkSummary; expiresAt: Date };
 
 export async function resolveOfferLinkState(payload: OfferTokenPayload, now: Date = new Date()): Promise<OfferLinkState> {
   const [request] = await db.select().from(requests).where(eq(requests.id, payload.requestId)).limit(1);
@@ -33,7 +38,7 @@ export async function resolveOfferLinkState(payload: OfferTokenPayload, now: Dat
   const positions = ((request.data ?? {}) as { offerPositions?: Record<string, number> }).offerPositions ?? {};
   const positionOf = (offerId: string): number => positionOfOffer(positions, offerId);
   const requestOffers = await db.select().from(offers).where(eq(offers.requestId, payload.requestId));
-  const summary = summarizeJob(request, position);
+  const summary: OfferLinkSummary = { ...summarizeJob(request, position), offerPlace: offerPlaceOf(request) };
   // A link bound to one offer only ever means that offer.
   const mine = requestOffers.filter(
     (o) => o.interpreterId === payload.interpreterId && positionOf(o.id) === position && (!payload.offerId || o.id === payload.offerId),
