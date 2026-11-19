@@ -1,7 +1,9 @@
 import { revalidatePath } from "next/cache";
 import { contentFingerprint, insertOdhhRequestOnce } from "@/lib/odhhDedupe";
 import { buildDraftData, draftTitle } from "@/lib/odhhDraft";
-import { jobSchedule, normalizeEmailText, parseIntakeEmail, parseWarnings, sanitizeSrn } from "@/lib/odhhEmailParser";
+import { jobSchedule, parseIntakeEmail, parseWarnings, sanitizeSrn } from "@/lib/odhhEmailParser";
+import { formGate } from "@/lib/odhhFormGate";
+import { senderTrusted } from "@/lib/stateVoidNotice";
 import type { ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { enrichRequestFromForm } from "@/lib/odhhEnrichStore";
 import { stateNoticeKind } from "@/lib/odhhNotice";
@@ -32,7 +34,8 @@ export interface JobEmailInput {
   hintedSrn?: string | null;
   /**
    * For mail that reached the Inbox rather than the API-key-protected route: act only on an email that is plainly the state's
-   * form (an SRN, and the state's portal link for that same SRN). Anything else is left in the Inbox for staff.
+   * form (an SRN and the state's portal link for it, or an HCA form / a trusted sender's forward: see odhhFormGate.ts). Anything
+   * else is left in the Inbox for staff.
    */
   strict?: boolean;
 }
@@ -42,9 +45,7 @@ export type JobEmailOutcome =
   | { outcome: "duplicate"; id: string; filled: string[] }
   | { outcome: "created"; id: string; parsed: ParsedIntakeEmail; warnings: string[]; hasRequestor: boolean };
 
-/** The state's portal link for this very SRN: every form it sends has one ("...servicerequest.aspx?id=202781026"). */
-export const carriesStatePortalLink = (rawContent: string, srn: string): boolean =>
-  new RegExp(`fortress\\.wa\\.gov/dshs/odhhapps/\\S*servicerequest\\.aspx\\?id=${srn}\\b`, "i").test(normalizeEmailText(rawContent));
+export { carriesStatePortalLink } from "@/lib/odhhFormGate";
 
 export async function processJobOfferEmail(input: JobEmailInput): Promise<JobEmailOutcome> {
   const { email, subject, rawContent } = input;
@@ -58,7 +59,8 @@ export async function processJobOfferEmail(input: JobEmailInput): Promise<JobEma
   const notice = stateNoticeKind(subject, rawContent, Boolean(parsed.isoDate));
   if (notice) return { outcome: "not_a_job", warnings: [...warnings, "A state notice, not a request form"] };
 
-  if (input.strict && (!srn || !carriesStatePortalLink(rawContent, srn))) {
+  // The Inbox accepts mail from anyone: only the state's form (see odhhFormGate.ts) is acted on there.
+  if (input.strict && !(await formGate({ rawContent, srn, senderEmail: email, senderTrusted: () => senderTrusted(email) }))) {
     return { outcome: "not_a_job", warnings: [...warnings, "Not recognised as the state's request form"] };
   }
 

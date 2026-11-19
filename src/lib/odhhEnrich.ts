@@ -43,6 +43,8 @@ const FILL_ONLY = [
   "onsite.contactMethod",
   "intake.requestedInterpreter",
   "intake.bookingPeriod",
+  // The client's WA # (ProviderOne): staff-only, needed on HCA invoices. Jobs made before the form's number was read have none.
+  "intake.providerOneNumber",
 ] as const;
 
 /** Yes/no flags from the form: set when the form says yes and the job has not already got it. */

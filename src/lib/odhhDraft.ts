@@ -1,8 +1,11 @@
 import type { RequestData } from "@/db/schema";
 import { FORMAT_LABELS, ODHH_PROGRAM, ODHH_TIME_ZONE_LABEL, type ParsedIntakeEmail } from "@/lib/odhhEmailParser";
 import { contactMethodText, stateFlagsLine, type FormExtras } from "@/lib/odhhFormFields";
-import { liftMeetingFromNote } from "@/lib/odhhLocationParse";
+import { liftVirtualMeeting } from "@/lib/odhhMeetingLift";
+import { PREP_ID_LABEL, scrubPrepIds } from "@/lib/odhhPrepScrub";
 import { roomFromPlace } from "@/lib/odhhRoom";
+import { teamRequest } from "@/lib/odhhTeam";
+import { withPositionCount } from "@/lib/positions";
 import { providerOneFromStateText } from "@/lib/providerOne";
 
 /**
@@ -47,24 +50,37 @@ export function buildDraftData(input: DraftInput): RequestData {
   // An Appointment Note that is only a number ("2272820") is the state's own reference, not guidance for the interpreter, and may
   // identify the client: it goes to the agency-private notes, never the interpreter-visible preparation notes.
   const numericNote = isNumbersOnlyNote(parsed.appointmentNote) ? (parsed.appointmentNote ?? "").trim() : null;
-  const prepNotes = noteAlreadyInBlock || numericNote ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH);
+  // A bare 8-digit number inside the note (a case or client number) is moved to the private notes too (see odhhPrepScrub.ts).
+  const scrubbed = scrubPrepIds(noteAlreadyInBlock || numericNote ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH));
+  const prepNotes = scrubbed.text;
   const contactMethod = contactMethodText(extras);
-  // Agency-private notes: the state's flags first, then a numbers-only appointment note, then the whole of section 5 (gender,
-  // hearing identity, comments, ...).
-  const privateNotes = [stateFlagsLine(extras), numericNote ? `${NUMERIC_NOTE_LABEL} ${numericNote}` : "", parsed.clientInfoBlock ?? ""].filter(Boolean).join("\n\n");
+  // Agency-private notes: the state's flags first, then a numbers-only appointment note and any number moved out of the note, then
+  // the whole of section 5 (gender, hearing identity, comments, ...).
+  const privateNotes = [
+    stateFlagsLine(extras),
+    numericNote ? `${NUMERIC_NOTE_LABEL} ${numericNote}` : "",
+    scrubbed.moved.length > 0 ? `${PREP_ID_LABEL} ${scrubbed.moved.join(", ")}` : "",
+    parsed.clientInfoBlock ?? "",
+  ].filter(Boolean).join("\n\n");
+  // How many interpreters the requester asked for (written in the note or the client section's comment). A size the text leaves
+  // unclear is flagged for staff in the parse warnings.
+  const team = teamRequest(parsed.appointmentNote, parsed.clientInfoBlock);
+  if (team.warning && !warnings.includes(team.warning)) warnings.push(team.warning);
   // The room: the form's own Room line, else a short code the Location line held ("E1"), else a numbered unit written into the
   // Location or Address line ("... Ocean 8"). It is never the place's name: a unit found in the venue is taken out of it.
   const placeRoom = (extras.room ?? parsed.locationCode) ? null : roomFromPlace(parsed.venue, parsed.address);
   const room = extras.room ?? parsed.locationCode ?? placeRoom?.room ?? null;
   const venue = placeRoom?.room ? placeRoom.venue : parsed.venue ?? "";
-  // A virtual job whose meeting invitation was pasted into the Directions & Parking note (no link on the meeting line): the link
-  // goes to the meeting fields, so it is a button for the interpreter and not plain text in the parking card.
-  const lifted = !parsed.meetingLink && parsed.format === "virtual" ? liftMeetingFromNote(extras.parking) : null;
+  // A virtual job whose join link is not on the meeting line: it may sit in the Directions & Parking note, the Appointment Note, or
+  // on a line of its own (see odhhMeetingLift.ts). The link goes to the meeting fields, so it is a button for the interpreter. Only
+  // a link lifted from the parking note is taken out of that note.
+  const found = !parsed.meetingLink && parsed.format === "virtual" ? liftVirtualMeeting({ parking: extras.parking, appointmentNote: parsed.appointmentNote, rawContent }) : null;
+  const lifted = found?.lifted ?? null;
   const meetingLink = parsed.meetingLink ?? lifted?.meetingLink ?? null;
-  const parking = lifted ? lifted.rest : extras.parking;
+  const parking = found?.from === "parking" ? found.lifted.rest : extras.parking;
   const providerOne = providerOneFromStateText(parsed.clientInfoBlock) ?? providerOneFromStateText(rawContent);
 
-  return {
+  const data: RequestData = {
     brief: {},
     intake: {
       program: ODHH_PROGRAM,
@@ -143,4 +159,6 @@ export function buildDraftData(input: DraftInput): RequestData {
       parseWarnings: warnings,
     },
   };
+  // A team request opens that many positions (every place the count is stored, kept in step: see positions.ts).
+  return team.count ? withPositionCount(data, team.count) : data;
 }

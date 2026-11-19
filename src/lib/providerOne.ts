@@ -26,5 +26,15 @@ export const providerOneWarning = (input: string): string | null => {
  */
 export function providerOneFromStateText(text: string | null | undefined): string | null {
   const match = /[Pp]rovider\s*[Oo]ne\s*#?\s*:?\s*(\d[\d\s-]{7,14}\s*[Ww][Aa])(?![a-z0-9])/.exec(text ?? "");
-  return match ? normalizeProviderOne(match[1]) : null;
+  if (match) return normalizeProviderOne(match[1]);
+  return unlabelledProviderOne(text ?? "");
+}
+
+/**
+ * The number written without its "Provider One" label ("... ID: 123456789WA"): accepted only in the standard shape, 9 digits
+ * then WA as one token, and only when the text holds exactly one such number (two different ones could be two people).
+ */
+function unlabelledProviderOne(text: string): string | null {
+  const found = new Set(Array.from(text.matchAll(/(?<![\dA-Za-z])(\d{9})[ \t]?WA(?![A-Za-z0-9])/gi), (m) => `${m[1]}WA`));
+  return found.size === 1 ? normalizeProviderOne(Array.from(found)[0]) : null;
 }

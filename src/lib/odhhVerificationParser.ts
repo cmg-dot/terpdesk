@@ -53,6 +53,11 @@ export interface ParsedServiceVerification {
   startTime: string | null;
   endDate: string | null;
   endTime: string | null;
+  /**
+   * The appointment's day from the report's own "BOOKING Appointment Date and Time" line (yyyy-MM-dd). The actual times carry no
+   * date, so this is the day they are read on; without it they would take the job's stored day, which can differ.
+   */
+  bookingDate: string | null;
   /** Total miles; 0 when the email says none. Null when not found. */
   totalMiles: number | null;
   /** Other fees as written (for the record), and the dollar amount when one is given. */
@@ -81,6 +86,8 @@ const MILEAGE = labelPattern([
   "Travel[ \\t]+Mile(?:s|age)",
   "Mile(?:s|age)",
 ]);
+// "BOOKING Appointment Date and Time: 10/15/2026 4:00:00 PM - 10/15/2026 5:30:00 PM": the first date is the booked day.
+const BOOKING = labelPattern(["BOOKING[ \\t]+Appointment[ \\t]+Date(?:[ \\t]+and[ \\t]+Time)?"]);
 const OTHER_FEES = labelPattern(["Other[ \\t]+Fee(?:s|\\(s\\))", "Additional[ \\t]+Fee(?:s|\\(s\\))"]);
 
 // "Service Complete - No" | "Service Complete: Yes" | "Service Completed? no"
@@ -189,6 +196,7 @@ export function parseServiceVerification(rawContent: string, hints: Verification
     startTime: start.time,
     endDate: end.date,
     endTime: end.time,
+    bookingDate: parseDateTimeValue(cleanValue(text.match(BOOKING)?.[1])).date,
     totalMiles: parseMiles(pick(MILEAGE, hints.totalMiles)),
     otherFeesText: fees.text,
     otherFeesAmount: fees.amount,

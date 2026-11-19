@@ -23,6 +23,11 @@ const OUTCOMES: Record<string, { label: string; tone: OutcomeTone }> = {
   ignored: { label: "No action", tone: "quiet" },
   unchanged: { label: "No change", tone: "quiet" },
   skipped: { label: "No action", tone: "quiet" },
+  returned: { label: "Job returned", tone: "done" },
+  unable_held: { label: "Held: check the job", tone: "attention" },
+  hours_report: { label: "Hours report", tone: "quiet" },
+  hours_no_job: { label: "Hours: no job found", tone: "attention" },
+  notice_only: { label: "State notice: no action", tone: "quiet" },
 };
 
 export const outcomeView = (outcome: string | null | undefined): { label: string; tone: OutcomeTone } | null => (outcome ? OUTCOMES[outcome] ?? null : null);

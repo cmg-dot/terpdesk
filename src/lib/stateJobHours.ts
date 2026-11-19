@@ -1,5 +1,5 @@
 import { randomBytes } from "crypto";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { requests, timesheets } from "@/db/schema";
 import { lockRequestForPosition } from "@/lib/positionClaim";
@@ -49,7 +49,29 @@ export interface StateJobHoursInput {
   review?: ReviewSubmission;
 }
 
-/** The new timesheet's id, or null when this interpreter already has a timesheet on the job (nothing is changed). */
+/**
+ * Travel legs for a timesheet that has none: the timesheet's own travel window (the first leg) when it is empty, and every leg on the
+ * request when the request holds none for this timesheet. Never overwrites, so running it twice changes nothing.
+ */
+async function mergeMissingTravel(tx: DbTx, requestId: string, timesheetId: string, sheetHasNoTravel: boolean, travel: TravelWindow[]): Promise<void> {
+  if (sheetHasNoTravel) {
+    await tx
+      .update(timesheets)
+      .set({ travelStartTime: new Date(travel[0].start), travelEndTime: new Date(travel[0].end), updatedAt: new Date() })
+      .where(and(eq(timesheets.id, timesheetId), isNull(timesheets.travelStartTime)));
+  }
+  await tx.execute(sql`
+    UPDATE requests
+    SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{travelWindows}',
+      coalesce(data -> 'travelWindows', '{}'::jsonb) || jsonb_build_object(${timesheetId}::text, ${JSON.stringify(travel)}::jsonb))
+    WHERE id = ${requestId} AND NOT (coalesce(data -> 'travelWindows', '{}'::jsonb) ? ${timesheetId}::text)
+  `);
+}
+
+/**
+ * The new timesheet's id, or null when this interpreter already has a timesheet on the job. The hours are then left as they are;
+ * only missing travel is added (mergeMissingTravel).
+ */
 export async function recordStateJobHours(input: StateJobHoursInput, exec: DbTx = db as unknown as DbTx): Promise<{ id: string } | null> {
   const { requestId, interpreterId, start, end, serviceHours, totalMiles, note, review } = input;
   const travel = (input.travelWindows ?? []).filter(isTravelWindow).slice(0, MAX_TRAVEL_WINDOWS);
@@ -58,11 +80,16 @@ export async function recordStateJobHours(input: StateJobHoursInput, exec: DbTx 
   return exec.transaction(async (tx) => {
     if (!(await lockRequestForPosition(tx, requestId))) return null;
     const [existing] = await tx
-      .select({ id: timesheets.id })
+      .select({ id: timesheets.id, travelStart: timesheets.travelStartTime })
       .from(timesheets)
       .where(and(eq(timesheets.requestId, requestId), eq(timesheets.interpreterId, interpreterId)))
       .limit(1);
-    if (existing) return null;
+    if (existing) {
+      // Already recorded: nothing about the hours is changed. Travel the existing timesheet never had (a receipt recorded before travel
+      // was read, or staff's entry without it) is added, fill-only: travel already on it is never replaced.
+      if (travel.length > 0) await mergeMissingTravel(tx, requestId, existing.id, existing.travelStart === null, travel);
+      return null;
+    }
 
     // The token columns are required, but no link exists for this row: the hash is of a value nobody holds and it
     // is already expired, so it can never be used.

@@ -1,5 +1,5 @@
 import { randomUUID } from "crypto";
-import { and, eq, isNull, sql } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
@@ -19,6 +19,7 @@ import { verificationNote } from "@/lib/verificationPending";
 import type { PendingVerification } from "@/lib/verificationPending";
 import { appendPendingVerification, reportIdFor, resolveBookedInterpreter } from "@/lib/verificationPendingStore";
 import { isStateJobRequest } from "@/lib/stateJob";
+import { findReceiptJob, holdReceipt, saveReceipt } from "@/lib/verificationReceipt";
 import { computeTimes, computeTravelWindows } from "@/lib/verificationTimes";
 import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
 
@@ -44,7 +45,9 @@ export type VerificationOutcome =
   | "conflict" // already recorded with different values: left as is, staff notified
   | "no_matching_request"
   | "ambiguous_srn" // more than one open request has this SRN
-  | "not_state_job";
+  | "not_state_job"
+  | "needs_review" // saved on the job, but its times could not become hours: staff notified
+  | "cancellation_receipt"; // the state's receipt for a cancelled job: saved on it, staff notified
 
 export type ServiceVerificationResult =
   | { ok: true; outcome: VerificationOutcome; requestId?: string }
@@ -116,26 +119,20 @@ export async function processServiceVerification(
     return { ok: false, error: "Could not read the service verification (missing fields).", missingFields: missing };
   }
   const srn = parsed.srn as string;
+  const match = await findReceiptJob(exec, srn, reportsNoService(parsed));
 
-  // The SRN lives in the request's JSON. The value is a bound parameter, never part of the SQL text.
-  const matches = await exec
-    .select({ id: requests.id, createdAt: requests.createdAt, data: requests.data, isStateJob: requests.isStateJob })
-    .from(requests)
-    .where(and(sql`${requests.data} #>> '{intake,odhhSrn}' = ${srn}`, isNull(requests.canceledAt)))
-    .limit(3);
-
-  if (matches.length === 0) {
+  if (match.kind === "none") {
     await fx.notify("Service verification without a request", "A service verification email arrived for an SRN with no open request. Check the SRN and add the request if needed.");
     await fx.audit({ action: "service_verification_received", details: "outcome=no_matching_request" });
     return { ok: true, outcome: "no_matching_request" };
   }
-  if (matches.length > 1) {
+  if (match.kind === "ambiguous") {
     await fx.notify("Service verification needs review", "A service verification email matches more than one open request. Record its hours manually.");
-    await fx.audit({ action: "service_verification_received", details: `outcome=ambiguous_srn; matches=${matches.length}` });
+    await fx.audit({ action: "service_verification_received", details: `outcome=ambiguous_srn; matches=${match.count}` });
     return { ok: true, outcome: "ambiguous_srn" };
   }
 
-  const request = matches[0];
+  const request = match.job;
   const requestId = request.id;
   if (!isStateJobRequest(request)) {
     await fx.audit({ action: "service_verification_received", details: `outcome=not_state_job; requestId=${requestId}` });
@@ -147,7 +144,8 @@ export async function processServiceVerification(
   const { startsAt } = resolveRequestTimes({ createdAt: request.createdAt, data: request.data });
   // A receipt that reports no service (cancelled / not completed) may carry no times at all; it is still recorded.
   const computed = parsed.startTime && parsed.endTime ? computeTimes(parsed, startsAt, zone) : null;
-  if (typeof computed === "string" && !reportsNoService(parsed)) return { ok: false, error: computed };
+  // Times that do not work (an end before the start, a day in the future) no longer drop the report: it is saved and staff are told.
+  const timeProblem = typeof computed === "string" && !reportsNoService(parsed) ? computed : null;
   const times = computed !== null && typeof computed !== "string" ? computed : null;
 
   const serviceHours = times ? Math.round(((times.end.getTime() - times.start.getTime()) / 3_600_000) * 100) / 100 : 0;
@@ -167,13 +165,13 @@ export async function processServiceVerification(
     cancellation: parsed.cancellation,
     cancelledBy: parsed.cancelledBy,
     comments: parsed.comments,
+    ...(times?.endsNextDay ? { endsNextDay: true } : {}),
+    // A receipt that is held (not turned into hours) keeps what it reported, so nothing has to be retyped from the email.
+    ...(timeProblem || match.kind === "cancelled" ? { held: match.kind === "cancelled" ? "cancelled_job" : "time_problem", timeProblem, travelWindows } : {}),
   };
-  await exec.execute(sql`
-    UPDATE requests
-    SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{serviceVerification}', coalesce(data -> 'serviceVerification', '{}'::jsonb) || ${JSON.stringify(record)}::jsonb),
-        updated_at = now()
-    WHERE id = ${requestId}
-  `);
+  await saveReceipt(exec, requestId, record);
+  if (match.kind === "cancelled") return { ok: true, outcome: await holdReceipt(fx, "cancelled_job", requestId, null), requestId };
+  if (timeProblem) return { ok: true, outcome: await holdReceipt(fx, "time_problem", requestId, timeProblem), requestId };
 
   const booked = await exec
     .select({ interpreterId: offers.interpreterId })
