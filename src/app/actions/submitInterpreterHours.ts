@@ -21,6 +21,8 @@ import { ONSITE_REQUIRED_MESSAGE, isOnsiteSignatureRequired } from "@/lib/onsite
 import type { OnsiteSignoffInput } from "@/lib/onsiteSignature";
 import { saveOnsiteSignoff } from "@/lib/onsiteSignoff";
 import { removeObjectsQuietly } from "@/lib/s3";
+import { findBillableCancelledBooking } from "@/lib/cancellationSubmission";
+import { assertCancellationForm } from "@/lib/interpreterCancellation";
 
 const signatureSchema = z
   .string()
@@ -53,12 +55,15 @@ export async function submitInterpreterHours(
   }
 ): Promise<{ success: boolean }> {
   const { interpreterId: sessionInterpreterId } = await requireInterpreter();
-  // Only an interpreter holding the accepted booking may report hours for it.
-  const [ownBooking] = await db
+  // Only an interpreter holding the accepted booking may report hours for it. The one other case is the CANCELLATION FORM: their own
+  // booking was cancelled with a billable outcome (billing on), decided from the database (cancellationSubmission.ts), never the browser.
+  const [acceptedBooking] = await db
     .select({ id: offers.id })
     .from(offers)
     .where(and(eq(offers.requestId, requestId), eq(offers.interpreterId, sessionInterpreterId), eq(offers.status, "accepted")))
     .limit(1);
+  const cancelled = acceptedBooking ? null : await findBillableCancelledBooking(requestId, sessionInterpreterId);
+  const ownBooking = acceptedBooking ?? (cancelled ? { id: cancelled.offerId } : undefined);
   if (!ownBooking) throw new Error(FORBIDDEN);
 
   // State jobs (ODHH/HCA) are reported in the state portal; the internal form is not allowed for them.
@@ -71,7 +76,8 @@ export async function submitInterpreterHours(
 
   // Whether the job needs the facility contact's sign-off is decided here from the job, never from the browser. The picture is
   // stored first; if the submission then fails, the unused object is removed again below.
-  const onsiteRequired = jobRow ? isOnsiteSignatureRequired(jobRow) : false;
+  // A cancelled appointment has no on-site contact to sign off.
+  const onsiteRequired = jobRow && !cancelled ? isOnsiteSignatureRequired(jobRow) : false;
   if (onsiteRequired && !extra?.onsiteSignoff) throw new Error(ONSITE_REQUIRED_MESSAGE);
   const onsiteSignoff = onsiteRequired ? await saveOnsiteSignoff(requestId, extra?.onsiteSignoff) : null;
 
@@ -84,11 +90,14 @@ export async function submitInterpreterHours(
     ? undefined
     : z.string().trim().max(1000).parse(extra.cancellationReason);
 
+  // The cancellation form needs the note and, if travel was given, a travel window that makes sense (cancellationSubmission.ts).
+  if (cancelled) assertCancellationForm({ note: cancellationReason, travelStart: extra?.travelStartTime, travelEnd: extra?.travelEndTime });
+
   // Empty and 0-mile legs are dropped and each leg's counted miles (doubled on a round trip) are worked out here.
   // The total comes from the legs whenever legs were sent, even if every one was empty; the `miles` argument is only
-  // used by a caller that sends no legs at all.
-  const legs = countLegs(travelLegsSchema.parse(extra?.legs ?? []));
-  const totalMiles = extra?.legs !== undefined ? sumCountedMiles(legs) : miles;
+  // used by a caller that sends no legs at all. No mileage is recorded on a cancellation (billing never pays it).
+  const legs = cancelled ? [] : countLegs(travelLegsSchema.parse(extra?.legs ?? []));
+  const totalMiles = cancelled ? 0 : extra?.legs !== undefined ? sumCountedMiles(legs) : miles;
   if (!Number.isFinite(totalMiles) || totalMiles < 0 || totalMiles > MAX_TOTAL_MILES) {
     throw new Error("Mileage is out of range.");
   }
@@ -106,24 +115,30 @@ export async function submitInterpreterHours(
     const posIdx = positionOfOffer(existing.offerPositions, ownBooking.id);
     const existingData = (existing.data as any) || {};
 
-    const { startsAt } = resolveRequestTimes({
+    const { startsAt, endsAt } = resolveRequestTimes({
       createdAt: existing.createdAt,
       data: existingData,
     });
     const startsAtMs = new Date(startsAt).getTime();
-    if (!isNaN(startsAtMs) && Date.now() < startsAtMs) {
+    // A cancellation form is filed after the cancellation, which can come before the start: no wait.
+    if (!cancelled && !isNaN(startsAtMs) && Date.now() < startsAtMs) {
       throw new Error("Actual service time can only be entered once the appointment starts.");
     }
+    // The scheduled times, fixed here: nothing was worked, so the browser's times are not used on a cancellation.
+    const reportedStart = cancelled ? startsAt : actualStartTime;
+    const reportedEnd = cancelled ? endsAt : actualEndTime;
 
     const travelStart = extra?.travelStartTime ? new Date(extra.travelStartTime) : null;
     const travelEnd = extra?.travelEndTime ? new Date(extra.travelEndTime) : null;
-    const isCompleted = typeof extra?.serviceCompleted === 'boolean'
-      ? extra.serviceCompleted
-      : extra?.serviceCompleted === 'yes'
-        ? true
-        : extra?.serviceCompleted === 'no'
-          ? false
-          : null;
+    const isCompleted = cancelled
+      ? false
+      : typeof extra?.serviceCompleted === 'boolean'
+        ? extra.serviceCompleted
+        : extra?.serviceCompleted === 'yes'
+          ? true
+          : extra?.serviceCompleted === 'no'
+            ? false
+            : null;
 
     if (isCompleted === false && !cancellationReason) {
       throw new Error("A reason is required when the service was not completed.");
@@ -136,19 +151,19 @@ export async function submitInterpreterHours(
     const isCorrection = (extra?.version ?? 1) > 1;
     const historyEntry = {
       id: Math.random().toString(36).substring(7),
-      type: isCorrection ? 'correction_submitted' : 'initial_submission',
-      title: isCorrection ? `Correction submitted (v${extra?.version})` : 'Initial hours submitted',
-      actor: extra?.interpreterName || `Interpreter (${positionLabel(existingData, posIdx)})`,
+      type: cancelled ? 'cancellation_submitted' : isCorrection ? 'correction_submitted' : 'initial_submission',
+      title: cancelled ? 'Cancellation form submitted' : isCorrection ? `Correction submitted (v${extra?.version})` : 'Initial hours submitted',
+      actor: cancelled?.interpreterName || extra?.interpreterName || `Interpreter (${positionLabel(existingData, posIdx)})`,
       timestamp: new Date().toISOString(),
       version: extra?.version ?? 1,
       details: {
-        actualStart: actualStartTime,
-        actualEnd: actualEndTime,
+        actualStart: reportedStart,
+        actualEnd: reportedEnd,
         mileage: totalMiles,
-        breakMinutes: extra?.breakMinutes ?? 0,
+        breakMinutes: cancelled ? 0 : extra?.breakMinutes ?? 0,
         travelStartTime: extra?.travelStartTime ?? null,
         travelEndTime: extra?.travelEndTime ?? null,
-        serviceCompleted: extra?.serviceCompleted ?? null,
+        serviceCompleted: cancelled ? false : extra?.serviceCompleted ?? null,
         mileageNote: extra?.mileageNote ?? "",
         note: extra?.note ?? "",
         positionIndex: posIdx,
@@ -164,16 +179,18 @@ export async function submitInterpreterHours(
       timesheetId: null,
       source: 'in_app',
       positionIndex: posIdx,
-      interpreterName: extra?.interpreterName || existingHours.interpreterName,
+      interpreterName: cancelled?.interpreterName || extra?.interpreterName || existingHours.interpreterName,
       interpreterId: sessionInterpreterId,
-      actualStartTime,
-      actualEndTime,
+      actualStartTime: reportedStart,
+      actualEndTime: reportedEnd,
       miles: totalMiles,
       legs,
-      breakMinutes: extra?.breakMinutes ?? 0,
+      breakMinutes: cancelled ? 0 : extra?.breakMinutes ?? 0,
+      // Marks a cancellation form: Hours review labels it "Cancelled · billable" (the job stays cancelled, so nothing is approved).
+      ...(cancelled ? { cancellationForm: true } : {}),
       travelStartTime: extra?.travelStartTime ?? null,
       travelEndTime: extra?.travelEndTime ?? null,
-      serviceCompleted: extra?.serviceCompleted ?? null,
+      serviceCompleted: cancelled ? false : extra?.serviceCompleted ?? null,
       mileageNote: extra?.mileageNote ?? "",
       note: extra?.note ?? "",
       version: extra?.version ?? 1,
@@ -196,7 +213,8 @@ export async function submitInterpreterHours(
     await tx
       .update(requests)
       .set({
-        status: "awaiting_review",
+        // A cancelled job keeps its status (Cancelled): the form is on file, not a timesheet awaiting approval.
+        ...(cancelled ? {} : { status: "awaiting_review" }),
         // The request-level columns are single-position legacy fields: only Position 1 writes them, so Position 2's
         // submission can't overwrite them. Each position's own values live in hoursSubmissions[position].
         ...(posIdx === 1
@@ -215,15 +233,15 @@ export async function submitInterpreterHours(
         updatedAt: new Date(),
       })
       .where(eq(requests.id, requestId));
-    await replaceMileageLegs(tx, { requestId, interpreterId: sessionInterpreterId }, legs);
+    if (!cancelled) await replaceMileageLegs(tx, { requestId, interpreterId: sessionInterpreterId }, legs);
   }).catch(async (err: unknown) => {
     if (onsiteSignoff) await removeObjectsQuietly([onsiteSignoff.storageKey]);
     throw err;
   });
 
-  await logActivity({ requestId, interpreterId: sessionInterpreterId, audience: "shared", kind: "hours_submitted", message: (extra?.version ?? 1) > 1 ? "Corrected hours submitted (in app)" : "Hours submitted (in app)", actorLabel: "Interpreter" });
-  // Agency: in-app notification + email that hours are waiting for review.
-  await alertAgency({ event: "timesheet_submitted", requestId, interpreterId: sessionInterpreterId, href: "/hours-review" });
+  await logActivity({ requestId, interpreterId: sessionInterpreterId, audience: "shared", kind: "hours_submitted", message: cancelled ? "Cancellation form submitted (in app)" : (extra?.version ?? 1) > 1 ? "Corrected hours submitted (in app)" : "Hours submitted (in app)", actorLabel: "Interpreter" });
+  // Agency: in-app notification + email. Hours wait for review; a cancellation form has nothing to approve, and says so.
+  await alertAgency({ event: cancelled ? "cancellation_form_submitted" : "timesheet_submitted", requestId, interpreterId: sessionInterpreterId, href: "/hours-review" });
 
   revalidatePath("/jobs");
   revalidatePath("/interpreter-home");

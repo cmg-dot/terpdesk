@@ -806,7 +806,7 @@ export default function AssignmentDetailPage() {
  {/* The older detail cards (still editable from here) are folded away so the form stays the focus. */}
  <details data-job-details className="group rounded-2xl border border-gray-200 bg-white">
  <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-6 py-4 text-[16px] font-medium text-[var(--ink)] sm:px-8 [&::-webkit-details-marker]:hidden">
- <span>Job details on file <span className="ml-1 text-sm font-normal text-[var(--sage)]">overview, format, location, preparation notes, requester</span></span>
+ <span>Job details on file <span className="ml-1 text-sm font-normal text-[var(--sage)]">overview, format, location, appointment notes, requester</span></span>
  <ChevronDown className="h-5 w-5 flex-none text-[var(--forest)] transition-transform group-open:rotate-180" aria-hidden="true" />
  </summary>
  <div className="flex flex-col gap-6 border-t border-gray-100 p-4 sm:p-6">
@@ -1020,9 +1020,14 @@ export default function AssignmentDetailPage() {
   })()}
 
  <div className={cardClass}>
- <h2 className="text-[18px] font-medium text-[var(--ink)] mb-2">Preparation notes</h2>
+ <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+ <h2 className="text-[18px] font-medium text-[var(--ink)]">Appointment notes</h2>
+ {!prepNotesText && !isCancelled && (
+ <Link href={`/requests/${params.id}/edit#appointment-notes`} className="text-sm font-medium text-[var(--accent-text)] hover:underline">Add notes</Link>
+ )}
+ </div>
  <p className="text-gray-800 text-[15px] leading-relaxed">
- {prepNotesText || <span className="text-sm italic text-gray-400">No preparation notes.</span>}
+ {prepNotesText || <span className="text-sm italic text-gray-500">No appointment notes yet.</span>}
  </p>
  </div>
 

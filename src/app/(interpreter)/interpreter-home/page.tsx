@@ -24,7 +24,10 @@ import { isAppointmentHappeningNow, isAppointmentUpcoming, sortUpcomingWithHappe
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { UpdatedBadge } from "@/components/jobDetails/UpdatedBadge";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
-import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord } from "@/utils/hoursState";
+import { isJobNeedingHours, getJobHoursState, getHoursBadgeInfo, findOwnServiceRecord, showsStatePortal } from "@/utils/hoursState";
+import { HoursDueLine } from "@/components/interpreter/HoursDueLine";
+import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
+import { resolveRequestTimes } from "@/utils/timezone";
 import { td_availability_view } from "@/app/actions/availability";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { bucketInterpreterJobs, isLivePendingOffer } from "@/lib/interpreterJobBuckets";
@@ -159,7 +162,8 @@ export default function InterpreterHomePage() {
   const pendingOffersList = offers.filter(o => isLivePendingOffer(o, currentTime));
   const pendingOffers = pendingOffersList.length;
 
-  const hoursToSubmitJobs = jobs.filter((job) => isJobNeedingHours(job, serviceRecords, currentTime));
+  // State jobs are listed too: their card points to the ODHH Verification Form (hours are reported in the state's portal).
+  const hoursToSubmitJobs = jobs.filter((job) => isJobNeedingHours(job, serviceRecords, currentTime, { includeState: true }));
   const sortedHoursToSubmitJobs = [...hoursToSubmitJobs].sort((a, b) => {
     const stateA = getJobHoursState(a, serviceRecords);
     const stateB = getJobHoursState(b, serviceRecords);
@@ -431,7 +435,7 @@ export default function InterpreterHomePage() {
     <OfferSummaryLines job={job} />
     {/* Before accepting: mental health, solo or team, and the notes (scrubbed of the client's details on the server). */}
     <OfferTags mentalHealth={job.mentalHealth === true} positionCount={job.positionCount} className="mt-2" />
-    <OfferNotes notes={job.offerNotes} compact />
+    <OfferNotes notes={job.offerNotes} removed={job.offerNotesRemoved} compact />
     <p className="text-[12px] text-[var(--sage)] mt-1">
     {(() => {
       const deadline = offerDeadlineLabel(job.offerExpiresAt, job.details?.timeZone || job.timeZone);
@@ -644,6 +648,7 @@ export default function InterpreterHomePage() {
  <MapPin className="w-3.5 h-3.5 text-gray-400 shrink-0 mt-0.5" />
  <span>{locPrimary}{locSecondary ? ` · ${locSecondary}` : ''}</span>
  </div>
+ {!isCorrection && <HoursDueLine endsAt={resolveRequestTimes(job).endsAt} stateForm={showsStatePortal(job, hoursState)} nowMs={currentTime} />}
  {isCorrection && reviewMsg && (
  <div className="mt-2 text-xs text-amber-900 bg-amber-100/90 rounded-lg p-2.5 border border-amber-200">
  <span className="font-semibold">Agency review comment: </span>"{reviewMsg}"
@@ -652,6 +657,17 @@ export default function InterpreterHomePage() {
  </div>
 
  <div className="shrink-0 w-full md:w-auto flex items-center justify-end">
+ {showsStatePortal(job, hoursState) && !isCorrection ? (
+ <a
+ href={ODHH_VERIFICATION_FORM_URL}
+ target="_blank"
+ rel="noopener noreferrer"
+ className="w-full md:w-auto text-xs font-semibold px-4 py-2 rounded-full transition-colors inline-flex items-center justify-center gap-1.5 shadow-sm bg-[var(--forest-soft)] hover:bg-[var(--forest-deep)] text-white"
+ >
+ ODHH Verification Form →
+ <span className="sr-only">(opens in a new tab)</span>
+ </a>
+ ) : (
  <Link
  href={`/jobs/${job.id}`}
  className={`w-full md:w-auto text-xs font-semibold px-4 py-2 rounded-full transition-colors inline-flex items-center justify-center gap-1.5 shadow-sm ${
@@ -666,6 +682,7 @@ export default function InterpreterHomePage() {
  ? 'Resume Draft →'
  : 'Submit Hours →'}
  </Link>
+ )}
  </div>
  </div>
  );

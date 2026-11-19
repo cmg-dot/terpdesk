@@ -60,10 +60,19 @@ const GENERIC: RegExp[] = [
   /\d{7,}/g,
 ];
 
+/** What a pending offer shows of the notes, and whether there WERE notes that the scrub removed completely (the screen says so). */
+export interface ScrubbedNotes {
+  text: string;
+  removed: boolean;
+}
+
 /** The notes as a pending offer may show them; "" when nothing readable is left. */
-export function sanitizeOfferNotes(notes: string | null | undefined, secrets: NoteSecrets = {}): string {
+export const sanitizeOfferNotes = (notes: string | null | undefined, secrets: NoteSecrets = {}): string => scrubOfferNotes(notes, secrets).text;
+
+/** Same scrub as `sanitizeOfferNotes`, telling "the agency wrote nothing" (removed false) from "everything written was removed" (removed true). */
+export function scrubOfferNotes(notes: string | null | undefined, secrets: NoteSecrets = {}): ScrubbedNotes {
   let text = typeof notes === "string" ? notes : "";
-  if (!text.trim()) return "";
+  if (!text.trim()) return { text: "", removed: false };
   const specific = [
     ...dobForms(secrets.clientDob ?? ""),
     ...[secrets.providerOne, secrets.priorAuth].map((v) => (v ?? "").trim()).filter((v) => v.length >= 3),
@@ -74,5 +83,5 @@ export function sanitizeOfferNotes(notes: string | null | undefined, secrets: No
   // "[removed] [removed]" (a full name hit part by part) reads as one removal.
   text = text.replace(new RegExp(`${escape(REMOVED)}(?:[\\s,]+${escape(REMOVED)})+`, "g"), REMOVED);
   const left = text.replace(new RegExp(escape(REMOVED), "g"), "").replace(/[\s.,;:()-]/g, "");
-  return left ? text.trim() : "";
+  return left ? { text: text.trim(), removed: false } : { text: "", removed: true };
 }

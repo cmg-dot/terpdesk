@@ -1,21 +1,22 @@
 "use client";
 
-import { Dropdown } from "@/components/ui/Dropdown";
 import { SignaturePad } from "@/components/ui/SignaturePad";
+import { MileageLegsSection } from "@/components/features/MileageLegsSection";
+import type { MileageLeg } from "@/components/features/MileageLegsSection";
 import { OnsiteSignoffSection } from "@/components/features/OnsiteSignoffSection";
 import type { OnsiteSignoffSectionProps } from "@/components/features/OnsiteSignoffSection";
+import { FIELD_INPUT as input, FIELD_LABEL as label } from "@/components/features/submitFormStyles";
 import type { DateFieldErrors } from "@/lib/timesheetErrors";
-import { sanitizeDecimal } from "@/lib/numericInput";
 
-export interface MileageLeg {
-  id: number;
-  from: string;
-  to: string;
-  distance: number | string;
-  type: "total" | "round_trip";
-}
+export type { MileageLeg } from "@/components/features/MileageLegsSection";
 
 interface InterpreterSubmitFormProps {
+  /**
+   * "cancellation": the form for a booking the agency cancelled with a billable outcome. The booked times are shown read-only (nothing
+   * was worked); travel, a cancellation note and the signature are asked; break, mileage and the on-site sign-off are not. The server
+   * enforces all of it (submitInterpreterHours.ts), whatever this form sends.
+   */
+  mode?: "hours" | "cancellation";
   isFutureAppointment: boolean;
   isSubmitting: boolean;
   isOdhh: boolean;
@@ -31,7 +32,7 @@ interface InterpreterSubmitFormProps {
   breakMinutes: string;
   onBreakMinutesChange: (value: string) => void;
 
-  /** ODHH jobs only. */
+  /** ODHH jobs only (and every job in cancellation mode). */
   travelStart: string;
   travelEnd: string;
   onTravelStartChange: (value: string) => void;
@@ -39,7 +40,7 @@ interface InterpreterSubmitFormProps {
   serviceCompleted: string;
   onServiceCompletedChange: (value: string) => void;
 
-  /** Shown when the service was not completed. Omit to hide the field (legacy portal). */
+  /** Shown when the service was not completed (and always, as the cancellation note, in cancellation mode). Omit to hide the field (legacy portal). */
   cancellationReason?: string;
   onCancellationReasonChange?: (value: string) => void;
 
@@ -74,23 +75,16 @@ interface InterpreterSubmitFormProps {
   submittingLabel?: string;
 }
 
-const input =
-  "w-full bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--forest)] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
-const legInput =
-  "min-w-0 bg-white border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--forest)] disabled:bg-gray-100 disabled:text-gray-400 disabled:cursor-not-allowed";
-const LEG_TYPE_OPTIONS = [
-  { value: "total", label: "Total distance already travelled" },
-  { value: "round_trip", label: "One-way distance + return on same route" },
-];
-const label = "block text-[13px] text-gray-600 mb-2";
 const errorText = "text-xs text-red-700 mt-1";
 const invalid = "border-red-400 focus:ring-red-500";
 
 export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
+  const cancellation = p.mode === "cancellation";
   const locked = p.isFutureAppointment;
+  // The booked times of a cancelled appointment are never edited.
+  const timesLocked = locked || cancellation;
+  const showTravel = p.isOdhh || cancellation;
   const twoCol = p.compact ? "grid grid-cols-1 gap-6 mb-6" : "grid grid-cols-1 md:grid-cols-2 gap-6 mb-6";
-  const legRow = p.compact ? "flex flex-col gap-3 mb-3" : "flex flex-col md:flex-row md:items-center gap-3 mb-3";
-  const m = (cls: string) => (p.compact ? "" : cls);
   const errs = p.fieldErrors ?? {};
   const fieldError = (text?: string) =>
     text ? (
@@ -103,19 +97,19 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
     <>
       <div className={twoCol}>
         <div>
-          <label className={label}>Actual start</label>
-          <input type="datetime-local" disabled={locked} value={p.actualStart} onChange={(e) => p.onActualStartChange(e.target.value)} aria-invalid={Boolean(errs.actualStart)} className={`${input} ${errs.actualStart ? invalid : ""}`} />
+          <label className={label}>{cancellation ? "Scheduled start" : "Actual start"}</label>
+          <input type="datetime-local" disabled={timesLocked} value={p.actualStart} onChange={(e) => p.onActualStartChange(e.target.value)} aria-invalid={Boolean(errs.actualStart)} className={`${input} ${errs.actualStart ? invalid : ""}`} />
           {fieldError(errs.actualStart)}
-          <p className="text-[11px] text-gray-500 mt-1">Times are in {p.timeZoneLabel}.</p>
+          <p className="text-[11px] text-gray-500 mt-1">Times are in {p.timeZoneLabel}.{cancellation ? " These are the booked times: nothing was worked." : ""}</p>
         </div>
         <div>
-          <label className={label}>Actual end</label>
-          <input type="datetime-local" disabled={locked} value={p.actualEnd} onChange={(e) => p.onActualEndChange(e.target.value)} aria-invalid={Boolean(errs.actualEnd)} className={`${input} ${errs.actualEnd ? invalid : ""}`} />
+          <label className={label}>{cancellation ? "Scheduled end" : "Actual end"}</label>
+          <input type="datetime-local" disabled={timesLocked} value={p.actualEnd} onChange={(e) => p.onActualEndChange(e.target.value)} aria-invalid={Boolean(errs.actualEnd)} className={`${input} ${errs.actualEnd ? invalid : ""}`} />
           {fieldError(errs.actualEnd)}
         </div>
       </div>
 
-      {p.isOdhh ? (
+      {showTravel ? (
         <>
           <div className={twoCol}>
             <div>
@@ -129,39 +123,47 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
           {fieldError(errs.travelEnd)}
             </div>
           </div>
+          {cancellation && <p className="-mt-3 mb-6 text-[12px] text-[var(--sage)]">Only if you had already started travelling when the appointment was cancelled. Leave both empty if not.</p>}
 
-          <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
-            <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Verification</h4>
-            <p className="text-xs text-[var(--sage)] mb-4">Was this service completed?</p>
-            <div className="flex gap-4">
-              {(["yes", "no"] as const).map((value) => (
-                <label key={value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
-                  <input
-                    type="radio"
-                    disabled={locked}
-                    value={value}
-                    checked={p.serviceCompleted === value}
-                    onChange={(e) => p.onServiceCompletedChange(e.target.value)}
-                    className="text-[var(--forest)] focus:ring-[var(--forest)] disabled:opacity-50"
-                  />
-                  {value === "yes" ? "Yes" : "No"}
-                </label>
-              ))}
+          {cancellation ? (
+            <div className="mb-6">
+              <label className={label}>Cancellation note</label>
+              <textarea rows={2} maxLength={1000} disabled={locked} value={p.cancellationReason ?? ""} onChange={(e) => p.onCancellationReasonChange?.(e.target.value)} className={input}></textarea>
             </div>
-            {p.serviceCompleted === "no" && p.onCancellationReasonChange && (
-              <div className="mt-4">
-                <label className={label}>Cancellation reason</label>
-                <textarea
-                  rows={2}
-                  maxLength={1000}
-                  disabled={locked}
-                  value={p.cancellationReason ?? ""}
-                  onChange={(e) => p.onCancellationReasonChange?.(e.target.value)}
-                  className={input}
-                ></textarea>
+          ) : (
+            <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
+              <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Verification</h4>
+              <p className="text-xs text-[var(--sage)] mb-4">Was this service completed?</p>
+              <div className="flex gap-4">
+                {(["yes", "no"] as const).map((value) => (
+                  <label key={value} className="flex items-center gap-2 text-sm text-gray-700 cursor-pointer">
+                    <input
+                      type="radio"
+                      disabled={locked}
+                      value={value}
+                      checked={p.serviceCompleted === value}
+                      onChange={(e) => p.onServiceCompletedChange(e.target.value)}
+                      className="text-[var(--forest)] focus:ring-[var(--forest)] disabled:opacity-50"
+                    />
+                    {value === "yes" ? "Yes" : "No"}
+                  </label>
+                ))}
               </div>
-            )}
-          </div>
+              {p.serviceCompleted === "no" && p.onCancellationReasonChange && (
+                <div className="mt-4">
+                  <label className={label}>Cancellation reason</label>
+                  <textarea
+                    rows={2}
+                    maxLength={1000}
+                    disabled={locked}
+                    value={p.cancellationReason ?? ""}
+                    onChange={(e) => p.onCancellationReasonChange?.(e.target.value)}
+                    className={input}
+                  ></textarea>
+                </div>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <div className="mb-6">
@@ -170,62 +172,27 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
         </div>
       )}
 
-      <div className="mb-6">
-        <p className="text-sm font-medium text-gray-800 mb-2">
-          Service time before review: <span className="font-bold">{p.serviceTimeHours}</span>
-        </p>
-      </div>
+      {!cancellation && (
+        <>
+          <div className="mb-6">
+            <p className="text-sm font-medium text-gray-800 mb-2">
+              Service time before review: <span className="font-bold">{p.serviceTimeHours}</span>
+            </p>
+          </div>
 
-      <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
-        <h4 className="text-sm font-medium text-[var(--ink)] mb-2">Mileage for this assignment</h4>
-        <p className="text-xs text-[var(--sage)] mb-6">
-          Enter either the one-way distance and add a return on the same route, or enter the total distance already travelled without adding a return. This records miles only — no reimbursement is calculated here, and not every assignment pays mileage.
-        </p>
-
-        {p.mileageLegs.map((leg) => {
-          const dist = parseFloat(String(leg.distance)) || 0;
-          const legTotal = leg.type === "round_trip" ? dist * 2 : dist;
-          return (
-            <div key={leg.id} className="mb-6 bg-gray-50 p-4 rounded-lg border border-gray-100">
-              <div className={legRow}>
-                <input type="text" disabled={locked} placeholder="From (Location)" aria-label="From (location)" value={leg.from} onChange={(e) => p.onUpdateLeg(leg.id, "from", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
-                <input type="text" disabled={locked} placeholder="To (Location)" aria-label="To (location)" value={leg.to} onChange={(e) => p.onUpdateLeg(leg.id, "to", e.target.value)} className={`${legInput} w-full ${m("md:flex-1")}`} />
-                {/* Text + decimal keypad, filtered as typed: digits and one "." only (type="number" lets letters / "e" through in some browsers). */}
-                <input type="text" inputMode="decimal" autoComplete="off" disabled={locked} placeholder="Distance (mi)" aria-label="Distance (miles)" value={leg.distance} onChange={(e) => p.onUpdateLeg(leg.id, "distance", sanitizeDecimal(e.target.value))} className={`${legInput} w-full ${m("md:w-32 md:flex-none")}`} />
-                <Dropdown
-                  id={`leg-type-${leg.id}`}
-                  ariaLabel="How the distance is counted"
-                  variant="compact"
-                  disabled={locked}
-                  value={leg.type}
-                  onChange={(type) => p.onUpdateLeg(leg.id, "type", type)}
-                  options={LEG_TYPE_OPTIONS}
-                  className={`w-full ${m("md:flex-[1.5]")}`}
-                />
-                <button type="button" disabled={locked} onClick={() => p.onRemoveLeg(leg.id)} className={`text-sm font-medium text-gray-500 hover:text-red-600 self-end ${m("md:self-auto")} shrink-0 px-1 disabled:opacity-50 disabled:cursor-not-allowed`}>
-                  Remove
-                </button>
-              </div>
-              <p className="text-xs text-gray-600">
-                Calculated total for this leg: <span className="font-semibold">{legTotal.toFixed(1)} mi</span> {legTotal === 0 ? "— no distance added" : ""}
-              </p>
-            </div>
-          );
-        })}
-
-        <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-6">
-          <button type="button" disabled={locked} onClick={p.onAddLeg} className="bg-white border border-gray-300 text-gray-700 rounded-full px-4 py-1.5 text-xs font-medium hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed">
-            Add a travel leg
-          </button>
-          <span className="text-sm text-gray-700">Calculated total mileage: <span className="font-bold">{p.totalMileage.toFixed(1)} mi</span></span>
-        </div>
-
-        <div className="mb-4">
-          <label className={label}>Mileage note (optional)</label>
-          <textarea rows={2} disabled={locked} value={p.mileageNote} onChange={(e) => p.onMileageNoteChange(e.target.value)} className={input}></textarea>
-        </div>
-        <p className="text-xs text-[var(--sage)]">Automatic driving distance is not switched on. No mapping service is connected to this workspace yet, so nothing can be calculated from an address today.</p>
-      </div>
+          <MileageLegsSection
+            legs={p.mileageLegs}
+            total={p.totalMileage}
+            onAdd={p.onAddLeg}
+            onRemove={p.onRemoveLeg}
+            onUpdate={p.onUpdateLeg}
+            note={p.mileageNote}
+            onNoteChange={p.onMileageNoteChange}
+            locked={locked}
+            compact={p.compact}
+          />
+        </>
+      )}
 
       <div className="mb-6">
         <label className={label}>Service note (optional)</label>
@@ -235,11 +202,11 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
 
       <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
         <h4 className="text-sm font-medium text-[var(--ink)] mb-1">Signature</h4>
-        <p className="text-xs text-[var(--sage)] mb-3">Sign below to confirm the hours you are reporting. A signature is required to submit.</p>
+        <p className="text-xs text-[var(--sage)] mb-3">Sign below to confirm the {cancellation ? "information you are reporting" : "hours you are reporting"}. A signature is required to submit.</p>
         <SignaturePad onChange={p.onSignatureChange} disabled={locked || p.isSubmitting} label="Interpreter signature drawing area" />
       </div>
 
-      {p.onsite && <OnsiteSignoffSection {...p.onsite} disabled={locked || p.isSubmitting} />}
+      {p.onsite && !cancellation && <OnsiteSignoffSection {...p.onsite} disabled={locked || p.isSubmitting} />}
 
       {p.formError && (
         <p className="mb-4 rounded-lg bg-red-50 p-3 text-sm text-red-700" role="alert">
@@ -248,15 +215,15 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature || (p.onsite !== undefined && !p.onsite.complete)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
-          {p.isSubmitting ? (p.submittingLabel ?? "Submitting...") : (p.submitLabel ?? "Submit actual hours")}
+        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature || (p.onsite !== undefined && !cancellation && !p.onsite.complete)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+          {p.isSubmitting ? (p.submittingLabel ?? "Submitting...") : (p.submitLabel ?? (cancellation ? "Submit cancellation form" : "Submit actual hours"))}
         </button>
-        {p.onSaveDraft && (
+        {p.onSaveDraft && !cancellation && (
           <button type="button" onClick={p.onSaveDraft} disabled={locked} className="bg-white border border-gray-300 text-gray-700 rounded-full px-5 py-2 text-sm font-medium hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
             Save draft
           </button>
         )}
-        {p.isOdhh && (
+        {p.isOdhh && !cancellation && (
           <a
             href={p.odhhPortalUrl}
             target="_blank"

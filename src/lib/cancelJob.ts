@@ -60,7 +60,7 @@ export type CancelledResult = { status: "cancelled" | "already_cancelled"; updat
 export type CancelCoreResult = CancelledResult | { status: "not_found" } | { status: "already_voided" } | { status: "hours_reported" };
 
 /** Offer status given to a booking when its appointment is cancelled, and to an open offer (closed, as when staff withdraw it). */
-const BOOKING_CANCELLED = "cancelled";
+export const BOOKING_CANCELLED = "cancelled";
 const OFFER_WITHDRAWN = "withdrawn";
 
 type Executor = Pick<typeof db, "transaction">;

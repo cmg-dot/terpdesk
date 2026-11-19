@@ -27,7 +27,7 @@ import { interpreterReference } from "@/utils/statusEngine";
  * SERVER ONLY.
  */
 
-export type AgencyAlertEvent = "offer_accepted" | "offer_declined" | "assignment_given_back" | "timesheet_submitted";
+export type AgencyAlertEvent = "offer_accepted" | "offer_declined" | "assignment_given_back" | "timesheet_submitted" | "cancellation_form_submitted";
 export type InterpreterAlertEvent = "booking_cancelled" | "timesheet_correction_requested";
 
 interface AlertContext {
@@ -67,6 +67,7 @@ const AGENCY_COPY: Record<AgencyAlertEvent, { title: string; did: string; next: 
   offer_declined: { title: "Offer declined", did: "declined the offer for", next: "This position may need a new offer." },
   assignment_given_back: { title: "Assignment given back", did: "gave back", next: "This position needs a replacement." },
   timesheet_submitted: { title: "Timesheet submitted", did: "submitted hours for", next: "The hours are waiting for your review." },
+  cancellation_form_submitted: { title: "Cancellation form submitted", did: "submitted a cancellation form for", next: "Billing pays the scheduled time and any travel reported; there is nothing to approve." },
 };
 
 async function sendSafely(to: string, subject: string, html: string, text: string, tag: string): Promise<void> {

@@ -5,10 +5,10 @@ import type { ChangeEvent } from "react";
 import { FileText, Paperclip, Trash2 } from "lucide-react";
 import { deleteCredentialFile, presignCredentialFile, saveCredentialFile } from "@/app/actions/credentialFiles";
 import type { DeleteCredentialFileResult, PresignCredentialFileResult, SaveCredentialFileResult } from "@/app/actions/credentialFiles";
+import { checkCredentialFile, uploadCredentialFile } from "@/components/profile/uploadCredentialFile";
 import { openStoredFile } from "@/lib/openFile";
-import { CREDENTIAL_FILE_TYPES, MAX_CREDENTIAL_FILE_BYTES, MAX_FILES_PER_CREDENTIAL, formatFileSize } from "@/lib/validation/file";
+import { MAX_FILES_PER_CREDENTIAL, formatFileSize } from "@/lib/validation/file";
 import type { CredentialFile } from "@/lib/validation/file";
-import { uploadToStorage } from "@/lib/uploadToStorage";
 
 /** The three steps of an upload, and deleting one: the interpreter's own by default; staff pass theirs (actions/staffInsuranceFiles.ts). */
 export interface CredentialFileActions {
@@ -46,29 +46,15 @@ export const CredentialFileUpload = ({ credentialId, files, onFilesChange, actio
     e.target.value = "";
     if (!file || busy) return;
     setError(null);
-    if (!(file.type in CREDENTIAL_FILE_TYPES)) return setError("Choose a PDF, JPEG or PNG file.");
-    if (file.size > MAX_CREDENTIAL_FILE_BYTES) return setError("That file is larger than 10 MB. Choose a smaller one.");
+    const problem = checkCredentialFile(file);
+    if (problem) return setError(problem);
 
     setBusy(true);
-    try {
-      setStatus("Preparing upload…");
-      const presign = await actions.presign({ credentialId, fileName: file.name, fileType: file.type, fileSize: file.size });
-      if (!presign.success) return setError(presign.error);
-
-      setStatus("Uploading…");
-      const put = await uploadToStorage(presign.uploadUrl, file);
-      if (!put.ok) return setError(put.message);
-
-      setStatus("Saving…");
-      const saved = await actions.save({ credentialId, key: presign.key, fileName: file.name });
-      if (!saved.success) return setError(saved.error);
-      onFilesChange([saved.file, ...files]);
-    } catch {
-      setError("The upload failed. Check your connection and try again.");
-    } finally {
-      setStatus(null);
-      setBusy(false);
-    }
+    const outcome = await uploadCredentialFile(actions, credentialId, file, setStatus);
+    setStatus(null);
+    setBusy(false);
+    if (outcome.ok) onFilesChange([outcome.file, ...files]);
+    else setError(outcome.error);
   };
 
   const open = async (fileId: string) => {

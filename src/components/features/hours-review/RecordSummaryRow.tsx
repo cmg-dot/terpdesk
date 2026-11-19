@@ -80,7 +80,7 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
             </span>
           )}
           {record.commercialAuto && <span className={`${CHIP} bg-emerald-50 text-emerald-800`}>{COMMERCIAL_AUTO_BADGE}</span>}
-          <RecordStatusBadge state={record.state} closed={record.jobClosed} />
+          <RecordStatusBadge state={record.state} closed={record.jobClosed} billable={record.cancelledBillable} />
           <ChevronDown className={`h-5 w-5 flex-none text-[var(--forest)] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
           <span className="sr-only">{expanded ? "Hide details" : "Show details"}</span>
         </span>

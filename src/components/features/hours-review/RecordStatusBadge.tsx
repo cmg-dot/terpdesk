@@ -6,9 +6,11 @@ const BADGE = "px-3 py-1 text-[12px] font-medium rounded-full whitespace-nowrap"
 
 /**
  * "Awaiting review", "Approved", "Correction requested" or "Draft" for a record (nothing for a state that has no badge). A record on a
- * voided, returned or cancelled job says so instead: its hours are not waiting for anyone.
+ * voided, returned or cancelled job says so instead: its hours are not waiting for anyone. A cancelled job with the interpreter's
+ * cancellation form on file (`billable`) reads "Cancelled · billable".
  */
-export function RecordStatusBadge({ state, closed }: { state: ServiceRecord["state"]; closed?: ClosedJobKind }) {
+export function RecordStatusBadge({ state, closed, billable = false }: { state: ServiceRecord["state"]; closed?: ClosedJobKind; billable?: boolean }) {
+  if (closed === "cancelled" && billable) return <span className={`${BADGE} bg-amber-100 text-amber-900`}>Cancelled · billable</span>;
   if (closed) return <span className={`${BADGE} bg-slate-100 text-slate-700`}>{CLOSED_JOB_LABEL[closed]}</span>;
   if (state === "submitted" || state === "awaiting_review") return <span className={`${BADGE} bg-purple-100 text-purple-700`}>Awaiting review</span>;
   if (state === "approved") return <span className={`${BADGE} bg-green-100 text-green-700`}>Approved</span>;

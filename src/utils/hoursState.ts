@@ -1,3 +1,4 @@
+import { hoursDueInfo } from "@/lib/hoursDue";
 import { isPlainSingle } from "@/lib/positions";
 import { resolveRequestTimes } from "./timezone";
 
@@ -77,10 +78,10 @@ export function getJobHoursState(job: any, serviceRecords: any[] = []): HoursWor
 export const showsStatePortal = (job: { isStateJob?: boolean } | null | undefined, state: HoursWorkflowState): boolean =>
   job?.isStateJob === true && state !== 'awaiting_review' && state !== 'approved';
 
-export function isJobNeedingHours(job: any, serviceRecords: any[] = [], nowMs: number = Date.now()): boolean {
+export function isJobNeedingHours(job: any, serviceRecords: any[] = [], nowMs: number = Date.now(), opts: { includeState?: boolean } = {}): boolean {
   if (!job) return false;
-  // State jobs: hours are submitted in the state portal, not in TerpDesk.
-  if (job.isStateJob === true) return false;
+  // State jobs: hours are submitted in the state portal, not in TerpDesk. A list that points them to the portal (Home) asks to include them.
+  if (job.isStateJob === true && !opts.includeState) return false;
   const isBooked = job.status === 'booked' || job.status === 'accepted';
   if (!isBooked) return false;
 
@@ -95,6 +96,10 @@ export function isJobNeedingHours(job: any, serviceRecords: any[] = [], nowMs: n
   // For not_submitted or draft: check if appointment has ended
   const { endsAt } = resolveRequestTimes(job);
   const endMs = endsAt ? new Date(endsAt).getTime() : 0;
+
+  // A State job is listed only inside the 48-business-hour rule (the same cut-off as the overdue banner): older State jobs were
+  // reported through the portal long ago, so they are not shown as work to do.
+  if (job.isStateJob === true && hoursDueInfo(endsAt, nowMs) === null) return false;
 
   // Appointment has ended and hours are not submitted or draft
   return endMs > 0 && nowMs > endMs && (hoursState === 'not_submitted' || hoursState === 'draft');

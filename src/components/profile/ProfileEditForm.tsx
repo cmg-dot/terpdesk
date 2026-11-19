@@ -200,6 +200,7 @@ export const ProfileEditForm = ({ profile, onSaved, onPhotoSaved, onCancel }: Pr
             className={inputClass}
           />
         </Field>
+        <p className="mt-3 text-[12px] text-[var(--sage)]">To add the policy document, save your profile, then open Credentials → Insurance.</p>
       </Card>
 
       <Card title="Contact details">

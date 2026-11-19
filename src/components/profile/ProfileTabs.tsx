@@ -35,6 +35,12 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
   const [credentials, setCredentials] = useState<MyCredential[]>(initialCredentials);
   const [insurance, setInsurance] = useState<MyInsurance>(initialInsurance);
   const [websiteSharing, setWebsiteSharing] = useState<MyWebsiteSharing[]>(initialWebsiteSharing);
+  // The Overview's "Add your policy document" link opens Credentials already scrolled to Insurance; choosing a tab by hand does not.
+  const [revealInsurance, setRevealInsurance] = useState(false);
+  const choose = (next: ProfileTab) => {
+    setRevealInsurance(false);
+    setTab(next);
+  };
 
   return (
     <div className="space-y-6">
@@ -47,7 +53,7 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
             id={`profile-tab-${t.id}`}
             aria-selected={tab === t.id}
             aria-controls="profile-tabpanel"
-            onClick={() => setTab(t.id)}
+            onClick={() => choose(t.id)}
             className={`rounded-full border px-5 py-2 text-sm font-medium transition-colors ${
               tab === t.id
                 ? "border-[var(--forest)] bg-[var(--forest)] text-[var(--canvas)]"
@@ -74,6 +80,10 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
             <ProfileOverviewTab
               profile={profile}
               onProfileChange={setProfile}
+              onOpenInsurance={() => {
+                setRevealInsurance(true);
+                setTab("credentials");
+              }}
               // The server sent approved website profiles back to review; mirror that on the Visibility tab.
               onWebsiteReReview={() =>
                 setWebsiteSharing((list) => list.map((s) => (s.status === "approved" ? { ...s, status: "pending" } : s)))
@@ -90,6 +100,7 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
                 insurance={insurance}
                 onChange={setInsurance}
                 timeZone={profile.timeZone}
+                revealOnMount={revealInsurance}
                 // Otherwise the Overview keeps the old date, and saving it there would overwrite the policy's.
                 onLiabilityDate={(date) => setProfile((p) => ({ ...p, liabilityInsuranceExpiration: date }))}
               />

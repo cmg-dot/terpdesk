@@ -61,7 +61,7 @@ const FIELDS: Field[] = [
   { label: "Meeting ID", emailSafe: false, read: (d) => d.virtual?.meetingId ?? "" },
   { label: "Passcode", emailSafe: false, read: (d) => d.virtual?.passcode ?? "" },
   { label: "Meeting instructions", emailSafe: false, read: (d) => d.virtual?.instructions ?? "" },
-  { label: "Preparation notes", emailSafe: false, read: (d) => d.prepNotes },
+  { label: "Appointment notes", emailSafe: false, read: (d) => d.prepNotes },
   { label: "Public / mixed group", emailSafe: false, read: (d) => groupFlagsText(d.groupFlags) },
 ];
 

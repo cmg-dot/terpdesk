@@ -17,7 +17,8 @@ import { UpdatedBadge, UpdatedNotice } from "@/components/jobDetails/UpdatedBadg
 import { JobQuestionsAndMessages } from "@/components/jobDetails/JobQuestionsAndMessages";
 import { JobPlaceCards } from "@/components/interpreter/JobPlaceCards";
 import { LinkifiedText } from "@/components/ui/LinkifiedText";
-import { OfferNotes } from "@/components/interpreter/OfferNotes";
+import { JobNotesCard } from "@/components/interpreter/JobNotesCard";
+import { CancelledJobView } from "@/components/interpreter/jobs/CancelledJobView";
 import { OfferTags } from "@/components/interpreter/OfferTags";
 import { AssignedByBadge } from "@/components/interpreter/AssignedByBadge";
 import { CollapsibleCard } from "@/components/ui/CollapsibleCard";
@@ -1264,20 +1265,8 @@ export default function JobDetailPage() {
     );
   }
 
-  if (job.status === 'cancelled') {
-    return (
-      <div className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased flex flex-col items-center justify-center pt-32">
-        <div role="status" className="bg-white rounded-2xl border border-gray-200 p-8 text-center max-w-md w-full">
-          <h2 className="text-xl font-semibold text-[var(--ink)] mb-4">Appointment Cancelled</h2>
-          <p className="text-[var(--sage)] mb-8">The agency cancelled this appointment. It has been removed from your upcoming jobs, and the job details are no longer available to you.</p>
-          <Link href="/interpreter-home" className="inline-flex items-center justify-center gap-2 text-[14px] font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 border border-gray-200 px-6 py-2.5 rounded-full transition-colors">
-            <ArrowLeft className="w-4 h-4" />
-            Back to dashboard
-          </Link>
-        </div>
-      </div>
-    );
-  }
+  // The plain notice where billing is off; where it is on, whether the cancellation is billable and the way to its form.
+  if (job.status === 'cancelled') return <CancelledJobView job={job} />;
 
   if (job.status === 'released') {
     return (
@@ -1478,15 +1467,13 @@ export default function JobDetailPage() {
 
           {/* Card 2 */}
           {/* A live offer shows the notes scrubbed of the client's details (the server did it); a booking shows them as written. */}
-          <CollapsibleCard cardId="preparation-notes" title={job.status === 'pending' ? "Appointment notes" : "Preparation notes"}>
-            {job.status === 'pending' && !isJobExpired ? (
-              <OfferNotes notes={job.offerNotes} />
-            ) : job.status === 'booked' && job.prepNotes ? (
-              <p className="whitespace-pre-line text-[14px] leading-relaxed text-gray-700"><LinkifiedText text={job.prepNotes} /></p>
-            ) : (
-              <p className="text-[14px] text-[var(--sage)]">{job.status === 'booked' ? "The agency has not added notes for this job." : "No notes for this job."}</p>
-            )}
-          </CollapsibleCard>
+          <JobNotesCard
+            status={job.status}
+            expired={isJobExpired || (job.status === 'pending' && Boolean(job.offerExpiresAt) && new Date(String(job.offerExpiresAt)) <= now)}
+            offerNotes={job.offerNotes}
+            offerNotesRemoved={job.offerNotesRemoved}
+            prepNotes={job.prepNotes}
+          />
 
           {/* Card 3 */}
           <JobPrepMaterials

@@ -60,6 +60,8 @@ export interface ServiceRecord {
   travelWindows?: TravelWindow[];
   /** A State or Apple Health job (the commercial auto +$10 applies to these only, in person). */
   stateJob?: boolean;
+  /** The record is the interpreter's cancellation form on a cancelled job (billable late cancellation): on file, nothing to approve. */
+  cancelledBillable?: boolean;
 }
 
 /** Whole minutes from a submitted travel start to its end; null unless both are real times in order. */
@@ -162,6 +164,7 @@ export function mergeHoursRecords({ localRecords, requests, timesheets }: MergeP
             interpreterId: acceptedOffer?.interpreterId ?? undefined,
             inPerson: req.isVirtual === false,
             stateJob: isStateJobRequest({ isStateJob: req.isStateJob, data: req.data }),
+            ...(hoursSub?.cancellationForm === true ? { cancelledBillable: true } : {}),
             ...reportedTravel(req.data, hoursSub?.timesheetId, hoursSub?.travelStartTime, hoursSub?.travelEndTime),
           };
 

@@ -700,7 +700,7 @@ async function processResponse(token: string | null, actionParam: string | undef
         status: "accepted",
         title: "Offer Accepted!",
         message:
-          "You're locked in for this assignment. A confirmation email with a private link to the full job details (location, preparation notes and materials) is on its way.",
+          "You're locked in for this assignment. A confirmation email with a private link to the full job details (location, appointment notes and materials) is on its way.",
         jobDetails: {
           title: jobTitle,
           date: jobDate,

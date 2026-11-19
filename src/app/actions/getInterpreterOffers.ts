@@ -11,6 +11,9 @@ import { isStateJobRequest } from "@/lib/stateJob";
 import { interpreterJobView } from "@/lib/interpreterJobData";
 import { latestSheetsByRequest, resolveOwnHours } from "@/lib/ownHours";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
+import { BILLING_ENABLED } from "@/lib/billing/enabled";
+import { loadCancellationRules } from "@/lib/cancellationSubmission";
+import { cancellationOf } from "@/lib/interpreterCancellation";
 
 // The email argument is ignored: only the signed-in interpreter's own offers are ever returned.
 export async function fetchInterpreterOffers(_interpreterEmail?: string) {
@@ -78,6 +81,11 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
 
   // Magic-link timesheets this interpreter submitted (also covers ones sent before they were mirrored into the request).
   const sheetByRequest = await latestSheetsByRequest(interpreter.id);
+
+  // Where billing is on, a cancelled booking carries billing's verdict (billable or not) so the interpreter sees which it is. Only
+  // loaded when there is a cancelled booking to judge.
+  const hasCancelledBooking = BILLING_ENABLED && offersData.some((row) => row.offer.status === 'cancelled' || (row.offer.status === 'accepted' && Boolean(row.request.canceledAt)));
+  const cancellationRules = hasCancelledBooking ? await loadCancellationRules() : null;
 
   return offersData.map(row => {
     const rowData = (row.request.data as any) || {};
@@ -155,6 +163,9 @@ export async function fetchInterpreterOffers(_interpreterEmail?: string) {
       prepNotes: job.prepNotes,
       // A live offer's notes, scrubbed of the client's details, and the mental health yes / no (never the billing modifier).
       offerNotes: job.offerNotes,
+      offerNotesRemoved: job.offerNotesRemoved,
+      // Billing's verdict on a cancelled booking (billing on only): billable or not, and when. Never any job detail.
+      cancellation: cancellationRules && effectiveOfferStatus === 'cancelled' ? cancellationOf(row.request, cancellationRules) : null,
       mentalHealth: job.mentalHealth,
       interpreterNotes: job.interpreterNotes,
       // The client's name reaches only an interpreter who is booked (null on an offer); see interpreterJobData.ts.

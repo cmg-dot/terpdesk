@@ -7,6 +7,7 @@ import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { useGlobalState } from "@/context/GlobalContext";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
+import type { InterpreterCancellation } from "@/lib/interpreterCancellation";
 import type { InterpreterNotes } from "@/lib/interpreterNotes";
 
 export interface Job {
@@ -58,6 +59,8 @@ export interface Job {
   prepNotes?: string;
   /** A live offer's appointment notes, scrubbed of the client's details on the server (lib/offerNotes.ts). */
   offerNotes?: string;
+  offerNotesRemoved?: boolean; // the agency wrote notes but the scrub removed all of them from this live offer
+  cancellation?: InterpreterCancellation | null; // a cancelled booking's billing verdict (billing on only): the pill and the way to its form
   /** A mental health appointment (the yes / no only). */
   mentalHealth?: boolean;
   /** The agency's pinned booking notes for the team, once the interpreter is booked. */
@@ -134,6 +137,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
           credentialsLocked: o.credentialsLocked,
           prepNotes: o.prepNotes,
           offerNotes: o.offerNotes,
+          offerNotesRemoved: o.offerNotesRemoved === true,
+          cancellation: o.cancellation,
           mentalHealth: o.mentalHealth === true,
           interpreterNotes: o.interpreterNotes,
           groupFlags: o.groupFlags,

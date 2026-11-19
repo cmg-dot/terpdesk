@@ -923,9 +923,9 @@ export default function NewRequestPage() {
  {/* Notes Section */}
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Notes</h2>
- <Field 
- label="Preparation and logistics notes for interpreters"
- subtext="Visible to interpreters who are offered or assigned this job."
+ <Field
+ label="Appointment notes"
+ subtext="Logistics and preparation for interpreters. Visible to interpreters who are offered or assigned this job; until an offer is accepted, the client's name, date of birth and ID numbers are removed from what they see."
  >
  <LimitedTextarea className="min-h-[100px]" maxLength={1000} value={formData.prepNotes} onChange={(val) => handleChange("prepNotes", val)} />
  </Field>

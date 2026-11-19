@@ -13,10 +13,12 @@ interface ProfileOverviewTabProps {
   onProfileChange: (profile: MyProfile) => void;
   /** Called when an edit sent approved agency website profiles back to review. */
   onWebsiteReReview: () => void;
+  /** Opens Credentials at the Insurance section (the "Add your policy document" link). */
+  onOpenInsurance: () => void;
 }
 
 /** "My Profile" Overview tab: read-only view with an "Edit profile" mode. */
-export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview }: ProfileOverviewTabProps) => {
+export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview, onOpenInsurance }: ProfileOverviewTabProps) => {
   const { setName: setDisplayName } = useInterpreterName();
   const [editing, setEditing] = useState(false);
   const [savedMessage, setSavedMessage] = useState<string | null>(null);
@@ -69,7 +71,7 @@ export const ProfileOverviewTab = ({ profile, onProfileChange, onWebsiteReReview
           Edit profile
         </button>
       </div>
-      <ProfileOverviewView profile={profile} />
+      <ProfileOverviewView profile={profile} onOpenInsurance={onOpenInsurance} />
     </div>
   );
 };

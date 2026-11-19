@@ -55,7 +55,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
     preheader: `A new interpreting job offer for ${s.dateLabel}. Please respond promptly.`,
     bodyContent: `
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">You have a new job offer</h1>
-      <p style="margin:0 0 4px;">Review the details below and respond. ${escapeHtml(locationNote)} Preparation notes and materials follow once you're booked.</p>
+      <p style="margin:0 0 4px;">Review the details below and respond. ${escapeHtml(locationNote)} Appointment notes and materials follow once you're booked.</p>
       ${emailActionCard(`
         ${emailDetailsTable(summaryRows(s))}
         <p style="margin:20px 0 12px;">${emailButton("Accept job offer", acceptUrl)}</p>
@@ -95,8 +95,8 @@ export function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: 
   const copy = CONFIRMATION_COPY[kind];
   const detailsBlock = detailsUrl
     ? `<p style="margin:20px 0 8px;">${emailButton("View full job details", detailsUrl)}</p>
-       <p style="margin:0;font-size:13px;color:#6B7280;">The exact location or meeting link, program, preparation notes and prep materials are on this private page (no password needed). Prep materials are also in the terpDESK app.</p>`
-    : `<p style="margin:16px 0 0;font-size:13px;color:#6B7280;">Sign in to terpDESK to see the location, preparation notes and prep materials.</p>`;
+       <p style="margin:0;font-size:13px;color:#6B7280;">The exact location or meeting link, program, appointment notes and prep materials are on this private page (no password needed). Prep materials are also in the terpDESK app.</p>`
+    : `<p style="margin:16px 0 0;font-size:13px;color:#6B7280;">Sign in to terpDESK to see the location, appointment notes and prep materials.</p>`;
   const html = buildTerpDeskEmail({
     title: interpreterEmailTitle(copy.title, s),
     preheader: `You're booked for ${s.dateLabel}.`,
@@ -113,8 +113,8 @@ export function buildConfirmationEmail(s: JobSummary, name: string, detailsUrl: 
     summaryText(s),
     "",
     detailsUrl
-      ? `Full job details (location, program, preparation notes, prep materials): ${detailsUrl}`
-      : "Sign in to terpDESK to see the location, preparation notes and prep materials.",
+      ? `Full job details (location, program, appointment notes, prep materials): ${detailsUrl}`
+      : "Sign in to terpDESK to see the location, appointment notes and prep materials.",
     "",
     "For your clients' privacy, location and preparation details are never sent by email.",
   ].join("\n");

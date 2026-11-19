@@ -32,7 +32,7 @@ const workModes = (p: MyProfile): string => {
 };
 
 /** Read-only "Overview" of the interpreter's profile. */
-export const ProfileOverviewView = ({ profile }: { profile: MyProfile }) => {
+export const ProfileOverviewView = ({ profile, onOpenInsurance }: { profile: MyProfile; onOpenInsurance: () => void }) => {
   const displayName = profile.preferredName || profile.fullName;
 
   return (
@@ -73,6 +73,11 @@ export const ProfileOverviewView = ({ profile }: { profile: MyProfile }) => {
 
       <Section title="Liability insurance">
         <Row label="Expiration date"><InsuranceExpiry date={profile.liabilityInsuranceExpiration} timeZone={profile.timeZone} /></Row>
+        <Row label="Policy document">
+          <button type="button" onClick={onOpenInsurance} className="font-medium text-[var(--accent-text)] underline-offset-2 hover:underline">
+            Add your policy document
+          </button>
+        </Row>
       </Section>
 
       <Section title="Contact details">

@@ -58,7 +58,13 @@ export function InsurancePolicyCard({ kind, policy, timeZone, onChange, onFilesC
       </div>
 
       {editing ? (
-        <InsuranceForm kind={kind} initial={policy} onCancel={() => setEditing(false)} onSaved={(next) => { onChange(next); setEditing(false); }} />
+        <InsuranceForm
+          kind={kind}
+          initial={policy}
+          onCancel={() => setEditing(false)}
+          // A saved policy whose document did not upload keeps the policy and says so; the upload box below is right there to retry.
+          onSaved={(next, notice) => { onChange(next); setError(notice ?? null); setEditing(false); }}
+        />
       ) : policy ? (
         <>
           <dl className="grid gap-x-6 gap-y-1 text-[13px] sm:grid-cols-2">

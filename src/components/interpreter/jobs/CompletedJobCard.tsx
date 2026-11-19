@@ -4,11 +4,13 @@ import Link from "next/link";
 import { MapPin } from "lucide-react";
 import type { Job } from "@/context/InterpreterJobsContext";
 import type { ServiceRecord } from "@/hooks/useServiceRecords";
+import { HoursDueLine } from "@/components/interpreter/HoursDueLine";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { jobDateLine } from "@/lib/interpreterJobDate";
 import { jobPlaceLines } from "@/lib/jobPlaceLines";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { settingLabel } from "@/lib/settingLabel";
+import { resolveRequestTimes } from "@/utils/timezone";
 import { findOwnServiceRecord, getJobHoursState, showsStatePortal } from "@/utils/hoursState";
 import type { HoursWorkflowState } from "@/utils/hoursState";
 
@@ -52,6 +54,7 @@ export function CompletedJobCard({ job, serviceRecords }: { job: Job; serviceRec
             <span className="text-[var(--sage)] text-[13px]">{secondary || job.agencyName || DEFAULT_AGENCY_NAME}</span>
           </div>
         </div>
+        {needsHours && !isCorrection && <div className="mb-2"><HoursDueLine endsAt={resolveRequestTimes(job).endsAt} stateForm={usesStatePortal} /></div>}
         {isCorrection && reviewMsg && (
           <div className="mb-2.5 text-xs text-amber-900 bg-amber-50 rounded-lg p-2.5 border border-amber-200">
             <span className="font-semibold">Agency correction request: </span>&ldquo;{reviewMsg}&rdquo;

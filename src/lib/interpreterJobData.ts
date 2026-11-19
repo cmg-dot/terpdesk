@@ -3,7 +3,7 @@ import { hasPhysicalPlace } from "@/lib/jobPlace";
 import { readInterpreterNotes } from "@/lib/interpreterNotes";
 import type { InterpreterNotes } from "@/lib/interpreterNotes";
 import { isMentalHealthJob } from "@/lib/mentalHealth";
-import { sanitizeOfferNotes } from "@/lib/offerNotes";
+import { scrubOfferNotes } from "@/lib/offerNotes";
 
 /**
  * What an interpreter's browser may receive about a job. The raw `requests.data` holds staff-only material (the client's
@@ -58,6 +58,8 @@ export interface InterpreterJobView {
    * accepting. "" when booked (they get `prepNotes` as written) or closed.
    */
   offerNotes: string;
+  /** True when the agency wrote appointment notes but the scrub removed all of them from a live offer (the screen says so). */
+  offerNotesRemoved: boolean;
   /** A mental health appointment (lib/mentalHealth.ts): only the yes / no, never the billing modifier. False once closed. */
   mentalHealth: boolean;
   /** The agency's pinned booking notes for the team (lib/interpreterNotes.ts). Shared once booked; null otherwise. */
@@ -125,6 +127,16 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
     ? { meetingLink: orNull(link), virtualLink: orNull(link), meetingId: orNull(meetingId), passcode: orNull(passcode), accessCode: orNull(passcode), virtualInstructions: orNull(instructions) }
     : {};
 
+  const offerNotes =
+    access === "offer"
+      ? scrubOfferNotes(text(data.prepNotes), {
+          clientName: text(details.deafParticipant),
+          clientDob: text(intake.clientDob),
+          providerOne: text(intake.providerOneNumber),
+          priorAuth: text(intake.priorAuthNumber),
+        })
+      : { text: "", removed: false };
+
   return {
     setting,
     format,
@@ -136,15 +148,8 @@ export function interpreterJobView(requestData: unknown, access: JobAccess): Int
     passcode: booked ? orNull(passcode) : null,
     virtualInstructions: booked ? orNull(instructions) : null,
     prepNotes: booked ? text(data.prepNotes) : "",
-    offerNotes:
-      access === "offer"
-        ? sanitizeOfferNotes(text(data.prepNotes), {
-            clientName: text(details.deafParticipant),
-            clientDob: text(intake.clientDob),
-            providerOne: text(intake.providerOneNumber),
-            priorAuth: text(intake.priorAuthNumber),
-          })
-        : "",
+    offerNotes: offerNotes.text,
+    offerNotesRemoved: offerNotes.removed,
     mentalHealth: access !== "closed" && isMentalHealthJob(data),
     interpreterNotes: booked ? readInterpreterNotes(data) : null,
     clientName: booked ? orNull(details.deafParticipant) : null,

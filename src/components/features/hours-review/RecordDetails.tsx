@@ -20,6 +20,8 @@ export function RecordDetails({ record }: { record: ServiceRecord }) {
       : "None reported";
   // ODHH and Apple Health are both state jobs: travel and service completion, never an unpaid break.
   const stateJob = Boolean(record.isOdhh || record.stateJob);
+  // A cancellation form reports travel and "not completed" on any job (billing pays the travel), so it uses the same rows.
+  const showTravel = stateJob || Boolean(record.cancelledBillable);
 
   const serviceMinutes = serviceMinutesOf(record);
   const serviceTime = formatHoursMinutes(serviceMinutes);
@@ -33,7 +35,7 @@ export function RecordDetails({ record }: { record: ServiceRecord }) {
             <div className="text-[var(--ink)]">{formattedScheduled}</div>
           </div>
 
-          {stateJob ? (
+          {showTravel ? (
             <>
               <div data-travel-time="">
                 <div className="text-[var(--sage)] mb-1 flex items-center justify-between">

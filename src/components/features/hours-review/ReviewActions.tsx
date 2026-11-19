@@ -15,6 +15,13 @@ const SECONDARY = "w-full sm:w-auto bg-white border border-gray-300 text-gray-70
 export function ReviewActions({ record, review }: { record: ServiceRecord; review: ReviewActionsState }) {
   const correctionId = useId();
   const travelId = useId();
+  if (record.jobClosed === "cancelled" && record.cancelledBillable) {
+    return (
+      <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-900" data-closed-job-note>
+        Cancelled with short notice, and the interpreter filed a cancellation form. Billing pays the scheduled time and any travel reported here, so there is nothing to approve. The job stays cancelled.
+      </p>
+    );
+  }
   if (record.jobClosed) {
     return (
       <p className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-slate-700" data-closed-job-note>
