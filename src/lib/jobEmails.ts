@@ -41,14 +41,16 @@ export const summaryText = (s: JobSummary, opts: { withReference?: boolean } = {
 /** How an interpreter email names its job: "Job offer · Tue, Nov 18". */
 export const interpreterEmailTitle = (prefix: string, s: JobSummary): string => `${prefix} · ${s.shortDate}`;
 
+export const OFFER_EMAIL_IN_PERSON_NOTE = "Click below to review the full location and address before accepting.";
+export const OFFER_EMAIL_VIRTUAL_NOTE = "The meeting link is shared after you accept.";
+
 /**
  * The offer email: restricted details plus Accept / Decline links. `deadline` is the offer's response deadline in the job's zone
  * (lib/offerDeadline.ts); the links last exactly that long.
  */
 export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string, deadline: string | null): { subject: string; html: string; text: string } {
-  const locationNote = s.isVirtual
-    ? "The meeting link is shared after you accept."
-    : "The exact location is shared after you accept.";
+  // The place itself is never in the email: an in-person offer's link page shows the clinic and street address before accepting.
+  const locationNote = s.isVirtual ? OFFER_EMAIL_VIRTUAL_NOTE : OFFER_EMAIL_IN_PERSON_NOTE;
   const respond = deadline ? `Please respond by ${deadline}.` : "Please respond as soon as you can.";
   const html = buildTerpDeskEmail({
     title: interpreterEmailTitle("Job offer", s),

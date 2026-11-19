@@ -22,6 +22,9 @@ export interface OfferPlace {
   platform: string | null;
 }
 
+/** The title the email link's pages (confirm, "Offer Accepted!", "already booked") show: the same header as the app's offer view. */
+export const offerCardTitle = (request: { title?: string | null; data: unknown }): string => offerPlaceOf(request).headline;
+
 export function offerPlaceOf(request: { title?: string | null; data: unknown }): OfferPlace {
   const view = interpreterJobView(request.data, "offer");
   const headline = jobHeadline({ srn: view.data.intake.odhhSrn, organization: view.organization, venue: view.onsite.venue, title: request.title });

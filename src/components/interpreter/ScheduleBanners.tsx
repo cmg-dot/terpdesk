@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarPlus, CalendarX, MessageCircleReply, X } from "lucide-react";
+import { CalendarMinus, CalendarPlus, CalendarX, MessageCircleReply, X } from "lucide-react";
 import { dismissScheduleBanner, getMyScheduleBanners } from "@/app/actions/scheduleBanners";
 import type { ScheduleBanner } from "@/app/actions/scheduleBanners";
 
 const STYLE = {
   booking_added: { box: "border-emerald-200 bg-emerald-50 text-emerald-950", icon: CalendarPlus, iconClass: "text-emerald-700" },
   booking_cancelled: { box: "border-red-200 bg-red-50 text-red-950", icon: CalendarX, iconClass: "text-red-700" },
+  booking_removed: { box: "border-red-200 bg-red-50 text-red-950", icon: CalendarMinus, iconClass: "text-red-700" },
   question_answered: { box: "border-sky-200 bg-sky-50 text-sky-950", icon: MessageCircleReply, iconClass: "text-sky-700" },
 } as const;
 
@@ -46,7 +47,7 @@ export function ScheduleBanners() {
               <p className="mt-0.5 leading-relaxed opacity-90">{item.message}</p>
               {item.href && (
                 <Link href={item.href} className="mt-1 inline-block font-medium underline underline-offset-2">
-                  {item.kind === "booking_cancelled" ? "Open your jobs" : item.kind === "question_answered" ? "Read the answer" : "Open the job"}
+                  {item.kind === "booking_cancelled" || item.kind === "booking_removed" ? "Open your jobs" : item.kind === "question_answered" ? "Read the answer" : "Open the job"}
                 </Link>
               )}
             </div>

@@ -16,6 +16,7 @@ import { escapeHtml } from "@/lib/emailTemplate";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { renderOfferConfirmPage } from "@/lib/offerConfirmPage";
 import { resolveOfferLinkState } from "@/lib/offerLinkState";
+import { offerCardTitle } from "@/lib/offerPlace";
 import { offerAnswerColumns } from "@/lib/acceptAnswers";
 import type { AcceptAnswers } from "@/lib/acceptAnswers";
 import { confirmPageWithProblem, readAcceptAnswers } from "@/lib/offerLinkAnswers";
@@ -373,7 +374,8 @@ async function processResponse(token: string | null, actionParam: string | undef
     const existingData = (parentReq.data as Record<string, any>) || {};
     const details = existingData.details || {};
     const onsite = existingData.onsite || {};
-    const jobTitle = parentReq.title || details.title || "Interpreting Assignment";
+    // "ODHH <SRN> - <organization>" on a state job, as in the app and on the confirm page (lib/offerPlace.ts); else the job's title.
+    const jobTitle = offerCardTitle({ title: parentReq.title || (typeof details.title === "string" ? details.title : null), data: parentReq.data });
     const jobDate = details.date || details.appointmentDate || existingData.date;
 
     const reqTimeZone =
@@ -869,7 +871,7 @@ export async function GET(request: NextRequest) {
         status: "accepted",
         title: "You're already booked",
         message: "This offer was already accepted, so there is nothing more to do. Your confirmation email has been sent.",
-        jobDetails: { title: state.summary.title, date: state.summary.dateLabel, time: state.summary.timeLabel, position: state.summary.role },
+        jobDetails: { title: state.summary.offerPlace.headline, date: state.summary.dateLabel, time: state.summary.timeLabel, position: state.summary.role },
       });
     }
   } catch (err) {
