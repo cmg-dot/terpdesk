@@ -41,6 +41,40 @@ export const summaryText = (s: JobSummary, opts: { withReference?: boolean } = {
 /** How an interpreter email names its job: "Job offer · Tue, Nov 18". */
 export const interpreterEmailTitle = (prefix: string, s: JobSummary): string => `${prefix} · ${s.shortDate}`;
 
+/**
+ * An agency-to-interpreter notice about one booking (cancelled, removed, hours to correct), one layout for all of them: the subject and
+ * title name the job by its date, the body is a line and what to do, then the restricted summary table (Assignment reads "WA ODHH
+ * assignment" on a state job) and the buttons. Never a reference, an SRN, an organization, a place or notes (security.md). Pure.
+ */
+export function buildInterpreterNoticeEmail(params: {
+  title: string;
+  line: string;
+  action: string;
+  summary: JobSummary;
+  /** The first is the main button, the rest secondary. */
+  buttons: { label: string; url: string }[];
+  /** Also list the links in the plain-text part. */
+  linksInText?: boolean;
+}): { subject: string; html: string; text: string } {
+  const { title, line, action, summary: s, buttons } = params;
+  const heading = interpreterEmailTitle(title, s);
+  const buttonHtml = buttons
+    .map((b, i) => `<p style="margin:${i === 0 ? "20px" : "12px"} 0 0;">${i === 0 ? emailButton(b.label, b.url) : emailSecondaryButton(b.label, b.url)}</p>`)
+    .join("");
+  const html = buildTerpDeskEmail({
+    title: heading,
+    preheader: `${title}: ${s.dateLabel}.`,
+    bodyContent: `
+        <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${escapeHtml(title)}</h1>
+        <p style="margin:0 0 4px;">${escapeHtml(line)} ${escapeHtml(action)}</p>
+        ${emailActionCard(`${emailDetailsTable(summaryRows(s))}${buttonHtml}`)}
+        <p style="margin:0;font-size:13px;color:#6B7280;">For your clients' privacy, location and notes are never sent by email.</p>`,
+  });
+  const links = params.linksInText ? ["", ...buttons.map((b) => `${b.label}: ${b.url}`)] : [];
+  const text = [heading, "", line, action, "", summaryText(s), ...links].join("\n");
+  return { subject: `${heading} - terpDESK`, html, text };
+}
+
 export const OFFER_EMAIL_IN_PERSON_NOTE = "Click below to review the full location and address before accepting.";
 export const OFFER_EMAIL_VIRTUAL_NOTE = "The meeting link is shared after you accept.";
 

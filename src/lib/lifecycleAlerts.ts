@@ -6,7 +6,7 @@ import type { AcceptAnswerColumns } from "@/lib/acceptedOfferAlert";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, escapeHtml } from "@/lib/emailTemplate";
-import { interpreterEmailTitle, summaryRows, summaryText } from "@/lib/jobEmails";
+import { buildInterpreterNoticeEmail, summaryRows, summaryText } from "@/lib/jobEmails";
 import { jobDetailsFor } from "@/lib/jobSummary";
 import type { JobSummary } from "@/lib/jobSummary";
 import { logError } from "@/lib/logError";
@@ -173,19 +173,15 @@ export async function alertInterpreter(params: {
     });
 
     if (!person?.email) return;
-    const s = ctx.summary;
-    const button = hasLogin ? `<p style="margin:20px 0 0;">${emailButton("Open terpDESK", `${getBaseUrl()}${href}`)}</p>` : "";
-    const html = buildTerpDeskEmail({
-      title: interpreterEmailTitle(copy.title, s),
-      preheader: `${copy.title}: ${s.dateLabel}.`,
-      bodyContent: `
-        <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">${escapeHtml(copy.title)}</h1>
-        <p style="margin:0 0 4px;">${escapeHtml(copy.line)} ${escapeHtml(copy.action(hasLogin))}</p>
-        ${emailActionCard(`${emailDetailsTable(summaryRows(s))}${button}`)}
-        <p style="margin:0;font-size:13px;color:#6B7280;">For your clients' privacy, location and notes are never sent by email.</p>`,
+    // The same layout as every agency-to-interpreter booking notice (jobEmails.ts): named by its date, no reference or SRN.
+    const email = buildInterpreterNoticeEmail({
+      title: copy.title,
+      line: copy.line,
+      action: copy.action(hasLogin),
+      summary: ctx.summary,
+      buttons: hasLogin ? [{ label: "Open terpDESK", url: `${getBaseUrl()}${href}` }] : [],
     });
-    const text = [`${interpreterEmailTitle(copy.title, s)}`, "", copy.line, copy.action(hasLogin), "", summaryText(s)].join("\n");
-    await sendSafely(person.email, `${interpreterEmailTitle(copy.title, s)} - terpDESK`, html, text, params.event);
+    await sendSafely(person.email, email.subject, email.html, email.text, params.event);
   } catch (err) {
     logError("alertInterpreter", err);
   }

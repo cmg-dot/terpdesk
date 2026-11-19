@@ -4,8 +4,9 @@ import { interpreters, requests, users } from "@/db/schema";
 import { writeAuditLog } from "@/lib/audit";
 import { getBaseUrl } from "@/lib/baseUrl";
 import { getInterpreterDisplayName } from "@/lib/displayName";
-import { buildTerpDeskEmail, emailActionCard, emailButton, emailSecondaryButton, escapeHtml } from "@/lib/emailTemplate";
+import { buildInterpreterNoticeEmail } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
+import type { JobSummary } from "@/lib/jobSummary";
 import { logError } from "@/lib/logError";
 import { notifyInterpreter } from "@/lib/notifications";
 import type { NotificationInput } from "@/lib/notifications";
@@ -18,8 +19,8 @@ import { sendEmail } from "@/lib/timesheetEmail";
 /**
  * Staff removed an interpreter from a booked position ("Remove booking"). The interpreter is told, and the job keeps a record:
  *  - in the app: a banner at the top of Home and Jobs (and the bell) naming the job's header and its date and time;
- *  - by email: only the APT reference, the date and time and links to their Jobs and Calendar (no place, organization, SRN, client
- *    or notes: security.md); sendEmail applies Silent Mode and the recipient gate;
+ *  - by email: the same notice as a cancellation (named by its date, the restricted summary, links to their Jobs and Calendar; no
+ *    reference, SRN, organization, place, client or notes: security.md); sendEmail applies Silent Mode and the recipient gate;
  *  - on the request: an agency-only history line and an audit row.
  * Never throws: the booking is already removed. SERVER ONLY.
  */
@@ -63,26 +64,25 @@ export interface RemovalCopy {
   text: string;
 }
 
-/** The interpreter's banner (in the app: the job's header) and email (the APT reference only). Pure. */
-export function removalCopy(params: { headline: string; reference: string; dateLabel: string; timeLabel: string; jobsUrl: string; calendarUrl: string }): RemovalCopy {
-  const { headline, reference, dateLabel, timeLabel, jobsUrl, calendarUrl } = params;
-  const when = `${dateLabel} at ${timeLabel}`;
-  const line = `The agency removed you from booking ${reference} on ${when}. It is no longer on your schedule, and no action is needed.`;
-  const html = buildTerpDeskEmail({
-    title: `Removed from booking ${reference}`,
-    preheader: `You have been removed from a booking on ${dateLabel}.`,
-    bodyContent: `
-      <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">You have been removed from a booking</h1>
-      <p style="margin:0 0 4px;">${escapeHtml(line)}</p>
-      ${emailActionCard(`<p style="margin:0 0 12px;">${emailButton("Open my jobs", jobsUrl)}</p><p style="margin:0;">${emailSecondaryButton("Open my calendar", calendarUrl)}</p>`)}
-      <p style="margin:0;font-size:13px;color:#6B7280;">For your clients' privacy, job details are only shown in terpDESK.</p>`,
+/**
+ * The interpreter's banner (in the app: the job's header, "ODHH <SRN> - <organization>" on a state job) and email. The email is the
+ * same notice as a cancellation (jobEmails.buildInterpreterNoticeEmail): named by its date, with the restricted summary table; never a
+ * reference, an SRN, an organization or a place. Pure.
+ */
+export function removalCopy(params: { headline: string; summary: JobSummary; jobsUrl: string; calendarUrl: string }): RemovalCopy {
+  const { headline, summary: s, jobsUrl, calendarUrl } = params;
+  const email = buildInterpreterNoticeEmail({
+    title: "Removed from booking",
+    line: "The agency removed you from this booking. It is no longer on your schedule.",
+    action: "No action is needed.",
+    summary: s,
+    buttons: [{ label: "Open my jobs", url: jobsUrl }, { label: "Open my calendar", url: calendarUrl }],
+    linksInText: true,
   });
   return {
     bannerTitle: "Removed from a booking",
-    bannerMessage: `You have been removed from ${headline} on ${when}.`,
-    subject: `Removed from booking ${reference} - terpDESK`,
-    html,
-    text: [line, "", `Your jobs: ${jobsUrl}`, `Your calendar: ${calendarUrl}`, "", "For your clients' privacy, job details are only shown in terpDESK."].join("\n"),
+    bannerMessage: `You have been removed from ${headline} on ${s.dateLabel} at ${s.timeLabel}.`,
+    ...email,
   };
 }
 
@@ -111,7 +111,7 @@ export async function announceBookingRemoval(removed: readonly RemovedBooking[],
       });
 
       const base = fx.baseUrl();
-      const copy = removalCopy({ headline: offerCardTitle(job), reference: summary.reference, dateLabel: summary.dateLabel, timeLabel: summary.timeLabel, jobsUrl: `${base}/jobs`, calendarUrl: `${base}/interpreter-calendar` });
+      const copy = removalCopy({ headline: offerCardTitle(job), summary, jobsUrl: `${base}/jobs`, calendarUrl: `${base}/interpreter-calendar` });
       await fx.notify(booking.interpreterId, { type: "job", kind: "booking_removed", href: "/jobs", title: copy.bannerTitle, message: copy.bannerMessage });
       if (person.email) await fx.email(person.email, copy.subject, copy.html, copy.text);
       told += 1;

@@ -2,7 +2,7 @@ import { afterEach, describe, it } from "node:test";
 import assert from "node:assert/strict";
 import { announceBookingRemoval, removalCopy } from "@/lib/bookingRemoval";
 import type { RemovalEffects, RemovalJob } from "@/lib/bookingRemoval";
-import { OFFER_EMAIL_IN_PERSON_NOTE, OFFER_EMAIL_VIRTUAL_NOTE, buildOfferEmail } from "@/lib/jobEmails";
+import { OFFER_EMAIL_IN_PERSON_NOTE, OFFER_EMAIL_VIRTUAL_NOTE, buildInterpreterNoticeEmail, buildOfferEmail } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { NotificationInput } from "@/lib/notifications";
 import { offerCardTitle } from "@/lib/offerPlace";
@@ -92,15 +92,38 @@ describe("Remove booking: telling the interpreter and keeping a record", () => {
     assert.ok(n.input.message.startsWith("You have been removed from ODHH 202787460 - Seattle Children's Hospital on Tue, Nov 24, 2026 at 9:00 AM"));
   });
 
-  it("emails only the APT reference, the date and time and links to their jobs and calendar", async () => {
+  it("emails the job by its date, like a cancellation: no APT code, SRN, organization or place, with links to their jobs and calendar", async () => {
     const { seen } = await run();
     const e = seen.email[0];
     assert.equal(e.to, "interp@example.org");
-    assert.match(e.subject, /^Removed from booking APT-[A-Z0-9]+ - terpDESK$/);
-    assert.ok(e.text.includes("Tue, Nov 24, 2026 at 9:00 AM"));
+    assert.equal(e.subject, "Removed from booking · Tue, Nov 24 - terpDESK");
+    assert.ok(e.text.includes("Assignment: WA ODHH assignment"));
+    assert.ok(e.text.includes("Date: Tue, Nov 24, 2026"));
+    assert.ok(!/APT-/.test(`${e.subject}${e.html}${e.text}`), "no internal APT code");
     assert.ok(e.html.includes("https://app.test/jobs") && e.html.includes("https://app.test/interpreter-calendar"));
     absentFrom(`${e.subject}${e.html}${e.text}`);
     assert.ok(!/—/.test(`${e.subject}${e.text}${seen.notify[0].input.message}`), "no em-dash in the copy");
+  });
+
+  it("uses exactly the cancellation email's layout and rules (one shared builder)", () => {
+    const s = summarizeJob(job);
+    const removal = removalCopy({ headline: "x", summary: s, jobsUrl: "https://app.test/jobs", calendarUrl: "https://app.test/interpreter-calendar" });
+    const cancelled = buildInterpreterNoticeEmail({ title: "Appointment cancelled", line: "The agency cancelled this appointment.", action: "No action is needed.", summary: s, buttons: [{ label: "Open terpDESK", url: "https://app.test/jobs" }] });
+    assert.equal(cancelled.subject, "Appointment cancelled · Tue, Nov 24 - terpDESK");
+    for (const email of [removal, cancelled]) {
+      assert.match(email.subject, / · Tue, Nov 24 - terpDESK$/);
+      assert.ok(email.html.includes("WA ODHH assignment"));
+      assert.ok(email.html.includes("For your clients&#39; privacy, location and notes are never sent by email.") || email.html.includes("For your clients' privacy, location and notes are never sent by email."));
+      assert.ok(!/APT-/.test(email.html + email.text));
+      absentFrom(`${email.subject}${email.html}${email.text}`);
+    }
+  });
+
+  it("names a non-state job by its date too, without the internal APT code", () => {
+    const privateJob = { ...job, title: "Team meeting", data: { details: { format: "In person", timeZone: "America/Los_Angeles" }, schedule: { startsAt: "2026-11-24T17:00:00.000Z", endsAt: "2026-11-24T18:00:00.000Z" } } };
+    const c = removalCopy({ headline: "Team meeting", summary: summarizeJob(privateJob), jobsUrl: "j", calendarUrl: "c" });
+    assert.equal(c.subject, "Removed from booking · Tue, Nov 24 - terpDESK");
+    assert.ok(!/APT-/.test(c.html + c.text));
   });
 
   it("skips the email when the interpreter has no address, and skips a job that no longer exists", async () => {
@@ -120,8 +143,10 @@ describe("Remove booking: telling the interpreter and keeping a record", () => {
     assert.equal(await sendEmail("interp@example.org", "s", "<p>h</p>", "t"), "suppressed");
   });
 
-  it("builds the copy without an em-dash", () => {
-    const c = removalCopy({ headline: "ODHH 1 - Org", reference: "APT-1", dateLabel: "Tue, Nov 24, 2026", timeLabel: "9:00 AM", jobsUrl: "j", calendarUrl: "c" });
+  it("builds the copy without an em-dash, and keeps the job's header for the in-app banner only", () => {
+    const c = removalCopy({ headline: "ODHH 202787460 - Seattle Children's Hospital", summary: summarizeJob(job), jobsUrl: "j", calendarUrl: "c" });
     assert.ok(!/—/.test(`${c.bannerTitle}${c.bannerMessage}${c.subject}${c.text}`));
+    assert.ok(c.bannerMessage.includes("ODHH 202787460 - Seattle Children's Hospital"));
+    absentFrom(`${c.subject}${c.html}${c.text}`);
   });
 });
