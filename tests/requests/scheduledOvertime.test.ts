@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import * as React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { exceedsScheduled } from "@/lib/hoursReviewSummary";
-import { OVERTIME_NOTE_REQUIRED, exceedsScheduledLabel, formatOvertime, minutesOverSchedule, overtimeNeedsNote, overtimeWarning, workedMinutesBetween } from "@/lib/scheduledOvertime";
+import { OVERTIME_GRACE_MINUTES, OVERTIME_NOTE_REQUIRED, exceedsGrace, exceedsScheduledLabel, formatOvertime, minutesOverSchedule, overtimeNeedsNote, overtimeWarning, workedMinutesBetween } from "@/lib/scheduledOvertime";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
 // The test runner compiles JSX in classic mode: the components need React in scope.
@@ -47,6 +47,54 @@ describe("Phase 32.3: time past the current schedule", () => {
     assert.ok(!overtimeNeedsNote(240, "Stayed for the family meeting at the agency's request"));
     assert.ok(!overtimeNeedsNote(0, ""));
     for (const copy of [overtimeWarning(240, "4 hr 0 min"), OVERTIME_NOTE_REQUIRED]) assert.ok(!copy.includes("—"), copy);
+  });
+});
+
+describe("Phase 34.2: a 15-minute grace before a note is needed", () => {
+  const SCHEDULED = 240;
+
+  it("the grace is 15 minutes and the note is needed only when actual minutes are MORE than scheduled plus 15", () => {
+    assert.equal(OVERTIME_GRACE_MINUTES, 15);
+    const needsNote = (actual: number) => overtimeNeedsNote(minutesOverSchedule(actual, SCHEDULED), "");
+    for (const actual of [200, 240, 245, 250, 255]) assert.equal(needsNote(actual), false, `${actual - SCHEDULED} min over`);
+    for (const actual of [256, 270, 480]) assert.equal(needsNote(actual), true, `${actual - SCHEDULED} min over`);
+    assert.ok(!exceedsGrace(0) && !exceedsGrace(15) && exceedsGrace(16));
+  });
+
+  it("past the grace, a note that says something is enough (blank or spaces are not)", () => {
+    const over = minutesOverSchedule(SCHEDULED + 30, SCHEDULED);
+    assert.equal(overtimeNeedsNote(over, undefined), true);
+    assert.equal(overtimeNeedsNote(over, "   "), true);
+    assert.equal(overtimeNeedsNote(over, "Stayed to finish the paperwork at the provider's request"), false);
+    assert.equal(overtimeNeedsNote(15, ""), false, "up to 15 minutes over needs no note at all");
+  });
+
+  it("the server's rule is the same, worked out from the stored times and the reported ones, with the break taken off first", () => {
+    const start = "2026-11-24T16:00:00.000Z";
+    const scheduled = workedMinutesBetween(start, "2026-11-24T20:00:00.000Z");
+    const server = (endIso: string, breakMinutes = 0) => overtimeNeedsNote(minutesOverSchedule(workedMinutesBetween(start, endIso, breakMinutes), scheduled), "");
+    assert.equal(server("2026-11-24T20:10:00.000Z"), false, "10 minutes over");
+    assert.equal(server("2026-11-24T20:15:00.000Z"), false, "exactly 15 minutes over");
+    assert.equal(server("2026-11-24T20:16:00.000Z"), true, "16 minutes over");
+    assert.equal(server("2026-11-24T20:30:00.000Z", 15), false, "30 minutes over, 15 of it an unpaid break: 15 worked over");
+    assert.equal(server("2026-11-24T20:30:00.000Z"), true);
+  });
+
+  it("the copy names the 15 minutes and has no em-dash", () => {
+    assert.ok(overtimeWarning(30, "4 hr 0 min").includes("more than 15 minutes over needs a note"));
+    assert.ok(OVERTIME_NOTE_REQUIRED.includes("more than 15 minutes longer"));
+    for (const copy of [overtimeWarning(30, "4 hr 0 min"), OVERTIME_NOTE_REQUIRED]) assert.ok(!copy.includes(String.fromCharCode(0x2014)));
+  });
+
+  it("Hours review still shows its pill for any overage, 10 minutes included (it is the staff's view, not a prompt)", () => {
+    const record = (endIso: string): ServiceRecord => ({
+      id: "r1", appointmentId: "req-1", interpreterName: "Interpreter", state: "awaiting_review",
+      scheduledStart: "2026-11-24T16:00:00.000Z", scheduledEnd: "2026-11-24T20:00:00.000Z", actualStart: "2026-11-24T16:00:00.000Z", actualEnd: endIso,
+      breakMinutes: 0, reportedMileage: 0, approvedMileage: null, reviewMessage: null, version: 1, timeZone: "America/Los_Angeles",
+    });
+    assert.equal(exceedsScheduled(record("2026-11-24T20:10:00.000Z")), 10);
+    assert.equal(exceedsScheduled(record("2026-11-24T20:30:00.000Z")), 30);
+    assert.equal(exceedsScheduled(record("2026-11-24T20:00:00.000Z")), null);
   });
 });
 
@@ -99,5 +147,16 @@ describe("Phase 32.3: the interpreter's hours form", () => {
     assert.ok(withNote.includes("data-overtime-warning") && !submitDisabled(withNote));
     const within = await form({ workedMinutes: 240 });
     assert.ok(!within.includes("data-overtime-warning") && !submitDisabled(within));
+  });
+
+  it("stays quiet for a routine wrap-up of up to 15 minutes, and asks for a note from 16 minutes over (Phase 34.2)", async () => {
+    for (const worked of [245, 250, 255]) {
+      const html = await form({ workedMinutes: worked });
+      assert.ok(!html.includes("data-overtime-warning") && !submitDisabled(html), `${worked - 240} min over: no warning, submit enabled`);
+    }
+    const sixteen = await form({ workedMinutes: 256 });
+    assert.ok(sixteen.includes("data-overtime-warning") && sixteen.includes("+0h 16m") && submitDisabled(sixteen), "16 min over: warning, submit waits for a note");
+    const withNote = await form({ workedMinutes: 256, note: "Waited for the interpreter's equipment to be returned" });
+    assert.ok(withNote.includes("data-overtime-warning") && !submitDisabled(withNote));
   });
 });

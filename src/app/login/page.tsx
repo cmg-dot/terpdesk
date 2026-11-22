@@ -28,7 +28,8 @@ export default function LoginChooserPage({ searchParams }: { searchParams: Searc
   const callbackRole = callback?.startsWith("/") && !callback.startsWith("//") ? requiredRoleForPath(callback.split("?")[0]) : null;
   if (callbackRole) redirect(`${loginPathForRole(callbackRole)}${qs}`);
   if (first(searchParams.registered) === "true") redirect(`${loginPathForRole("interpreter")}${qs}`);
-  // Idle sign-out only ever applies to agency staff, so /login?reason=idle goes to the agency sign-in, notice included.
+  // The app itself sends an idle sign-out straight to the login's own portal (lib/auth/idle.ts); an older /login?reason=idle link
+  // cannot tell which, so it goes to the agency sign-in, notice included.
   if (first(searchParams.reason) === IDLE_LOGIN_REASON) redirect(`${loginPathForRole("agency")}${qs}`);
 
   const option = "flex items-center gap-4 rounded-2xl border border-neutral-200 p-4 transition-colors hover:border-[var(--forest)] hover:bg-neutral-50";

@@ -19,6 +19,7 @@ import { BrandLockup } from "@/components/brand/BrandLockup";
 import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { AlertToasts } from "@/components/ui/AlertToasts";
+import { IdleTimeoutGuard } from "@/components/auth/IdleTimeoutGuard";
 import { motion, AnimatePresence } from "framer-motion";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
@@ -43,6 +44,8 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-[var(--canvas)] font-sans text-slate-900">
+      {/* HIPAA automatic logoff: after 30 minutes without activity (a warning at 28) the interpreter is signed out, as agency staff are. */}
+      <IdleTimeoutGuard />
       {/* Sidebar (stays in view while the page scrolls with the browser's own scrollbar) */}
       <aside className="hidden md:flex sticky top-0 h-screen self-start w-64 flex-col bg-[var(--forest)] text-white shrink-0">
         <div className="flex flex-col p-5 pb-2">

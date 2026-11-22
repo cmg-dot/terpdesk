@@ -29,7 +29,7 @@ export default async function RootLayout({
 }>) {
   // Resolved on the server and handed to the client provider, so useSession() has data on first paint.
   const stored = await getServerSession(authOptions);
-  // An agency login idle past the limit is signed out: nothing of it (name, theme) reaches the page.
+  // A login (agency or interpreter) idle past the limit is signed out: nothing of it (name, theme) reaches the page.
   const session = stored?.user?.idleExpired ? null : stored;
 
   return (

@@ -19,7 +19,7 @@ declare module "next-auth" {
       displayName: string;
       /** The workspace theme: the saved choice for agency staff, always "default" for interpreters. Refreshed by `update()`. */
       theme: ThemeId;
-      /** True when this agency login has been idle past the limit (see lib/auth/idle.ts). Always false for interpreters. */
+      /** True when this login (agency or interpreter) has been idle past the 30-minute limit (see lib/auth/idle.ts). */
       idleExpired: boolean;
     } & DefaultSession["user"];
   }

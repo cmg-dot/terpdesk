@@ -1,10 +1,11 @@
 /**
- * Idle sign-out for agency staff (HIPAA automatic logoff). Pure and Edge-safe (used by the middleware, the NextAuth callbacks,
- * the server guards and the browser), so it imports nothing.
+ * Idle sign-out for agency staff AND interpreters (HIPAA automatic logoff): both portals sign out after the same 30 minutes
+ * without activity. Pure and Edge-safe (used by the middleware, the NextAuth callbacks, the server guards and the browser), so it
+ * imports nothing.
  *
  * The server decides: the signed token carries `lastActivityAt`, and a request whose token has been idle past the limit is
  * treated as signed out. The browser timer (useIdleTimeout) only gives the warning and sends "I'm still here" pings.
- * Only agency logins are governed; interpreters and the public token pages are not.
+ * Every login is governed; the public token pages (emailed links) are not logins and are not.
  */
 
 /** Signed out after this long without activity. */
@@ -32,24 +33,35 @@ export const lastActivityOf = (token: IdleTokenFields): number | null => {
   return null;
 };
 
+/** The logins the idle rule governs: each portal's own role. */
+export type IdleRole = "agency" | "interpreter";
+
+export const isIdleRole = (role: unknown): role is IdleRole => role === "agency" || role === "interpreter";
+
 /**
- * True when this token is an agency login that has been idle longer than the limit. Anyone else (interpreters, no token) is
- * never idle-expired. An agency token with no timestamp at all cannot be shown to be fresh, so it counts as expired.
+ * True when this token is a login (agency or interpreter) that has been idle longer than the limit. No token, or a token with no
+ * known role, is never idle-expired. A login token with no timestamp at all cannot be shown to be fresh, so it counts as expired.
  */
 export const isIdleExpired = (token: IdleTokenFields | null | undefined, now: number = Date.now()): boolean => {
-  if (!token || token.role !== "agency") return false;
+  if (!token || !isIdleRole(token.role)) return false;
   const last = lastActivityOf(token);
   if (last === null) return true;
   return now - last > IDLE_LIMIT_MS;
 };
 
+/** Where the browser's own idle sign-out lands: the sign-in of the portal this login belongs to (anything but an interpreter: agency). */
+export const signedOutUrl = (role: unknown): string => idleLoginPath(undefined, role === "interpreter" ? "interpreter" : "agency");
+
 /** The "still here" ping the browser sends through NextAuth's `update()`: `update({ touch: true })`. */
 export const isTouchUpdate = (session: unknown): boolean =>
   typeof session === "object" && session !== null && (session as { touch?: unknown }).touch === true;
 
-/** Where an idle-expired agency login is sent: the agency sign-in, with the reason and the page they were on. */
-export const idleLoginPath = (returnTo?: string): string => {
+/**
+ * Where an idle-expired login is sent: its own portal's sign-in (an interpreter to the interpreter sign-in, staff to the agency
+ * one), with the reason and, when given, the page they were on (a same-site path only).
+ */
+export const idleLoginPath = (returnTo?: string, role: IdleRole = "agency"): string => {
   const query = new URLSearchParams({ reason: IDLE_LOGIN_REASON });
   if (returnTo && returnTo.startsWith("/") && !returnTo.startsWith("//")) query.set("callbackUrl", returnTo);
-  return `/login/agency?${query.toString()}`;
+  return `/login/${role}?${query.toString()}`;
 };

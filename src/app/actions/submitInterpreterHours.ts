@@ -134,7 +134,8 @@ export async function submitInterpreterHours(
     // The scheduled times, fixed here: nothing was worked, so the browser's times are not used on a cancellation.
     const reportedStart = cancelled ? startsAt : actualStartTime;
     const reportedEnd = cancelled ? endsAt : actualEndTime;
-    // Time past the job's current schedule (e.g. a booking shortened from 8 to 4 hours) is accepted only with a note explaining it.
+    // Time more than 15 minutes past the job's current schedule (e.g. a booking shortened from 8 to 4 hours) is accepted only with a
+    // note explaining it; a routine wrap-up of up to 15 minutes over needs none (lib/scheduledOvertime.ts).
     const overMinutes = cancelled ? 0 : minutesOverSchedule(workedMinutesBetween(reportedStart, reportedEnd, extra?.breakMinutes ?? 0), workedMinutesBetween(startsAt, endsAt));
     if (overtimeNeedsNote(overMinutes, extra?.note)) throw new Error(OVERTIME_NOTE_REQUIRED);
 

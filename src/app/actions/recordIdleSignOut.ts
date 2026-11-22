@@ -6,10 +6,10 @@ import { db } from "@/db";
 import { auditLogs } from "@/db/schema";
 import { authOptions } from "@/lib/auth/options";
 import { writeAuditLog } from "@/lib/audit";
-import { IDLE_LIMIT_MS } from "@/lib/auth/idle";
+import { IDLE_LIMIT_MS, isIdleRole } from "@/lib/auth/idle";
 
 /**
- * Records that an agency login was signed out for inactivity (called by the browser just before it signs out). Takes no
+ * Records that a login (agency staff or interpreter) was signed out for inactivity (called by the browser just before it signs out). Takes no
  * input: the row is always about the caller's own session, never an id from the request. It reads the session directly
  * instead of through the guards, because by now the session is, by design, past the idle limit and the guards refuse it.
  * Identifiers only: no names, no page, no data. Failures are swallowed, so a timeout always completes. Several open tabs
@@ -20,7 +20,7 @@ const DUPLICATE_WINDOW_MS = 60 * 1000;
 export async function recordIdleSignOut(): Promise<void> {
   const session = await getServerSession(authOptions);
   const user = session?.user;
-  if (!user?.id || user.role !== "agency") return;
+  if (!user?.id || !isIdleRole(user.role)) return;
   try {
     const [recent] = await db
       .select({ rows: count() })

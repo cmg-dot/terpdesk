@@ -3,7 +3,7 @@
 import { TriangleAlert } from "lucide-react";
 import { SignaturePad } from "@/components/ui/SignaturePad";
 import { formatHoursMinutes } from "@/lib/durationFormat";
-import { minutesOverSchedule, overtimeNeedsNote, overtimeWarning } from "@/lib/scheduledOvertime";
+import { exceedsGrace, minutesOverSchedule, overtimeNeedsNote, overtimeWarning } from "@/lib/scheduledOvertime";
 import { MileageLegsSection } from "@/components/features/MileageLegsSection";
 import type { MileageLeg } from "@/components/features/MileageLegsSection";
 import { OnsiteSignoffSection } from "@/components/features/OnsiteSignoffSection";
@@ -186,7 +186,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
             <p className="text-sm font-medium text-gray-800 mb-2">
               Service time before review: <span className="font-bold">{p.serviceTimeHours}</span>
             </p>
-            {overMinutes > 0 && (
+            {exceedsGrace(overMinutes) && (
               <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="alert" data-overtime-warning="">
                 <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
                 <span>{overtimeWarning(overMinutes, formatHoursMinutes(p.scheduledMinutes ?? 0))}</span>

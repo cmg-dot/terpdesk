@@ -2,7 +2,7 @@ import { getToken } from "next-auth/jwt";
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getAuthSecret } from "@/lib/auth/secret";
-import { idleLoginPath, isIdleExpired } from "@/lib/auth/idle";
+import { idleLoginPath, isIdleExpired, isIdleRole } from "@/lib/auth/idle";
 import { homePathForRole, isAppRole, loginPathForRole, requiredRoleForPath } from "@/lib/auth/routes";
 
 /** Public entry pages a signed-in user has no reason to see (the portal chooser and both sign-in portals). */
@@ -15,9 +15,10 @@ export async function middleware(req: NextRequest) {
   if (!requiredRole && !isEntryPage) return NextResponse.next();
 
   const token = await getToken({ req, secret: getAuthSecret() });
-  // An agency login idle past the limit counts as signed out everywhere, so the entry pages below do not bounce it back in.
+  // A login (either portal) idle past the limit counts as signed out everywhere, so the entry pages below do not bounce it back in.
   const idle = isIdleExpired(token);
-  const role = !idle && isAppRole(token?.role) ? token.role : null;
+  const tokenRole = token?.role;
+  const role = !idle && isAppRole(tokenRole) ? tokenRole : null;
 
   if (isEntryPage) {
     if (!role) return NextResponse.next();
@@ -38,8 +39,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(new URL(homePathForRole(role), req.url));
   }
 
-  // Idle sign-out: the agency sign-in with the reason, remembering where they were.
-  if (idle && requiredRole === "agency") return NextResponse.redirect(new URL(idleLoginPath(`${pathname}${search}`), req.url));
+  // Idle sign-out (30 minutes, agency staff and interpreters alike): the login's own portal sign-in with the reason, remembering
+  // where they were.
+  if (idle && isIdleRole(tokenRole)) return NextResponse.redirect(new URL(idleLoginPath(`${pathname}${search}`, tokenRole), req.url));
 
   // Not signed in: the sign-in portal for the area they were headed to, remembering where that was.
   const loginUrl = new URL(loginPathForRole(requiredRole), req.url);

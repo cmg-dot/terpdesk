@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { signOut, useSession } from "next-auth/react";
 import { recordIdleSignOut } from "@/app/actions/recordIdleSignOut";
 import { clearClientCache } from "@/lib/clientCache";
-import { IDLE_LIMIT_MS, IDLE_LOGIN_REASON, IDLE_TOUCH_INTERVAL_MS, IDLE_WARNING_LEAD_MS } from "@/lib/auth/idle";
+import { IDLE_LIMIT_MS, IDLE_TOUCH_INTERVAL_MS, IDLE_WARNING_LEAD_MS, signedOutUrl } from "@/lib/auth/idle";
 
 /**
  * The browser half of the 30-minute idle sign-out (the server's half is lib/auth/idle.ts, which is what actually decides).
@@ -19,7 +19,6 @@ import { IDLE_LIMIT_MS, IDLE_LOGIN_REASON, IDLE_TOUCH_INTERVAL_MS, IDLE_WARNING_
  */
 
 const CHANNEL_NAME = "terpdesk-idle";
-const SIGNED_OUT_URL = `/login?reason=${IDLE_LOGIN_REASON}`;
 const MOVE_SAMPLE_MS = 1000;
 const BROADCAST_MS = 5000;
 const AUDIT_WAIT_MS = 1500;
@@ -37,6 +36,9 @@ export interface IdleTimeoutState {
 
 export function useIdleTimeout(): IdleTimeoutState {
   const { data: session, update } = useSession();
+  // Read when the sign-out happens (after the session is gone), so it is the role this tab was signed in with.
+  const roleRef = useRef<unknown>(session?.user?.role);
+  roleRef.current = session?.user?.role ?? roleRef.current;
   const [warning, setWarning] = useState(false);
   const [remainingSec, setRemainingSec] = useState(Math.ceil(IDLE_WARNING_LEAD_MS / 1000));
   const updateRef = useRef(update);
@@ -64,7 +66,7 @@ export function useIdleTimeout(): IdleTimeoutState {
       // The audit row is best effort and bounded: the sign-out never waits long for it.
       if (record) await Promise.race([recordIdleSignOut().catch(() => undefined), new Promise((r) => setTimeout(r, AUDIT_WAIT_MS))]);
       clearClientCache();
-      await signOut({ callbackUrl: SIGNED_OUT_URL });
+      await signOut({ callbackUrl: signedOutUrl(roleRef.current) });
     };
     const end = (record: boolean) => {
       if (ended) return;
@@ -158,7 +160,7 @@ export function useIdleTimeout(): IdleTimeoutState {
           ended = true;
           stopTimers();
           clearClientCache();
-          void signOut({ callbackUrl: SIGNED_OUT_URL });
+          void signOut({ callbackUrl: signedOutUrl(roleRef.current) });
         }
       };
     }

@@ -3,6 +3,7 @@
 import { useSession } from "next-auth/react";
 import { IdleWarningDialog } from "@/components/auth/IdleWarningDialog";
 import { useIdleTimeout } from "@/hooks/useIdleTimeout";
+import { isIdleRole } from "@/lib/auth/idle";
 
 const ActiveGuard = () => {
   const { warning, remainingSec, stay, signOutNow } = useIdleTimeout();
@@ -10,10 +11,10 @@ const ActiveGuard = () => {
 };
 
 /**
- * Mounted once in the agency workspace layout. It governs agency staff only: for any other login (or none) it renders
- * nothing and attaches nothing, so interpreters and the public token pages are never affected.
+ * Mounted once in each workspace layout (agency and interpreter). It governs signed-in logins only: with no login it renders
+ * nothing and attaches nothing, so the public pages and the emailed token pages are never affected.
  */
 export const IdleTimeoutGuard = () => {
   const { data: session } = useSession();
-  return session?.user?.role === "agency" ? <ActiveGuard /> : null;
+  return isIdleRole(session?.user?.role) ? <ActiveGuard /> : null;
 };

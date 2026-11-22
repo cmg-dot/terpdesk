@@ -190,7 +190,7 @@ export const authOptions: NextAuthOptions = {
         session.user.interpreterId = token.interpreterId ?? null;
         session.user.displayName = token.displayName ?? token.name ?? "";
         session.user.theme = themeForRole(token.role, token.theme);
-        // Read by the server guards and the root layout: an idle agency login is signed out even though its cookie is still valid.
+        // Read by the server guards and the root layout: an idle login (agency or interpreter) is signed out even though its cookie is still valid.
         session.user.idleExpired = isIdleExpired(token);
       }
       return session;
