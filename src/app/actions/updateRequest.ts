@@ -14,6 +14,9 @@ import { recordTimeChange } from "@/lib/timeChangeLog";
 import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
+import { bookedTimeConflict, withOriginalSchedule } from "@/lib/bookedTimeEdit";
+import { getInterpreterDisplayName } from "@/lib/displayName";
+import { td_conflict } from "./availability";
 import { definedOnly } from "@/lib/definedValues";
 import { clampPositionCount, countFromLabel, positionFields, readPositions, resizePositions } from "@/lib/positions";
 import { hasSubmittedHours, resolveOnsiteFlag } from "@/lib/onsiteSignature";
@@ -55,9 +58,10 @@ export type UpdateRequestResult =
 
 /**
  * Full edit. Refused while an offer is live or once a booked appointment has started (enforced here on the server,
- * so opening the edit page by URL does not get around it). While an interpreter is booked, the date, time, time zone
- * and program are ignored (kept as stored). Booked interpreters are told what changed, plus the agency's optional
- * message. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
+ * so opening the edit page by URL does not get around it). While an interpreter is booked, the time zone and program are
+ * ignored (kept as stored); the date and times may change, if every booked interpreter is free then. Booked interpreters
+ * are told what changed, plus the agency's optional message. Problems are returned, not thrown: in production a thrown
+ * message is hidden from the browser.
  */
 export async function updateRequestAction(requestId: string, requested: UpdateRequestPayload): Promise<UpdateRequestResult> {
   const session = await requireRole("agency");
@@ -231,8 +235,15 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
   // The message goes to ONE booked interpreter; on a team job the agency must say which. Checked before saving.
   const recipient = resolveMessageRecipient(notice, message, requested.messageRecipientId);
   if (!recipient.ok) return { success: false, error: recipient.error };
+  // Any move of the start or end, worked out from the stored instants (old and new). A booked job may move before it starts, but
+  // only to a time every booked interpreter is free (bookedTimeEdit.ts); the first move keeps the booked window for billing.
+  const timeChange = timeChangeOf(existing, { startsAt: startsAtIso, endsAt: endsAtIso });
+  if (timeChange && notice.booked.length > 0) {
+    const conflict = await bookedTimeConflict({ requestId, booked: notice.booked, window: timeChange.after }, { check: td_conflict, nameOf: getInterpreterDisplayName });
+    if (conflict) return { success: false, error: conflict };
+  }
   const flag = detailsUpdateFlag(notice);
-  const finalData = flag ? { ...updatedData, detailsUpdate: flag } : updatedData;
+  const finalData = withOriginalSchedule(flag ? { ...updatedData, detailsUpdate: flag } : updatedData, timeChange, lock.booked);
 
   // 4. Update Database Row
   const [updated] = await db.update(requests)
@@ -246,8 +257,7 @@ export async function updateRequestAction(requestId: string, requested: UpdateRe
     .where(eq(requests.id, requestId))
     .returning();
 
-  // Any move of the start or end is recorded from the stored instants (old and new, Pacific Time), apart from the label diff above.
-  const timeChange = timeChangeOf(existing, { startsAt: startsAtIso, endsAt: endsAtIso });
+  // The move is recorded (old and new, Pacific Time) apart from the label diff above.
   if (timeChange) {
     await recordTimeChange({ requestId, srn: existingData.intake?.odhhSrn ?? null, change: timeChange, userId: session.user.id ?? null, userEmail: session.user.email ?? null, actorLabel: session.user.name ?? "Agency staff" });
   }

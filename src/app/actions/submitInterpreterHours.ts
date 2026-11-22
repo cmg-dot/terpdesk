@@ -3,6 +3,7 @@
 import { requireInterpreter, FORBIDDEN } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { offers, requests } from "@/db/schema";
+import type { RequestData } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { logActivity } from "@/lib/requestActivity";
 import { lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
@@ -23,6 +24,11 @@ import { saveOnsiteSignoff } from "@/lib/onsiteSignoff";
 import { removeObjectsQuietly } from "@/lib/s3";
 import { findBillableCancelledBooking } from "@/lib/cancellationSubmission";
 import { assertCancellationForm } from "@/lib/interpreterCancellation";
+import { OVERTIME_NOTE_REQUIRED, minutesOverSchedule, overtimeNeedsNote, workedMinutesBetween } from "@/lib/scheduledOvertime";
+
+/** The parts of a stored job this action reads; everything else is carried over untouched. */
+type StoredHours = Record<string, unknown> & { interpreterId?: string; interpreterName?: string; history?: unknown };
+type StoredJobData = Record<string, unknown> & { hoursSubmissions?: Record<string, StoredHours> };
 
 const signatureSchema = z
   .string()
@@ -45,7 +51,8 @@ export async function submitInterpreterHours(
     mileageNote?: string;
     note?: string;
     version?: number;
-    history?: any[];
+    /** Ignored: the server keeps the history (the browser's copy is never trusted). */
+    history?: unknown[];
     signatureDataUrl?: string;
     /** The on-site contact's printed name and signature; the server decides whether the job needs it. */
     onsiteSignoff?: OnsiteSignoffInput;
@@ -113,7 +120,7 @@ export async function submitInterpreterHours(
     // The position comes from the interpreter's OWN accepted offer, never from the browser, so a team member can only
     // ever write their own position's hours.
     const posIdx = positionOfOffer(existing.offerPositions, ownBooking.id);
-    const existingData = (existing.data as any) || {};
+    const existingData = (existing.data ?? {}) as RequestData & StoredJobData;
 
     const { startsAt, endsAt } = resolveRequestTimes({
       createdAt: existing.createdAt,
@@ -127,6 +134,9 @@ export async function submitInterpreterHours(
     // The scheduled times, fixed here: nothing was worked, so the browser's times are not used on a cancellation.
     const reportedStart = cancelled ? startsAt : actualStartTime;
     const reportedEnd = cancelled ? endsAt : actualEndTime;
+    // Time past the job's current schedule (e.g. a booking shortened from 8 to 4 hours) is accepted only with a note explaining it.
+    const overMinutes = cancelled ? 0 : minutesOverSchedule(workedMinutesBetween(reportedStart, reportedEnd, extra?.breakMinutes ?? 0), workedMinutesBetween(startsAt, endsAt));
+    if (overtimeNeedsNote(overMinutes, extra?.note)) throw new Error(OVERTIME_NOTE_REQUIRED);
 
     const travelStart = extra?.travelStartTime ? new Date(extra.travelStartTime) : null;
     const travelEnd = extra?.travelEndTime ? new Date(extra.travelEndTime) : null;

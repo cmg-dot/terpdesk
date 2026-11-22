@@ -4,6 +4,8 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { interpreters, offers } from "@/db/schema";
 import { getBaseUrl } from "@/lib/baseUrl";
+import { movesSchedule, scheduleUpdateNotice } from "@/lib/bookedTimeEdit";
+import { offerCardTitle } from "@/lib/offerPlace";
 import { writeAuditLog } from "@/lib/audit";
 import { buildTerpDeskEmail, emailActionCard, emailButton, escapeHtml } from "@/lib/emailTemplate";
 import { createJobDetailsToken } from "@/lib/jobDetailsToken";
@@ -11,6 +13,7 @@ import { interpreterEmailTitle } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import type { JobRequestRow, JobSummary } from "@/lib/jobSummary";
 import { notifyInterpreter } from "@/lib/notifications";
+import type { NotificationInput } from "@/lib/notifications";
 import { AGENCY_MESSAGE_KIND, logActivity } from "@/lib/requestActivity";
 import { agencyOnlyChangedSections, describeChange, diffJobForInterpreter } from "@/lib/requestChanges";
 import type { JobFieldChange } from "@/lib/requestChanges";
@@ -64,7 +67,24 @@ export function detailsUpdateFlag(notice: EditNotice): DetailsUpdateFlag | null 
 const changeLine = (c: JobFieldChange): string =>
   c.emailSafe ? describeChange(c) : `${c.field} was updated (see the secure job page)`;
 
-function buildUpdateEmail(s: JobSummary, changes: JobFieldChange[], detailsUrl: string | null, message?: string) {
+/**
+ * The in-app notice for one booked interpreter. A moved date or time is also a "Schedule updated" banner at the top of Home and Jobs
+ * (kind booking_time_changed, naming the job's header and its new date and time); any other change stays bell-only. Pure.
+ */
+export function editNotification(after: JobRequestRow, b: Pick<BookedInterpreter, "offerId" | "position">, changes: readonly JobFieldChange[], withMessage: boolean): NotificationInput {
+  const href = `/jobs/${b.offerId}`;
+  if (movesSchedule(changes)) return { type: "job", kind: "booking_time_changed", href, ...scheduleUpdateNotice(offerCardTitle(after), summarizeJob(after, b.position), withMessage) };
+  return {
+    type: "job",
+    href,
+    title: changes.length > 0 ? "Job details updated" : "Message from the agency",
+    message: changes.length > 0
+      ? `The agency changed: ${changes.map((c) => c.field).join(", ")}.${withMessage ? " They also sent you a message." : ""} Open the job to review.`
+      : "The agency sent you a message about this job. Open the job to read it.",
+  };
+}
+
+export function buildUpdateEmail(s: JobSummary, changes: JobFieldChange[], detailsUrl: string | null, message?: string) {
   const hasChanges = changes.length > 0;
   const items = changes.map((c) => `<li style="margin:0 0 6px;">${escapeHtml(changeLine(c))}</li>`).join("");
   // The agency's own words (e.g. the answer to a clarification question). escapeHtml keeps it inert; pre-line keeps its line breaks.
@@ -221,14 +241,7 @@ export async function announceEdit(after: JobRequestRow, notice: EditNotice, act
     const forThem = messageTo.has(b.interpreterId) ? messageText : undefined;
     if (changes.length === 0 && !forThem) continue;
     if (await emailInterpreter(after, b, changes, forThem)) notified += 1;
-    await notifyInterpreter(b.interpreterId, {
-      type: "job",
-      href: `/jobs/${b.offerId}`,
-      title: changes.length > 0 ? "Job details updated" : "Message from the agency",
-      message: changes.length > 0
-        ? `The agency changed: ${changes.map((c) => c.field).join(", ")}.${forThem ? " They also sent you a message." : ""} Open the job to review.`
-        : "The agency sent you a message about this job. Open the job to read it.",
-    });
+    await notifyInterpreter(b.interpreterId, editNotification(after, b, changes, Boolean(forThem)));
   }
   await writeAuditLog({
     action: "job_update_notice_sent",

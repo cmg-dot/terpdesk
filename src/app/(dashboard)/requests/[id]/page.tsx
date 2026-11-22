@@ -725,7 +725,7 @@ export default function AssignmentDetailPage() {
  )}
  {!isEditLocked && hasAcceptedBooking && !isCancelled && (
  <div className="bg-sky-50 border border-sky-200 rounded-2xl px-5 py-3.5 text-sm text-sky-900 mb-6">
- An interpreter is booked. The date, time, time zone and program are locked, but you can still edit the location, contacts, notes and credentials. When you save, each booked interpreter is emailed exactly what changed (plus an optional message from you), and the job is marked “Updated” in their app.
+ An interpreter is booked. The time zone and program are locked, but you can still change the date and times before the appointment starts, and edit the location, contacts, notes and credentials. When you save, each booked interpreter is emailed exactly what changed (plus an optional message from you), and the job is marked “Updated” in their app.
  </div>
  )}
  {editNotice && (

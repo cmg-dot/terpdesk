@@ -1,6 +1,9 @@
 "use client";
 
+import { TriangleAlert } from "lucide-react";
 import { SignaturePad } from "@/components/ui/SignaturePad";
+import { formatHoursMinutes } from "@/lib/durationFormat";
+import { minutesOverSchedule, overtimeNeedsNote, overtimeWarning } from "@/lib/scheduledOvertime";
 import { MileageLegsSection } from "@/components/features/MileageLegsSection";
 import type { MileageLeg } from "@/components/features/MileageLegsSection";
 import { OnsiteSignoffSection } from "@/components/features/OnsiteSignoffSection";
@@ -50,6 +53,9 @@ interface InterpreterSubmitFormProps {
   formError?: string | null;
 
   serviceTimeHours: string;
+  /** The entered time (less the break) and the job's current scheduled length, in minutes: overtime gets a warning and needs a note. */
+  workedMinutes?: number;
+  scheduledMinutes?: number;
 
   mileageLegs: MileageLeg[];
   totalMileage: number;
@@ -86,6 +92,8 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
   const showTravel = p.isOdhh || cancellation;
   const twoCol = p.compact ? "grid grid-cols-1 gap-6 mb-6" : "grid grid-cols-1 md:grid-cols-2 gap-6 mb-6";
   const errs = p.fieldErrors ?? {};
+  const overMinutes = cancellation || p.workedMinutes === undefined || p.scheduledMinutes === undefined ? 0 : minutesOverSchedule(p.workedMinutes, p.scheduledMinutes);
+  const noteMissing = overtimeNeedsNote(overMinutes, p.note);
   const fieldError = (text?: string) =>
     text ? (
       <p className={errorText} role="alert">
@@ -178,6 +186,12 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
             <p className="text-sm font-medium text-gray-800 mb-2">
               Service time before review: <span className="font-bold">{p.serviceTimeHours}</span>
             </p>
+            {overMinutes > 0 && (
+              <p className="mt-2 flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900" role="alert" data-overtime-warning="">
+                <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" aria-hidden="true" />
+                <span>{overtimeWarning(overMinutes, formatHoursMinutes(p.scheduledMinutes ?? 0))}</span>
+              </p>
+            )}
           </div>
 
           <MileageLegsSection
@@ -197,7 +211,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       <div className="mb-6">
         <label className={label}>Service note (optional)</label>
         <textarea rows={3} disabled={locked} value={p.note} onChange={(e) => p.onNoteChange(e.target.value)} className={input}></textarea>
-        <p className="text-xs text-[var(--sage)] mt-2">Keep this about timing only — start, end, breaks and waiting. Do not enter participant names, health details or anything said during the assignment.</p>
+        <p className="text-xs text-[var(--sage)] mt-2">Keep this about timing only: start, end, breaks and waiting. Do not enter participant names, health details or anything said during the assignment.</p>
       </div>
 
       <div className="bg-white p-5 rounded-xl border border-gray-200 mb-6">
@@ -215,7 +229,7 @@ export const InterpreterSubmitForm = (p: InterpreterSubmitFormProps) => {
       )}
 
       <div className="flex flex-wrap gap-3">
-        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature || (p.onsite !== undefined && !cancellation && !p.onsite.complete)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+        <button type="button" onClick={p.onSubmit} disabled={p.isSubmitting || locked || !p.hasSignature || noteMissing || (p.onsite !== undefined && !cancellation && !p.onsite.complete)} className="bg-[var(--forest-soft)] text-white rounded-full px-5 py-2 text-sm font-medium hover:bg-[var(--forest-deep)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
           {p.isSubmitting ? (p.submittingLabel ?? "Submitting...") : (p.submitLabel ?? (cancellation ? "Submit cancellation form" : "Submit actual hours"))}
         </button>
         {p.onSaveDraft && !cancellation && (

@@ -6,10 +6,10 @@ import { logError } from "@/lib/logError";
 
 /**
  * Notices an interpreter also sees on the dismissible banner at the top of Home and Jobs (lib/scheduleBanners.ts): a booking added
- * to their schedule by the agency, one taken off it by a cancellation or by staff removing them from it, or the agency's answer to
- * their question. Every other notice is bell-only (kind NULL).
+ * to their schedule by the agency, one taken off it by a cancellation or by staff removing them from it, one whose date or time the
+ * agency moved, or the agency's answer to their question. Every other notice is bell-only (kind NULL).
  */
-export const SCHEDULE_BANNER_KINDS = ["booking_added", "booking_cancelled", "booking_removed", "question_answered"] as const;
+export const SCHEDULE_BANNER_KINDS = ["booking_added", "booking_cancelled", "booking_removed", "booking_time_changed", "question_answered"] as const;
 export type ScheduleBannerKind = (typeof SCHEDULE_BANNER_KINDS)[number];
 
 /**

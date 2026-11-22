@@ -1,4 +1,5 @@
 import { formatHoursMinutes } from "@/lib/durationFormat";
+import { minutesOverSchedule } from "@/lib/scheduledOvertime";
 import { formatDateInZone, getIanaZone, parseInstantInZone } from "@/utils/timezone";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
 
@@ -23,6 +24,16 @@ export function scheduledMinutesOf(record: Pick<ServiceRecord, "scheduledStart" 
   const start = parseInstantInZone(record.scheduledStart, zone) ?? new Date(NaN);
   const end = parseInstantInZone(record.scheduledEnd, zone) ?? new Date(NaN);
   return Math.max(0, (end.getTime() - start.getTime()) / 60000);
+}
+
+/**
+ * Minutes the reported time runs past the job's current schedule (worked time less the break, against the booked length); null when
+ * it does not, or when the record has no worked time to compare (a billable cancellation form, or a closed job).
+ */
+export function exceedsScheduled(record: ServiceRecord): number | null {
+  if (record.cancelledBillable || record.jobClosed) return null;
+  const over = minutesOverSchedule(serviceMinutesOf(record), scheduledMinutesOf(record));
+  return over > 0 ? over : null;
 }
 
 const miles = (value: number | null | undefined): string => `${(value ?? 0).toFixed(1)} mi`;

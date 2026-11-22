@@ -92,7 +92,10 @@ export function quickEditTimesInvalid(values: Pick<QuickEditValues, "startDate" 
   }
 }
 
-/** What the server action is sent. While an interpreter is booked the schedule is left out and the message goes instead. */
+/**
+ * What the server action is sent. While an interpreter is booked the time zone is left out (it stays fixed) and the optional message
+ * goes too; the date and times are always sent (the server checks a booked job's new time against every booked interpreter).
+ */
 export function quickEditPayload(
   requestId: string,
   values: QuickEditValues,
@@ -114,9 +117,11 @@ export function quickEditPayload(
     building: values.building,
     contact: values.contact,
     contactMethod: values.contactMethod,
-    ...(scheduleLocked
-      ? { messageToInterpreter: message, messageRecipientId: recipientId || undefined }
-      : { startDate: values.startDate, startTime: values.startTime, endDate: values.endDate, endTime: values.endTime, timeZone: values.timeZone }),
+    startDate: values.startDate,
+    startTime: values.startTime,
+    endDate: values.endDate,
+    endTime: values.endTime,
+    ...(scheduleLocked ? { messageToInterpreter: message, messageRecipientId: recipientId || undefined } : { timeZone: values.timeZone }),
   };
 }
 

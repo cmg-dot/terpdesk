@@ -10,7 +10,9 @@ import { fromZonedTime, formatInTimeZone } from "date-fns-tz";
 import { fetchLiveRequestById } from "@/app/actions/getRequests";
 import { updateRequestAction } from "@/app/actions/updateRequest";
 import { getIanaZone, buildAppointmentUtcTimes } from "@/utils/timezone";
-import { Lock, AlertTriangle } from "lucide-react";
+import { Lock, AlertTriangle, Info } from "lucide-react";
+import { STATE_PORTAL_TIME_NOTE } from "@/lib/bookedTimeEdit";
+import { isStateProgram } from "@/lib/stateJob";
 import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, type SavedAgencyRequester } from "@/utils/savedRequesters";
 import { getClientsAction, saveRequesterToClientsAction, type ClientWithStats } from "@/app/actions/clients";
 import { isInvalidEmail } from "@/utils/validation";
@@ -399,7 +401,8 @@ export default function EditRequestPage() {
     ['assigned', 'booked', 'Fully staffed'].includes(existingRequest?.status);
   const isCancelledRequest = ['Cancelled', 'cancelled'].includes(existingRequest?.status);
   const isEditLocked = isCancelledRequest || hasLivePendingOffer || (isBookedRequest && !Number.isNaN(apptStartMs) && nowMs >= apptStartMs);
-  // While an interpreter is booked, date, time, time zone and program are fixed (the server ignores them too).
+  // While an interpreter is booked, the time zone and program are fixed (the server ignores them too). The date and times can move
+  // until the appointment starts; the server refuses a time any booked interpreter is not free for (bookedTimeEdit.ts).
   const isScheduleLocked = isBookedRequest && !isEditLocked;
   const [messageToInterpreter, setMessageToInterpreter] = useState("");
   // Team jobs: the message goes to one booked interpreter (the one being replied to), never the whole team.
@@ -746,7 +749,6 @@ export default function EditRequestPage() {
   };
 
  const inputClass = "w-full bg-[#F4F3EF] border-none rounded-full px-4 py-2.5 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] outline-none transition-shadow appearance-none";
- const lockedInputClass = `${inputClass} opacity-70 cursor-not-allowed`;
  const textareaClass = "w-full bg-[#F4F3EF] border-none rounded-2xl p-4 text-sm text-gray-800 focus:ring-2 focus:ring-[var(--forest)] resize-none outline-none transition-shadow";
  const cardClass = "bg-white rounded-2xl border border-gray-200 p-6 border border-gray-200/50 shadow-none space-y-6";
  const sectionTitleClass = "text-[18px] font-medium text-[var(--ink)] mb-4";
@@ -786,7 +788,7 @@ export default function EditRequestPage() {
  )}
  {!isEditLocked && isBookedRequest && (
  <div className="mt-4 bg-sky-50 border border-sky-200 text-sky-900 rounded-xl p-4 text-sm">
- An interpreter is booked on this job, so the date, time, time zone and program are locked. You can still edit the location, contacts, notes and credentials. When you save, each booked interpreter is emailed exactly what changed (plus an optional message from you), and the job is marked “Updated” in their app.
+ An interpreter is booked on this job, so the time zone and program are locked. You can still change the date and times before the appointment starts, and edit the location, contacts, notes and credentials. When you save, each booked interpreter is emailed exactly what changed (plus an optional message from you), and the job is marked “Updated” in their app.
  </div>
  )}
  </div>
@@ -948,9 +950,12 @@ export default function EditRequestPage() {
  <div className={cardClass}>
  <h2 className={sectionTitleClass}>Schedule and modality</h2>
  {isScheduleLocked && (
- <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-amber-200 bg-amber-50 p-3.5 text-sm text-amber-900">
- <Lock className="mt-0.5 h-4 w-4 flex-shrink-0 text-amber-700" />
- <span>The date, time and time zone are locked because an interpreter is booked. Changing them would skip the availability check they were booked under. To move the appointment, remove the booking first.</span>
+ <div className="mb-4 flex items-start gap-2.5 rounded-xl border border-sky-200 bg-sky-50 p-3.5 text-sm text-sky-900">
+ <Info className="mt-0.5 h-4 w-4 flex-shrink-0 text-sky-700" />
+ <span>
+ An interpreter is booked. You can change the date and times before the appointment starts: the new time is saved only if every booked interpreter is free then, and they are told. The time zone stays fixed.
+ {isStateProgram(formData.program) && <span className="mt-1 block font-medium">{STATE_PORTAL_TIME_NOTE}</span>}
+ </span>
  </div>
  )}
  
@@ -961,14 +966,14 @@ export default function EditRequestPage() {
  <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-6">
  <Field label="Starts" subtext={getHelperText(formData.startDate, formData.startTime, formData.timeZone)}>
  <div className="flex flex-col sm:flex-row gap-2">
- <IconInput kind="date" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
- <IconInput kind="time" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
+ <IconInput kind="date" className={inputClass} value={formData.startDate} onChange={(e) => handleChange("startDate", e.target.value)} />
+ <IconInput kind="time" className={inputClass} value={formData.startTime} onChange={(e) => handleChange("startTime", e.target.value)} />
  </div>
  </Field>
  <Field label="Ends" subtext={getHelperText(formData.endDate, formData.endTime, formData.timeZone)}>
  <div className="flex flex-col sm:flex-row gap-2">
- <IconInput kind="date" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
- <IconInput kind="time" disabled={isScheduleLocked} className={isScheduleLocked ? lockedInputClass : inputClass} value={formData.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
+ <IconInput kind="date" className={inputClass} value={formData.endDate} onChange={(e) => handleChange("endDate", e.target.value)} />
+ <IconInput kind="time" className={inputClass} value={formData.endTime} onChange={(e) => handleChange("endTime", e.target.value)} />
  </div>
  </Field>
  </div>

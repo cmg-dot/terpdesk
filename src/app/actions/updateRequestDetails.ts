@@ -4,6 +4,7 @@ import { realSetting } from "@/lib/settingLabel";
 import { requireRole } from "@/lib/auth/guards";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
+import type { RequestData } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { resolveEditedTimes } from "@/lib/editTimes";
@@ -12,6 +13,9 @@ import { recordTimeChange } from "@/lib/timeChangeLog";
 import { getRequestEditLock } from "@/lib/offerLock";
 import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipient } from "@/lib/jobUpdateNotice";
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
+import { bookedTimeConflict, withOriginalSchedule } from "@/lib/bookedTimeEdit";
+import { getInterpreterDisplayName } from "@/lib/displayName";
+import { td_conflict } from "./availability";
 
 export interface UpdateRequestDetailsPayload {
   requestId: string;
@@ -41,13 +45,23 @@ export interface UpdateRequestDetailsPayload {
   endsAt?: string | Date;
 }
 
+/** The parts of the stored job this edit reads; every other key is carried over untouched. */
+type Loose = Record<string, unknown>;
+type Text = string | null | undefined;
+type StoredDetails = Loose & {
+  format?: string; setting?: string; timeZone?: string; startDate?: string; startTime?: string; endDate?: string; endTime?: string;
+  meetingLink?: Text; virtualLink?: Text; passcode?: Text; accessCode?: Text; meetingId?: Text; platform?: Text; virtualInstructions?: Text;
+};
+type StoredOnsite = Loose & { venue?: Text; address?: Text; building?: Text; contact?: Text; contactMethod?: Text };
+type StoredData = Loose & { details?: StoredDetails; onsite?: StoredOnsite; overview?: Loose; format?: string; setting?: string; intake?: { odhhSrn?: string | null } };
+
 export type UpdateRequestDetailsResult =
   | { success: true; request: typeof requests.$inferSelect; notifiedInterpreters: number }
   | { success: false; error: string };
 
 /**
  * Quick edit. Same lock as "Edit assignment" (see offerLock.ts), enforced here on the server. While an interpreter is
- * booked, the date, time and time zone are ignored. Booked interpreters are told what changed, plus the optional message. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
+ * booked, the time zone is ignored, and a new date or time is saved only if every booked interpreter is free then. Booked interpreters are told what changed, plus the optional message. Problems are returned, not thrown: in production a thrown message is hidden from the browser.
  */
 export async function updateRequestDetails(requested: UpdateRequestDetailsPayload): Promise<UpdateRequestDetailsResult> {
   const session = await requireRole("agency");
@@ -58,13 +72,13 @@ export async function updateRequestDetails(requested: UpdateRequestDetailsPayloa
   const existing = rows[0];
   const lock = await getRequestEditLock(requested.requestId);
   if (lock.locked) return { success: false, error: lock.message };
-  // While an interpreter is booked, the date, time and time zone are ignored (kept as stored).
+  // While an interpreter is booked, the time zone is ignored (kept as stored); the date and times may change.
   const payload = lock.booked ? stripLockedFields(requested) : requested;
   const message = lock.booked ? cleanInterpreterMessage(requested.messageToInterpreter) : undefined;
 
-  const existingData = (existing.data as any) || {};
-  const existingDetails = existingData.details || {};
-  const existingOnsite = existingData.onsite || {};
+  const existingData = (existing.data ?? {}) as RequestData & StoredData;
+  const existingDetails: StoredDetails = existingData.details || {};
+  const existingOnsite: StoredOnsite = existingData.onsite || {};
 
   const newFormat = payload.format || existingDetails.format || existingData.format || "Virtual";
   const newSetting = realSetting(payload.setting) || realSetting(existingDetails.setting) || realSetting(existingData.setting);
@@ -158,8 +172,15 @@ export async function updateRequestDetails(requested: UpdateRequestDetailsPayloa
   // The message goes to ONE booked interpreter; on a team job the agency must say which. Checked before saving.
   const recipient = resolveMessageRecipient(notice, message, requested.messageRecipientId);
   if (!recipient.ok) return { success: false, error: recipient.error };
+  // A booked job may move before it starts, but only to a time every booked interpreter is free (bookedTimeEdit.ts); the first
+  // move keeps the booked window for billing.
+  const timeChange = timeChangeOf(existing, { startsAt: startsAtIso, endsAt: endsAtIso });
+  if (timeChange && notice.booked.length > 0) {
+    const conflict = await bookedTimeConflict({ requestId: requested.requestId, booked: notice.booked, window: timeChange.after }, { check: td_conflict, nameOf: getInterpreterDisplayName });
+    if (conflict) return { success: false, error: conflict };
+  }
   const flag = detailsUpdateFlag(notice);
-  const finalData = flag ? { ...updatedData, detailsUpdate: flag } : updatedData;
+  const finalData = withOriginalSchedule(flag ? { ...updatedData, detailsUpdate: flag } : updatedData, timeChange, lock.booked);
 
   const [updated] = await db.update(requests)
     .set({
@@ -170,8 +191,7 @@ export async function updateRequestDetails(requested: UpdateRequestDetailsPayloa
     .where(eq(requests.id, payload.requestId))
     .returning();
 
-  // Any move of the start or end is recorded from the stored instants (old and new, Pacific Time), apart from the label diff above.
-  const timeChange = timeChangeOf(existing, { startsAt: startsAtIso, endsAt: endsAtIso });
+  // Any move of the start or end is recorded (old and new, Pacific Time), apart from the label diff above.
   if (timeChange) {
     await recordTimeChange({ requestId: payload.requestId, srn: existingData.intake?.odhhSrn ?? null, change: timeChange, userId: session.user.id ?? null, userEmail: session.user.email ?? null, actorLabel: session.user.name ?? "Agency staff" });
   }

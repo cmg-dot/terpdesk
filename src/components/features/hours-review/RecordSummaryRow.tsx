@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { Check, ChevronDown, TriangleAlert } from "lucide-react";
 import { RecordStatusBadge } from "@/components/features/hours-review/RecordStatusBadge";
-import { summarizeRecord } from "@/lib/hoursReviewSummary";
+import { exceedsScheduled, summarizeRecord } from "@/lib/hoursReviewSummary";
+import { exceedsScheduledLabel } from "@/lib/scheduledOvertime";
 import { COMMERCIAL_AUTO_BADGE } from "@/lib/insurance";
 import { formatReference } from "@/utils/statusEngine";
 import type { ServiceRecord } from "@/utils/hoursReviewRecords";
@@ -31,6 +32,7 @@ function NoBreakSrn({ text }: { text: string }) {
  */
 export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props) {
   const summary = summarizeRecord(record);
+  const overSchedule = exceedsScheduled(record);
   const heading = record.title || record.reference || formatReference(record.appointmentId);
   const showReference = Boolean(record.title && record.reference && !record.title.includes(record.reference.replace("SRN ", "")));
 
@@ -79,7 +81,13 @@ export function RecordSummaryRow({ record, expanded, onToggle, panelId }: Props)
               No signature
             </span>
           )}
-          {record.commercialAuto && <span className={`${CHIP} bg-emerald-50 text-emerald-800`}>{COMMERCIAL_AUTO_BADGE}</span>}
+          {overSchedule !== null && (
+            <span className={`${CHIP} border border-amber-300 bg-amber-100 text-amber-900`} title="The reported time is longer than the job's current scheduled time. Check the service note before approving.">
+              <TriangleAlert className="h-3.5 w-3.5" aria-hidden="true" />
+              {exceedsScheduledLabel(overSchedule)}
+            </span>
+          )}
+          {record.commercialAuto &&<span className={`${CHIP} bg-emerald-50 text-emerald-800`}>{COMMERCIAL_AUTO_BADGE}</span>}
           <RecordStatusBadge state={record.state} closed={record.jobClosed} billable={record.cancelledBillable} />
           <ChevronDown className={`h-5 w-5 flex-none text-[var(--forest)] transition-transform ${expanded ? "rotate-180" : ""}`} aria-hidden="true" />
           <span className="sr-only">{expanded ? "Hide details" : "Show details"}</span>

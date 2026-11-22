@@ -670,6 +670,9 @@ function BookedServiceTime({ job }: { job: any }) {
   };
 
   let serviceTimeHours = "-";
+  // The entered time and the job's current scheduled length: the form warns (and asks for a note) when the times run past it.
+  let workedMinutes: number | undefined;
+  const scheduledMinutes = Number.isFinite(endsAtMs - startsAtMs) ? (endsAtMs - startsAtMs) / 60000 : undefined;
   if (actualStart && actualEnd) {
     // The inputs are wall-clock times in the job's zone: read them there, so the length is right across a DST change.
     const jobZone = mapSafeZone((job as any).details?.timeZone || job.timeZone);
@@ -679,6 +682,7 @@ function BookedServiceTime({ job }: { job: any }) {
       const diffMs = end - start;
       const mins = Math.max(0, (diffMs / 60000) - (effectiveBreakMinutes));
       serviceTimeHours = formatHoursMinutes(mins);
+      workedMinutes = mins;
     }
   }
 
@@ -804,6 +808,8 @@ function BookedServiceTime({ job }: { job: any }) {
                fieldErrors={fieldErrors}
                formError={submitError}
                serviceTimeHours={serviceTimeHours}
+               workedMinutes={workedMinutes}
+               scheduledMinutes={scheduledMinutes}
                mileageLegs={mileageLegs}
                totalMileage={totalMileage}
                onAddLeg={addMileageLeg}

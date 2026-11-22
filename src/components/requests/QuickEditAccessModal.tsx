@@ -14,6 +14,7 @@ import { SCROLLBAR_CLASS } from "@/components/ui/popoverStyles";
 import { plainOptions, withCurrent } from "@/lib/dropdown";
 import { initialQuickEditValues, quickEditPayload, quickEditTimesInvalid, requestField } from "@/lib/quickEditAccess";
 import type { QuickEditValues } from "@/lib/quickEditAccess";
+import { isStateProgram } from "@/lib/stateJob";
 import { defaultRecipient } from "@/utils/messageRecipients";
 import type { MessageRecipient } from "@/utils/messageRecipients";
 
@@ -27,7 +28,7 @@ export interface QuickEditAccessModalProps {
   requestId: string;
   /** The stored request the form starts from (read once, when the modal opens). */
   request: unknown;
-  /** An interpreter is booked: date, time and time zone are fixed, and a message to them can be added instead. */
+  /** An interpreter is booked: the time zone is fixed (the date and times can move), and a message to them can be added. */
   scheduleLocked: boolean;
   /** An offer is waiting or the appointment has started: nothing can be saved. */
   editLocked: boolean;
@@ -59,12 +60,13 @@ const ModalBody = memo(function ModalBody({ requestId, request, scheduleLocked, 
   // Only the five schedule fields matter here, so typing in an address box does not redo the time check.
   const timesInvalid = useMemo(() => quickEditTimesInvalid({ startDate, startTime, endDate, endTime, timeZone }), [startDate, startTime, endDate, endTime, timeZone]);
   const needsRecipient = scheduleLocked && message.trim() !== "" && recipients.length > 1 && !recipientId;
+  const stateJob = isStateProgram(String(requestField(requestField(requestField(request, "data"), "intake"), "program") ?? ""));
 
   const save = async (event: FormEvent) => {
     event.preventDefault();
     event.stopPropagation();
     if (editLocked) return setError(editLockMessage);
-    if (!scheduleLocked && timesInvalid) return;
+    if (timesInvalid) return;
     setSaving(true);
     setError(null);
     try {
@@ -98,7 +100,7 @@ const ModalBody = memo(function ModalBody({ requestId, request, scheduleLocked, 
         <form onSubmit={save} className="flex min-h-0 flex-1 flex-col">
           {/* The scrolling body: cream track, emerald thumb (SCROLLBAR_CLASS). The padding keeps field focus rings and shadows from being cut at its edges. */}
           <div className={`min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-6 py-4 sm:px-7 ${SCROLLBAR_CLASS}`}>
-            <QuickEditSchedule values={values} onChange={change} locked={scheduleLocked} startsAt={requestField(request, "startsAt")} endsAt={requestField(request, "endsAt")} timesInvalid={timesInvalid} />
+            <QuickEditSchedule values={values} onChange={change} booked={scheduleLocked} stateJob={stateJob} timesInvalid={timesInvalid} />
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div>
@@ -140,7 +142,7 @@ const ModalBody = memo(function ModalBody({ requestId, request, scheduleLocked, 
             </button>
             <button
               type="submit"
-              disabled={saving || (!scheduleLocked && timesInvalid) || needsRecipient}
+              disabled={saving || timesInvalid || needsRecipient}
               className="rounded-full bg-[var(--forest)] px-6 py-2 text-sm font-medium text-white transition-colors hover:bg-[var(--forest)]/90 disabled:cursor-not-allowed disabled:opacity-50"
             >
               {saving ? "Saving..." : "Save details"}

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CalendarMinus, CalendarPlus, CalendarX, MessageCircleReply, X } from "lucide-react";
+import { CalendarClock, CalendarMinus, CalendarPlus, CalendarX, MessageCircleReply, X } from "lucide-react";
 import { dismissScheduleBanner, getMyScheduleBanners } from "@/app/actions/scheduleBanners";
 import type { ScheduleBanner } from "@/app/actions/scheduleBanners";
 
@@ -10,12 +10,14 @@ const STYLE = {
   booking_added: { box: "border-emerald-200 bg-emerald-50 text-emerald-950", icon: CalendarPlus, iconClass: "text-emerald-700" },
   booking_cancelled: { box: "border-red-200 bg-red-50 text-red-950", icon: CalendarX, iconClass: "text-red-700" },
   booking_removed: { box: "border-red-200 bg-red-50 text-red-950", icon: CalendarMinus, iconClass: "text-red-700" },
+  // A moved booking: the interpreter must notice it, so it is the strong amber alert (a thicker border and a stronger fill).
+  booking_time_changed: { box: "border-2 border-amber-400 bg-amber-100 text-amber-950", icon: CalendarClock, iconClass: "text-amber-700" },
   question_answered: { box: "border-sky-200 bg-sky-50 text-sky-950", icon: MessageCircleReply, iconClass: "text-sky-700" },
 } as const;
 
 /**
- * Top of the interpreter's Home and Jobs: each recent change the agency made to their schedule (a booking added, or one cancelled),
- * and each answer to a question they asked, until they close it. The same notice stays in the bell. Shows nothing while loading or on error.
+ * Top of the interpreter's Home and Jobs: each recent change the agency made to their schedule (a booking added, cancelled, removed or
+ * moved to a new time), and each answer to a question they asked, until they close it. The same notice stays in the bell. Shows nothing while loading or on error.
  */
 export function ScheduleBanners() {
   const [items, setItems] = useState<ScheduleBanner[]>([]);
