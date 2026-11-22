@@ -208,6 +208,9 @@ export interface PublicRequestDraft {
   data: RequestData;
 }
 
+/** `data.source.channel` of every request made from the public form: the Website requests page lists exactly these. */
+export const PUBLIC_INTAKE_CHANNEL = "public_intake_form";
+
 /** The generic title: the setting only. The public form has no title, and participant names never go in one. */
 export const publicRequestTitle = (setting: string): string => `Interpreter Request - ${setting}`;
 
@@ -266,7 +269,7 @@ export function buildPublicRequest(input: PublicIntake, receivedAt: Date = new D
       recurrenceNote: input.repeats ? input.recurrenceNote ?? "" : "",
       // Staff decide the positions; the form's team answer is only a suggestion (requester.teamSuggested).
       positions: "One interpreter",
-      source: { channel: "public_intake_form", receivedAt: receivedAt.toISOString(), ...(input.submissionId ? { submissionId: input.submissionId } : {}) },
+      source: { channel: PUBLIC_INTAKE_CHANNEL, receivedAt: receivedAt.toISOString(), ...(input.submissionId ? { submissionId: input.submissionId } : {}) },
     },
     input.startsAt,
     input.endsAt,

@@ -4,6 +4,7 @@ import { db } from "@/db";
 import { requests } from "@/db/schema";
 import { summarizeJob } from "@/lib/jobSummary";
 import { notifyAgencyAdmins } from "@/lib/notifications";
+import { PUBLIC_INTAKE_CHANNEL } from "@/lib/publicIntake";
 import type { PublicRequestDraft } from "@/lib/publicIntake";
 import { logActivity } from "@/lib/requestActivity";
 import { formatReference } from "@/utils/statusEngine";
@@ -13,7 +14,7 @@ import { formatReference } from "@/utils/statusEngine";
  * deployment's own booking page (/book). Never books, never sends offers. SERVER ONLY.
  */
 
-const SOURCE_CHANNEL = "public_intake_form";
+const SOURCE_CHANNEL = PUBLIC_INTAKE_CHANNEL;
 
 /**
  * One transaction. With a submissionId, a retry of the same submission (a timeout, a double click) returns the first request instead

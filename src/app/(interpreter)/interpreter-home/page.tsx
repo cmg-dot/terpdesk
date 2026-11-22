@@ -33,12 +33,20 @@ import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import { bucketInterpreterJobs, isLivePendingOffer } from "@/lib/interpreterJobBuckets";
 import { jobPlaceLines } from "@/lib/jobPlaceLines";
 import { offerDeadlineLabel } from "@/lib/offerDeadline";
-import { OfferSummaryLines } from "@/components/interpreter/OfferSummaryLines";
+import { HomeOfferCard } from "@/components/interpreter/HomeOfferCard";
+import type { HomeOffer } from "@/components/interpreter/HomeOfferCard";
 import { AcceptOfferDialog } from "@/components/interpreter/AcceptOfferDialog";
 import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
+import { jobWhenParts } from "@/lib/interpreterJobDate";
+
+/** A job's `details.setting` / `details.format` when the server sent them as text, else "". */
+const detailText = (job: object, key: "setting" | "format"): string => {
+  const value = (job as { details?: Record<string, unknown> | null }).details?.[key];
+  return typeof value === "string" ? value : "";
+};
 
 export default function InterpreterHomePage() {
-  const { jobs, acceptJobOffer } = useInterpreterJobs();
+  const { jobs, acceptJobOffer, declineOffer } = useInterpreterJobs();
   const { currentUser } = useGlobalState();
   const { data: session } = useSession();
   // Preferred name, else the account name (same name the sidebar shows).
@@ -47,9 +55,9 @@ export default function InterpreterHomePage() {
   React.useEffect(() => {
     getConnectedAgencyCount().then(setConnectedAgencyCount).catch(() => setConnectedAgencyCount(0));
   }, [session?.user?.id]);
-  const [offers, setOffers] = React.useState<any[]>([]);
+  const [offers, setOffers] = React.useState<HomeOffer[]>([]);
   const [currentTime, setCurrentTime] = React.useState<number>(Date.now());
-  const [serviceRecords, setServiceRecords] = React.useState<any[]>([]);
+  const [serviceRecords, setServiceRecords] = React.useState<Record<string, unknown>[]>([]);
   const [acceptError, setAcceptError] = React.useState<string | null>(null);
   const [profileTimezone, setProfileTimezone] = React.useState<string>(() => {
     if (typeof window !== 'undefined') {
@@ -125,9 +133,20 @@ export default function InterpreterHomePage() {
 
   // Accept first asks "Do you need travel time?" (AcceptOfferDialog); the offer is accepted with the answers.
   const [acceptingOffer, setAcceptingOffer] = React.useState<{ id: string; title: string } | null>(null);
-  const handleAcceptOffer = (offer: any) => {
+  const handleAcceptOffer = (offer: HomeOffer) => {
     setAcceptError(null);
     setAcceptingOffer({ id: String(offer.id), title: String(offer.title || "this job") });
+  };
+  // Decline (after the card's own "Decline this offer?" confirmation): declineOffer tells the agency and closes the offer; the card
+  // then leaves the list. A refusal (expired, withdrawn) rejects, the card shows it, and the list is reloaded to match the database.
+  const handleDeclineOffer = async (offerId: string) => {
+    try {
+      await declineOffer(offerId);
+    } catch (err) {
+      if (currentUser?.email) fetchInterpreterOffers(currentUser.email).then(setOffers).catch(() => console.error("[interpreter-home page] request failed"));
+      throw err;
+    }
+    setOffers((prev) => prev.filter((o) => o.id !== offerId));
   };
   const confirmAccept = (answers: AcceptAnswersInput) => {
     const offer = acceptingOffer;
@@ -139,9 +158,9 @@ export default function InterpreterHomePage() {
         await acceptJobOffer(offer.id, answers);
         setOffers(prev => prev.filter(o => o.id !== offer.id));
         setAcceptingOffer(null);
-      } catch (err: any) {
+      } catch (err) {
         console.error("[interpreter-home page] operation failed");
-        setAcceptError(err?.message || "This offer has expired and can no longer be accepted.");
+        setAcceptError((err instanceof Error && err.message) || "This offer has expired and can no longer be accepted.");
         if (currentUser?.email) {
           fetchInterpreterOffers(currentUser.email).then(data => setOffers(data)).catch(() => console.error("[interpreter-home page] request failed"));
         }
@@ -173,7 +192,7 @@ export default function InterpreterHomePage() {
   });
   const hoursToSubmit = sortedHoursToSubmitJobs.length;
 
-  const parseSafeDate = (dateVal: any) => {
+  const parseSafeDate = (dateVal?: string) => {
     if (!dateVal) return null;
     let d = new Date(dateVal);
     if (!isNaN(d.getTime())) return d;
@@ -239,11 +258,10 @@ export default function InterpreterHomePage() {
           </p>
           {happeningNowJobs.length === 1 && (
             <p className="text-[13px] text-emerald-200/80 mt-0.5">
-              {formatJobDate(
-                happeningNowJobs[0].startsAt || ((happeningNowJobs[0] as any).details?.startDate ? `${(happeningNowJobs[0] as any).details.startDate}T${(happeningNowJobs[0] as any).details.startTime || '00:00'}` : undefined),
-                happeningNowJobs[0].endsAt || ((happeningNowJobs[0] as any).details?.endDate ? `${(happeningNowJobs[0] as any).details.endDate}T${(happeningNowJobs[0] as any).details.endTime || '00:00'}` : undefined),
-                (happeningNowJobs[0] as any).details?.timeZone || happeningNowJobs[0].timeZone
-              )}
+              {(() => {
+                const w = jobWhenParts(happeningNowJobs[0]);
+                return formatJobDate(w.start, w.end, w.zone);
+              })()}
               {happeningNowJobs[0].location ? ` · ${happeningNowJobs[0].location}` : ''}
             </p>
           )}
@@ -422,53 +440,14 @@ export default function InterpreterHomePage() {
  ) : (
  <div className="space-y-4">
  {pendingOffersList.map((job) => (
-  <div
+  <HomeOfferCard
     key={job.id}
-    className="bg-[var(--canvas)] rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border border-gray-200/50"
-  >
-    <div className="flex items-start gap-3">
-    <div className="w-2 h-2 rounded-full bg-[#9B1C1C] mt-2 shrink-0" />
-    <div>
-    <h3 className="text-[15px] font-medium text-[var(--ink)] mb-1">
-    Offer received — {job.title}
-    </h3>
-    <OfferSummaryLines job={job} />
-    {/* Before accepting: mental health, solo or team, and the notes (scrubbed of the client's details on the server). */}
-    <OfferTags mentalHealth={job.mentalHealth === true} positionCount={job.positionCount} className="mt-2" />
-    <OfferNotes notes={job.offerNotes} removed={job.offerNotesRemoved} compact />
-    <p className="text-[12px] text-[var(--sage)] mt-1">
-    {(() => {
-      const deadline = offerDeadlineLabel(job.offerExpiresAt, job.details?.timeZone || job.timeZone);
-      return deadline ? `Respond by ${deadline} · ` : "";
-    })()}Pending offers do not reserve time.
-    </p>
-    </div>
-    </div>
-    <div className="flex flex-wrap gap-2 shrink-0 md:w-auto w-full">
-      <ClarificationButton target={{ kind: "app", offerId: job.id }} label="Ask a question" compact />
-      <Link
-        href={`/jobs/${job.id}`}
-        className="text-[13px] font-medium text-gray-700 hover:text-[var(--ink)] bg-white border border-gray-200 rounded-full px-4 py-2 text-center transition-colors flex-1 md:flex-none"
-      >
-        Review
-      </Link>
-      <button
-        onClick={() => handleAcceptOffer(job)}
-        disabled={isPending && actingOfferId === job.id}
-        className="text-[13px] font-medium text-white bg-[var(--forest)] hover:bg-[var(--forest-bright)] disabled:opacity-50 disabled:cursor-not-allowed rounded-full px-4 py-2 text-center transition-colors flex-1 md:flex-none cursor-pointer flex justify-center items-center gap-2"
-      >
-        {isPending && actingOfferId === job.id ? (
-          <>
-            <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-            Accepting...
-          </>
-        ) : (
-          'Accept'
-        )}
-      </button>
-    </div>
-  </div>
-  ))}
+    job={job}
+    accepting={isPending && actingOfferId === job.id}
+    onAccept={() => handleAcceptOffer(job)}
+    onDecline={handleDeclineOffer}
+  />
+ ))}
  </div>
  )}
  </div>
@@ -512,10 +491,8 @@ export default function InterpreterHomePage() {
  <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2 mb-1">
  <div className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase leading-6">
  {(() => {
-    const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
-    const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
-    const tz = (job as any).details?.timeZone || job.timeZone;
-    return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+    const w = jobWhenParts(job);
+    return w.start ? formatJobDate(w.start, w.end, w.zone) : job.dateString;
  })()}
  </div>
  <div className="flex flex-row flex-wrap items-center justify-end gap-2">
@@ -552,10 +529,10 @@ export default function InterpreterHomePage() {
 
  <div className="flex flex-wrap gap-1.5 mt-2.5">
  <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
- {settingLabel(job.setting, (job as any).details?.setting)}
+ {settingLabel(job.setting, detailText(job, "setting"))}
  </span>
  <span className="text-xs font-medium text-gray-600 border border-gray-200 px-2.5 py-0.5 rounded-full">
- {job.isVirtual ? "Virtual" : (job.format || (job as any).details?.format || "In person")}
+ {job.isVirtual ? "Virtual" : (job.format || detailText(job, "format") || "In person")}
  </span>
  {job.positionIndex && (
  <span className="text-xs font-medium text-[var(--forest-soft)] bg-[var(--surface)] px-2.5 py-0.5 rounded-full">
@@ -616,7 +593,7 @@ export default function InterpreterHomePage() {
  const locSecondary = place.secondary;
 
  const record = findOwnServiceRecord(serviceRecords, job);
- const reviewMsg = record?.reviewMessage || (job.hoursSubmission as any)?.reviewMessage;
+ const reviewMsg = record?.reviewMessage || job.hoursSubmission?.reviewMessage;
 
  return (
  <div
@@ -631,10 +608,8 @@ export default function InterpreterHomePage() {
  <div className="flex flex-row flex-wrap items-center gap-2">
  <span className="text-[11px] font-bold tracking-wider text-[#A0522D] uppercase">
  {(() => {
- const startStr = job.startsAt || ((job as any).details?.startDate ? `${(job as any).details.startDate}T${(job as any).details.startTime || '00:00'}` : undefined);
- const endStr = job.endsAt || ((job as any).details?.endDate ? `${(job as any).details.endDate}T${(job as any).details.endTime || '00:00'}` : undefined);
- const tz = (job as any).details?.timeZone || job.timeZone;
- return startStr ? formatJobDate(startStr, endStr, tz) : job.dateString;
+ const w = jobWhenParts(job);
+ return w.start ? formatJobDate(w.start, w.end, w.zone) : job.dateString;
  })()}
  </span>
  <span className={`inline-flex h-6 items-center text-[11px] px-2.5 rounded-full whitespace-nowrap ${badgeInfo.badgeClass}`}>

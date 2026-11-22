@@ -5,6 +5,7 @@ import { getBaseUrl } from "@/lib/baseUrl";
 import { writeAuditLog } from "@/lib/audit";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { buildTerpDeskEmail, emailActionCard, emailButton, emailDetailsTable, emailHeroButton, emailSecondaryButton, escapeHtml } from "@/lib/emailTemplate";
+import { sanitizeOrganization } from "@/lib/emailOrganization";
 import { createJobDetailsToken } from "@/lib/jobDetailsToken";
 import { ODHH_VERIFICATION_FORM_URL } from "@/lib/odhhPortal";
 import { summarizeJob } from "@/lib/jobSummary";
@@ -16,7 +17,8 @@ import { resolveRequestTimes } from "@/utils/timezone";
 /**
  * Job emails with progressive disclosure. These emails carry the restricted summary only (title, date and time, format,
  * generic setting, role, broad program type), and no reference: the subject names the job by its date. Addresses, prep notes and materials are never emailed;
- * after acceptance they are on the secure details page that the confirmation links to.
+ * after acceptance they are on the secure details page that the confirmation links to. The one addition is the OFFER email's
+ * Organization row, a sanitized organization name (lib/emailOrganization.ts). The setting is always one of the generic categories.
  *
  * SERVER ONLY.
  */
@@ -37,6 +39,17 @@ export const summaryRows = (s: JobSummary, opts: { withReference?: boolean } = {
 ];
 
 export const summaryText = (s: JobSummary, opts: { withReference?: boolean } = {}) => summaryRows(s, opts).map((r) => `${r.label}: ${r.value}`).join("\n");
+
+/**
+ * The offer email's rows: the usual restricted summary, with an Organization row after the Assignment when the job names a clean
+ * one ("Seattle Children's Hospital", "DVR": lib/emailOrganization.ts). The value is sanitized here too, so no caller can put a
+ * contact's name, an email address or a number in the email. Only the OFFER email has this row.
+ */
+export function offerRows(s: JobSummary, organization?: string | null): { label: string; value: string }[] {
+  const rows = summaryRows(s);
+  const safe = sanitizeOrganization(organization);
+  return safe ? [rows[0], { label: "Organization", value: safe }, ...rows.slice(1)] : rows;
+}
 
 /** How an interpreter email names its job: "Job offer · Tue, Nov 18". */
 export const interpreterEmailTitle = (prefix: string, s: JobSummary): string => `${prefix} · ${s.shortDate}`;
@@ -80,9 +93,11 @@ export const OFFER_EMAIL_VIRTUAL_NOTE = "The meeting link is shared after you ac
 
 /**
  * The offer email: restricted details plus Accept / Decline links. `deadline` is the offer's response deadline in the job's zone
- * (lib/offerDeadline.ts); the links last exactly that long.
+ * (lib/offerDeadline.ts); the links last exactly that long. `organization` adds an Organization row when it is a clean organization
+ * name (offerRows); the place, SRN, client and notes are never in the email.
  */
-export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string, deadline: string | null): { subject: string; html: string; text: string } {
+export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: string, deadline: string | null, organization?: string | null): { subject: string; html: string; text: string } {
+  const rows = offerRows(s, organization);
   // The place itself is never in the email: an in-person offer's link page shows the clinic and street address before accepting.
   const locationNote = s.isVirtual ? OFFER_EMAIL_VIRTUAL_NOTE : OFFER_EMAIL_IN_PERSON_NOTE;
   const respond = deadline ? `Please respond by ${deadline}.` : "Please respond as soon as you can.";
@@ -93,7 +108,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
       <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;">You have a new job offer</h1>
       <p style="margin:0 0 4px;">Review the details below and respond. ${escapeHtml(locationNote)} Appointment notes and materials follow once you're booked.</p>
       ${emailActionCard(`
-        ${emailDetailsTable(summaryRows(s))}
+        ${emailDetailsTable(rows)}
         <p style="margin:20px 0 12px;">${emailButton("Accept job offer", acceptUrl)}</p>
         <p style="margin:0;">${emailSecondaryButton("Decline offer", declineUrl)}</p>
       `)}
@@ -102,7 +117,7 @@ export function buildOfferEmail(s: JobSummary, acceptUrl: string, declineUrl: st
   const text = [
     "You have a new interpreting job offer.",
     "",
-    summaryText(s),
+    rows.map((r) => `${r.label}: ${r.value}`).join("\n"),
     "",
     locationNote,
     "",

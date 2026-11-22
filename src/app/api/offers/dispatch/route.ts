@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { interpreters, offers, requests } from "@/db/schema";
 import { hasRole } from "@/lib/auth/guards";
 import { getBaseUrl } from "@/lib/baseUrl";
+import { emailOrganization } from "@/lib/emailOrganization";
 import { buildOfferEmail } from "@/lib/jobEmails";
 import { summarizeJob } from "@/lib/jobSummary";
 import { generateOfferToken } from "@/lib/jwt";
@@ -25,8 +26,8 @@ const bodySchema = z.object({
 
 /**
  * Emails a job offer with zero-login Accept / Decline links. Progressive disclosure: the email carries only the
- * restricted summary (reference, title, date and time, format, generic setting, role). Location, client, program,
- * prep notes and materials are shared after acceptance through the booking confirmation's secure link.
+ * restricted summary (title, date and time, format, a generic setting category, role) and a sanitized Organization row. Location,
+ * client, SRN, prep notes and materials are never in it: the place is on the link's page, the rest after acceptance.
  */
 export async function POST(req: Request) {
   if (!(await hasRole("agency"))) {
@@ -82,7 +83,8 @@ export async function POST(req: Request) {
     const declineUrl = `${appUrl}/api/offers/response?token=${token}&action=decline`;
 
     const summary = summarizeJob(request, body.positionNumber);
-    const email = buildOfferEmail(summary, acceptUrl, declineUrl, offerDeadlineLabel(offer?.expiresAt, summary.timeZone));
+    // The Organization row: a clean organization name only (never a contact's name, email, phone or number: lib/emailOrganization.ts).
+    const email = buildOfferEmail(summary, acceptUrl, declineUrl, offerDeadlineLabel(offer?.expiresAt, summary.timeZone), emailOrganization(request.data));
     // The offer is already saved; `email` says whether it was emailed or held back ("muted" / "suppressed").
     const outcome = await sendEmail(interpreter.email, email.subject, email.html, email.text);
     return NextResponse.json({ success: true, email: outcome });

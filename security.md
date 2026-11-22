@@ -17,3 +17,5 @@
 ## 4. HIPAA & Logging Hygiene
 - Do NOT output sensitive client, patient, or appointment details to terminal or production logs (`console.log`).
 - Keep outbound email notifications free of Protected Health Information (PHI). Only include appointment time, generic setting (e.g., Medical, Legal, Educational), and format (Virtual / On-site).
+- The setting in an email is always one of the fixed categories in `src/lib/genericSetting.ts` (Medical, Legal, Educational, Mental Health, Social Services, Employment, General), never the form's own words.
+- One exception to "no organization in email": the interpreter OFFER email may carry an Organization row, and only a value that passes `src/lib/emailOrganization.ts` (a clean organization name: no person's name, email address, phone number or ID number). Cancellation, removal and every other email still carry none.

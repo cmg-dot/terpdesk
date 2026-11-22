@@ -1,6 +1,7 @@
 import { positionRole } from "@/lib/positions";
 import { formatInTimeZone } from "date-fns-tz";
 import { formatHoursMinutes } from "@/lib/durationFormat";
+import { genericSetting } from "@/lib/genericSetting";
 import { hasPhysicalPlace } from "@/lib/jobPlace";
 import { readInterpreterNotes } from "@/lib/interpreterNotes";
 import type { InterpreterNotes } from "@/lib/interpreterNotes";
@@ -17,7 +18,7 @@ import { getIanaZone, resolveRequestTimes } from "@/utils/timezone";
  * put in an email (security.md: no PHI in outbound email).
  */
 
-type LooseData = Record<string, any>;
+type LooseData = Record<string, unknown>;
 
 export interface JobRequestRow {
   id: string;
@@ -74,7 +75,7 @@ const GENERATED_STATE_TITLE = /^ODHH\s+SRN\s*#/i;
 export function summarizeJob(request: JobRequestRow, positionNumber?: number): JobSummary {
   const data = (request.data ?? {}) as LooseData;
   const details = (data.details ?? {}) as LooseData;
-  const zone = getIanaZone(details.timeZone || details.timezone || data.timeZone || data.timezone);
+  const zone = getIanaZone(text(details.timeZone) || text(details.timezone) || text(data.timeZone) || text(data.timezone));
 
   let dateLabel = "Date to be confirmed";
   let shortDate = "Date to be confirmed";
@@ -113,8 +114,9 @@ export function summarizeJob(request: JobRequestRow, positionNumber?: number): J
     format: rawFormat,
     // A meeting link means the job is online, whatever its saved format says.
     isVirtual: rawFormat.toLowerCase().includes("virtual") || hasMeetingLink,
-    // Generic setting only (e.g. Medical, Legal, Educational).
-    setting: rawSetting && rawSetting !== "Choose a setting" ? rawSetting : "General interpreting",
+    // One of a fixed set of generic categories (Medical, Legal, Educational, Mental Health, Social Services, Employment, General),
+    // never the form's own words (lib/genericSetting.ts). Every email and the email link's pages read this.
+    setting: genericSetting(rawSetting),
     role: positionRole(request.data, positionNumber),
     // Mapped to a fixed label so a free-text program value can never leak client detail into an email.
     program: /odhh/i.test(rawProgram) ? "WA ODHH" : /apple/i.test(rawProgram) ? "WA Apple Health" : "Agency (general)",
