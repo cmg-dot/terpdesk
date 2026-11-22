@@ -11,6 +11,7 @@ import { QuickEditLocation } from "@/components/requests/QuickEditLocation";
 import { QuickEditSchedule } from "@/components/requests/QuickEditSchedule";
 import { Dropdown } from "@/components/ui/Dropdown";
 import { SCROLLBAR_CLASS } from "@/components/ui/popoverStyles";
+import { invalidateKey } from "@/lib/clientCache";
 import { plainOptions, withCurrent } from "@/lib/dropdown";
 import { initialQuickEditValues, quickEditPayload, quickEditTimesInvalid, requestField } from "@/lib/quickEditAccess";
 import type { QuickEditValues } from "@/lib/quickEditAccess";
@@ -72,6 +73,8 @@ const ModalBody = memo(function ModalBody({ requestId, request, scheduleLocked, 
     try {
       const result = await updateRequestDetails(quickEditPayload(requestId, values, scheduleLocked, message, recipientId));
       if (!result.success) return setError(result.error);
+      // A moved time or changed detail makes this tab's cached dashboard figures out of date.
+      invalidateKey("dashboard-summary");
       await onSaved(result, values);
       onClose();
     } catch (err) {

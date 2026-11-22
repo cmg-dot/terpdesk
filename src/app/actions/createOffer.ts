@@ -85,6 +85,7 @@ export async function createOffer(input: CreateOfferInput): Promise<CreateOfferR
       jobStartsAtUtc: apptStart,
       jobEndsAtUtc: apptEnd,
       jobTimeZone: jobTimeZoneOf(request.data),
+      excludeRequestId: payload.requestId,
     }));
   } catch (err) {
     logError("createOffer availability check", err);

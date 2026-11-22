@@ -33,16 +33,20 @@ interface Props {
 }
 
 /**
- * One live offer on Home: its header, when and where, the tags and the scrubbed notes, the response deadline, and the four things an
- * interpreter can do: ask a question, decline (after one "Decline this offer?" confirmation), review, or accept.
+ * One live offer on Home: its header, when and where, the tags and the scrubbed notes, the response deadline, and (on a row of their
+ * own below) the four things an interpreter can do: ask a question, decline (after one "Decline this offer?" confirmation), review,
+ * or accept.
  */
 export function HomeOfferCard({ job, accepting, onAccept, onDecline }: Props) {
   const deadline = offerDeadlineLabel(job.offerExpiresAt, job.details?.timeZone ? String(job.details.timeZone) : job.timeZone);
   return (
-    <div className="bg-[var(--canvas)] rounded-xl p-4 flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border border-gray-200/50" data-home-offer={job.id}>
-      <div className="flex items-start gap-3">
+    // The details take the whole width of the card; the buttons sit on their own row below them (never beside, where they squeezed the
+    // details and pushed the "Decline this offer?" box past the card's edge). The Decline confirmation and the "question sent" note
+    // each take a full row of their own, last in the row (order-last).
+    <div className="bg-[var(--canvas)] rounded-xl p-4 flex flex-col gap-3 border border-gray-200/50" data-home-offer={job.id}>
+      <div className="flex w-full min-w-0 flex-1 items-start gap-3">
         <div className="w-2 h-2 rounded-full bg-[#9B1C1C] mt-2 shrink-0" />
-        <div>
+        <div className="min-w-0 flex-1 break-words">
           <h3 className="text-[15px] font-medium text-[var(--ink)] mb-1">Offer received: {job.title}</h3>
           <OfferSummaryLines job={job} />
           {/* Before accepting: mental health, solo or team, and the notes (scrubbed of the client's details on the server). */}
@@ -53,7 +57,7 @@ export function HomeOfferCard({ job, accepting, onAccept, onDecline }: Props) {
           </p>
         </div>
       </div>
-      <div className="flex flex-wrap gap-2 shrink-0 md:w-auto w-full">
+      <div className="w-full flex flex-wrap items-center gap-2 pt-3 border-t border-gray-200/70" data-home-offer-actions="">
         <ClarificationButton target={{ kind: "app", offerId: job.id }} label="Ask a question" compact />
         <OfferDeclineControl offerId={job.id} onDecline={onDecline} />
         <Link

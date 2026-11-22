@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { answerQuestion, getOpenQuestions } from "@/app/actions/clarificationReply";
 import type { OpenQuestion } from "@/app/actions/clarificationReply";
+import { invalidateKey } from "@/lib/clientCache";
 import { MAX_ANSWER_LENGTH } from "@/lib/clarificationThread";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
@@ -57,6 +58,8 @@ export function AnswerQuestionDialog({ open, onOpenChange, requestId, questionId
     try {
       const result = await answerQuestion({ requestId, questionId: question.id, answer });
       if (!result.success) return setError(result.error);
+      // Cached counts of open questions (the dashboard's) are now out of date.
+      invalidateKey("dashboard-summary");
       onAnswered?.(question.id, answer.trim());
       setAnswer("");
       onOpenChange(false);

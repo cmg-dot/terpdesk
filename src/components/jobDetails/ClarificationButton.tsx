@@ -54,8 +54,9 @@ export function ClarificationButton({ target, label = "Request clarification", c
   };
 
   return (
-    // Compact (Home's offer card): its own full-width row on a phone, beside Review / Accept from 768px up.
-    <div className={compact ? "flex w-full flex-col items-stretch gap-1 md:w-auto" : "flex flex-col items-center gap-2"}>
+    // Compact (Home's offer card): the button is one item of the card's button row (display: contents), and the "sent" note below
+    // takes a full row of its own at the end of that row, so nothing is squeezed or pushed past the card.
+    <div className={compact ? "contents" : "flex flex-col items-center gap-2"}>
       <button
         type="button"
         onClick={() => {
@@ -73,7 +74,7 @@ export function ClarificationButton({ target, label = "Request clarification", c
         {label}
       </button>
       {sent && (
-        <p role="status" className={`${compact ? "text-xs" : "text-sm"} font-medium text-emerald-700`}>
+        <p role="status" className={`${compact ? "order-last w-full basis-full text-xs" : "text-sm"} font-medium text-emerald-700`}>
           Your question was sent to the agency. They&apos;ll get back to you.
         </p>
       )}

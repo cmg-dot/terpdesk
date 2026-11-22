@@ -2,28 +2,28 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
-import { CalendarCheck, MessageCircleQuestion, X } from "lucide-react";
+import { CalendarCheck, Hourglass, MessageCircleQuestion, UserMinus, X } from "lucide-react";
 import { dismissAgencyBanner, getMyAgencyBanners } from "@/app/actions/agencyBanners";
 import type { AgencyBanner } from "@/app/actions/agencyBanners";
 import { AnswerQuestionDialog } from "@/components/requests/AnswerQuestionDialog";
+import { usePulseChange } from "@/hooks/usePulse";
 import { parseQuestionHref } from "@/lib/clarificationThread";
 
 /** The request (and question) an interpreter's-question notice is about; null for any other notice. */
 const target = (item: AgencyBanner) => (item.kind === "offer_question" ? parseQuestionHref(item.href) : null);
 
-/** How often an open, visible agency page checks for new notices. */
-const POLL_MS = 30_000;
-
 const STYLE = {
   offer_accepted: { box: "border-emerald-200 bg-emerald-50 text-emerald-950", icon: CalendarCheck, iconClass: "text-emerald-700", open: "Open Staffing" },
+  offer_declined: { box: "border-red-200 bg-red-50 text-red-950", icon: UserMinus, iconClass: "text-red-700", open: "Open Staffing" },
+  offer_expired: { box: "border-amber-200 bg-amber-50 text-amber-950", icon: Hourglass, iconClass: "text-amber-700", open: "Open Staffing" },
   offer_question: { box: "border-amber-200 bg-amber-50 text-amber-950", icon: MessageCircleQuestion, iconClass: "text-amber-700", open: "Read the question" },
 } as const;
 
 /**
- * Top of every agency page, full width, built like the interpreter's schedule banner: each offer an interpreter accepted and each
- * question they asked, until this staff member opens it (which also closes it and goes to the job) or closes it with ×. Kari and
- * Josie each close their own. Up to three show; "+N more" opens the bell, which keeps every notice. Checked on every page change,
- * when the window regains focus and every 30 s while the tab is visible.
+ * Top of every agency page, full width, built like the interpreter's schedule banner: each offer an interpreter accepted or declined,
+ * each offer that ran out of time, and each question they asked, until this staff member opens it (which also closes it and goes to
+ * the job) or closes it with ×. Kari and Josie each close their own. Up to three show; "+N more" opens the bell, which keeps every
+ * notice. Checked on every page change and whenever the 15-second pulse (hooks/usePulse.ts) sees something new.
  */
 export function AgencyBanners() {
   const pathname = usePathname();
@@ -42,19 +42,8 @@ export function AgencyBanners() {
     void load();
   }, [pathname, load]);
 
-  useEffect(() => {
-    const onFocus = () => {
-      if (document.visibilityState === "visible") void load();
-    };
-    const timer = window.setInterval(onFocus, POLL_MS);
-    window.addEventListener("focus", onFocus);
-    document.addEventListener("visibilitychange", onFocus);
-    return () => {
-      window.clearInterval(timer);
-      window.removeEventListener("focus", onFocus);
-      document.removeEventListener("visibilitychange", onFocus);
-    };
-  }, [load]);
+  // The 15-second pulse (hooks/usePulse.ts, also on focus) says when something new arrived: re-read the notices then.
+  usePulseChange(() => void load());
 
   const dismiss = async (id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));

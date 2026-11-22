@@ -19,6 +19,8 @@ import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { readInterpreterNotes } from "@/lib/interpreterNotes";
 import { getInterpretersFitForJob } from "@/app/actions/availability";
+import { offersFitKey } from "@/lib/offersFitKey";
+import { usePulseChange } from "@/hooks/usePulse";
 import type { InterpreterFitStatus } from "@/app/actions/availability";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
@@ -211,6 +213,9 @@ export default function AssignmentDetailPage() {
   const positionIds = positionFacts.map((f) => f.id);
 
   const reloadRequest = async () => { setFoundRequest(await fetchLiveRequestById(id)); };
+  // The 15-second pulse (hooks/usePulse.ts, also on focus): an interpreter accepted, declined or let an offer expire, or a colleague
+  // changed something. Read the request again, so Staffing and the availability map are current without a refresh.
+  usePulseChange(() => { void reloadRequest().catch(() => undefined); });
   const offerForms = usePositionOfferForms({ requestId: id, request: foundRequest, ids: positionIds, dbInterpreters, fits: interpreterFitMap, reload: reloadRequest, toast: showToast });
   const slotActions = usePositionSlots({ requestId: id, reload: async () => { await reloadRequest(); router.refresh(); }, toast: showToast });
 
@@ -352,9 +357,10 @@ export default function AssignmentDetailPage() {
     }
   }, [id]);
 
-  // The interpreter-fit check reads only these from the request.
+  // The interpreter-fit check reads only these from the request, plus who holds which offer: when an offer is accepted, declined,
+  // withdrawn or expires, or someone is booked or removed, the check runs again (it used to keep its first answer until a refresh).
   const fitKey = foundRequest
-    ? [foundRequest.id, foundRequest.startsAt, foundRequest.endsAt, foundRequest.details?.timeZone || foundRequest.details?.timezone || foundRequest.timeZone || foundRequest.data?.details?.timeZone || foundRequest.data?.timeZone || ""].join("|")
+    ? [foundRequest.id, foundRequest.startsAt, foundRequest.endsAt, foundRequest.details?.timeZone || foundRequest.details?.timezone || foundRequest.timeZone || foundRequest.data?.details?.timeZone || foundRequest.data?.timeZone || "", offersFitKey(foundRequest.offers)].join("|")
     : "";
 
   useEffect(() => {
@@ -391,6 +397,8 @@ export default function AssignmentDetailPage() {
           jobStartsAtUtc: jobStart.toISOString(),
           jobEndsAtUtc: jobEnd.toISOString(),
           jobTimeZone,
+          // This job's own offers and bookings never count against its window (an interpreter removed from it is not "unavailable").
+          excludeRequestId: String(foundRequest.id),
         });
         if (!fits || typeof fits !== "object") {
           throw new Error("The availability service returned no interpreter statuses.");

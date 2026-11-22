@@ -1,10 +1,12 @@
 "use client";
 
 import { settingLabel } from "@/lib/settingLabel";
-import React, { createContext, useContext, useState, ReactNode, useEffect, useRef } from "react";
+import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
 import { updateOfferStatus } from "@/app/actions/updateOfferStatus";
 import { useGlobalState } from "@/context/GlobalContext";
+import { useJobsResync } from "@/hooks/useJobsResync";
+import { invalidateKey } from "@/lib/clientCache";
 import { DEFAULT_AGENCY_NAME } from "@/lib/agency";
 import type { AcceptAnswersInput } from "@/lib/acceptAnswers";
 import type { InterpreterCancellation } from "@/lib/interpreterCancellation";
@@ -87,9 +89,6 @@ interface InterpreterJobsContextType {
 
 const InterpreterJobsContext = createContext<InterpreterJobsContextType | undefined>(undefined);
 
-/** How often an open, visible page re-reads the interpreter's jobs. */
-const POLL_INTERVAL_MS = 60_000;
-
 export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [isMounted, setIsMounted] = useState(false);
@@ -162,26 +161,8 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
     }
   }, [currentUser?.email]);
 
-  // Hours can be submitted outside this tab (e.g. via the emailed secure link) and the agency can change or cancel a job,
-  // so re-sync when the app regains focus and once a minute while it is visible.
-  const lastSyncRef = useRef(0);
-  useEffect(() => {
-    if (!currentUser?.email) return;
-    const resync = () => {
-      if (document.visibilityState !== 'visible' || Date.now() - lastSyncRef.current < 5000) return;
-      lastSyncRef.current = Date.now();
-      void reloadJobs();
-    };
-    window.addEventListener('focus', resync);
-    document.addEventListener('visibilitychange', resync);
-    // Changes made by the agency while this page stays open (a cancellation, an edit) show up within a minute.
-    const poll = window.setInterval(resync, POLL_INTERVAL_MS);
-    return () => {
-      window.removeEventListener('focus', resync);
-      document.removeEventListener('visibilitychange', resync);
-      window.clearInterval(poll);
-    };
-  }, [currentUser?.email]);
+  // Re-read the jobs on the 15-second pulse, on focus, and once a minute (hooks/useJobsResync.ts).
+  useJobsResync(Boolean(currentUser?.email), reloadJobs);
 
   useEffect(() => {
     if (isMounted) {
@@ -198,6 +179,7 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
       setJobs(prevJobs => prevJobs.map(job =>
         job.id === jobId ? { ...job, status: 'booked' } : job
       ));
+      invalidateKey("dashboard-summary");
     } catch (err: any) {
       // If offer expired or rejected, reload to sync updated DB state
       await reloadJobs();
@@ -212,9 +194,11 @@ export function InterpreterJobsProvider({ children }: { children: ReactNode }) {
     try {
       const result = await updateOfferStatus(jobId, 'declined');
       if ('success' in result && !result.success) throw new Error(result.error);
-      setJobs(prevJobs => prevJobs.map(job => 
+      setJobs(prevJobs => prevJobs.map(job =>
         job.id === jobId ? { ...job, status: 'declined' } : job
       ));
+      // Anything cached in this tab that counted this offer (the dashboard's offers-out figure) is now out of date.
+      invalidateKey("dashboard-summary");
     } catch (err: any) {
       await reloadJobs();
       throw err;

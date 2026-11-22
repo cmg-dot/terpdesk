@@ -13,6 +13,8 @@ export interface CacheEntry<T> {
   /** When `data` was last read from the server (ms). */
   updatedAt: number;
   validating: boolean;
+  /** Marked by `invalidateKey`: what is held is known to be out of date, so the next read ignores the "just read it" window. */
+  stale?: boolean;
 }
 
 /** An answer older than this is not shown (a tab left open for hours must not show yesterday's board as if it were live). */
@@ -58,7 +60,7 @@ export function revalidate<T>(key: string, fetcher: () => Promise<T>, nowMs: num
   const running = inFlight.get(key);
   if (running) return running;
   const current = readEntry<T>(key);
-  if (current && !current.error && nowMs - current.updatedAt < DEDUPE_MS) return Promise.resolve();
+  if (current && !current.error && !current.stale && nowMs - current.updatedAt < DEDUPE_MS) return Promise.resolve();
 
   const startedIn = generation;
   entries.set(key, { data: current?.data, error: current?.error ?? false, updatedAt: current?.updatedAt ?? 0, validating: true });
@@ -79,6 +81,20 @@ export function revalidate<T>(key: string, fetcher: () => Promise<T>, nowMs: num
     });
   inFlight.set(key, run);
   return run;
+}
+
+/**
+ * Marks one answer as out of date (an offer was accepted or declined, a question answered, a schedule edited) and tells the screens
+ * showing it, which re-read it at once (useCachedAction). `suffix` is the key a screen passed to useCachedAction, such as
+ * "dashboard-summary": every signed-in user's copy of that key goes stale (in this tab there is only ever one). What is shown stays on
+ * screen until the fresh answer arrives, so nothing blanks. An unknown key does nothing.
+ */
+export function invalidateKey(suffix: string): void {
+  entries.forEach((entry, key) => {
+    if (key !== suffix && !key.endsWith(`:${suffix}`)) return;
+    entries.set(key, { ...entry, stale: true });
+    notify(key);
+  });
 }
 
 /** Empties the cache (sign-out, sign-in as someone else) and tells every screen that is showing an answer from it. */

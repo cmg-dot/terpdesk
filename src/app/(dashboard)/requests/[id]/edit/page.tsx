@@ -12,6 +12,7 @@ import { updateRequestAction } from "@/app/actions/updateRequest";
 import { getIanaZone, buildAppointmentUtcTimes } from "@/utils/timezone";
 import { Lock, AlertTriangle, Info } from "lucide-react";
 import { STATE_PORTAL_TIME_NOTE } from "@/lib/bookedTimeEdit";
+import { invalidateKey } from "@/lib/clientCache";
 import { isStateProgram } from "@/lib/stateJob";
 import { getSavedAgencyRequesters, saveAgencyRequester, formatRequesterLabel, type SavedAgencyRequester } from "@/utils/savedRequesters";
 import { getClientsAction, saveRequesterToClientsAction, type ClientWithStats } from "@/app/actions/clients";
@@ -699,6 +700,8 @@ export default function EditRequestPage() {
         setIsSaving(false);
         return;
       }
+      // A moved time or changed detail makes this tab's cached dashboard figures out of date.
+      invalidateKey("dashboard-summary");
 
       if (formData.saveOrg && isNewRequester) {
         await saveRequesterToClientsAction({

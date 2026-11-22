@@ -18,6 +18,7 @@ import { revalidatePath } from "next/cache";
 import { formatInTimeZone } from "date-fns-tz";
 import { getIanaZone, resolveRequestTimes, wallClockToUtcDate } from "@/utils/timezone";
 import { logError } from "@/lib/logError";
+import { cleanRequestId, hasScheduleConflict } from "@/lib/fitConflict";
 
 let tablesEnsured = false;
 
@@ -800,10 +801,17 @@ export async function checkInterpreterFit(params: {
   jobStartsAtUtc: string | Date;
   jobEndsAtUtc: string | Date;
   jobTimeZone?: string;
+  /**
+   * The job being staffed. Its own bookings never count against it: an interpreter booked on this job, or removed from it, would
+   * otherwise clash with the job's own window and show "unavailable" for the very job they are on. Anything that is not a request
+   * id is ignored (the check then simply counts every booking).
+   */
+  excludeRequestId?: string;
 }): Promise<{ fit: InterpreterFitStatus }> {
   await requireRole("agency");
   await ensureAvailabilityTables();
   const { interpreterId, jobStartsAtUtc, jobEndsAtUtc } = params;
+  const excludeRequestId = cleanRequestId(params.excludeRequestId);
   // Staff accounts have no agency of their own yet, so the workspace's single agency is used. Always checking it
   // (instead of an optional, browser-supplied id) means the sharing check can never be skipped.
   const agencyId = DEFAULT_AGENCY_ID;
@@ -814,16 +822,9 @@ export async function checkInterpreterFit(params: {
   const jobEndsDate = new Date(jobEndsAtUtc);
 
   // --- Tier 1 & 2: Double-booked or Private busy ---
-  for (const tid of targetIds) {
-    const conflictCheck = await td_conflict({
-      interpreterId: tid,
-      startsAtUtc: jobStartsDate,
-      endsAtUtc: jobEndsDate,
-    });
-    if (conflictCheck.hasConflict) {
-      // Privacy rule: Tier 1 & 2 unify into "unavailable". Never leak title or private details.
-      return { fit: "unavailable" };
-    }
+  if (await hasScheduleConflict({ interpreterIds: targetIds, startsAtUtc: jobStartsDate, endsAtUtc: jobEndsDate, excludeRequestId }, td_conflict)) {
+    // Privacy rule: Tier 1 & 2 unify into "unavailable". Never leak title or private details.
+    return { fit: "unavailable" };
   }
 
   // --- Tier 3: Not shared ---
@@ -933,6 +934,8 @@ export async function getInterpretersFitForJob(params: {
   jobStartsAtUtc: string | Date;
   jobEndsAtUtc: string | Date;
   jobTimeZone?: string;
+  /** The job being staffed: its own bookings do not count against its window (see checkInterpreterFit). */
+  excludeRequestId?: string;
 }): Promise<Record<string, InterpreterFitStatus>> {
   await requireRole("agency");
   const result: Record<string, InterpreterFitStatus> = {};
@@ -944,6 +947,7 @@ export async function getInterpretersFitForJob(params: {
         jobStartsAtUtc: params.jobStartsAtUtc,
         jobEndsAtUtc: params.jobEndsAtUtc,
         jobTimeZone: params.jobTimeZone,
+        excludeRequestId: params.excludeRequestId,
       });
       result[interpreterId] = fit;
     } catch (error) {

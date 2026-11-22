@@ -24,6 +24,7 @@ import { CountBadge } from "@/components/ui/CountBadge";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
 import { AgencySidebar } from "@/components/agency/AgencySidebar";
 import { AgencyBanners } from "@/components/agency/AgencyBanners";
+import { AlertToasts } from "@/components/ui/AlertToasts";
 import { MobileBrand } from "@/components/agency/SidebarBrand";
 import { IdleTimeoutGuard } from "@/components/auth/IdleTimeoutGuard";
 import { SignOutButton } from "@/components/auth/SignOutButton";
@@ -73,6 +74,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               {children}
             </div>
           </main>
+          {/* A floating pop-up for each new alert (offer accepted, declined or expired; a question), over the page. */}
+          <AlertToasts />
 
           <AnimatePresence>
             {isMenuOpen && (

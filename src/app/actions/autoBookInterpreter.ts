@@ -41,7 +41,7 @@ export async function autoBookInterpreter(input: AssignInterpreterDirectlyInput)
     if (!summarizeJob(job).isVirtual) return { success: false, error: "Auto-book covers virtual jobs only. Send an offer for in-person work." };
 
     const { startsAt, endsAt } = resolveRequestTimes(job);
-    const { fit } = await checkInterpreterFit({ interpreterId, jobStartsAtUtc: startsAt, jobEndsAtUtc: endsAt });
+    const { fit } = await checkInterpreterFit({ interpreterId, jobStartsAtUtc: startsAt, jobEndsAtUtc: endsAt, excludeRequestId: jobId });
     if (fit !== "available") return { success: false, error: "This job is outside the availability the interpreter shares, or clashes with their schedule. Send an offer instead." };
   } catch (err) {
     logError("autoBookInterpreter", err);

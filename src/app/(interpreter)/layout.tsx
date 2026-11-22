@@ -18,6 +18,7 @@ import {
 import { BrandLockup } from "@/components/brand/BrandLockup";
 import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
+import { AlertToasts } from "@/components/ui/AlertToasts";
 import { motion, AnimatePresence } from "framer-motion";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
@@ -122,6 +123,8 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
           </InterpreterJobsProvider>
         </div>
       </main>
+      {/* A floating pop-up for each new alert (a schedule change, an answer to a question), over the page. */}
+      <AlertToasts />
 
       <AnimatePresence>
         {isMenuOpen && (

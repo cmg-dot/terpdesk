@@ -7,6 +7,8 @@ import { eq } from "drizzle-orm";
 import { resolveRequestTimes } from "@/utils/timezone";
 import { ensureDisplayNameColumns, interpreterDisplayName } from "@/lib/displayName";
 import { mapRequestRow } from "@/lib/mapRequestRow";
+import { announceExpiredOffer, claimExpiredOffer, expiryNeedsStaff } from "@/lib/offerExpiryAlert";
+import type { ExpiredOffer } from "@/lib/offerExpiryAlert";
 
 /**
  * ONE request in full (its whole data blob and every offer), for that request's own page. There is deliberately no "every request in
@@ -47,12 +49,16 @@ export async function fetchLiveRequestById(id: string) {
 
   // Auto-expire pending offers if the appointment passed or the offer's response deadline passed
   let anyExpired = false;
+  const toAnnounce: ExpiredOffer[] = [];
+  const { startsAt: appointmentStartsAt } = resolveRequestTimes(row);
   for (const o of requestOffers) {
     const deadlinePassed = Boolean(o.expiresAt) && new Date(o.expiresAt).getTime() <= now.getTime();
     if ((o.status === 'pending' || o.state === 'pending') && (isAppointmentPassed || deadlinePassed)) {
-      await db.update(offers)
-        .set({ status: 'expired', updatedAt: now })
-        .where(eq(offers.id, o.id));
+      // Conditional: only the caller that really changes the offer announces it (offerExpiry.ts).
+      const claimed = await claimExpiredOffer(o.id, now);
+      if (claimed && expiryNeedsStaff(now, { expiresAt: o.expiresAt, startsAt: appointmentStartsAt })) {
+        toAnnounce.push({ offerId: o.id, requestId: o.requestId, interpreterId: o.interpreterId, data: row.data });
+      }
       o.status = 'expired';
       o.state = 'expired';
       anyExpired = true;
@@ -89,6 +95,7 @@ export async function fetchLiveRequestById(id: string) {
         .where(eq(requests.id, row.id));
     }
   }
+  for (const expired of toAnnounce) await announceExpiredOffer(expired);
 
   const mappedOffers = requestOffers.map(o => ({
     id: o.id,

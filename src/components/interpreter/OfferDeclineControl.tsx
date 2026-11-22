@@ -27,7 +27,7 @@ export function OfferDeclineView({ confirming, busy, error, onAsk, onConfirm, on
     );
   }
   return (
-    <div role="group" aria-label="Confirm declining this offer" data-offer-decline-confirm="" className="flex w-full flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2">
+    <div role="group" aria-label="Confirm declining this offer" data-offer-decline-confirm="" className="order-last flex w-full basis-full flex-wrap items-center gap-2 rounded-xl border border-red-200 bg-red-50/60 px-3 py-2">
       <span className="text-[13px] font-medium text-[var(--ink)]">Decline this offer?</span>
       <button type="button" onClick={onConfirm} disabled={busy} className={`${BUTTON} bg-[#9B1C1C] text-white hover:bg-[#7F1717]`}>
         {busy ? "Declining..." : "Yes, decline"}

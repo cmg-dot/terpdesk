@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { getMyNotifications, markAllNotificationsRead, markNotificationRead } from "@/app/actions/notificationActions";
 import type { MyNotification } from "@/app/actions/notificationActions";
-
-const POLL_MS = 60_000;
+import { usePulseChange } from "@/hooks/usePulse";
 
 /** Global bell: the signed-in user's rows from the `notifications` table (the server scopes them to the session). */
 export function NotificationBell() {
@@ -27,15 +26,11 @@ export function NotificationBell() {
     }
   }, []);
 
-  // Load on sign-in, then poll quietly while the tab is visible.
+  // Load on sign-in; after that the 15-second pulse (hooks/usePulse.ts, also on focus) says when there is something new to read.
   useEffect(() => {
-    if (status !== "authenticated") return;
-    refresh();
-    const timer = setInterval(() => {
-      if (document.visibilityState === "visible") refresh();
-    }, POLL_MS);
-    return () => clearInterval(timer);
+    if (status === "authenticated") refresh();
   }, [status, refresh]);
+  usePulseChange(() => void refresh());
 
   // Close when clicking outside
   useEffect(() => {

@@ -68,5 +68,11 @@ export function useCachedAction<T>(key: string, fetcher: () => Promise<T>, optio
     };
   }, [cacheKey, refreshMs]);
 
+  // `invalidateKey` marked this answer stale (something changed): read it again now, without waiting for the timer or a focus.
+  const isStale = stored?.stale === true && !stored.validating;
+  useEffect(() => {
+    if (cacheKey && isStale) void revalidate(cacheKey, () => fetcherRef.current());
+  }, [cacheKey, isStale]);
+
   return { data: entry?.data, error: entry?.error ?? false, isValidating: entry?.validating ?? false };
 }

@@ -27,7 +27,21 @@ import { interpreterReference } from "@/utils/statusEngine";
  * SERVER ONLY.
  */
 
-export type AgencyAlertEvent = "offer_accepted" | "offer_declined" | "assignment_given_back" | "timesheet_submitted" | "cancellation_form_submitted";
+export type AgencyAlertEvent = "offer_accepted" | "offer_declined" | "offer_expired" | "assignment_given_back" | "timesheet_submitted" | "cancellation_form_submitted";
+
+/** Events that are also a banner at the top of every staff member's workspace (lib/bannerKinds.ts), and open straight on Staffing. */
+const BANNER_EVENTS = ["offer_accepted", "offer_declined", "offer_expired"] as const;
+type BannerEvent = (typeof BANNER_EVENTS)[number];
+const isBannerEvent = (event: AgencyAlertEvent): event is BannerEvent => (BANNER_EVENTS as readonly string[]).includes(event);
+
+/** The banner kind a staff alert is shown with (an event and its kind share a name), or null for a bell-only alert. Pure. */
+export const agencyBannerKind = (event: AgencyAlertEvent): BannerEvent | null => (isBannerEvent(event) ? event : null);
+
+/** Where a staff alert opens: banner events go straight to the job's Staffing section, unless the caller named a place. Pure. */
+export const agencyAlertHref = (event: AgencyAlertEvent, requestId: string, explicit?: string): string => {
+  const href = explicit ?? `/requests/${requestId}`;
+  return isBannerEvent(event) && !explicit ? `${href}#staffing` : href;
+};
 export type InterpreterAlertEvent = "booking_cancelled" | "timesheet_correction_requested";
 
 interface AlertContext {
@@ -65,6 +79,7 @@ const interpreterContext = (ctx: AlertContext): string =>
 const AGENCY_COPY: Record<AgencyAlertEvent, { title: string; did: string; next: string }> = {
   offer_accepted: { title: "Offer accepted", did: "accepted", next: "The interpreter is now booked." },
   offer_declined: { title: "Offer declined", did: "declined the offer for", next: "This position may need a new offer." },
+  offer_expired: { title: "Offer expired", did: "did not answer in time, so the offer expired for", next: "This position may need a new offer." },
   assignment_given_back: { title: "Assignment given back", did: "gave back", next: "This position needs a replacement." },
   timesheet_submitted: { title: "Timesheet submitted", did: "submitted hours for", next: "The hours are waiting for your review." },
   cancellation_form_submitted: { title: "Cancellation form submitted", did: "submitted a cancellation form for", next: "Billing pays the scheduled time and any travel reported; there is nothing to approve." },
@@ -97,17 +112,21 @@ export async function alertAgency(params: {
     const name = (await getInterpreterDisplayName(params.interpreterId).catch(() => null)) || "An interpreter";
     const href = params.href ?? `/requests/${params.requestId}`;
     const accepted = params.event === "offer_accepted";
+    const kind = agencyBannerKind(params.event);
     const answers = accepted && params.answers ? acceptAnswersText(params.answers) : "";
 
     await notifyAgencyAdmins({
       type: "job",
-      // An acceptance is also a banner at the top of every staff member's workspace, until each of them closes or opens it.
-      ...(accepted ? { kind: "offer_accepted" as const } : {}),
-      // An acceptance opens straight on the job's Staffing section.
-      href: accepted && !params.href ? `${href}#staffing` : href,
+      // An acceptance, a decline and an expiry are also a banner at the top of every staff member's workspace, until each of them
+      // closes or opens it.
+      ...(kind ? { kind } : {}),
+      // ...and open straight on the job's Staffing section.
+      href: agencyAlertHref(params.event, params.requestId, params.href),
       title: copy.title,
       message: [`${name} ${copy.did} ${staffContext(ctx)}. ${copy.next}`, answers].filter(Boolean).join(" "),
     });
+    // An expiry is in the app only (banner, bell and pop-up): nobody did anything, so there is nothing to email about.
+    if (params.event === "offer_expired") return;
 
     const url = `${getBaseUrl()}${href}`;
     const s = ctx.summary;

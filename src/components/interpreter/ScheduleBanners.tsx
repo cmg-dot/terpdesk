@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CalendarClock, CalendarMinus, CalendarPlus, CalendarX, MessageCircleReply, X } from "lucide-react";
 import { dismissScheduleBanner, getMyScheduleBanners } from "@/app/actions/scheduleBanners";
 import type { ScheduleBanner } from "@/app/actions/scheduleBanners";
+import { usePulseChange } from "@/hooks/usePulse";
 
 const STYLE = {
   booking_added: { box: "border-emerald-200 bg-emerald-50 text-emerald-950", icon: CalendarPlus, iconClass: "text-emerald-700" },
@@ -22,13 +23,14 @@ const STYLE = {
 export function ScheduleBanners() {
   const [items, setItems] = useState<ScheduleBanner[]>([]);
 
+  const load = useCallback(() => getMyScheduleBanners().then(setItems).catch(() => undefined), []);
+
   useEffect(() => {
-    let live = true;
-    getMyScheduleBanners()
-      .then((rows) => { if (live) setItems(rows); })
-      .catch(() => undefined);
-    return () => { live = false; };
-  }, []);
+    void load();
+  }, [load]);
+  // The 15-second pulse (hooks/usePulse.ts, also on focus) says when a new notice arrived: re-read, so a schedule change shows up
+  // without a refresh. (A state update after the page was left is ignored by React.)
+  usePulseChange(() => void load());
 
   const dismiss = (id: string) => {
     setItems((prev) => prev.filter((item) => item.id !== id));

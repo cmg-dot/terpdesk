@@ -27,39 +27,52 @@ export type AnswerResult = { success: true; answered: Clarification } | { succes
 
 const LEGACY_HREF = (requestId: string) => `/requests/${requestId}#questions`;
 
-export async function answerClarification(params: { requestId: string; questionId: string; answer: string; staffName: string; staffUserId: string; staffEmail: string | null }): Promise<AnswerResult> {
-  const { requestId, questionId, answer, staffName } = params;
-  const now = new Date();
-  const saved = await db.transaction(async (tx) => {
-    const [row] = await tx.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).for("update");
-    if (!row) return { ok: false as const, error: "This request no longer exists." };
-    const data = (row.data ?? {}) as Record<string, unknown>;
-    const outcome = withAnswer(data.clarifications, questionId, answer, staffName, now);
-    if (!outcome.ok) return outcome;
+/** The database handle inside a transaction (what `db.transaction` gives its callback). */
+export type AnswerTx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-    await tx.execute(sql`
-      UPDATE requests SET data = jsonb_set(coalesce(data, '{}'::jsonb), '{clarifications}', ${JSON.stringify(outcome.clarifications)}::jsonb), updated_at = ${now}
-      WHERE id = ${requestId}
-    `);
-    const interpreterId = outcome.answered.interpreterId ?? null;
-    if (interpreterId) {
-      await tx.insert(requestActivity).values({ requestId, kind: AGENCY_MESSAGE_KIND, audience: "shared", interpreterId, message: `Answer to your question: ${answer}`, actorLabel: staffName });
-    }
-    await tx.insert(requestActivity).values({
-      requestId,
-      kind: "question_answered",
-      audience: "agency",
-      interpreterId,
-      message: `${staffName} answered ${outcome.answered.interpreterName || "the interpreter"}'s question`,
-      actorLabel: staffName,
-    });
-    const hrefs = [questionHref(requestId, questionId), ...(outcome.stillOpen === 0 ? [LEGACY_HREF(requestId)] : [])];
-    await tx
-      .update(notifications)
-      .set({ bannerDismissedAt: now, isRead: true })
-      .where(and(eq(notifications.kind, "offer_question"), inArray(notifications.href, hrefs), isNull(notifications.bannerDismissedAt)));
-    return { ok: true as const, answered: outcome.answered };
+export type SavedAnswer = { ok: true; answered: Clarification } | { ok: false; error: string };
+
+/**
+ * The transactional part: everything that must be saved together or not at all. Runs on the caller's transaction (so a test can hand it
+ * a stand-in). The request is written with a typed `.set({ updatedAt })`, never a raw `Date` inside a `sql` template: drizzle's
+ * postgres-js driver turns off the driver's own date serializer, so a raw `Date` there throws and every answer failed ("We could not
+ * send your answer"). Any `sql` parameter below is a string or a number.
+ */
+export async function saveAnswer(tx: AnswerTx, params: { requestId: string; questionId: string; answer: string; staffName: string }, now: Date): Promise<SavedAnswer> {
+  const { requestId, questionId, answer, staffName } = params;
+  const [row] = await tx.select({ data: requests.data }).from(requests).where(eq(requests.id, requestId)).for("update");
+  if (!row) return { ok: false, error: "This request no longer exists." };
+  const data = (row.data ?? {}) as Record<string, unknown>;
+  const outcome = withAnswer(data.clarifications, questionId, answer, staffName, now);
+  if (!outcome.ok) return outcome;
+
+  await tx
+    .update(requests)
+    .set({ data: sql`jsonb_set(coalesce(data, '{}'::jsonb), '{clarifications}', ${JSON.stringify(outcome.clarifications)}::jsonb)`, updatedAt: now })
+    .where(eq(requests.id, requestId));
+  const interpreterId = outcome.answered.interpreterId ?? null;
+  if (interpreterId) {
+    await tx.insert(requestActivity).values({ requestId, kind: AGENCY_MESSAGE_KIND, audience: "shared", interpreterId, message: `Answer to your question: ${answer}`, actorLabel: staffName });
+  }
+  await tx.insert(requestActivity).values({
+    requestId,
+    kind: "question_answered",
+    audience: "agency",
+    interpreterId,
+    message: `${staffName} answered ${outcome.answered.interpreterName || "the interpreter"}'s question`,
+    actorLabel: staffName,
   });
+  const hrefs = [questionHref(requestId, questionId), ...(outcome.stillOpen === 0 ? [LEGACY_HREF(requestId)] : [])];
+  await tx
+    .update(notifications)
+    .set({ bannerDismissedAt: now, isRead: true })
+    .where(and(eq(notifications.kind, "offer_question"), inArray(notifications.href, hrefs), isNull(notifications.bannerDismissedAt)));
+  return { ok: true, answered: outcome.answered };
+}
+
+export async function answerClarification(params: { requestId: string; questionId: string; answer: string; staffName: string; staffUserId: string; staffEmail: string | null }): Promise<AnswerResult> {
+  const { requestId, questionId } = params;
+  const saved = await db.transaction((tx) => saveAnswer(tx, params, new Date()));
   if (!saved.ok) return { success: false, error: saved.error };
 
   await writeAuditLog({ userId: params.staffUserId, userEmail: params.staffEmail, action: "job_clarification_answered", details: `requestId=${requestId}; questionId=${questionId}` });
