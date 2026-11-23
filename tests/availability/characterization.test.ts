@@ -62,7 +62,8 @@ const conflictParams = { interpreterId: ME, startsAtUtc: START, endsAtUtc: END }
 describe("td_conflict", () => {
   it("says no conflict when the interpreter has no booking and no busy time", async () => {
     assert.deepEqual(await tdConflict(conflictParams), { hasConflict: false });
-    assert.deepEqual(state.ops, ["select:interpreters", "select:offers", "select:busy_blocks"]);
+    // B3 added the personal jobs read, last; the first three reads and their order are unchanged from the original file.
+    assert.deepEqual(state.ops, ["select:interpreters", "select:offers", "select:busy_blocks", "select:interpreter_personal_jobs"]);
   });
 
   it("finds an accepted booking that overlaps, as a job conflict", async () => {

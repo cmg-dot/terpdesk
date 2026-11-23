@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { busyBlocks, offers, requests } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { isUuid, resolveInterpreterIds } from "@/lib/availability/ids";
+import { hasPersonalJobConflict } from "@/lib/availability/personalJobConflict";
 import { logError } from "@/lib/logError";
 import { resolveRequestTimes } from "@/utils/timezone";
 
@@ -12,7 +13,7 @@ import { resolveRequestTimes } from "@/utils/timezone";
  */
 
 /**
- * Check if interpreter has an overlapping booked job or busy block.
+ * Check if interpreter has an overlapping booked job, busy block or personal job.
  */
 export async function td_conflict(params: {
   interpreterId: string;
@@ -82,6 +83,12 @@ export async function td_conflict(params: {
       .limit(1);
 
     if (overlappingBusy.length > 0) {
+      return { hasConflict: true, reason: "busy" };
+    }
+
+    // 3. Personal jobs (work done outside any agency). They count as busy time, so nothing says what they are. The table is keyed by
+    // the interpreter's UUID, so mock ids are skipped. A missing table counts as none; any other failure lands in the catch below.
+    if (await hasPersonalJobConflict(offerInterpreterIds, startTarget, endTarget)) {
       return { hasConflict: true, reason: "busy" };
     }
 

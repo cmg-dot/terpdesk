@@ -1,6 +1,6 @@
 # Standalone Interpreter Mode, Slice B: personal jobs, `/my-work`, conflict check
 
-Status: **approved decisions below; B0 (extractions) done; B1 + B3 next, then B2.** Slice A (empty states and getting-started guidance, no schema change) shipped as `3bc175a`.
+Status: **approved decisions below; B0 (extractions), B1 (table, helpers, actions) and B3 (conflict check) done; B2 (UI and export) next.** Slice A (empty states and getting-started guidance, no schema change) shipped as `3bc175a`.
 
 ## Intent
 
@@ -87,3 +87,13 @@ B0 (done) then B1 + B3 together (table and guard land together), then B2. SQL go
 ## Standing constraints
 
 Every file under 300 lines, zero `any`, zero em-dashes in copy, `EMAIL_SILENT_MODE=true`, no production writes, no PHI in logs.
+
+## After B1 + B3: what was built, and open items
+
+Built: `migrations/manual/0014_personal_jobs.sql` (applied to `terpdesk_demo` only), `db/personalJobsSchema.ts`, `lib/personalJobs.ts`, `lib/validation/personalJob.ts`, `app/actions/personalJobs.ts` (`listMyPersonalJobs`, `savePersonalJob`, `deletePersonalJob`), `lib/availability/personalJobConflict.ts`, and the call in `lib/availability/conflict.ts`.
+
+- Every acceptance path inherits the check, because they all go through `td_conflict`: `respondToOffer`, `/api/offers/response`, `updateRequest`, `updateRequestDetails`, and the agency's `checkInterpreterFit` (so offers, auto-book and the staffing "unavailable" status).
+- Verified against the real demo database before and after the migration: a missing table (a real 42P01) falls back to "no personal jobs" and logs once; overlap is strict on both ends; another interpreter is never affected; the table's CHECK constraints hold; the actions work end to end with the audit log carrying only the job id.
+- Open: the agency's Interpreter View timeline (`getInterpreterDayView`, `lib/agencyInterpreterView.ts`) reads busy blocks directly, so personal jobs do not appear there yet. Decide in B2 whether they should show as unavailable time (never with the label).
+- Open: the 2,000-row cap is checked just before the insert, not in a transaction, so two simultaneous saves could pass 2,000 by one. It is an abuse limit, not a correctness boundary.
+- Production: the SQL has not been applied there. Until it is, the conflict check ignores personal jobs and nothing else changes.
