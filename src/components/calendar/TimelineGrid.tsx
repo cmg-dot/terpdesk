@@ -33,7 +33,7 @@ export const rowCaption = (person: TimelineInterpreter, jobCount: number, busyCo
   if (jobCount > 0) parts.push(`${jobCount} ${jobCount === 1 ? "job" : "jobs"}`);
   else if (person.active && person.onRoster) {
     // "Free" is only honest when the interpreter shares their calendar with the agency.
-    parts.push(!person.sharesAvailability ? "Availability not shared" : busyCount > 0 ? "Busy part of the day" : "Free all day");
+    parts.push(!person.sharesAvailability ? "Availability not shared" : busyCount > 0 ? "Unavailable part of the day" : "Free all day");
   }
   return parts.join(" · ");
 };
@@ -57,7 +57,7 @@ const groupBy = <T extends { interpreterId: string }>(items: readonly T[]): Map<
 
 /**
  * The resource timeline: a sticky hour ruler across the top, one row per interpreter, and each job drawn as a block where
- * it falls on the day, over a greyed "Busy" layer for time the interpreter shares as busy.
+ * it falls on the day, over a greyed "Unavailable" layer for time the interpreter shares as busy (private busy time and personal jobs alike).
  *
  * Layout rule: every width here is explicit (label column + 24 fixed-width hours), and the frame around it is the ONLY
  * thing that scrolls. So on a phone the day scrolls smoothly sideways at full size, the name column stays pinned on the

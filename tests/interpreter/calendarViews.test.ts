@@ -11,6 +11,7 @@ import {
   formatBusyBlockTimes,
   formatEventTimes,
   parseSafeIso,
+  personalJobBlocks,
   sortLiveFirst,
 } from "@/lib/interpreterCalendar";
 import type { CalendarAppointment, CalendarBusyBlock } from "@/lib/interpreterCalendar";
@@ -84,7 +85,7 @@ describe("the interpreter calendar's pure helpers", () => {
 });
 
 describe("the calendar views", () => {
-  const common = { currentDate: new Date(2026, 11, 7, 12), appointments: [NINE], busyBlocks: [NOON_BLOCK], zone: ZONE, currentTime: NOON_MS, onOpenJob: () => undefined };
+  const common = { currentDate: new Date(2026, 11, 7, 12), appointments: [NINE], busyBlocks: [NOON_BLOCK], personalJobs: [] as CalendarBusyBlock[], zone: ZONE, currentTime: NOON_MS, onOpenJob: () => undefined };
 
   it("the month grid has a cell per day, the weekday headers, and the day's booking and busy time", async () => {
     const { CalendarMonthView } = await import("@/components/calendar/interpreter/CalendarMonthView");
@@ -127,6 +128,54 @@ describe("the calendar views", () => {
     assert.ok(html.includes("Block time on this day"));
     const empty = renderToStaticMarkup(React.createElement(CalendarDayView, { ...common, appointments: [], busyBlocks: [], onBlockTime: () => undefined }));
     assert.ok(empty.includes("Nothing scheduled for this day."));
+  });
+});
+
+describe("personal jobs on the interpreter's own calendar", () => {
+  const PERSONAL = block("pj1", "2026-12-07T21:00:00.000Z", "2026-12-07T22:30:00.000Z", "Community class");
+  const withPersonal = { currentDate: new Date(2026, 11, 7, 12), appointments: [NINE], busyBlocks: [NOON_BLOCK], personalJobs: [PERSONAL], zone: ZONE, currentTime: NOON_MS, onOpenJob: () => undefined };
+
+  it("turns the view's personal jobs into blocks, with their label or else Personal job", () => {
+    assert.deepEqual(personalJobBlocks([
+      { id: "a", label: "Class", startsAt: "2026-12-07T21:00:00.000Z", endsAt: "2026-12-07T22:00:00.000Z", timeZone: "America/Denver" },
+      { id: "b", label: "", startsAt: "2026-12-08T21:00:00.000Z", endsAt: "2026-12-08T22:00:00.000Z", timeZone: ZONE },
+    ]), [
+      { id: "a", label: "Class", timeZone: "America/Denver", isAllDay: false, start: "2026-12-07T21:00:00.000Z", end: "2026-12-07T22:00:00.000Z" },
+      { id: "b", label: "Personal job", timeZone: ZONE, isAllDay: false, start: "2026-12-08T21:00:00.000Z", end: "2026-12-08T22:00:00.000Z" },
+    ]);
+    assert.deepEqual(personalJobBlocks([]), []);
+  });
+
+  it("the month grid draws one in the theme's tint, apart from busy time, with its times, and it is not clickable", async () => {
+    const { CalendarMonthView } = await import("@/components/calendar/interpreter/CalendarMonthView");
+    const html = renderToStaticMarkup(React.createElement(CalendarMonthView, withPersonal));
+    const mine = html.slice(html.indexOf('data-personal-job="pj1"'));
+    assert.ok(mine.includes("Community class") && mine.includes("1:00 PM – 2:30 PM PST"));
+    assert.ok(html.includes("bg-[var(--tint)]") && html.includes("Dentist"), "busy time is still there, drawn differently");
+    const tag = html.slice(html.lastIndexOf("<div", html.indexOf('data-personal-job="pj1"')), html.indexOf(">", html.indexOf('data-personal-job="pj1"')) + 1);
+    assert.ok(!tag.includes("cursor-pointer") && !tag.includes("onClick"), "read only");
+  });
+
+  it("the week grid places it by its start minute and length (1:00 PM is minute 780, 90 minutes tall)", async () => {
+    const { CalendarWeekView } = await import("@/components/calendar/interpreter/CalendarWeekView");
+    const html = renderToStaticMarkup(React.createElement(CalendarWeekView, { ...withPersonal, onSlotClick: () => undefined }));
+    assert.match(html, /data-personal-job="pj1"[^>]*style="top:780px;height:90px"/);
+    assert.ok(html.includes("top:720px;height:60px"), "the busy block is still placed too");
+  });
+
+  it("the day agenda lists it, says Personal job, and the empty message does not show when it is the only entry", async () => {
+    const { CalendarDayView } = await import("@/components/calendar/interpreter/CalendarDayView");
+    const html = renderToStaticMarkup(React.createElement(CalendarDayView, { ...withPersonal, onBlockTime: () => undefined }));
+    assert.ok(html.includes("Community class") && html.includes("Personal job · 1:00 PM – 2:30 PM PST"));
+    const only = renderToStaticMarkup(React.createElement(CalendarDayView, { ...withPersonal, appointments: [], busyBlocks: [], onBlockTime: () => undefined }));
+    assert.ok(only.includes("Community class") && !only.includes("Nothing scheduled for this day."));
+  });
+
+  it("a label that is missing reads Personal job in every view", async () => {
+    const { CalendarDayView } = await import("@/components/calendar/interpreter/CalendarDayView");
+    const unlabeled = personalJobBlocks([{ id: "x", label: "", startsAt: "2026-12-07T21:00:00.000Z", endsAt: "2026-12-07T22:00:00.000Z", timeZone: ZONE }]);
+    const html = renderToStaticMarkup(React.createElement(CalendarDayView, { ...withPersonal, personalJobs: unlabeled, onBlockTime: () => undefined }));
+    assert.ok(html.includes(">Personal job<"));
   });
 });
 

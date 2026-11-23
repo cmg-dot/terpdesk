@@ -6,7 +6,7 @@ import { useGlobalState } from "@/context/GlobalContext";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { useCalendarNavigation } from "@/hooks/useCalendarNavigation";
 import { zoneDateKey } from "@/lib/calendarNav";
-import { bookedAppointments } from "@/lib/interpreterCalendar";
+import { bookedAppointments, personalJobBlocks } from "@/lib/interpreterCalendar";
 import type { CalendarAppointment, CalendarBusyBlock, CalendarJobSource } from "@/lib/interpreterCalendar";
 import { getIanaZone } from "@/utils/timezone";
 
@@ -58,6 +58,7 @@ export function useInterpreterCalendar() {
 
   const landedOnToday = React.useRef(false);
   const [busyBlocks, setBusyBlocks] = useState<CalendarBusyBlock[]>([]);
+  const [personalJobs, setPersonalJobs] = useState<CalendarBusyBlock[]>([]);
   const [acceptedAppointments, setAcceptedAppointments] = useState<CalendarAppointment[]>([]);
 
   const reloadAvailability = React.useCallback(async () => {
@@ -72,6 +73,7 @@ export function useInterpreterCalendar() {
           goToDate(zoneDateKey(profileTimezone));
         }
       }
+      setPersonalJobs(personalJobBlocks(data.personalJobs ?? []));
       if (data.busyBlocks) {
         setBusyBlocks(data.busyBlocks.map((b) => ({
           id: b.id,
@@ -119,6 +121,6 @@ export function useInterpreterCalendar() {
 
   return {
     interpreterId, baseTimezone, safeBaseTimezone, isTimezoneLoading, currentTime, todayKey, nav,
-    busyBlocks, acceptedAppointments, handleTimezoneChange, reloadAvailability,
+    busyBlocks, personalJobs, acceptedAppointments, handleTimezoneChange, reloadAvailability,
   };
 }

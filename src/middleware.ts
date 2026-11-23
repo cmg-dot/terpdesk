@@ -75,5 +75,6 @@ export const config = {
     "/profile/:path*",
     "/prep/:path*",
     "/mileage/:path*",
+    "/my-work/:path*",
   ],
 };

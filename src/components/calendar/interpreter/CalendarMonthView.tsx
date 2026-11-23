@@ -7,6 +7,8 @@ export interface CalendarViewProps {
   currentDate: Date;
   appointments: readonly CalendarAppointment[];
   busyBlocks: readonly CalendarBusyBlock[];
+  /** Personal jobs (work outside any agency), drawn read-only and apart from busy time. */
+  personalJobs: readonly CalendarBusyBlock[];
   /** The zone the calendar is drawn in. */
   zone: string;
   currentTime: number;
@@ -16,7 +18,7 @@ export interface CalendarViewProps {
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
 
 /** The month grid of the interpreter's calendar: each day lists its bookings and private busy time. */
-export function CalendarMonthView({ currentDate, appointments, busyBlocks, zone, currentTime, onOpenJob }: CalendarViewProps) {
+export function CalendarMonthView({ currentDate, appointments, busyBlocks, personalJobs, zone, currentTime, onOpenJob }: CalendarViewProps) {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   const firstDay = new Date(year, month, 1, 12, 0, 0).getDay();
@@ -50,6 +52,7 @@ export function CalendarMonthView({ currentDate, appointments, busyBlocks, zone,
                 // Appointments and busy blocks are matched on their true date in the calendar's zone.
                 const sortedDayAppts = sortLiveFirst(appointmentsOnDay(appointments, zone, dateStr), currentTime);
                 const dayBusy = busyBlocksOnDay(busyBlocks, zone, dateStr);
+                const dayPersonal = busyBlocksOnDay(personalJobs, zone, dateStr);
 
                 return (
                   <div key={colIdx} className="p-2 border-r border-gray-200 text-[12px] font-medium text-[var(--ink)] last:border-r-0 relative flex flex-col">
@@ -85,6 +88,12 @@ export function CalendarMonthView({ currentDate, appointments, busyBlocks, zone,
                           </div>
                         );
                       })}
+                      {dayPersonal.map((block) => (
+                        <div key={block.id} data-personal-job={block.id} title="Personal job" className="rounded-md border border-[var(--forest)]/25 bg-[var(--tint)] px-1.5 py-1 text-[var(--tint-ink)]">
+                          <div className="text-[11px] font-semibold truncate leading-tight">{block.label}</div>
+                          <div className="text-[10px] opacity-80 leading-tight mt-0.5 truncate">{formatBusyBlockTimes(zone, block)}</div>
+                        </div>
+                      ))}
                       {dayBusy.map((block) => (
                         <div key={block.id} className="px-1.5 py-1 bg-gray-100 text-gray-700 rounded-md">
                           <div className="text-[11px] font-medium truncate leading-tight">{block.label || "Busy"}</div>

@@ -55,6 +55,7 @@ export function reset(): void {
 
 interface Chain extends PromiseLike<unknown[]> {
   innerJoin: (...args: unknown[]) => Chain;
+  leftJoin: (...args: unknown[]) => Chain;
   where: (condition?: unknown) => Chain;
   orderBy: (...args: unknown[]) => Chain;
   limit: (...args: unknown[]) => Chain;
@@ -63,6 +64,7 @@ interface Chain extends PromiseLike<unknown[]> {
 function chain(table: string, fields: string[]): Chain {
   const self: Chain = {
     innerJoin: () => self,
+    leftJoin: () => self,
     where: (condition) => {
       state.wheres.push({ table, condition });
       return self;
@@ -111,6 +113,11 @@ export async function install(): Promise<void> {
       return chain(name, fields);
     },
   });
+  // Runtime "ALTER TABLE ... IF NOT EXISTS" helpers some readers call first: nothing to do against a stub.
+  fake.execute = async () => {
+    state.ops.push("execute");
+    return [];
+  };
   fake.insert = (t: Table) => ({
     values: (values: unknown) => {
       const table = getTableName(t);

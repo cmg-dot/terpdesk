@@ -10,16 +10,17 @@ interface CalendarDayViewProps extends CalendarViewProps {
 }
 
 /** The day agenda of the interpreter's calendar: the day's bookings, then its private busy time. */
-export function CalendarDayView({ currentDate, appointments, busyBlocks, zone, currentTime, onOpenJob, onBlockTime }: CalendarDayViewProps) {
+export function CalendarDayView({ currentDate, appointments, busyBlocks, personalJobs, zone, currentTime, onOpenJob, onBlockTime }: CalendarDayViewProps) {
   const cellDateStr = format(currentDate, "yyyy-MM-dd");
   const sortedJobs = sortLiveFirst(appointmentsOnDay(appointments, zone, cellDateStr), currentTime);
   const dayBlocks = busyBlocksOnDay(busyBlocks, zone, cellDateStr);
+  const dayPersonal = busyBlocksOnDay(personalJobs, zone, cellDateStr);
 
   return (
     <div className="bg-white rounded-2xl border border-gray-200 p-6 mb-12 shadow-sm">
       <h2 className="text-[18px] font-semibold text-[var(--ink)] mb-4">{format(currentDate, "EEEE, MMMM d, yyyy")}</h2>
 
-      {sortedJobs.length === 0 && dayBlocks.length === 0 ? (
+      {sortedJobs.length === 0 && dayBlocks.length === 0 && dayPersonal.length === 0 ? (
         <p className="text-[14px] text-[var(--sage)] mb-6">Nothing scheduled for this day.</p>
       ) : (
         <div className="flex flex-col gap-3 mb-6">
@@ -47,6 +48,15 @@ export function CalendarDayView({ currentDate, appointments, busyBlocks, zone, c
               </div>
             );
           })}
+
+          {dayPersonal.map((block) => (
+            <div key={block.id} data-personal-job={block.id} className="p-4 rounded-xl border border-[var(--forest)]/25 bg-[var(--tint)] text-[var(--tint-ink)]">
+              <div className="space-y-1">
+                <span className="text-[14px] font-semibold">{block.label}</span>
+                <div className="text-[13px]">Personal job · {formatBusyBlockTimes(zone, block)}</div>
+              </div>
+            </div>
+          ))}
 
           {dayBlocks.map((block) => (
             <div key={block.id} className="p-4 rounded-xl bg-gray-50 border border-gray-200 text-gray-800">

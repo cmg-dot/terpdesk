@@ -131,3 +131,59 @@ export function personalJobCsvRows(jobs: readonly PersonalJobView[]): string[][]
       ];
     });
 }
+
+/** "Mon, Dec 7, 2026 · 9:00 AM to 11:30 AM PST" in the job's own zone; an end on another day carries its date. */
+export function personalJobWhen(job: Pick<PersonalJobView, "startsAt" | "endsAt" | "timeZone">): string {
+  const start = new Date(job.startsAt);
+  const end = new Date(job.endsAt);
+  const zone = job.timeZone;
+  const sameDay = formatInTimeZone(start, zone, "yyyy-MM-dd") === formatInTimeZone(end, zone, "yyyy-MM-dd");
+  const endText = sameDay ? formatInTimeZone(end, zone, "h:mm a zzz") : formatInTimeZone(end, zone, "EEE, MMM d, h:mm a zzz");
+  return `${formatInTimeZone(start, zone, "EEE, MMM d, yyyy")} · ${formatInTimeZone(start, zone, "h:mm a")} to ${endText}`;
+}
+
+/** "2 h 15 min", "45 min", "3 h". */
+export function hoursLabel(minutes: number): string {
+  const whole = Math.max(0, Math.round(minutes));
+  const h = Math.floor(whole / 60);
+  const m = whole % 60;
+  if (h === 0) return `${m} min`;
+  return m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+/** The personal job form's values: text, as the fields hold them. */
+export interface PersonalJobFormValues {
+  label: string;
+  setting: string;
+  startDate: string;
+  startTime: string;
+  endDate: string;
+  endTime: string;
+  timeZone: string;
+  breakMinutes: string;
+  miles: string;
+  roundTrip: boolean;
+}
+
+/** A new job: today, 9:00 to 10:00, in `timeZone`. `today` is yyyy-MM-dd in that zone. */
+export const emptyPersonalJobForm = (timeZone: string, today: string): PersonalJobFormValues => ({
+  label: "", setting: "", startDate: today, startTime: "09:00", endDate: today, endTime: "10:00", timeZone, breakMinutes: "", miles: "", roundTrip: false,
+});
+
+/** A saved job as the form shows it for editing: the wall-clock times in the zone it was entered in. */
+export function personalJobFormValues(job: PersonalJobView): PersonalJobFormValues {
+  const start = new Date(job.startsAt);
+  const end = new Date(job.endsAt);
+  return {
+    label: job.label,
+    setting: job.setting,
+    startDate: formatInTimeZone(start, job.timeZone, "yyyy-MM-dd"),
+    startTime: formatInTimeZone(start, job.timeZone, "HH:mm"),
+    endDate: formatInTimeZone(end, job.timeZone, "yyyy-MM-dd"),
+    endTime: formatInTimeZone(end, job.timeZone, "HH:mm"),
+    timeZone: job.timeZone,
+    breakMinutes: job.breakMinutes === 0 ? "" : String(job.breakMinutes),
+    miles: job.miles === null ? "" : String(job.miles),
+    roundTrip: job.roundTrip,
+  };
+}

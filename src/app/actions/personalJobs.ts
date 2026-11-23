@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, desc, eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
@@ -10,6 +10,7 @@ import { requireInterpreter } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";
 import { toPersonalJobView } from "@/lib/personalJobs";
 import type { PersonalJobView } from "@/lib/personalJobs";
+import { readPersonalJobs } from "@/lib/personalJobsStore";
 import { MAX_PERSONAL_JOBS, parsePersonalJob } from "@/lib/validation/personalJob";
 import type { PersonalJobField, PersonalJobInput } from "@/lib/validation/personalJob";
 
@@ -47,13 +48,7 @@ const refresh = () => {
 /** The signed-in interpreter's personal jobs, newest first (at most the cap). */
 export async function listMyPersonalJobs(): Promise<PersonalJobView[]> {
   const { interpreterId } = await requireInterpreter();
-  const rows = await db
-    .select()
-    .from(interpreterPersonalJobs)
-    .where(eq(interpreterPersonalJobs.interpreterId, interpreterId))
-    .orderBy(desc(interpreterPersonalJobs.startsAt))
-    .limit(MAX_PERSONAL_JOBS);
-  return rows.map(toPersonalJobView);
+  return readPersonalJobs(interpreterId);
 }
 
 /** Adds a personal job, or updates one of the interpreter's own when `id` is given. */

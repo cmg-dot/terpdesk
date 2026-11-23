@@ -3,19 +3,9 @@
 import React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import {
-  Home,
-  Briefcase,
-  Calendar,
-  Navigation,
-  FileText,
-  Building,
-  User,
-  Settings,
-  Menu,
-  X,
-} from "lucide-react";
+import { Menu, X } from "lucide-react";
 import { BrandLockup } from "@/components/brand/BrandLockup";
+import { INTERPRETER_BOTTOM_NAV, INTERPRETER_NAV, isNavActive } from "@/components/interpreter/interpreterNav";
 import { InterpreterJobsProvider } from "@/context/InterpreterJobsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { AlertToasts } from "@/components/ui/AlertToasts";
@@ -44,7 +34,8 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-[var(--canvas)] font-sans text-slate-900">
-      {/* HIPAA automatic logoff: after 30 minutes without activity (a warning at 28) the interpreter is signed out, as agency staff are. */}
+      {/* HIPAA automatic logoff: after 30 minutes without activity (a warning at 28) the interpreter is signed out, as agency staff are.
+          This layout wraps every interpreter page, My work included. */}
       <IdleTimeoutGuard />
       {/* Sidebar (stays in view while the page scrolls with the browser's own scrollbar) */}
       <aside className="hidden md:flex sticky top-0 h-screen self-start w-64 flex-col bg-[var(--forest)] text-white shrink-0">
@@ -55,38 +46,12 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 overflow-y-auto space-y-0.5 px-4 py-1 [&::-webkit-scrollbar]:w-2 [&::-webkit-scrollbar-track]:bg-[var(--forest)] [&::-webkit-scrollbar-thumb]:bg-[var(--forest-soft)] [&::-webkit-scrollbar-thumb]:rounded-full">
-          <Link href="/interpreter-home" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname === '/interpreter-home' ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <Home strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Home
-          </Link>
-          <Link href="/jobs" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/jobs') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <Briefcase strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Jobs
-          </Link>
-          <Link href="/interpreter-calendar" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/interpreter-calendar') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <Calendar strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Calendar
-          </Link>
-          <Link href="/mileage" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/mileage') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <Navigation strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Mileage
-          </Link>
-          <Link href="/prep" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/prep') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <FileText strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Prep
-          </Link>
-          <Link href="/agencies" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/agencies') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <Building strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Agencies
-          </Link>
-          <Link href="/profile" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/profile') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <User strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            My Profile
-          </Link>
-          <Link href="/interpreter-settings" className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${pathname.startsWith('/interpreter-settings') ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
-            <Settings strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
-            Settings
-          </Link>
+          {INTERPRETER_NAV.map((item) => (
+            <Link key={item.href} href={item.href} className={`flex items-center gap-3 rounded-xl px-4 py-[9px] text-[14px] font-medium transition-colors ${isNavActive(pathname, item) ? 'bg-white/10 text-white' : 'text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white'}`}>
+              <item.Icon strokeWidth={1.5} className="h-[18px] w-[18px] shrink-0" />
+              {item.label}
+            </Link>
+          ))}
         </nav>
 
         <div className="p-5 pt-2">
@@ -141,48 +106,22 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
             {/* Header (Logo & Close) */}
             <div className="flex justify-between items-center p-6 border-b border-neutral-100 shrink-0">
               <BrandLockup tone="onLight" markClassName="h-8 w-8" />
-              <button 
+              <button
                 onClick={() => setIsMenuOpen(false)}
                 className="p-2 text-slate-400 hover:text-slate-600 transition-colors"
               >
                 <X className="w-6 h-6" />
               </button>
             </div>
-            
+
             {/* Navigation Links */}
             <div className="flex flex-col gap-2 p-6 overflow-y-auto">
-              <Link href="/interpreter-home" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname === '/interpreter-home' ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <Home strokeWidth={1.5} className="h-5 w-5" />
-                Home
-              </Link>
-              <Link href="/jobs" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/jobs') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <Briefcase strokeWidth={1.5} className="h-5 w-5" />
-                Jobs
-              </Link>
-              <Link href="/interpreter-calendar" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/interpreter-calendar') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <Calendar strokeWidth={1.5} className="h-5 w-5" />
-                Calendar
-              </Link>
-              <Link href="/mileage" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/mileage') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <Navigation strokeWidth={1.5} className="h-5 w-5" />
-                Mileage
-              </Link>
-              <Link href="/prep" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/prep') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <FileText strokeWidth={1.5} className="h-5 w-5" />
-                Prep
-              </Link>
-              <Link href="/agencies" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/agencies') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <Building strokeWidth={1.5} className="h-5 w-5" />
-                Agencies
-              </Link>
-              <Link href="/profile" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/profile') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <User strokeWidth={1.5} className="h-5 w-5" />
-                My Profile
-              </Link>
-              <Link href="/interpreter-settings" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/interpreter-settings') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
-                <Settings strokeWidth={1.5} className="h-5 w-5" />
-                Settings
-              </Link>
+              {INTERPRETER_NAV.map((item) => (
+                <Link key={item.href} href={item.href} onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${isNavActive(pathname, item) ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
+                  <item.Icon strokeWidth={1.5} className="h-5 w-5" />
+                  {item.label}
+                </Link>
+              ))}
             </div>
 
             {/* Footer */}
@@ -203,26 +142,12 @@ function InterpreterShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 w-full bg-[var(--canvas)] border-t border-neutral-200 flex justify-between items-center px-2 py-2 md:hidden z-40 pb-[env(safe-area-inset-bottom,0.5rem)]">
-        <Link href="/interpreter-home" className={`flex flex-col items-center justify-center rounded-2xl px-5 py-2 ${pathname === '/interpreter-home' ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
-          <Home className="h-5 w-5 mb-1" />
-          <span className="text-[10px] font-medium">Home</span>
-        </Link>
-        <Link href="/jobs" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/jobs') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
-          <Briefcase className="h-5 w-5 mb-1" />
-          <span className="text-[10px] font-medium">Jobs</span>
-        </Link>
-        <Link href="/interpreter-calendar" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/interpreter-calendar') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
-          <Calendar className="h-5 w-5 mb-1" />
-          <span className="text-[10px] font-medium">Calendar</span>
-        </Link>
-        <Link href="/mileage" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/mileage') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
-          <Navigation className="h-5 w-5 mb-1" />
-          <span className="text-[10px] font-medium">Mileage</span>
-        </Link>
-        <Link href="/interpreter-settings" className={`flex flex-col items-center justify-center rounded-2xl px-4 py-2 ${pathname.startsWith('/interpreter-settings') ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
-          <Settings className="h-5 w-5 mb-1" />
-          <span className="text-[10px] font-medium">Settings</span>
-        </Link>
+        {INTERPRETER_BOTTOM_NAV.map((item) => (
+          <Link key={item.href} href={item.href} className={`flex flex-col items-center justify-center rounded-2xl py-2 ${item.exact ? 'px-5' : 'px-4'} ${isNavActive(pathname, item) ? 'bg-[var(--tint)] text-[var(--tint-ink)]' : 'text-slate-500'}`}>
+            <item.Icon className="h-5 w-5 mb-1" />
+            <span className="text-[10px] font-medium">{item.label}</span>
+          </Link>
+        ))}
       </nav>
     </div>
   );

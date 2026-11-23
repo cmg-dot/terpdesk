@@ -20,7 +20,7 @@ const LEGEND: { swatch: string; label: string }[] = [
   { swatch: "bg-emerald-600 border-emerald-600", label: "Happening now" },
   { swatch: "bg-amber-50 border-amber-300", label: "Needs attention" },
   { swatch: "bg-gray-100 border-gray-200", label: "Finished" },
-  { swatch: "bg-gray-300 border-gray-400", label: "Busy (time the interpreter shares)" },
+  { swatch: "bg-gray-300 border-gray-400", label: "Unavailable (time the interpreter shares)" },
 ];
 
 /**

@@ -2,6 +2,7 @@
 
 import { and, eq, gt, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
 import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
+import { personalJobWindowsFor } from "@/lib/availability/personalJobBlocks";
 import { db } from "@/db";
 import { availabilityShares, busyBlocks, interpreters, offers, requests } from "@/db/schema";
 import { DEFAULT_AGENCY_ID, DEFAULT_AGENCY_TIME_ZONE } from "@/lib/agency";
@@ -37,9 +38,10 @@ const storedStartDate = sql<string>`left(coalesce(
  * (a cheap, index-free text compare, so a zone difference can never drop a job), then the exact test is made here, in
  * the agency's zone, with the same time reader the rest of the app uses. Cancelled jobs are left out. Nothing is written.
  *
- * Busy time: an interpreter's saved "private busy time" is returned ONLY for interpreters who share their availability with
- * this agency (the same rule as the interpreter profile page), as bare start/end times with overlaps merged. The private
- * title is never selected, so it cannot reach the browser. Interpreters who don't share are flagged so the screen never
+ * Busy time: an interpreter's saved "private busy time" AND their personal jobs (work done outside any agency) are returned ONLY
+ * for interpreters who share their availability with this agency (the same rule as the interpreter profile page), as bare
+ * start/end times with overlaps merged into one band, so the screen cannot tell which was which. The private title, the
+ * personal job's label and its setting are never selected, so none of them can reach the browser. Interpreters who don't share are flagged so the screen never
  * shows them as "free" when it simply can't know.
  *
  * Each person also carries their credential tags and location tags (agency-only data, which is why this is agency-only)
@@ -138,6 +140,9 @@ export async function getInterpreterDayView(input: { date: string }): Promise<In
     }
     jobs.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
 
+    // Personal jobs, for the sharing interpreters only, as bare windows: they are drawn in the same band as private busy time.
+    const personalRows = await personalJobWindowsFor(sharing.map((s) => s.interpreterId), new Date(window.startMs), new Date(window.endMs));
+
     const shares = new Set(sharing.map((s) => s.interpreterId));
     const people = new Map<string, TimelineInterpreter>(
       roster.map((r) => {
@@ -156,7 +161,7 @@ export async function getInterpreterDayView(input: { date: string }): Promise<In
 
     // Busy time per person, overlaps merged (also hides how many separate private entries there were).
     const busyByPerson = new Map<string, { startsAt: string; endsAt: string }[]>();
-    for (const row of busyRows) {
+    for (const row of [...busyRows, ...personalRows]) {
       busyByPerson.set(row.interpreterId, [...(busyByPerson.get(row.interpreterId) ?? []), { startsAt: row.startsAt.toISOString(), endsAt: row.endsAt.toISOString() }]);
     }
     const busy: TimelineBusy[] = [];

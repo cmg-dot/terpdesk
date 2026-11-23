@@ -22,7 +22,7 @@ const minutesOfDay = (date: Date, zone: string): number =>
   parseInt(formatInTimeZone(date, zone, "H"), 10) * 60 + parseInt(formatInTimeZone(date, zone, "m"), 10);
 
 /** The week time grid of the interpreter's calendar: bookings and busy time placed by their true start and length. */
-export function CalendarWeekView({ currentDate, appointments, busyBlocks, zone, currentTime, onOpenJob, onSlotClick }: CalendarWeekViewProps) {
+export function CalendarWeekView({ currentDate, appointments, busyBlocks, personalJobs, zone, currentTime, onOpenJob, onSlotClick }: CalendarWeekViewProps) {
   const startOfWeek = new Date(currentDate.getFullYear(), currentDate.getMonth(), currentDate.getDate() - currentDate.getDay(), 12, 0, 0);
   const days = Array.from({ length: 7 }, (_, i) => new Date(startOfWeek.getFullYear(), startOfWeek.getMonth(), startOfWeek.getDate() + i, 12, 0, 0));
 
@@ -62,6 +62,7 @@ export function CalendarWeekView({ currentDate, appointments, busyBlocks, zone, 
                 const dayDateStr = format(day, "yyyy-MM-dd");
                 const dayJobs = appointmentsOnDay(appointments, zone, dayDateStr);
                 const blocks = busyBlocksOnDay(busyBlocks, zone, dayDateStr);
+                const dayPersonal = busyBlocksOnDay(personalJobs, zone, dayDateStr);
 
                 return (
                   <div key={dIdx} className="border-r border-gray-100 last:border-r-0 relative group">
@@ -102,6 +103,24 @@ export function CalendarWeekView({ currentDate, appointments, busyBlocks, zone, 
                           )}
                           <div className={`text-[11px] font-semibold truncate ${isHappening ? "text-white" : "text-[var(--forest)]"}`}>{appt.title}</div>
                           <div className={`text-[10px] mt-0.5 truncate ${isHappening ? "text-emerald-100" : "text-[var(--forest-deep)]"}`}>{timeLabel}</div>
+                        </div>
+                      );
+                    })}
+
+                    {dayPersonal.map((block) => {
+                      const top = minutesOfDay(new Date(block.start), zone);
+                      let endM = minutesOfDay(new Date(block.end), zone);
+                      if (endM <= top) endM = 1440;
+                      return (
+                        <div
+                          key={block.id}
+                          data-personal-job={block.id}
+                          title="Personal job"
+                          className="absolute left-1 right-1 rounded-lg border border-[var(--forest)]/25 bg-[var(--tint)] p-2 overflow-hidden z-10"
+                          style={{ top: `${top}px`, height: `${Math.max(endM - top, 36)}px` }}
+                        >
+                          <div className="text-[11px] font-semibold text-[var(--tint-ink)] truncate">{block.label}</div>
+                          <div className="text-[10px] text-[var(--tint-ink)] opacity-80 mt-0.5 truncate">{formatBusyBlockTimes(zone, block)}</div>
                         </div>
                       );
                     })}

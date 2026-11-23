@@ -28,6 +28,19 @@ export interface CalendarBusyBlock {
   end: string;
 }
 
+/** A personal job as `td_availability_view` returns it (the interpreter's own, so the label is theirs to see). */
+export interface PersonalJobForCalendar {
+  id: string;
+  label: string;
+  startsAt: string;
+  endsAt: string;
+  timeZone: string;
+}
+
+/** Personal jobs as read-only blocks for the calendar (drawn apart from private busy time): the label, else "Personal job". */
+export const personalJobBlocks = (jobs: readonly PersonalJobForCalendar[]): CalendarBusyBlock[] =>
+  jobs.map((j) => ({ id: j.id, label: j.label || "Personal job", timeZone: j.timeZone, isAllDay: false, start: j.startsAt, end: j.endsAt }));
+
 /** A job as the interpreter's job list (or the copy this browser keeps) describes it. Every field may be missing. */
 export interface CalendarJobSource {
   id: string | number;

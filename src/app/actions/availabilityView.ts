@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { availabilityExceptions, availabilityRules, availabilityShares, busyBlocks, interpreterProfiles } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
+import { ownPersonalJobsFor } from "@/lib/availability/personalJobBlocks";
 import { resolveInterpreterIds } from "@/lib/availability/ids";
 import { assertOwnInterpreterId, requireRole } from "@/lib/auth/guards";
 
@@ -43,6 +44,9 @@ export async function td_availability_view(interpreterId: string) {
     .from(availabilityShares)
     .where(inArray(availabilityShares.interpreterId, targetIds));
 
+  // The interpreter's own personal jobs (outside any agency), for their calendar. Their label is theirs to see.
+  const personalJobs = await ownPersonalJobsFor(targetIds);
+
   // This goes to the interpreter's browser, so only the fields its callers use are returned. Never the whole row:
   // interpreter_profiles also holds agency-only data (the State / Non-state rates an agency sets).
   const row = profiles[0];
@@ -67,6 +71,7 @@ export async function td_availability_view(interpreterId: string) {
       revision: b.revision,
     })),
     shares,
+    personalJobs,
   };
 }
 

@@ -13,6 +13,7 @@ import {
 } from "@/db/schema";
 import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { resolveInterpreterIds } from "@/lib/availability/ids";
+import { personalJobWindowsFor } from "@/lib/availability/personalJobBlocks";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";
@@ -170,6 +171,8 @@ export async function loadAgencyInterpreterView(agencyId: string, interpreterId:
       .select({ startsAt: busyBlocks.startsAt, endsAt: busyBlocks.endsAt })
       .from(busyBlocks)
       .where(and(inArray(busyBlocks.interpreterId, ids), gt(busyBlocks.endsAt, now), lt(busyBlocks.startsAt, windowEnd)));
+    // Personal jobs (work done outside any agency) are time the interpreter is not free, shown the same way: start and end only.
+    busy = [...busy, ...(await personalJobWindowsFor(ids, now, windowEnd))];
   }
 
   const contactShared = profile?.contactVisibility === "shared";

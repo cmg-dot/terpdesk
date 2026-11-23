@@ -1,6 +1,6 @@
 # Standalone Interpreter Mode, Slice B: personal jobs, `/my-work`, conflict check
 
-Status: **approved decisions below; B0 (extractions), B1 (table, helpers, actions) and B3 (conflict check) done; B2 (UI and export) next.** Slice A (empty states and getting-started guidance, no schema change) shipped as `3bc175a`.
+Status: **approved decisions below; B0 (extractions), B1 (table, helpers, actions), B3 (conflict check) and B2 (UI, export, calendar, agency timeline) done. Owed: one real-browser check of B2 at 1280, 900 and 390 px (skipped on purpose while the machine was low on memory).** Slice A (empty states and getting-started guidance, no schema change) shipped as `3bc175a`.
 
 ## Intent
 
@@ -94,6 +94,15 @@ Built: `migrations/manual/0014_personal_jobs.sql` (applied to `terpdesk_demo` on
 
 - Every acceptance path inherits the check, because they all go through `td_conflict`: `respondToOffer`, `/api/offers/response`, `updateRequest`, `updateRequestDetails`, and the agency's `checkInterpreterFit` (so offers, auto-book and the staffing "unavailable" status).
 - Verified against the real demo database before and after the migration: a missing table (a real 42P01) falls back to "no personal jobs" and logs once; overlap is strict on both ends; another interpreter is never affected; the table's CHECK constraints hold; the actions work end to end with the audit log carrying only the job id.
-- Open: the agency's Interpreter View timeline (`getInterpreterDayView`, `lib/agencyInterpreterView.ts`) reads busy blocks directly, so personal jobs do not appear there yet. Decide in B2 whether they should show as unavailable time (never with the label).
+- Decided and done in B2: personal jobs appear on the agency Interpreter View timeline, merged into the same band as private busy time and labelled only "Unavailable" (see below).
 - Open: the 2,000-row cap is checked just before the insert, not in a transaction, so two simultaneous saves could pass 2,000 by one. It is an abuse limit, not a correctness boundary.
 - Production: the SQL has not been applied there. Until it is, the conflict check ignores personal jobs and nothing else changes.
+
+## After B2: what was built, and what is still owed
+
+Built: `(interpreter)/my-work/page.tsx` and `components/myWork/{PersonalJobsBoard,PersonalJobForm,PersonalJobRow,MyWorkTotals}.tsx`; `GET /api/my-work/export` (session only, Papa Parse with `escapeFormulae`, a byte order mark, never cached, audited by row count only); `lib/personalJobsStore.ts` and `lib/myWorkData.ts`; `components/interpreter/interpreterNav.ts` (the layout draws the sidebar and mobile menu from it, with My work after Mileage); `/my-work` on the interpreter route list and the middleware matcher, so it gets the same 30 minute idle sign-out; `lib/availability/personalJobBlocks.ts`.
+
+- Calendar: `td_availability_view` returns the interpreter's own personal jobs; Month, Week and Day draw them as read-only tinted blocks apart from busy time; "Add a personal job" sits beside "Block time" and goes to `/my-work`.
+- Agency: personal jobs are read as bare windows (who and when; the label and setting are never selected), only for interpreters who share availability with the agency, merged with their busy time into one band. Because a personal job must be indistinguishable from other busy time, the band, its legend and the row caption now say "Unavailable" instead of "Busy" for all of it. The agency's interpreter detail page counts the same windows as not free.
+- Verified: unit tests (rendered components, the export route, the middleware, the agency timeline through the real action with a stubbed database) and, by script against the real demo database with the session mocked, the save, the CSV download and its 401/403 refusals, the interpreter's calendar data, and the agency timeline including the sharing rule.
+- Owed: a real-browser check (save, edit, delete and download through the UI; the calendar blocks; the agency band) at 1280, 900 and 390 px. It was skipped because free memory was under 1 GB. Run it when memory allows.

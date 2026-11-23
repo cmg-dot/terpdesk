@@ -2,6 +2,7 @@
 
 import React from "react";
 import { motion } from "framer-motion";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { CalendarDayView } from "@/components/calendar/interpreter/CalendarDayView";
@@ -22,7 +23,7 @@ export default function InterpreterCalendarPage() {
   const { view, goToDate } = nav;
   const currentDate = nav.date;
   const openJob = (id: string) => router.push(`/jobs/${id}`);
-  const views = { currentDate, appointments: cal.acceptedAppointments, busyBlocks: cal.busyBlocks, zone, currentTime, onOpenJob: openJob };
+  const views = { currentDate, appointments: cal.acceptedAppointments, busyBlocks: cal.busyBlocks, personalJobs: cal.personalJobs, zone, currentTime, onOpenJob: openJob };
 
   return (
     <motion.div initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.4, ease: "easeOut" }} className="max-w-[1200px] mx-auto p-4 md:p-8 w-full pb-24 antialiased">
@@ -48,9 +49,14 @@ export default function InterpreterCalendarPage() {
         onToday={nav.goToToday}
         onPick={goToDate}
         extra={
-          <button onClick={scrollToBusyTime} className="px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-[13px] font-medium hover:bg-[var(--forest-deep)] transition-colors">
-            Block time
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/my-work" className="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-[13px] font-medium hover:bg-[var(--surface)] transition-colors">
+              Add a personal job
+            </Link>
+            <button onClick={scrollToBusyTime} className="px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-[13px] font-medium hover:bg-[var(--forest-deep)] transition-colors">
+              Block time
+            </button>
+          </div>
         }
       />
 
