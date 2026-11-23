@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { assignInterpreterDirectly } from "@/app/actions/assignInterpreterDirectly";
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 import { InterpreterFitBadge } from "@/components/scheduling-ui";
 import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import type { EmailOutcome } from "@/lib/timesheetEmail";

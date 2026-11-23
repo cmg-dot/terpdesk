@@ -1,4 +1,4 @@
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 import type { PositionId } from "@/lib/positions";
 import type { TimesheetFlags } from "@/app/actions/getTimesheetStatus";
 import type { DirectAssignOfferRef, DirectAssignRosterEntry, DirectAssignSuccess } from "@/components/requests/DirectAssignPanel";

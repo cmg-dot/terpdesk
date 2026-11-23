@@ -11,7 +11,8 @@ import {
   offers,
   requests,
 } from "@/db/schema";
-import { ensureAvailabilityTables, resolveInterpreterIds } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
+import { resolveInterpreterIds } from "@/lib/availability/ids";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { isRegisteredInterpreter } from "@/lib/interpreterAccount";
 import { isPlaceholderEmail } from "@/lib/placeholderEmail";

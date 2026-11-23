@@ -15,15 +15,10 @@ import { Dropdown } from "@/components/ui/Dropdown";
 import { IconInput } from "@/components/ui/IconInput";
 import { useGlobalState } from "@/context/GlobalContext";
 import { getIanaZone } from "@/utils/timezone";
-import {
-  td_save_availability,
-  td_update_interpreter_timezone,
-  td_save_busy,
-  td_delete_busy,
-  td_availability_view,
-  AvailabilityRuleInput,
-  AvailabilityExceptionInput,
-} from "@/app/actions/availability";
+import { td_save_availability, td_update_interpreter_timezone } from "@/app/actions/availabilityRules";
+import { td_save_busy, td_delete_busy } from "@/app/actions/busyBlocks";
+import { td_availability_view } from "@/app/actions/availabilityView";
+import type { AvailabilityRuleInput, AvailabilityExceptionInput } from "@/lib/availability/types";
 
 export interface Rule {
   weekday: number;

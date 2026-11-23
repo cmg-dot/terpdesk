@@ -1,5 +1,5 @@
 /**
- * The "double-booked or busy" tier of an interpreter's availability for a job (app/actions/availability.ts, checkInterpreterFit), with
+ * The "double-booked or busy" tier of an interpreter's availability for a job (app/actions/interpreterFit.ts, checkInterpreterFit), with
  * the conflict lookup passed in so it is tested without a database. The job being staffed is always left out of the lookup: its own
  * accepted offer (an interpreter booked on it, or removed from it a moment ago) is not "another booking" and must never make that
  * interpreter show as "unavailable" for the very job they are on. Pure.

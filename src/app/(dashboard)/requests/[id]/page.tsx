@@ -18,10 +18,10 @@ import { isAppointmentHappeningNow, isUnfilledPastDue } from "@/utils/happeningN
 import { HappeningNowBadge } from "@/components/HappeningNowBadge";
 import { formatReference } from "@/utils/statusEngine";
 import { readInterpreterNotes } from "@/lib/interpreterNotes";
-import { getInterpretersFitForJob } from "@/app/actions/availability";
+import { getInterpretersFitForJob } from "@/app/actions/interpreterFit";
 import { offersFitKey } from "@/lib/offersFitKey";
 import { usePulseChange } from "@/hooks/usePulse";
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 import { PrepMaterialsSection } from "@/components/requests/PrepMaterialsSection";
 import { RequestHeadline } from "@/components/requests/RequestHeadline";
 import { RequestActionBar } from "@/components/requests/RequestActionBar";

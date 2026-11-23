@@ -1,7 +1,7 @@
 import { asc, and, desc, eq, getTableColumns, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { agencyInterpreters, interpreterProfiles, interpreters } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { ensureDisplayNameColumns } from "@/lib/displayName";
 import { interpreterDisplayName, interpreterPhotoUrl } from "@/lib/displayNameSql";

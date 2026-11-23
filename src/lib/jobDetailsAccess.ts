@@ -1,7 +1,7 @@
 import { and, desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { files, offers, requests } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { verifyJobDetailsToken } from "@/lib/jobDetailsToken";
 import { jobDetailsFor } from "@/lib/jobSummary";
 import type { JobDetails } from "@/lib/jobSummary";

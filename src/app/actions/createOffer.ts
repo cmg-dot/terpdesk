@@ -15,8 +15,8 @@ import { isActivePosition, positionLabel, positionOfOffer } from "@/lib/position
 import type { PositionId } from "@/lib/positions";
 import { createOfferSchema } from "@/lib/validation/createOffer";
 import type { CreateOfferInput } from "@/lib/validation/createOffer";
-import { checkInterpreterFit } from "./availability";
-import type { InterpreterFitStatus } from "./availability";
+import { checkInterpreterFit } from "@/app/actions/interpreterFit";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 
 type OfferRecord = typeof offers.$inferSelect;
 

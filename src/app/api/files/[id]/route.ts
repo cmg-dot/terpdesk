@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { files } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { writeAuditLog } from "@/lib/audit";
 import { requireSession } from "@/lib/auth/guards";
 import { canViewFile, isProfilePhoto } from "@/lib/fileAuthorization";

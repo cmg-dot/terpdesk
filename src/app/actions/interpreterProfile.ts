@@ -5,7 +5,7 @@ import { desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/db";
 import { interpreterProfiles, users } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { requireInterpreter } from "@/lib/auth/guards";
 import { logError } from "@/lib/logError";

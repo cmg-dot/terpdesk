@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createOffer } from "@/app/actions/createOffer";
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 import { offerBlock } from "@/lib/offerAvailability";
 import { DEFAULT_OFFER_EXPIRY_HOURS, checkOfferExpiry, defaultOfferExpiry } from "@/lib/offerExpiry";
 import type { PositionId } from "@/lib/positions";

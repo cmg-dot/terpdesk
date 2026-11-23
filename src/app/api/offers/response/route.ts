@@ -6,7 +6,7 @@ import type { RequestData } from "@/db/schema";
 import { verifyOfferToken } from "@/lib/jwt";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
-import { td_conflict } from "@/app/actions/availability";
+import { td_conflict } from "@/lib/availability/conflict";
 import { getInterpreterDisplayName } from "@/lib/displayName";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 import { logError } from "@/lib/logError";

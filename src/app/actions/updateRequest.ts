@@ -16,7 +16,7 @@ import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipien
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 import { bookedTimeConflict, withOriginalSchedule } from "@/lib/bookedTimeEdit";
 import { getInterpreterDisplayName } from "@/lib/displayName";
-import { td_conflict } from "./availability";
+import { td_conflict } from "@/lib/availability/conflict";
 import { definedOnly } from "@/lib/definedValues";
 import { clampPositionCount, countFromLabel, positionFields, readPositions, resizePositions } from "@/lib/positions";
 import { hasSubmittedHours, resolveOnsiteFlag } from "@/lib/onsiteSignature";

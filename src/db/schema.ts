@@ -510,7 +510,7 @@ export const contactVisibilityValues = ['private', 'shared'] as const;
 export type ContactVisibility = (typeof contactVisibilityValues)[number];
 
 // One row per interpreter (the calendar's time zone plus the "My Profile" fields the interpreter edits).
-// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
+// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/lib/availability/ensureTables.ts).
 export const interpreterProfiles = pgTable('interpreter_profiles', {
   id: text('id').primaryKey(),
   interpreterId: text('interpreter_id').notNull(),
@@ -549,7 +549,7 @@ export type SelectInterpreterProfile = typeof interpreterProfiles.$inferSelect;
 export type InsertInterpreterProfile = typeof interpreterProfiles.$inferInsert;
 
 // Certifications, insurance, training... an interpreter lists on their profile. Dates are plain calendar dates.
-// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
+// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/lib/availability/ensureTables.ts).
 export const credentialTypeValues = ['Certification', 'Qualification', 'Training', 'Insurance', 'Other'] as const;
 export type CredentialType = (typeof credentialTypeValues)[number];
 
@@ -592,7 +592,7 @@ export const credentialAgencyShares = pgTable('credential_agency_shares', {
 // Files in S3 (prep materials now; profile photos and credential documents later). The bucket is PRIVATE:
 // `file_url` is the object's address for reference only, and every view goes through a short-lived signed link
 // issued after an authorization check. `storage_key` is the S3 object key used for signing.
-// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/app/actions/availability.ts).
+// Keep in sync with the runtime DDL in ensureAvailabilityTables (src/lib/availability/ensureTables.ts).
 export const files = pgTable('files', {
   id: uuid('id').defaultRandom().primaryKey(),
   fileUrl: text('file_url').notNull(),

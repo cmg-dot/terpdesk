@@ -3,7 +3,7 @@
 import React from "react";
 import { useSession } from "next-auth/react";
 import { fetchInterpreterOffers } from "@/app/actions/getInterpreterOffers";
-import { td_availability_view } from "@/app/actions/availability";
+import { td_availability_view } from "@/app/actions/availabilityView";
 import type { HomeOffer } from "@/components/interpreter/HomeOfferCard";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
 import { useGlobalState } from "@/context/GlobalContext";

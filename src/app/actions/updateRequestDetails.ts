@@ -15,7 +15,7 @@ import { announceEdit, detailsUpdateFlag, planEditNotice, resolveMessageRecipien
 import { cleanInterpreterMessage, stripLockedFields } from "@/lib/bookedEditLimits";
 import { bookedTimeConflict, withOriginalSchedule } from "@/lib/bookedTimeEdit";
 import { getInterpreterDisplayName } from "@/lib/displayName";
-import { td_conflict } from "./availability";
+import { td_conflict } from "@/lib/availability/conflict";
 
 export interface UpdateRequestDetailsPayload {
   requestId: string;

@@ -8,7 +8,7 @@ import { and, eq, gt } from "drizzle-orm";
 import { interpreterHoldsOtherPosition, isPositionTakenByOther, lockRequestForPosition, positionOfOffer } from "@/lib/positionClaim";
 import { revalidatePath } from "next/cache";
 import { resolveRequestTimes } from "@/utils/timezone";
-import { td_conflict } from "./availability";
+import { td_conflict } from "@/lib/availability/conflict";
 import { sendBookingConfirmation } from "@/lib/jobEmails";
 import { alertAgency } from "@/lib/lifecycleAlerts";
 import { isActivePosition, positionLabel } from "@/lib/positions";

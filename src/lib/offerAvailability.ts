@@ -1,4 +1,4 @@
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 
 /**
  * Which availability results stop a standard offer (Create offer). Shared by the form (disabled button + message)

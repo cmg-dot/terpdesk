@@ -8,7 +8,7 @@ import { SearchableSelect } from "@/components/ui/SearchableSelect";
 import { AutoBookAction } from "@/components/requests/staffing/AutoBookAction";
 import { useAutoBookEligibility } from "@/hooks/useAutoBookEligibility";
 import { offerBlock } from "@/lib/offerAvailability";
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 import type { PositionView, StaffingActions, StaffingContext } from "@/components/requests/staffing/staffingTypes";
 
 /** End-of-row status in the recipient list: the same badge the Directly assign list shows, or why there is none yet. */

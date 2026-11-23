@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { files, requests } from "@/db/schema";
 import type { SelectFile } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { writeAuditLog } from "@/lib/audit";
 import { requireRole } from "@/lib/auth/guards";

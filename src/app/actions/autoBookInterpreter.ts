@@ -3,7 +3,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
-import { checkInterpreterFit } from "@/app/actions/availability";
+import { checkInterpreterFit } from "@/app/actions/interpreterFit";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { readPermission } from "@/lib/agencyPermissions";
 import { NOT_ALLOWED_MESSAGE, requireRole } from "@/lib/auth/guards";

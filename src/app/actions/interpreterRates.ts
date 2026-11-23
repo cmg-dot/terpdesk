@@ -3,7 +3,7 @@
 import { randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { db } from "@/db";
 import { agencyInterpreters, interpreterProfiles } from "@/db/schema";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { agencyInterpreters, interpreters } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { DEFAULT_AGENCY_ID } from "@/lib/agency";
 import { ensureAgencyInterpreterColumns } from "@/lib/agencyInterpreterColumns";
 import { writeAuditLog } from "@/lib/audit";

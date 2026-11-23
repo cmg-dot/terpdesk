@@ -2,7 +2,7 @@
 
 import React from "react";
 import { CheckCircle2, Clock, Ban, HelpCircle, AlertCircle } from "lucide-react";
-import type { InterpreterFitStatus } from "@/app/actions/availability";
+import type { InterpreterFitStatus } from "@/lib/interpreterFit";
 
 export interface InterpreterFitBadgeProps {
   fit?: InterpreterFitStatus | string | null;

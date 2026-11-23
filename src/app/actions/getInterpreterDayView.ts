@@ -1,7 +1,7 @@
 "use server";
 
 import { and, eq, gt, gte, isNull, lt, lte, or, sql } from "drizzle-orm";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { db } from "@/db";
 import { availabilityShares, busyBlocks, interpreters, offers, requests } from "@/db/schema";
 import { DEFAULT_AGENCY_ID, DEFAULT_AGENCY_TIME_ZONE } from "@/lib/agency";

@@ -5,7 +5,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
 import { credentials } from "@/db/schema";
-import { ensureAvailabilityTables } from "@/app/actions/availability";
+import { ensureAvailabilityTables } from "@/lib/availability/ensureTables";
 import { writeAuditLog } from "@/lib/audit";
 import { INSURANCE_LABEL, staffCommercialAutoSchema } from "@/lib/insurance";
 import type { InsurancePolicy, StaffCommercialAutoField, StaffCommercialAutoInput } from "@/lib/insurance";
