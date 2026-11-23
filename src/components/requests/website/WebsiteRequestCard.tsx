@@ -9,6 +9,14 @@ import { startsInLabel, urgencyOf, waitingLabel, waitingMinutes } from "@/lib/we
 import type { Urgency } from "@/lib/websiteRequestView";
 import type { WebsiteRequestRow } from "@/lib/websiteRequests";
 
+/**
+ * The card is a size container, so what it shows follows ITS width, not the window's (a split screen with the sidebar open leaves a
+ * narrow card in a wide window). Wide: text, then the Review button, then the chevron, each in its own lane. Narrow: text and chevron
+ * only; the opened preview has the same link.
+ */
+// Whole class names on purpose: Tailwind only generates the ones it can read in full from the source.
+const LANE_FOR_BUTTON = "[@container_(min-width:34rem)]:mr-[5.5rem]";
+const SHOW_BUTTON = "[@container_(min-width:34rem)]:inline-flex";
 const CHIP = "inline-flex max-w-full items-center gap-1 rounded-full border border-[var(--banner-edge)] bg-[var(--canvas)] px-2.5 py-0.5 text-[12px] text-[var(--sage)]";
 const SIGNAL = "inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[12px] font-semibold";
 
@@ -49,7 +57,7 @@ function CardHeader({ row, now }: { row: WebsiteRequestRow; now: number }) {
   const startsIn = startsInLabel(row, now);
   const when = row.timeRange ? `${row.dateTile?.weekday ?? ""} · ${row.timeRange}`.replace(/^ · /, "") : row.requestedFor;
   return (
-    <span className="flex items-start gap-3 sm:gap-4">
+    <span className={`flex items-start gap-3 sm:gap-4 ${LANE_FOR_BUTTON}`}>
       <DateTile tile={row.dateTile} />
       <span className="block min-w-0 flex-1">
         <span className="flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -89,8 +97,8 @@ function CardHeader({ row, now }: { row: WebsiteRequestRow; now: number }) {
 
 /**
  * One website request: the date tile, the organization, the status, the chips that say what and where, and how long it has waited and
- * how soon it starts. The row opens (inline preview) or goes straight to the request ("Review", wide screens; the preview has the same
- * link on every screen). A request that starts within 48 hours carries a rail in the theme's badge colour.
+ * how soon it starts. The row opens (inline preview) or goes straight to the request ("Review", on a card wide enough for it; the preview
+ * has the same link on every card). A request that starts within 48 hours carries a rail in the theme's badge colour.
  */
 export function WebsiteRequestCard({ row, now }: { row: WebsiteRequestRow; now: number }) {
   const urgency = urgencyOf(row, now);
@@ -100,15 +108,15 @@ export function WebsiteRequestCard({ row, now }: { row: WebsiteRequestRow; now: 
       role="listitem"
       data-website-request={row.id}
       data-urgency={urgency}
-      className={`relative rounded-2xl border border-[var(--banner-edge)] bg-white transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_10px_28px_-14px_rgb(var(--forest-rgb)_/_0.45)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${rail}`}
+      className={`relative rounded-2xl border border-[var(--banner-edge)] bg-white [container-type:inline-size] transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_10px_28px_-14px_rgb(var(--forest-rgb)_/_0.45)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 ${rail}`}
     >
-      <Expandable name="website-request" className="rounded-2xl" headerClassName="px-4 py-4 sm:px-5 sm:pr-40" header={<CardHeader row={row} now={now} />}>
+      <Expandable name="website-request" className="rounded-2xl" headerClassName="!items-start px-4 py-4 sm:px-5 [&>svg]:mt-0.5" header={<CardHeader row={row} now={now} />}>
         <WebsiteRequestPreview row={row} />
       </Expandable>
       <Link
         href={`/requests/${row.id}`}
         aria-label={`${row.needsReview ? "Review" : "Open"} request ${row.reference}`}
-        className="absolute right-14 top-4 hidden min-h-9 items-center rounded-full border border-[var(--forest)] px-4 text-[13px] font-medium text-[var(--forest)] transition-colors hover:bg-[var(--forest)] hover:text-[var(--canvas)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] sm:inline-flex"
+        className={`absolute right-12 top-3.5 hidden min-h-8 items-center rounded-full border border-[var(--forest)] px-4 text-[13px] font-medium text-[var(--forest)] transition-colors hover:bg-[var(--forest)] hover:text-[var(--canvas)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] ${SHOW_BUTTON}`}
       >
         {row.needsReview ? "Review" : "Open"}
       </Link>

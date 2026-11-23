@@ -187,7 +187,7 @@ describe("the Website requests board", () => {
     const html = await board([toWebsiteRequestRow(raw)]);
     assert.ok(html.includes('data-expandable="website-request"') && html.includes('data-open="false"'));
     assert.ok(!html.includes("data-website-preview"), "the preview is not in the page until opened");
-    assert.ok(!/\S+@\S+\.\S+/.test(html), "no email address anywhere in the page");
+    assert.ok(!/[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(html), "no email address anywhere in the page");
   });
 
   it("uses the workspace theme's colours, not fixed grays, and has no em-dash", async () => {

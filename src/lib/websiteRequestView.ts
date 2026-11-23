@@ -1,3 +1,4 @@
+import { REQUEST_FORMATS, REQUEST_SETTINGS } from "@/lib/requestOptions";
 import type { WebsiteRequestRow } from "@/lib/websiteRequests";
 
 /**
@@ -117,8 +118,8 @@ const compareBy = (key: SortKey, now: number) => (a: WebsiteRequestRow, b: Websi
 export function applyFilters(rows: readonly WebsiteRequestRow[], filters: WebsiteFilters, now: number): WebsiteRequestRow[] {
   return rows
     .filter((row) => inTab(row, filters.tab))
-    .filter((row) => filters.setting === ALL_SETTINGS || row.setting === filters.setting)
-    .filter((row) => filters.format === ALL_FORMATS || row.format === filters.format)
+    .filter((row) => filters.setting === ALL_SETTINGS || sameText(row.setting, filters.setting))
+    .filter((row) => filters.format === ALL_FORMATS || sameText(row.format, filters.format))
     .filter((row) => matchesQuery(row, filters.query))
     .sort(compareBy(filters.sort, now));
 }
@@ -150,10 +151,23 @@ export function boardStats(rows: readonly WebsiteRequestRow[], now: number): Boa
   };
 }
 
-/** The setting and format choices that exist in the data, behind an "All ..." entry. */
+const sameText = (a: string, b: string): boolean => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/**
+ * Every choice our forms offer, in the forms' order, then any other value that is in the rows (sorted): the lists never shrink to what
+ * a small queue happens to hold. A value in the rows that only differs in capitals from a form choice is the same choice.
+ */
+const withExtras = (canonical: readonly string[], found: readonly string[]): string[] => {
+  const extras = Array.from(new Set(found)).filter((value) => !canonical.some((choice) => sameText(choice, value)));
+  return [...canonical, ...extras.sort((a, b) => a.localeCompare(b))];
+};
+
+/** The setting and format choices, behind an "All ..." entry. */
 export function filterOptions(rows: readonly WebsiteRequestRow[]): { settings: string[]; formats: string[] } {
-  const unique = (values: string[]): string[] => Array.from(new Set(values)).sort((a, b) => a.localeCompare(b));
-  return { settings: [ALL_SETTINGS, ...unique(rows.map((row) => row.setting))], formats: [ALL_FORMATS, ...unique(rows.map((row) => row.format))] };
+  return {
+    settings: [ALL_SETTINGS, ...withExtras(REQUEST_SETTINGS, rows.map((row) => row.setting))],
+    formats: [ALL_FORMATS, ...withExtras(REQUEST_FORMATS, rows.map((row) => row.format))],
+  };
 }
 
 /** True when anything other than the tab has been changed (what "Clear filters" undoes). */
