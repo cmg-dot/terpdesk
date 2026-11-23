@@ -6,6 +6,7 @@ import { CountBadge } from "@/components/ui/CountBadge";
 import { SignOutButton } from "@/components/auth/SignOutButton";
 import { NavLegalLinks } from "@/components/legal/LegalLinks";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
+import { useWebsiteReviewCount } from "@/hooks/useWebsiteReviewCount";
 import { AGENCY_NAV, isNavActive } from "@/components/agency/agencyNav";
 import { BrandCard, TerpdeskBrand } from "@/components/agency/SidebarBrand";
 
@@ -18,6 +19,7 @@ const IDLE = "text-[var(--sidebar-muted)] hover:bg-white/5 hover:text-white";
 export const AgencySidebar = ({ userName, userEmail }: { userName: string; userEmail: string }) => {
   const pathname = usePathname();
   const unreadInbox = useInboxUnreadCount();
+  const websiteToReview = useWebsiteReviewCount();
 
   return (
     <aside className="sticky top-0 hidden h-screen w-64 shrink-0 flex-col self-start overflow-hidden bg-[var(--sidebar)] text-white md:flex">
@@ -47,6 +49,7 @@ export const AgencySidebar = ({ userName, userEmail }: { userName: string; userE
               {item.label}
             </span>
             {item.trailing === "inboxCount" && <CountBadge count={unreadInbox} label="unread emails" />}
+            {item.trailing === "websiteCount" && <CountBadge count={websiteToReview} label="website requests needing review" />}
             {item.trailing === "later" && <span className="text-[10px] text-[var(--sidebar-muted)]">Later</span>}
           </Link>
         ))}

@@ -10,7 +10,7 @@ export interface AgencyNavItem {
   /** The Dashboard link is exact; every other page is active for its whole subtree. */
   exact?: boolean;
   /** Extra marker shown on the right. */
-  trailing?: "inboxCount" | "later";
+  trailing?: "inboxCount" | "websiteCount" | "later";
 }
 
 export const AGENCY_NAV: readonly AgencyNavItem[] = [
@@ -19,7 +19,7 @@ export const AGENCY_NAV: readonly AgencyNavItem[] = [
   { href: "/calendar", label: "Calendar", icon: Calendar },
   { href: "/interpreters", label: "Interpreters", icon: Users },
   { href: "/clients", label: "Organizations", icon: Building },
-  { href: "/website-requests", label: "Website requests", icon: Globe },
+  { href: "/website-requests", label: "Website requests", icon: Globe, trailing: "websiteCount" },
   { href: "/inbox", label: "Inbox", icon: Inbox, trailing: "inboxCount" },
   // "Later" only where billing is still switched off (production until sign-off).
   { href: "/billing", label: "Billing", icon: CreditCard, ...(BILLING_ENABLED ? {} : { trailing: "later" as const }) },

@@ -22,6 +22,7 @@ import { ClientsProvider } from "@/context/ClientsContext";
 import { NotificationBell } from "@/components/NotificationBell";
 import { CountBadge } from "@/components/ui/CountBadge";
 import { useInboxUnreadCount } from "@/hooks/useInboxUnreadCount";
+import { useWebsiteReviewCount } from "@/hooks/useWebsiteReviewCount";
 import { AgencySidebar } from "@/components/agency/AgencySidebar";
 import { AgencyBanners } from "@/components/agency/AgencyBanners";
 import { AlertToasts } from "@/components/ui/AlertToasts";
@@ -40,6 +41,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const userName = session?.user?.name ?? "";
   const userEmail = session?.user?.email ?? "";
   const unreadInbox = useInboxUnreadCount();
+  const websiteToReview = useWebsiteReviewCount();
 
   return (
     <ClientsProvider>
@@ -124,6 +126,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   <Link href="/website-requests" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/website-requests') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Globe className="h-5 w-5" />
                     Website requests
+                    <CountBadge count={websiteToReview} label="website requests needing review" />
                   </Link>
                   <Link href="/inbox" onClick={() => setIsMenuOpen(false)} className={`flex items-center gap-4 rounded-full px-5 py-3.5 text-[15px] font-medium transition-colors ${pathname.startsWith('/inbox') ? 'bg-[var(--surface)] text-[var(--forest)]' : 'text-slate-600 hover:bg-neutral-100 hover:text-slate-900'}`}>
                     <Inbox className="h-5 w-5" />
