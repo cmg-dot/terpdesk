@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { FORMATS, SETTINGS } from "@/lib/publicIntake";
-import { REQUEST_FORMATS, REQUEST_SETTINGS } from "@/lib/requestOptions";
+import { GENERIC_SETTINGS } from "@/lib/genericSetting";
+import { FILTER_SETTINGS, REQUEST_FORMATS, REQUEST_SETTINGS } from "@/lib/requestOptions";
 import { websiteFormatLabel } from "@/lib/websiteRequests";
 
 const read = (...parts: string[]): string => readFileSync(join(process.cwd(), ...parts), "utf8");
@@ -25,8 +26,17 @@ describe("the setting and format choices the Website requests board filters by",
     assert.deepEqual([...REQUEST_FORMATS], ["In person", "Virtual", "Hybrid"]);
   });
 
+  it("list, for filtering, the forms' settings and then the system's other generic categories (Social Services, Employment, General)", () => {
+    assert.deepEqual(FILTER_SETTINGS.slice(0, REQUEST_SETTINGS.length), [...REQUEST_SETTINGS]);
+    assert.deepEqual(FILTER_SETTINGS.slice(REQUEST_SETTINGS.length), ["Social Services", "Employment", "General"]);
+    for (const generic of GENERIC_SETTINGS) {
+      const covered = FILTER_SETTINGS.some((s) => s.toLowerCase() === generic.toLowerCase()) || (generic === "Educational" && FILTER_SETTINGS.includes("Education"));
+      assert.ok(covered, `generic category ${generic}`);
+    }
+  });
+
   it("have no em-dash and no repeats", () => {
-    const all = [...REQUEST_SETTINGS, ...REQUEST_FORMATS];
+    const all = [...FILTER_SETTINGS, ...REQUEST_FORMATS];
     assert.equal(new Set(all.map((v) => v.toLowerCase())).size, all.length);
     for (const value of all) assert.ok(!value.includes(String.fromCharCode(0x2014)));
   });

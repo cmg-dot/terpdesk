@@ -7,6 +7,7 @@ import { HoursOverdueBanner } from "@/components/interpreter/HoursOverdueBanner"
 import { ScheduleBanners } from "@/components/interpreter/ScheduleBanners";
 import { CancelledJobCard } from "@/components/interpreter/jobs/CancelledJobCard";
 import { CompletedJobCard } from "@/components/interpreter/jobs/CompletedJobCard";
+import { UpcomingEmpty } from "@/components/interpreter/jobs/UpcomingEmpty";
 import { UpcomingJobCard } from "@/components/interpreter/jobs/UpcomingJobCard";
 import { AnimatedPaginatedList } from "@/components/ui/AnimatedPaginatedList";
 import { useInterpreterJobs } from "@/context/InterpreterJobsContext";
@@ -121,7 +122,7 @@ export default function InterpreterJobsPage() {
 
       {tab === "upcoming" && (
         buckets.upcoming.length === 0 ? (
-          <p className="bg-white rounded-2xl border border-gray-200 p-6 text-[14px] text-[var(--sage)]">No upcoming offers or bookings right now.</p>
+          <UpcomingEmpty />
         ) : (
           <AnimatedPaginatedList
             items={buckets.upcoming}

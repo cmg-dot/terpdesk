@@ -1,4 +1,4 @@
-import { REQUEST_FORMATS, REQUEST_SETTINGS } from "@/lib/requestOptions";
+import { FILTER_SETTINGS, REQUEST_FORMATS } from "@/lib/requestOptions";
 import type { WebsiteRequestRow } from "@/lib/websiteRequests";
 
 /**
@@ -165,7 +165,7 @@ const withExtras = (canonical: readonly string[], found: readonly string[]): str
 /** The setting and format choices, behind an "All ..." entry. */
 export function filterOptions(rows: readonly WebsiteRequestRow[]): { settings: string[]; formats: string[] } {
   return {
-    settings: [ALL_SETTINGS, ...withExtras(REQUEST_SETTINGS, rows.map((row) => row.setting))],
+    settings: [ALL_SETTINGS, ...withExtras(FILTER_SETTINGS, rows.map((row) => row.setting))],
     formats: [ALL_FORMATS, ...withExtras(REQUEST_FORMATS, rows.map((row) => row.format))],
   };
 }

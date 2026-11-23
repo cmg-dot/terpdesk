@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { MileageEmpty } from "@/components/features/MileageEmpty";
 import { MileageEntryCard } from "@/components/features/MileageEntryCard";
 import { MILEAGE_RANGES, entriesInRange, mileageTotals } from "@/lib/mileageSummary";
 import type { MileageEntry, MileageRange } from "@/lib/mileageSummary";
@@ -54,9 +55,7 @@ export function MileageOverview({ entries, generatedAt }: MileageOverviewProps) 
       </div>
 
       {visible.length === 0 ? (
-        <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-[var(--sage)]">
-          No mileage reported {range === "all" ? "yet" : "in this period"}. Mileage you add when you submit hours for a job appears here.
-        </div>
+        <MileageEmpty noneAtAll={entries.length === 0} allTime={range === "all"} />
       ) : (
         <ul className="space-y-3">
           {visible.map((entry) => (

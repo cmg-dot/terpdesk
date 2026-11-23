@@ -17,7 +17,7 @@ import {
   waitingLabel,
   waitingMinutes,
 } from "@/lib/websiteRequestView";
-import { REQUEST_FORMATS, REQUEST_SETTINGS } from "@/lib/requestOptions";
+import { FILTER_SETTINGS, REQUEST_FORMATS } from "@/lib/requestOptions";
 import { toWebsiteRequestRow } from "@/lib/websiteRequests";
 import type { WebsiteRequestRow } from "@/lib/websiteRequests";
 
@@ -139,21 +139,21 @@ describe("tabs, filters and counts", () => {
   });
 
   it("always lists every setting and format our forms offer, in the forms' order, behind All", () => {
-    const everySetting = [ALL_SETTINGS, ...REQUEST_SETTINGS];
+    const everySetting = [ALL_SETTINGS, ...FILTER_SETTINGS];
     const everyFormat = [ALL_FORMATS, ...REQUEST_FORMATS];
     assert.deepEqual(filterOptions(rows), { settings: everySetting, formats: everyFormat });
     assert.deepEqual(filterOptions([]), { settings: everySetting, formats: everyFormat }, "an empty queue still has the full lists");
     const small = [row({ setting: "Education", format: "In person" })];
     assert.deepEqual(filterOptions(small), { settings: everySetting, formats: everyFormat }, "one request does not shrink the lists to its own values");
-    assert.ok(["Education", "Medical", "Mental Health", "Workplace", "Legal", "Community", "Other"].every((s) => everySetting.includes(s)));
+    assert.ok(["Education", "Medical", "Mental Health", "Workplace", "Legal", "Community", "Other", "Social Services", "Employment", "General"].every((s) => everySetting.includes(s)));
     assert.ok(["In person", "Virtual"].every((f) => everyFormat.includes(f)));
   });
 
   it("adds a value that is in the rows but not on the forms (sorted, after the form's choices), and never twice", () => {
-    const odd = [row({ setting: "Not stated" }), row({ setting: "Zoo visit" }), row({ setting: "Employment" }), row({ setting: "medical" }), row({ setting: "Zoo visit" }), row({ format: "Phone" })];
+    const odd = [row({ setting: "Not stated" }), row({ setting: "Zoo visit" }), row({ setting: "Housing" }), row({ setting: "medical" }), row({ setting: "Zoo visit" }), row({ format: "Phone" })];
     const { settings, formats } = filterOptions(odd);
-    assert.deepEqual(settings.slice(0, 1 + REQUEST_SETTINGS.length), [ALL_SETTINGS, ...REQUEST_SETTINGS]);
-    assert.deepEqual(settings.slice(1 + REQUEST_SETTINGS.length), ["Employment", "Not stated", "Zoo visit"]);
+    assert.deepEqual(settings.slice(0, 1 + FILTER_SETTINGS.length), [ALL_SETTINGS, ...FILTER_SETTINGS]);
+    assert.deepEqual(settings.slice(1 + FILTER_SETTINGS.length), ["Housing", "Not stated", "Zoo visit"]);
     assert.equal(settings.filter((s) => s.toLowerCase() === "medical").length, 1, "a different capitalisation is the same choice");
     assert.deepEqual(formats.slice(1 + REQUEST_FORMATS.length), ["Phone"]);
   });
