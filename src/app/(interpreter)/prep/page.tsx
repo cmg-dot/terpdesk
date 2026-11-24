@@ -1,5 +1,6 @@
 import { getMyPrepMaterials } from "@/app/actions/fileAccess";
-import { PrepMaterialsTab } from "@/components/prep/PrepMaterialsTab";
+import { PrepTabs } from "@/components/prep/PrepTabs";
+import { loadGlossary } from "@/lib/glossaryData";
 import { logError } from "@/lib/logError";
 import type { InterpreterPrepFile } from "@/lib/validation/file";
 
@@ -10,6 +11,7 @@ export default async function PrepPage() {
   // The middleware requires an interpreter session; the action limits files to jobs they are booked on.
   let files: InterpreterPrepFile[] = [];
   let unavailable = false;
+  const glossary = loadGlossary();
   try {
     files = await getMyPrepMaterials();
   } catch (err) {
@@ -22,14 +24,14 @@ export default async function PrepPage() {
     <div className="mx-auto w-full max-w-[1000px] space-y-6 p-4 pb-24 antialiased sm:p-6">
       <div className="space-y-2">
         <h1 className="text-[28px] font-semibold tracking-tight text-[var(--ink)]">Prep</h1>
-        <p className="text-[15px] text-[var(--sage)]">Materials agencies have shared for your booked jobs.</p>
+        <p className="text-[15px] text-[var(--sage)]">Materials agencies have shared for your booked jobs, and your own glossary of terms.</p>
       </div>
       {unavailable ? (
         <div role="alert" className="rounded-2xl border border-amber-200 bg-amber-50 p-6 text-sm text-amber-900">
           We couldn&apos;t load your prep materials. If you just signed up, confirm your email first, then refresh.
         </div>
       ) : (
-        <PrepMaterialsTab files={files} />
+        <PrepTabs files={files} glossary={await glossary} />
       )}
     </div>
   );

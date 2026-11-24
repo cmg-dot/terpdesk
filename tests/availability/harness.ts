@@ -27,6 +27,8 @@ export const state: {
   failAlways: Set<string>;
   /** Table names whose reads always throw this specific error (for example one carrying a Postgres code). */
   errors: Record<string, Error>;
+  /** Table names whose writes (`.returning()`) always throw this error, for example a unique violation. */
+  writeErrors: Record<string, Error>;
   ops: string[];
   inserted: { table: string; values: unknown }[];
   updated: { table: string; set: unknown }[];
@@ -34,7 +36,7 @@ export const state: {
   selects: { table: string; fields: string[] }[];
   wheres: { table: string; condition: unknown }[];
 } = {
-  session: null, rows: {}, returning: {}, counts: {}, failOnce: new Set(), failAlways: new Set(), errors: {},
+  session: null, rows: {}, returning: {}, counts: {}, failOnce: new Set(), failAlways: new Set(), errors: {}, writeErrors: {},
   ops: [], inserted: [], updated: [], selects: [], wheres: [],
 };
 
@@ -46,6 +48,7 @@ export function reset(): void {
   state.failOnce.clear();
   state.failAlways.clear();
   state.errors = {};
+  state.writeErrors = {};
   state.ops = [];
   state.inserted = [];
   state.updated = [];
@@ -86,12 +89,21 @@ function chain(table: string, fields: string[]): Chain {
 }
 
 /** A write that can be awaited as it is, or asked for `.returning()`. */
-function write(table: string, fallback: () => unknown[]): PromiseLike<void> & { returning: (fields?: unknown) => Promise<unknown[]> } {
+type Write = PromiseLike<void> & { returning: (fields?: unknown) => Promise<unknown[]>; onConflictDoNothing: () => Write };
+
+function write(table: string, fallback: () => unknown[]): Write {
   const answer = (): unknown[] => state.returning[table] ?? fallback();
-  return {
+  const self: Write = {
     then: (onFulfilled, onRejected) => Promise.resolve().then(onFulfilled, onRejected),
-    returning: async () => answer(),
+    returning: async () => {
+      const error = state.writeErrors[table];
+      if (error) throw error;
+      return answer();
+    },
+    // An insert that skips rows the database already has: the fake answers with what a test set in `returning`, else every row.
+    onConflictDoNothing: () => self,
   };
+  return self;
 }
 
 let installed = false;
