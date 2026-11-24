@@ -13,6 +13,13 @@
 - Never store raw dispatch or magic link tokens in plain text in the database.
 - Store SHA-256 hashes (`crypto.createHash('sha256').update(token).digest('hex')`). Compare hashes on lookup.
 - Tokens must have an explicit expiration timestamp (`expiresAt`) and a one-time-use flag or state-lock check.
+- **Documented exception: the calendar subscription link (`/api/calendar/feed/<secret>.ics`, `interpreter_calendar_feeds`).** A calendar app (Apple, Google) re-fetches the same address for months or years, so the link can be neither one-time nor expiring: an expiry would silently end the subscription. In place of expiry and one-time use it has these controls, all required:
+  - The secret is 32 random bytes (256 bits), shown to the interpreter once when it is made or rotated, and stored only as its SHA-256. It is never logged, audited or returned again; the request path is never printed.
+  - The interpreter can **revoke** it or **rotate** it (a new secret; the old one stops working at once) in one click, and the card shows when a calendar app last fetched it (`last_fetched_at`).
+  - A revoked, unknown or malformed secret, or a database without the table, all get the identical `404`, so the answer reveals nothing.
+  - Fetches are rate limited in the database (about 60 an hour per secret, `429` with `Retry-After`), counted in one atomic statement.
+  - Events carry no PHI: the only titles are "terpDESK job", "Personal job" and "Busy" (plus, if the interpreter chooses, one generic setting category from `src/lib/genericSetting.ts`). Never a client, organization, address, meeting link, note, busy-block title or personal-job label.
+  - The response sets `Referrer-Policy: no-referrer`, `X-Robots-Tag: noindex` and `Cache-Control: private`. Events a calendar app has already fetched cannot be recalled by revoking; the card says so.
 
 ## 4. HIPAA & Logging Hygiene
 - Do NOT output sensitive client, patient, or appointment details to terminal or production logs (`console.log`).

@@ -10,11 +10,13 @@ import { CalendarMonthView } from "@/components/calendar/interpreter/CalendarMon
 import { CalendarWeekView } from "@/components/calendar/interpreter/CalendarWeekView";
 import { CalendarNav } from "@/components/calendar/CalendarNav";
 import { CalendarTransition } from "@/components/calendar/CalendarTransition";
+import { CalendarFeedCard } from "@/components/calendar/interpreter/CalendarFeedCard";
 import ConnectedAvailability from "@/connected/availability";
 import { useInterpreterCalendar } from "@/hooks/useInterpreterCalendar";
 import { formatBadgeDate, rangeKeyFor, weekStartKey } from "@/lib/calendarNav";
 
 const scrollToBusyTime = () => document.getElementById("private-busy-time")?.scrollIntoView({ behavior: "smooth", block: "start" });
+const scrollToFeed = () => document.getElementById("calendar-feed")?.scrollIntoView({ behavior: "smooth", block: "start" });
 
 export default function InterpreterCalendarPage() {
   const router = useRouter();
@@ -56,6 +58,9 @@ export default function InterpreterCalendarPage() {
             <button onClick={scrollToBusyTime} className="px-4 py-2 rounded-full bg-[var(--forest-soft)] text-white text-[13px] font-medium hover:bg-[var(--forest-deep)] transition-colors">
               Block time
             </button>
+            <button onClick={scrollToFeed} className="px-4 py-2 rounded-full border border-gray-200 bg-white text-gray-700 text-[13px] font-medium hover:bg-[var(--surface)] transition-colors">
+              Subscribe
+            </button>
           </div>
         }
       />
@@ -85,6 +90,8 @@ export default function InterpreterCalendarPage() {
         {view === "week" && <CalendarWeekView {...views} onSlotClick={scrollToBusyTime} />}
         {view === "day" && <CalendarDayView {...views} onBlockTime={scrollToBusyTime} />}
       </CalendarTransition>
+
+      <CalendarFeedCard />
 
       {/* Manage availability & Private busy time Section */}
       <div className="mt-12">
