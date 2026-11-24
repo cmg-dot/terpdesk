@@ -99,3 +99,27 @@ export function parseExportQuery(params: URLSearchParams): { range: MileageRange
     },
   };
 }
+
+/** Jobs on one page of the My work list. */
+export const JOBS_PER_PAGE = 10;
+
+export interface JobPage {
+  /** The page shown, 1 based, never past the last one. */
+  page: number;
+  pages: number;
+  /** The first and last job shown, 1 based ("Showing 11-20 of 24"); both 0 when there are none. */
+  from: number;
+  to: number;
+  /** Where the page starts and stops in the list (for slice). */
+  start: number;
+  end: number;
+}
+
+/** Which jobs a page holds. A page number that is too high (the last job on the last page was deleted) lands on the last page. */
+export function pageWindow(total: number, requested: number, size: number = JOBS_PER_PAGE): JobPage {
+  const pages = Math.max(1, Math.ceil(total / size));
+  const page = Math.min(Math.max(1, Math.floor(requested) || 1), pages);
+  const start = (page - 1) * size;
+  const end = Math.min(total, start + size);
+  return { page, pages, from: total === 0 ? 0 : start + 1, to: end, start, end };
+}

@@ -77,10 +77,10 @@ describe("the My work screen", () => {
     assert.ok(html.includes('href="/api/my-work/export?range=30"') && html.includes("Export CSV"), "the link carries the view it downloads");
   });
 
-  it("a job without a label reads Personal job, and a long list shows twenty then offers more", async () => {
+  it("a job without a label reads Personal job, and a long list shows ten per page with a pager", async () => {
     const html = await board(Array.from({ length: 25 }, (_, i) => at(`job-${i}`, i + 1)));
-    assert.equal((html.match(/data-personal-job="/g) ?? []).length, 20);
-    assert.ok(html.includes("Show 5 more (5 left)"));
+    assert.equal((html.match(/data-personal-job="/g) ?? []).length, 10);
+    assert.ok(html.includes("Showing 1-10 of 25") && html.includes("Page 1 of 3") && !html.includes(" more ("));
     assert.ok(html.includes(">Personal job<"));
   });
 
@@ -123,6 +123,7 @@ describe("the files of My work", () => {
     const files = [
       ["src", "app", "(interpreter)", "my-work", "page.tsx"], ["src", "app", "(interpreter)", "layout.tsx"], ["src", "app", "api", "my-work", "export", "route.ts"],
       ["src", "components", "myWork", "PersonalJobsBoard.tsx"], ["src", "components", "myWork", "PersonalJobForm.tsx"], ["src", "components", "myWork", "PersonalJobRow.tsx"], ["src", "components", "myWork", "MyWorkTotals.tsx"],
+      ["src", "components", "myWork", "MyWorkList.tsx"], ["src", "components", "myWork", "MyWorkPager.tsx"], ["src", "components", "myWork", "Reveal.tsx"],
       ["src", "components", "interpreter", "interpreterNav.ts"], ["src", "lib", "personalJobs.ts"], ["src", "lib", "personalJobsStore.ts"], ["src", "lib", "myWorkData.ts"],
       ["src", "lib", "availability", "personalJobBlocks.ts"], ["src", "lib", "interpreterCalendar.ts"], ["src", "hooks", "useInterpreterCalendar.ts"],
       ["src", "app", "actions", "getInterpreterDayView.ts"], ["src", "app", "actions", "availabilityView.ts"], ["src", "lib", "agencyInterpreterView.ts"],

@@ -58,7 +58,7 @@ export function MyWorkToolbar({ filters, counts, settings, shown, onChange, onCl
       </div>
 
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div role="group" aria-label="Show personal jobs" className="flex gap-1 rounded-full bg-[var(--surface)] p-1 lg:w-auto">
+        <div role="group" aria-label="Show personal jobs" className="flex flex-wrap gap-1 rounded-3xl bg-[var(--surface)] p-1 lg:w-auto lg:rounded-full">
           {JOB_TABS.map((tab) => {
             const active = filters.tab === tab;
             return (
@@ -68,7 +68,7 @@ export function MyWorkToolbar({ filters, counts, settings, shown, onChange, onCl
                 aria-pressed={active}
                 data-tab={tab}
                 onClick={() => onChange({ tab })}
-                className={`relative flex min-h-9 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-4 text-[13px] font-medium transition-colors lg:flex-none ${active ? "text-white" : "text-[var(--sage)] hover:text-[var(--ink)]"}`}
+                className={`relative flex min-h-11 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 text-[13px] sm:min-h-9 sm:px-4 font-medium transition-colors lg:flex-none ${active ? "text-white" : "text-[var(--sage)] hover:text-[var(--ink)]"}`}
               >
                 {active && <motion.span layoutId="my-work-tab" transition={reduce ? { duration: 0 } : transition(0.2)} className="absolute inset-0 rounded-full bg-[var(--pill)] shadow-sm" />}
                 <span className="relative">{JOB_TAB_LABELS[tab]}</span>

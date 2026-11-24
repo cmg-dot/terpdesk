@@ -121,7 +121,7 @@ describe("the toolbar and the card", () => {
   it("the card has the date block, the title, the when line, the pills and Edit / Delete, and Upcoming only when it is", async () => {
     const { PersonalJobRow } = await import("@/components/myWork/PersonalJobRow");
     const sample = toPersonalJobView(record({ label: "Spring class", setting: "Education", startsAt: new Date("2026-11-24T17:00:00Z"), endsAt: new Date("2026-11-24T19:30:00Z"), breakMinutes: 30, miles: "12.5", roundTrip: true, countedMiles: "25.0" }));
-    const render = (upcoming: boolean) => renderToStaticMarkup(React.createElement(PersonalJobRow, { job: sample, upcoming, onEdit: () => undefined, onDelete: async () => null }));
+    const render = (upcoming: boolean) => renderToStaticMarkup(React.createElement(PersonalJobRow, { job: sample, upcoming, onEdit: () => undefined, onSaved: () => undefined, onCancelEdit: () => undefined, onDelete: async () => null }));
     const html = render(true);
     assert.deepEqual(personalJobDateTile(sample), { month: "NOV", day: "24" });
     assert.match(html, /data-date-tile=""[^>]*>[\s\S]*?NOV[\s\S]*?24/);

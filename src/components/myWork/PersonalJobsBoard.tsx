@@ -1,18 +1,22 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
+import { AnimatePresence } from "framer-motion";
 import { Download, Plus } from "lucide-react";
 import { deletePersonalJob } from "@/app/actions/personalJobs";
+import { MyWorkList } from "@/components/myWork/MyWorkList";
+import { MyWorkPager } from "@/components/myWork/MyWorkPager";
 import { MyWorkToolbar } from "@/components/myWork/MyWorkToolbar";
 import { MyWorkTotals } from "@/components/myWork/MyWorkTotals";
 import { PersonalJobForm } from "@/components/myWork/PersonalJobForm";
-import { PersonalJobRow } from "@/components/myWork/PersonalJobRow";
+import { Reveal } from "@/components/myWork/Reveal";
 import { useClockFrom } from "@/hooks/useClockFrom";
+import { useHoursMotion } from "@/hooks/useHoursMotion";
 import type { MileageRange } from "@/lib/mileageSummary";
-import { DEFAULT_JOB_FILTERS, applyPersonalJobFilters, exportQuery, isUpcoming, personalJobSettingOptions, personalJobTabCounts } from "@/lib/personalJobFilters";
+import { DEFAULT_JOB_FILTERS, applyPersonalJobFilters, exportQuery, pageWindow, personalJobSettingOptions, personalJobTabCounts } from "@/lib/personalJobFilters";
 import type { PersonalJobFilters } from "@/lib/personalJobFilters";
-import { emptyPersonalJobForm, personalJobFormValues, personalJobsInRange } from "@/lib/personalJobs";
+import { emptyPersonalJobForm, personalJobsInRange } from "@/lib/personalJobs";
 import type { PersonalJobFormValues, PersonalJobView } from "@/lib/personalJobs";
 
 interface PersonalJobsBoardProps {
@@ -23,9 +27,6 @@ interface PersonalJobsBoardProps {
   generatedAt: string;
 }
 
-const PAGE_SIZE = 20;
-type Editor = { mode: "new"; values: PersonalJobFormValues } | { mode: "edit"; job: PersonalJobView; values: PersonalJobFormValues };
-
 const noMatchBox = "rounded-2xl border border-dashed border-[var(--banner-edge)] bg-white p-8 text-center text-sm text-[var(--sage)]";
 
 /** My work: totals that double as the date range, search and filters, the cards, the form, and the CSV download of what is shown. */
@@ -33,8 +34,11 @@ export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }:
   const [jobs, setJobs] = useState<PersonalJobView[]>(initialJobs);
   const [range, setRange] = useState<MileageRange>("30");
   const [filters, setFilters] = useState<PersonalJobFilters>(DEFAULT_JOB_FILTERS);
-  const [editor, setEditor] = useState<Editor | null>(null);
-  const [more, setMore] = useState<{ view: string; pages: number }>({ view: "", pages: 1 });
+  // The panel at the top is only for a new job; an edit opens inside the job's own card.
+  const [adding, setAdding] = useState<PersonalJobFormValues | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const listTop = useRef<HTMLDivElement>(null);
+  const { reduce } = useHoursMotion();
   const [notice, setNotice] = useState<string | null>(null);
   // Starts at the moment the server read the jobs (so the first render matches the server's HTML), then follows the real time, so an upcoming job turns into a completed one when it ends.
   const serverNow = useMemo(() => new Date(generatedAt).getTime(), [generatedAt]);
@@ -46,24 +50,33 @@ export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }:
 
   const update = (patch: Partial<PersonalJobFilters>) => setFilters((current) => ({ ...current, ...patch }));
   const clear = () => setFilters((current) => ({ ...DEFAULT_JOB_FILTERS, tab: current.tab }));
-  // "Show more" is forgotten whenever the view changes, so a new range, tab, search or sort starts at the top again.
+  // A new range, tab, search, setting or sort starts at page 1 again, including one that goes back to a view seen before: the page is reset
+  // as soon as the view differs from the one it was set for (adjusting state while rendering, so there is no frame on the wrong page).
   const view = `${range}|${JSON.stringify(filters)}`;
-  const pages = more.view === view ? more.pages : 1;
-  const visible = matching.slice(0, pages * PAGE_SIZE);
-  const left = matching.length - visible.length;
+  const [pager, setPager] = useState<{ view: string; page: number }>({ view, page: 1 });
+  if (pager.view !== view) setPager({ view, page: 1 });
+  const slot = pageWindow(matching.length, pager.view === view ? pager.page : 1);
+  const visible = matching.slice(slot.start, slot.end);
+  const goToPage = (page: number) => {
+    setPager({ view, page });
+    // From the pager under the list, bring the top of the new page back into view (when the list top is already visible, nothing moves).
+    const top = listTop.current;
+    if (top && top.getBoundingClientRect().top < 0) top.scrollIntoView({ block: "start", behavior: reduce ? "auto" : "smooth" });
+  };
 
   const openNew = () => {
     setNotice(null);
-    setEditor({ mode: "new", values: emptyPersonalJobForm(defaultTimeZone, formatInTimeZone(new Date(), defaultTimeZone, "yyyy-MM-dd")) });
+    setAdding(emptyPersonalJobForm(defaultTimeZone, formatInTimeZone(new Date(), defaultTimeZone, "yyyy-MM-dd")));
   };
   const openEdit = (job: PersonalJobView) => {
     setNotice(null);
-    setEditor({ mode: "edit", job, values: personalJobFormValues(job) });
+    setEditingId(job.id);
   };
   const saved = (job: PersonalJobView) => {
     setJobs((prev) => [job, ...prev.filter((j) => j.id !== job.id)]);
-    setNotice(editor?.mode === "edit" ? "Changes saved." : "Personal job saved.");
-    setEditor(null);
+    setNotice(editingId === job.id ? "Changes saved." : "Personal job saved.");
+    if (editingId === job.id) setEditingId(null);
+    else setAdding(null);
   };
   const remove = async (job: PersonalJobView): Promise<string | null> => {
     try {
@@ -100,15 +113,13 @@ export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }:
         {notice && <p role="status" className="text-[13px] font-medium text-[var(--tint-ink)]">{notice}</p>}
       </div>
 
-      {editor && (
-        <PersonalJobForm
-          key={editor.mode === "edit" ? editor.job.id : "new"}
-          initial={editor.values}
-          editingId={editor.mode === "edit" ? editor.job.id : undefined}
-          onSaved={saved}
-          onCancel={() => setEditor(null)}
-        />
-      )}
+      <AnimatePresence initial={false}>
+        {adding && (
+          <Reveal key="add">
+            <PersonalJobForm initial={adding} onSaved={saved} onCancel={() => setAdding(null)} />
+          </Reveal>
+        )}
+      </AnimatePresence>
 
       <MyWorkTotals jobs={jobs} range={range} onRange={setRange} nowMs={nowMs} />
 
@@ -136,23 +147,9 @@ export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }:
               </button>
             </div>
           ) : (
-            <ul className="-mb-3" aria-label="Personal jobs">
-              {visible.map((job) => (
-                <PersonalJobRow key={job.id} job={job} upcoming={isUpcoming(job, nowMs)} onEdit={openEdit} onDelete={remove} />
-              ))}
-            </ul>
+            <MyWorkList ref={listTop} jobs={visible} page={slot.page} nowMs={nowMs} editingId={editingId} onEdit={openEdit} onSaved={saved} onCancelEdit={() => setEditingId(null)} onDelete={remove} />
           )}
-          {left > 0 && (
-            <div className="flex justify-center pt-2">
-              <button
-                type="button"
-                onClick={() => setMore({ view, pages: pages + 1 })}
-                className="min-h-11 rounded-full border border-[var(--forest)] px-6 text-[13px] font-medium text-[var(--forest)] transition-colors hover:bg-[var(--forest)] hover:text-[var(--canvas)]"
-              >
-                Show {Math.min(PAGE_SIZE, left)} more ({left} left)
-              </button>
-            </div>
-          )}
+          <MyWorkPager window={slot} total={matching.length} onPage={goToPage} />
         </>
       )}
     </div>
