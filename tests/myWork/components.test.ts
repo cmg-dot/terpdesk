@@ -68,13 +68,13 @@ describe("the My work screen", () => {
       at("b", 45, { miles: "5.5", countedMiles: "5.5" }),
       at("c", 200),
     ]);
-    assert.match(html, /data-range="30"[^>]*>[\s\S]*?Last 30 days[\s\S]*?1 h[\s\S]*?20\.0 mi counted · 1 job/);
-    assert.match(html, /data-range="90"[^>]*>[\s\S]*?Last 90 days[\s\S]*?2 h[\s\S]*?25\.5 mi counted · 2 jobs/);
-    assert.match(html, /data-range="all"[^>]*>[\s\S]*?All time[\s\S]*?3 h[\s\S]*?25\.5 mi counted · 3 jobs/);
+    assert.match(html, /data-range="30"[^>]*>[\s\S]*?1 h[\s\S]*?Last 30 days[\s\S]*?20\.0 mi counted · 1 job/);
+    assert.match(html, /data-range="90"[^>]*>[\s\S]*?2 h[\s\S]*?Last 90 days[\s\S]*?25\.5 mi counted · 2 jobs/);
+    assert.match(html, /data-range="all"[^>]*>[\s\S]*?3 h[\s\S]*?All time[\s\S]*?25\.5 mi counted · 3 jobs/);
     assert.ok(html.includes('aria-pressed="true" data-range="30"'), "opens on the last 30 days");
     assert.ok(html.includes('data-personal-job="a"') && !html.includes('data-personal-job="b"'), "only the 30 day job is listed");
     assert.ok(html.includes("Conference") && html.includes("Education") && html.includes("20.0 mi counted (10.0 each way)"));
-    assert.ok(html.includes('href="/api/my-work/export"') && html.includes("Export CSV"));
+    assert.ok(html.includes('href="/api/my-work/export?range=30"') && html.includes("Export CSV"), "the link carries the view it downloads");
   });
 
   it("a job without a label reads Personal job, and a long list shows twenty then offers more", async () => {

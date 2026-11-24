@@ -142,6 +142,12 @@ export function personalJobWhen(job: Pick<PersonalJobView, "startsAt" | "endsAt"
   return `${formatInTimeZone(start, zone, "EEE, MMM d, yyyy")} · ${formatInTimeZone(start, zone, "h:mm a")} to ${endText}`;
 }
 
+/** The calendar block on a card: the start's month ("NOV") and day ("24") in the zone the job was entered in. */
+export function personalJobDateTile(job: Pick<PersonalJobView, "startsAt" | "timeZone">): { month: string; day: string } {
+  const start = new Date(job.startsAt);
+  return { month: formatInTimeZone(start, job.timeZone, "MMM").toUpperCase(), day: formatInTimeZone(start, job.timeZone, "d") };
+}
+
 /** "2 h 15 min", "45 min", "3 h". */
 export function hoursLabel(minutes: number): string {
   const whole = Math.max(0, Math.round(minutes));

@@ -1,23 +1,31 @@
 "use client";
 
 import { useState } from "react";
-import { hoursLabel, personalJobWhen } from "@/lib/personalJobs";
+import { hoursLabel, personalJobDateTile, personalJobWhen } from "@/lib/personalJobs";
 import type { PersonalJobView } from "@/lib/personalJobs";
 
 interface PersonalJobRowProps {
   job: PersonalJobView;
+  /** True while the job has not ended yet (it carries an "Upcoming" tag). */
+  upcoming?: boolean;
   onEdit: (job: PersonalJobView) => void;
   /** Resolves to an error message, or null when it was deleted. */
   onDelete: (job: PersonalJobView) => Promise<string | null>;
 }
 
-const chip = "rounded-full border border-gray-200 px-2.5 py-0.5 text-xs font-medium text-gray-600";
+const CHIP = "inline-flex max-w-full items-center rounded-full border border-[var(--banner-edge)] bg-[var(--canvas)] px-2.5 py-0.5 text-[12px] text-[var(--sage)]";
+const BUTTON = "min-h-9 rounded-full px-4 text-[13px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--forest)] disabled:opacity-50";
 
-/** One personal job in the list: when, the optional label, hours and miles, with Edit and a two-step Delete. */
-export function PersonalJobRow({ job, onEdit, onDelete }: PersonalJobRowProps) {
+/**
+ * One personal job, in the style of a Website request card: the calendar block (month over day), the title (the label, else "Personal job"),
+ * when it was, the pills (setting, hours worked, break, counted miles), and Edit with a two-step Delete. The buttons sit to the right on a
+ * wide card and under the text, in line with it, on a narrow one.
+ */
+export function PersonalJobRow({ job, upcoming = false, onEdit, onDelete }: PersonalJobRowProps) {
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const tile = personalJobDateTile(job);
 
   const remove = async () => {
     setDeleting(true);
@@ -31,40 +39,54 @@ export function PersonalJobRow({ job, onEdit, onDelete }: PersonalJobRowProps) {
   };
 
   return (
-    <li data-personal-job={job.id} role="listitem" className="rounded-2xl border border-gray-200 bg-white p-4 sm:p-5">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div className="min-w-0 space-y-1.5">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-[var(--sage)]">{personalJobWhen(job)}</p>
-          <h3 className="break-words text-base font-semibold text-[var(--ink)]">{job.label || "Personal job"}</h3>
-          <div className="flex flex-wrap gap-1.5">
-            {job.setting && <span className={chip}>{job.setting}</span>}
-            <span className="rounded-full bg-[var(--tint)] px-2.5 py-0.5 text-xs font-medium text-[var(--tint-ink)]">{hoursLabel(job.workedMinutes)} worked</span>
-            {job.breakMinutes > 0 && <span className={chip}>{job.breakMinutes} min break</span>}
-            {job.countedMiles !== null && (
-              <span className={chip}>
-                {job.countedMiles.toFixed(1)} mi counted{job.roundTrip && job.miles !== null ? ` (${job.miles.toFixed(1)} each way)` : ""}
-              </span>
-            )}
+    <li
+      data-personal-job={job.id}
+      data-upcoming={upcoming ? "true" : "false"}
+      role="listitem"
+      className="mb-3 rounded-2xl border border-[var(--banner-edge)] bg-white p-4 transition-[box-shadow,transform] duration-200 hover:-translate-y-px hover:shadow-[0_10px_28px_-14px_rgb(var(--forest-rgb)_/_0.45)] motion-reduce:transition-none motion-reduce:hover:translate-y-0 sm:p-5"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+        <div className="flex min-w-0 flex-1 items-start gap-3 sm:gap-4">
+          <span className="flex h-14 w-14 shrink-0 flex-col items-center justify-center rounded-xl bg-[var(--tint)] text-[var(--tint-ink)]" data-date-tile="">
+            <span className="text-[10px] font-semibold uppercase leading-none tracking-wider">{tile.month}</span>
+            <span className="mt-1 text-[20px] font-semibold leading-none">{tile.day}</span>
+          </span>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <h3 className="min-w-0 break-words text-[16px] font-semibold text-[var(--ink)]">{job.label || "Personal job"}</h3>
+              {upcoming && <span className="inline-flex items-center rounded-full bg-[var(--tint)] px-2.5 py-0.5 text-[12px] font-semibold text-[var(--tint-ink)]">Upcoming</span>}
+            </div>
+            <p className="mt-0.5 text-[13px] text-[var(--sage)]">{personalJobWhen(job)}</p>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+              {job.setting && <span className={CHIP}>{job.setting}</span>}
+              <span className="inline-flex items-center rounded-full bg-[var(--tint)] px-2.5 py-0.5 text-[12px] font-semibold text-[var(--tint-ink)]">{hoursLabel(job.workedMinutes)} worked</span>
+              {job.breakMinutes > 0 && <span className={CHIP}>{job.breakMinutes} min break</span>}
+              {job.countedMiles !== null && (
+                <span className={CHIP}>
+                  {job.countedMiles.toFixed(1)} mi counted{job.roundTrip && job.miles !== null ? ` (${job.miles.toFixed(1)} each way)` : ""}
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
-        <div className="flex shrink-0 items-center gap-2 self-start">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 pl-[4.25rem] sm:pl-0">
           {confirming ? (
             <>
               <span className="text-[13px] text-[var(--sage)]">Delete this job?</span>
-              <button type="button" onClick={remove} disabled={deleting} className="rounded-full bg-red-600 px-4 py-1.5 text-[13px] font-medium text-white transition-colors hover:bg-red-700 disabled:opacity-50">
+              <button type="button" onClick={remove} disabled={deleting} className={`${BUTTON} bg-red-600 text-white hover:bg-red-700`}>
                 {deleting ? "Deleting..." : "Yes, delete"}
               </button>
-              <button type="button" onClick={() => setConfirming(false)} disabled={deleting} className="rounded-full border border-gray-200 px-4 py-1.5 text-[13px] font-medium text-gray-700 hover:bg-gray-50">
+              <button type="button" onClick={() => setConfirming(false)} disabled={deleting} className={`${BUTTON} border border-[var(--banner-edge)] text-[var(--ink)] hover:bg-[var(--surface)]`}>
                 Keep
               </button>
             </>
           ) : (
             <>
-              <button type="button" onClick={() => onEdit(job)} className="rounded-full border border-gray-200 px-4 py-1.5 text-[13px] font-medium text-gray-700 transition-colors hover:bg-[var(--surface)]">
+              <button type="button" onClick={() => onEdit(job)} className={`${BUTTON} border border-[var(--forest)] text-[var(--forest)] hover:bg-[var(--forest)] hover:text-[var(--canvas)]`}>
                 Edit
               </button>
-              <button type="button" onClick={() => setConfirming(true)} className="rounded-full border border-gray-200 px-4 py-1.5 text-[13px] font-medium text-red-700 transition-colors hover:bg-red-50">
+              <button type="button" onClick={() => setConfirming(true)} className={`${BUTTON} border border-[var(--banner-edge)] text-red-700 hover:bg-red-50`}>
                 Delete
               </button>
             </>

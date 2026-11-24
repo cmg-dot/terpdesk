@@ -4,7 +4,8 @@ import { writeAuditLog } from "@/lib/audit";
 import { UNAUTHORIZED, requireInterpreter } from "@/lib/auth/guards";
 import { isMissingTable } from "@/lib/availability/personalJobConflict";
 import { logError } from "@/lib/logError";
-import { PERSONAL_JOB_CSV_HEADER, personalJobCsvRows } from "@/lib/personalJobs";
+import { applyPersonalJobFilters, parseExportQuery } from "@/lib/personalJobFilters";
+import { PERSONAL_JOB_CSV_HEADER, personalJobCsvRows, personalJobsInRange } from "@/lib/personalJobs";
 import { readPersonalJobs } from "@/lib/personalJobsStore";
 
 /**
@@ -12,11 +13,14 @@ import { readPersonalJobs } from "@/lib/personalJobsStore";
  * label, break, hours worked, miles, round trip, counted miles). The interpreter id comes from the session only. There are no rates,
  * earnings or payer, so the only free text is the label the interpreter chose to enter; it is never cached, and the audit log records
  * that an export happened and how many rows, never their contents. Cells a spreadsheet would read as a formula (=, +, -, @) are escaped.
+ *
+ * The page's CSV link passes the view it shows (`range` 30|90|all, `tab`, `q`, `setting`), and the same rules narrow the rows here, so
+ * the download is the list as shown. With none of them (or anything unrecognised) it is every job the interpreter has.
  */
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: Request) {
   let own;
   try {
     own = await requireInterpreter();
@@ -28,7 +32,9 @@ export async function GET() {
   }
 
   try {
-    const jobs = await readPersonalJobs(own.interpreterId);
+    const all = await readPersonalJobs(own.interpreterId);
+    const { range, filters } = parseExportQuery(new URL(request.url).searchParams);
+    const jobs = applyPersonalJobFilters(personalJobsInRange(all, range, Date.now()), filters, Date.now());
     const csv = Papa.unparse({ fields: [...PERSONAL_JOB_CSV_HEADER], data: personalJobCsvRows(jobs) }, { escapeFormulae: true, newline: "\r\n" });
     await writeAuditLog({
       userId: own.session.user.id,

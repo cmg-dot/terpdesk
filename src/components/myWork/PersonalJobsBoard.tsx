@@ -4,10 +4,14 @@ import { useMemo, useState } from "react";
 import { formatInTimeZone } from "date-fns-tz";
 import { Download, Plus } from "lucide-react";
 import { deletePersonalJob } from "@/app/actions/personalJobs";
+import { MyWorkToolbar } from "@/components/myWork/MyWorkToolbar";
 import { MyWorkTotals } from "@/components/myWork/MyWorkTotals";
 import { PersonalJobForm } from "@/components/myWork/PersonalJobForm";
 import { PersonalJobRow } from "@/components/myWork/PersonalJobRow";
+import { useClockFrom } from "@/hooks/useClockFrom";
 import type { MileageRange } from "@/lib/mileageSummary";
+import { DEFAULT_JOB_FILTERS, applyPersonalJobFilters, exportQuery, isUpcoming, personalJobSettingOptions, personalJobTabCounts } from "@/lib/personalJobFilters";
+import type { PersonalJobFilters } from "@/lib/personalJobFilters";
 import { emptyPersonalJobForm, personalJobFormValues, personalJobsInRange } from "@/lib/personalJobs";
 import type { PersonalJobFormValues, PersonalJobView } from "@/lib/personalJobs";
 
@@ -15,22 +19,38 @@ interface PersonalJobsBoardProps {
   initialJobs: PersonalJobView[];
   /** The zone a new job starts in (the interpreter's profile zone). */
   defaultTimeZone: string;
-  /** When the jobs were read (ISO): the 30 and 90 day windows end here. */
+  /** When the jobs were read (ISO): the first render's clock, so the page matches the server's HTML. */
   generatedAt: string;
 }
 
 const PAGE_SIZE = 20;
 type Editor = { mode: "new"; values: PersonalJobFormValues } | { mode: "edit"; job: PersonalJobView; values: PersonalJobFormValues };
 
-/** My work: totals that double as the date filter, the form, the list, and the CSV download. */
+const noMatchBox = "rounded-2xl border border-dashed border-[var(--banner-edge)] bg-white p-8 text-center text-sm text-[var(--sage)]";
+
+/** My work: totals that double as the date range, search and filters, the cards, the form, and the CSV download of what is shown. */
 export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }: PersonalJobsBoardProps) {
   const [jobs, setJobs] = useState<PersonalJobView[]>(initialJobs);
   const [range, setRange] = useState<MileageRange>("30");
+  const [filters, setFilters] = useState<PersonalJobFilters>(DEFAULT_JOB_FILTERS);
   const [editor, setEditor] = useState<Editor | null>(null);
-  const [shownCount, setShownCount] = useState(PAGE_SIZE);
+  const [more, setMore] = useState<{ view: string; pages: number }>({ view: "", pages: 1 });
   const [notice, setNotice] = useState<string | null>(null);
-  const nowMs = useMemo(() => new Date(generatedAt).getTime(), [generatedAt]);
+  // Starts at the moment the server read the jobs (so the first render matches the server's HTML), then follows the real time, so an upcoming job turns into a completed one when it ends.
+  const serverNow = useMemo(() => new Date(generatedAt).getTime(), [generatedAt]);
+  const nowMs = useClockFrom(serverNow);
   const inRange = useMemo(() => personalJobsInRange(jobs, range, nowMs), [jobs, range, nowMs]);
+  const counts = useMemo(() => personalJobTabCounts(inRange, nowMs), [inRange, nowMs]);
+  const settings = useMemo(() => personalJobSettingOptions(jobs), [jobs]);
+  const matching = useMemo(() => applyPersonalJobFilters(inRange, filters, nowMs), [inRange, filters, nowMs]);
+
+  const update = (patch: Partial<PersonalJobFilters>) => setFilters((current) => ({ ...current, ...patch }));
+  const clear = () => setFilters((current) => ({ ...DEFAULT_JOB_FILTERS, tab: current.tab }));
+  // "Show more" is forgotten whenever the view changes, so a new range, tab, search or sort starts at the top again.
+  const view = `${range}|${JSON.stringify(filters)}`;
+  const pages = more.view === view ? more.pages : 1;
+  const visible = matching.slice(0, pages * PAGE_SIZE);
+  const left = matching.length - visible.length;
 
   const openNew = () => {
     setNotice(null);
@@ -58,16 +78,23 @@ export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }:
   };
 
   return (
-    <div className="space-y-6" data-my-work="">
+    <div className="space-y-5" data-my-work="">
       <div className="flex flex-wrap items-center gap-3">
-        <button type="button" onClick={openNew} className="inline-flex items-center gap-2 rounded-full bg-[var(--forest)] px-5 py-2.5 text-[14px] font-medium text-white transition-colors hover:opacity-90">
+        <button type="button" onClick={openNew} className="inline-flex min-h-11 items-center gap-2 rounded-full bg-[var(--forest)] px-5 text-[14px] font-medium text-white transition-colors hover:opacity-90">
           <Plus className="h-4 w-4" aria-hidden="true" />
           Add a personal job
         </button>
-        {jobs.length > 0 && (
-          <a href="/api/my-work/export" download className="inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-5 py-2.5 text-[14px] font-medium text-gray-700 transition-colors hover:bg-[var(--surface)]">
+        {matching.length > 0 && (
+          <a
+            href={`/api/my-work/export?${exportQuery(range, filters)}`}
+            download
+            aria-label={`Export CSV, ${matching.length} ${matching.length === 1 ? "job" : "jobs"} shown`}
+            data-export-count={matching.length}
+            className="inline-flex min-h-11 items-center gap-2 rounded-full border border-[var(--banner-edge)] bg-white px-5 text-[14px] font-medium text-[var(--ink)] transition-colors hover:bg-[var(--surface)]"
+          >
             <Download className="h-4 w-4" aria-hidden="true" />
             Export CSV
+            <span className="rounded-full bg-[var(--tint)] px-2 py-0.5 text-[12px] font-semibold text-[var(--tint-ink)]">{matching.length}</span>
           </a>
         )}
         {notice && <p role="status" className="text-[13px] font-medium text-[var(--tint-ink)]">{notice}</p>}
@@ -83,31 +110,48 @@ export function PersonalJobsBoard({ initialJobs, defaultTimeZone, generatedAt }:
         />
       )}
 
-      <MyWorkTotals jobs={jobs} range={range} onRange={(next) => { setRange(next); setShownCount(PAGE_SIZE); }} nowMs={nowMs} />
+      <MyWorkTotals jobs={jobs} range={range} onRange={setRange} nowMs={nowMs} />
 
       {jobs.length === 0 ? (
-        <div data-my-work-empty="none" className="space-y-2 rounded-2xl border border-dashed border-gray-200 bg-white p-6 sm:p-8">
+        <div data-my-work-empty="none" className="space-y-2 rounded-2xl border border-dashed border-[var(--banner-edge)] bg-white p-6 sm:p-8">
           <h2 className="text-[16px] font-semibold text-[var(--ink)]">No personal jobs yet</h2>
           <p className="text-sm leading-relaxed text-[var(--sage)]">
             Add the work you do on your own, outside any agency, with its hours and miles. Your totals appear above, you can export everything as a CSV, and an agency
             job that overlaps one of these cannot be accepted.
           </p>
         </div>
-      ) : inRange.length === 0 ? (
-        <div data-my-work-empty="range" className="rounded-2xl border border-dashed border-gray-200 bg-white p-8 text-center text-sm text-[var(--sage)]">
-          No personal jobs in this period. Choose a longer one above.
-        </div>
       ) : (
         <>
-          <ul className="space-y-3" aria-label="Personal jobs">
-            {inRange.slice(0, shownCount).map((job) => (
-              <PersonalJobRow key={job.id} job={job} onEdit={openEdit} onDelete={remove} />
-            ))}
-          </ul>
-          {inRange.length > shownCount && (
-            <button type="button" onClick={() => setShownCount((n) => n + PAGE_SIZE)} className="rounded-full border border-gray-200 bg-white px-5 py-2 text-[13px] font-medium text-gray-700 hover:bg-[var(--surface)]">
-              Show {Math.min(PAGE_SIZE, inRange.length - shownCount)} more ({inRange.length - shownCount} left)
-            </button>
+          <MyWorkToolbar filters={filters} counts={counts} settings={settings} shown={matching.length} onChange={update} onClear={clear} />
+          {inRange.length === 0 ? (
+            <div data-my-work-empty="range" className={noMatchBox}>
+              No personal jobs in this period. Choose a longer one above.
+            </div>
+          ) : matching.length === 0 ? (
+            <div data-my-work-empty="match" className={noMatchBox}>
+              <p className="font-medium text-[var(--ink)]">No personal jobs match</p>
+              <p className="mt-1">Try a different search, tab or setting, or clear the filters.</p>
+              <button type="button" onClick={() => setFilters(DEFAULT_JOB_FILTERS)} className="mt-4 rounded-full border border-[var(--forest)] px-5 py-1.5 text-[13px] font-medium text-[var(--forest)] hover:bg-[var(--forest)] hover:text-[var(--canvas)]">
+                Clear filters
+              </button>
+            </div>
+          ) : (
+            <ul className="-mb-3" aria-label="Personal jobs">
+              {visible.map((job) => (
+                <PersonalJobRow key={job.id} job={job} upcoming={isUpcoming(job, nowMs)} onEdit={openEdit} onDelete={remove} />
+              ))}
+            </ul>
+          )}
+          {left > 0 && (
+            <div className="flex justify-center pt-2">
+              <button
+                type="button"
+                onClick={() => setMore({ view, pages: pages + 1 })}
+                className="min-h-11 rounded-full border border-[var(--forest)] px-6 text-[13px] font-medium text-[var(--forest)] transition-colors hover:bg-[var(--forest)] hover:text-[var(--canvas)]"
+              >
+                Show {Math.min(PAGE_SIZE, left)} more ({left} left)
+              </button>
+            </div>
           )}
         </>
       )}
