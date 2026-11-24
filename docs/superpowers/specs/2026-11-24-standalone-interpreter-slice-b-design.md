@@ -1,6 +1,6 @@
 # Standalone Interpreter Mode, Slice B: personal jobs, `/my-work`, conflict check
 
-Status: **approved decisions below; B0 (extractions), B1 (table, helpers, actions), B3 (conflict check) and B2 (UI, export, calendar, agency timeline) done. Owed: one real-browser check of B2 at 1280, 900 and 390 px (skipped on purpose while the machine was low on memory).** Slice A (empty states and getting-started guidance, no schema change) shipped as `3bc175a`.
+Status: **approved decisions below; B0 (extractions), B1 (table, helpers, actions), B3 (conflict check) and B2 (UI, export, calendar, agency timeline) done, including the real-browser check of B2 at 1280, 900 and 390 px (see "Browser check of B2" below).** Slice A (empty states and getting-started guidance, no schema change) shipped as `3bc175a`.
 
 ## Intent
 
@@ -105,4 +105,14 @@ Built: `(interpreter)/my-work/page.tsx` and `components/myWork/{PersonalJobsBoar
 - Calendar: `td_availability_view` returns the interpreter's own personal jobs; Month, Week and Day draw them as read-only tinted blocks apart from busy time; "Add a personal job" sits beside "Block time" and goes to `/my-work`.
 - Agency: personal jobs are read as bare windows (who and when; the label and setting are never selected), only for interpreters who share availability with the agency, merged with their busy time into one band. Because a personal job must be indistinguishable from other busy time, the band, its legend and the row caption now say "Unavailable" instead of "Busy" for all of it. The agency's interpreter detail page counts the same windows as not free.
 - Verified: unit tests (rendered components, the export route, the middleware, the agency timeline through the real action with a stubbed database) and, by script against the real demo database with the session mocked, the save, the CSV download and its 401/403 refusals, the interpreter's calendar data, and the agency timeline including the sharing rule.
-- Owed: a real-browser check (save, edit, delete and download through the UI; the calendar blocks; the agency band) at 1280, 900 and 390 px. It was skipped because free memory was under 1 GB. Run it when memory allows.
+- The real-browser check was first skipped (free memory under 1 GB), then attempted once and stopped at 98 MB free, then run to the end (next section).
+
+## Browser check of B2 (done)
+
+Run against a local dev server (port 3935, `terpdesk_demo`, `EMAIL_SILENT_MODE=true`) with headless Chrome at 1280x800, 900x800 and 390x844, using minted demo sessions. An attempt against the Vercel demo deployment was not possible: it rejected the minted session cookie (its signing secret differs), so nothing was written there.
+
+- `/my-work`: the three totals tiles (30 days, 90 days, all time) render and act as the pressed date range; Add through the form (label with the "No client names" hint, 15 minute break, 8.5 miles round trip) lists the job with 17.0 counted miles; Edit (10 miles) shows 20.0; the CSV downloads through the page's Export link as `terpdesk-personal-jobs-YYYY-MM-DD.csv` with a byte order mark and the edited row; Delete asks first, then removes it. No horizontal overflow empty, with the form open, or with a job.
+- Interpreter Calendar: in Month, Week and Day the personal job renders as a read-only block (no button or link inside) inside the viewport; "Add a personal job" links to `/my-work` and sits beside "Block time" inside the viewport; no overflow, no console errors.
+- Agency Calendar, Interpreter View (1280 and 390 px): the sharing demo interpreter's row shows an "Unavailable" band over the job's time; the band's accessible name and text are only "Unavailable"; the legend says "Unavailable"; neither the label nor "Personal job" appears anywhere in the page; no overflow, no console errors.
+- Result: 113 checks passed, 3 reported failures. All three were the same test slip (a case-sensitive match on the tile labels, which are drawn in capitals: "LAST 30 DAYS"); the labels are present and correct in the screenshots.
+- Limits: the agency band was verified from the page's markup and accessible name, not from a close-up screenshot of the band itself (the saved agency screenshots show the top of the page). Synthetic rows (`E2E40 ...`) and this run's 12 personal-job audit rows were deleted from the demo database afterwards.
