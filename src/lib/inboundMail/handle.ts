@@ -3,8 +3,9 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { requests } from "@/db/schema";
 import { classifyInboundMail } from "@/lib/inboundMail/classify";
-import type { InboundClassification } from "@/lib/inboundMail/classify";
+import type { InboundClassification, InboundKind } from "@/lib/inboundMail/classify";
 import { logError } from "@/lib/logError";
+import { applyReplyMeetingLink } from "@/lib/replyMeetingLinkStore";
 import { processRequesterCancelRequest } from "@/lib/requesterCancel";
 import { processStateCancellation, processStateInProcess } from "@/lib/stateCancelNotice";
 import { processStateUnableToFill } from "@/lib/stateUnableToFill";
@@ -44,6 +45,9 @@ export interface HandledMail {
   result: string;
 }
 
+/** The kinds of reply that may carry a meeting link (a cancellation or other notice never does). */
+const LINK_REPLY_KINDS: ReadonlySet<InboundKind> = new Set<InboundKind>(["requester_reply", "state_request_form", "other"]);
+
 const fingerprint = (mail: InboundMailInput): string => `lambda:${createHash("sha256").update(`${mail.senderEmail}\n${mail.subject}\n${mail.bodyText}`).digest("hex")}`;
 
 /** A reply that mentions cancelling in words that are not a clear instruction needs a person's eye, not silence. */
@@ -66,6 +70,10 @@ export async function handleStateNotice(mail: InboundMailInput): Promise<Handled
   const record = async () => {
     if (srn) await recordStateEvent({ srn, kind, occurredAt: classification.cancelledAt ? new Date(classification.cancelledAt) : mail.receivedAt, receivedAt: mail.receivedAt, messageId, senderEmail: mail.senderEmail, authenticated: mail.authenticated });
   };
+
+  // A reply that gives the meeting link ("Here is the link: https://...zoom.us/...") fills the job's blank link, whoever sent it (a
+  // state reply carries on to the form flow afterwards, as before). A trusted, authenticated sender only: see replyMeetingLinkStore.ts.
+  const linked = srn && classification.isReply && LINK_REPLY_KINDS.has(kind) ? await applyReplyMeetingLink({ srn, senderEmail: mail.senderEmail, bodyText: mail.bodyText, authenticated: mail.authenticated, messageId }) : null;
 
   try {
     switch (kind) {
@@ -112,7 +120,8 @@ export async function handleStateNotice(mail: InboundMailInput): Promise<Handled
       case "requester_reply": {
         // Correspondence: never read as a request form. A cancel-ish wording that is not a clear instruction still gets a human look.
         const id = classification.intent && srn ? await noteUnclearCancelMention(srn) : null;
-        return done(id ? "reply_needs_look" : "ignored_reply", id, "unchanged", false);
+        if (id) return done("reply_needs_look", id, "unchanged", false);
+        return linked ? done(linked.outcome, linked.requestId, "unchanged", false) : done("ignored_reply", null, "unchanged", false);
       }
       default:
         return null;

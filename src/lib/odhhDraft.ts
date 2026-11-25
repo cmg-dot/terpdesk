@@ -45,14 +45,13 @@ export const draftTitle = ({ srn, parsed, subject, fromEmail }: Pick<DraftInput,
 export function buildDraftData(input: DraftInput): RequestData {
   const { parsed, extras, srn, fromEmail, subject, rawContent, contentHash, receivedAt, warnings, startsAt, endsAt } = input;
   const hasRequestor = Boolean(parsed.requestorName || parsed.requestorPhone || parsed.requestorEmail);
-  // A "Comment:" line inside the client/employee section stays in that (private) block and is not copied into the
-  // interpreter-visible preparation notes.
-  const noteAlreadyInBlock = Boolean(parsed.appointmentNote && parsed.clientInfoBlock?.includes(parsed.appointmentNote));
+  // A "Comment:" line inside the client/employee section stays in that (private) block: the parser never takes it for the Appointment
+  // Note (odhhEmailSections.ts), so an Appointment Note that repeats the comment word for word is still the interpreter's note.
   // An Appointment Note that is only a number ("2272820") is the state's own reference, not guidance for the interpreter, and may
   // identify the client: it goes to the agency-private notes, never the interpreter-visible preparation notes.
   const numericNote = isNumbersOnlyNote(parsed.appointmentNote) ? (parsed.appointmentNote ?? "").trim() : null;
   // A bare 8-digit number inside the note (a case or client number) is moved to the private notes too (see odhhPrepScrub.ts).
-  const scrubbed = scrubPrepIds(noteAlreadyInBlock || numericNote ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH));
+  const scrubbed = scrubPrepIds(numericNote ? "" : (parsed.appointmentNote ?? "").slice(0, MAX_PREP_NOTES_LENGTH));
   const prepNotes = scrubbed.text;
   const contactMethod = contactMethodText(extras);
   // Agency-private notes: the state's flags first, then a numbers-only appointment note and any number moved out of the note, then

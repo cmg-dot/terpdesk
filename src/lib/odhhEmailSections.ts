@@ -23,9 +23,15 @@ const REQUESTOR_EMAIL_PATTERN = labelPattern(["Requestor[ \t]+E-?mail(?:[ \t]+Ad
 const CLIENT_BLOCK_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}((?:CLIENT[ \t]*\/[ \t]*EMPLOYEE|PATIENT)[ \t]+INFORMATION)(?:[ \t]*[,;:–—-][ \t]*[A-Za-z][^\n]{0,40}?)?[ \t]*:?[ \t]*$`, "im");
 const REQUESTOR_SECTION_HEADER = new RegExp(String.raw`^[ \t]*${SECTION_NUMBER}REQUES?TOR(?:[ \t]+(?:INFORMATION|INFO|DETAILS))?[ \t]*:?[ \t]*$`, "im");
 
-/** Text of a "Label: value" line that may continue onto following lines until a blank line or the next "Label:". */
+/**
+ * Text of a "Label: value" line that may continue onto following lines until a blank line or the next "Label:".
+ * Only the lines ABOVE section 5 are read: a "Comment:" inside the client/employee section is private to the agency (it stays in that
+ * block) and is never the Appointment Note, even when the requester typed the very same words in both places.
+ */
 export function extractNote(text: string): string | null {
-  const lines = text.split("\n");
+  const all = text.split("\n");
+  const clientAt = all.findIndex((line) => CLIENT_BLOCK_HEADER.test(line));
+  const lines = clientAt >= 0 ? all.slice(0, clientAt) : all;
   const start = lines.findIndex((line) => NOTE_START_PATTERN.test(line));
   if (start < 0) return null;
   const parts = [stripSoftLineBreak(lines[start].match(NOTE_START_PATTERN)?.[1] ?? "").trim()];
