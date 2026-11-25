@@ -3,6 +3,7 @@ import type { JobSummary } from "@/lib/jobSummary";
 import type { OfferPlace } from "@/lib/offerPlace";
 import { MAX_AVAILABILITY_NOTE } from "@/lib/acceptAnswers";
 import { offerDeadlineLabel } from "@/lib/offerDeadline";
+import { renderOfferShell } from "@/lib/offerResponseShell";
 
 /**
  * The page an Accept / Decline email link opens. It changes nothing by itself: the button posts to the same
@@ -67,38 +68,24 @@ export function renderOfferConfirmPage(params: { token: string; action: "accept"
     )
     .join("");
 
-  const html = `<!DOCTYPE html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex,nofollow"><meta name="referrer" content="no-referrer">
-<title>${accepting ? "Accept" : "Decline"} job offer | terpDESK</title></head>
-<body style="margin:0;background:#F9F8F4;font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif;color:#0f172a;">
-<div style="max-width:480px;margin:8vh auto;padding:0 16px;">
-  <div style="background:#fff;border:1px solid #e2e8f0;border-radius:16px;padding:28px;">
-    <h1 style="margin:0 0 6px;font-size:20px;">${accepting ? "Accept this job offer?" : "Decline this job offer?"}</h1>
-    <p style="margin:0 0 16px;font-size:14px;color:#475569;">${
-      accepting
-        ? "Nothing is booked until you confirm below. Parking, the on-site contact and preparation details are shared after you accept."
-        : "Nothing changes until you confirm below."
-    }</p>
-    ${s.offerPlace ? placeBlock(s.offerPlace) : ""}
-    <table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #f1f5f9;">${rowsHtml}</table>
-    <form method="POST" action="/api/offers/response" style="margin-top:20px;">
+  const form = `<form method="POST" action="/api/offers/response" style="margin-top:20px;">
       <input type="hidden" name="token" value="${escapeHtml(token)}">
       <input type="hidden" name="action" value="${action}">
       ${accepting ? acceptQuestions() : ""}
       ${params.error ? `<p role="alert" style="margin:14px 0 0;padding:10px 12px;border-radius:10px;background:#FEF2F2;color:#B91C1C;font-size:13px;">${escapeHtml(params.error)}</p>` : ""}
       <div style="height:16px;"></div>
-      <button type="submit" style="width:100%;border:0;border-radius:999px;padding:12px 20px;font-size:15px;font-weight:600;cursor:pointer;color:${
-        accepting ? "#fff" : "#0B3B32"
-      };background:${accepting ? "#0B3B32" : "#fff"};${accepting ? "" : "border:1px solid #0B3B32;"}">${
-        accepting ? "Yes, accept this job" : "Yes, decline this offer"
-      }</button>
-    </form>
-  </div>
-</div></body></html>`;
+      <button type="submit" class="btn ${accepting ? "btn-primary" : "btn-secondary"}">${accepting ? "Yes, accept this job" : "Yes, decline this offer"}</button>
+    </form>`;
 
-  return new Response(html, {
-    status: 200,
-    headers: { "Content-Type": "text/html; charset=utf-8", "Cache-Control": "no-store, max-age=0", "Referrer-Policy": "no-referrer" },
+  // The same shell, header, footer and icon circle as the receipt and the expired page (offerResponseShell.ts).
+  return renderOfferShell({
+    tone: "ask",
+    title: accepting ? "Accept this job offer?" : "Decline this job offer?",
+    message: accepting
+      ? "Nothing is booked until you confirm below. Parking, the on-site contact and preparation details are shared after you accept."
+      : "Nothing changes until you confirm below.",
+    bodyHtml: `<div style="margin-top:24px;">${s.offerPlace ? placeBlock(s.offerPlace) : ""}
+    <table role="presentation" width="100%" style="border-collapse:collapse;border-top:1px solid #f1f5f9;">${rowsHtml}</table>
+    ${form}</div>`,
   });
 }
