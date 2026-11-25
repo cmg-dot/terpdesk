@@ -23,7 +23,7 @@ Anti-goals: PHI in logs, email, audit rows, calendar titles or agency views; a d
 
 1. Order D, C, E, F.
 2. Slice C: no hard expiry on the feed token; one-click rotate and revoke; `last_fetched_at` shown in Calendar settings. This is a documented exception to `security.md` 3 (which asks for expiry and one-time use): a calendar subscription cannot be one-time, and an expiry would silently break it. The exception is written into `security.md` when Slice C ships.
-3. Slice E: Option (a). Existing agency visibility of active credentials is unchanged; the renewal goals and the CEU log are private to the interpreter (separate tables, never selected by any agency view). `credential_agency_shares` stays untouched.
+3. Slice E: Option (a). Existing agency visibility of active credentials is unchanged; the renewal goals and the CEU log are private to the interpreter (separate tables, never selected by any agency view). `credential_agency_shares` stays untouched. Amended 2026-11-26: cycles are standalone-capable (see Slice E).
 4. Slice D: both ASL and spoken languages. Fields are labelled `English / Source term` and `ASL Gloss / Target rendering`, with a hint that an ASL entry is a gloss or a short sign note.
 5. Slice F: included, as a Jobs / Expenses tab on `/my-work`, with an annual category plus combined-mileage summary and a CSV export.
 
@@ -54,7 +54,14 @@ interpreter_glossary_terms
 
 ## Slice E: credentials and CEU (`0017_ceu_tracker.sql`)
 
-New tables only, `credentials` untouched: `credential_renewal_goals` (credential_id unique, cycle_start, cycle_end, required_hours, required_ethics_hours) and `ceu_entries` (interpreter_id, credential_id, earned_on, title, provider, category, hours, is_ethics). Progress bars, countdown badges at 180, 90, 60 and 30 days (pure UI over `expiryStatus`), a private CEU transcript CSV. Categories are a neutral list plus Other: certifying-body rules (RID, state, CCHI) are not encoded. Renewal reminder emails are out of the first pass.
+**Amended 2026-11-26 (owner approved):** the first draft tied every goal to a credential (`credential_id` unique). It is replaced by the design below, so a renewal tracker also works for an interpreter who has added no credential at all.
+
+- **Placement:** a 4th pill on `/profile`: `Overview | Credentials | CEUs & renewals | Visibility & sharing`. The tab opens with a neutral lock banner, "Private to you. Agencies never see this.", and Visibility & sharing carries a matching "Never shared" note. The Credentials tab and its "Visible to your agency" banner are unchanged. The tab loads its data when first opened, so Overview and Credentials are untouched.
+- **`renewal_cycles`** (new): interpreter_id, credential_id (nullable, `ON DELETE SET NULL`; linking only pre-fills the label and end date, the two dates stay separate), label, cycle_start, cycle_end, unit (`ceu` or `hours`, never converted), and three nullable targets: required_total, required_ethics, required_ppo. Several cycles may be active at once; at most 20 per interpreter.
+- **`ceu_entries`** (new): interpreter_id, cycle_id (nullable, `ON DELETE SET NULL`, so a deleted cycle keeps the log), earned_on, title, provider, category (fixed neutral list plus Other), amount (two decimals), unit, is_ethics, is_ppo. At most 2,000 per interpreter. An entry in a cycle takes the cycle's unit and must fall inside its dates; a cycle's dates or unit cannot change in a way that strands an assigned entry. The form defaults the cycle when exactly one is active.
+- **Progress:** a total counts an entry once; the ethics and PPO subtotals count each flagged entry (an entry may carry both). Countdown badges at 180, 90, 60 and 30 days and "Ended", computed in the interpreter's own time zone by a new pure function (the agency-facing `expiryStatus` is unchanged). Certifying-body rules are not encoded.
+- **Privacy:** no file uploads (so nothing lands in the agency-shareable credential files); the form says "No client names or patient details"; audit rows carry ids and counts only; the CSV transcript escapes cells that start with = + - @ and is exported with `GET /api/profile/ceu/export`. A database without 0017 answers "not set up yet" (Postgres 42P01) and never breaks `/profile`.
+- **Interface:** inline card editing, ten entries a page, a search that "/" focuses, reduced-motion-safe transitions, the app's theme tokens, no em-dashes in copy. Renewal reminder emails stay out of the first pass.
 
 ## Slice F: expenses and tax summary (`0018_expenses.sql`)
 

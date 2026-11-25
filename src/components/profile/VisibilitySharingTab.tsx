@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { Lock } from "lucide-react";
 import { setWebsiteSharing } from "@/app/actions/websiteSharing";
 import { PublicProfileCard } from "@/components/profile/PublicProfileCard";
 import { useGlobalState } from "@/context/GlobalContext";
@@ -126,6 +127,13 @@ export const VisibilitySharingTab = ({ profile, sharing, onSharingChange }: Visi
           permission never shares any of them.
         </p>
       </section>
+
+      <p data-ceu-never-shared="" className="flex items-start gap-2.5 rounded-2xl border border-l-4 border-[var(--banner-edge)] border-l-[var(--accent)] bg-[var(--surface)] px-4 py-3 text-[13px] leading-relaxed text-[var(--forest)]">
+        <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <span>
+          <span className="font-semibold">Never shared:</span> your renewal cycles and CEU log (see CEUs &amp; renewals). They are private to you and no agency can see them.
+        </span>
+      </p>
     </div>
   );
 };

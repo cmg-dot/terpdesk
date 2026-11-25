@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import { CeuTab } from "@/components/profile/ceu/CeuTab";
+import type { CeuData } from "@/lib/ceuData";
 import { CredentialsTab } from "@/components/profile/CredentialsTab";
 import { InsuranceSections } from "@/components/profile/InsuranceSections";
 import type { MyInsurance } from "@/lib/insurance";
@@ -11,11 +13,12 @@ import type { MyCredential } from "@/lib/validation/credential";
 import type { MyProfile } from "@/lib/validation/interpreterProfile";
 import type { MyWebsiteSharing } from "@/lib/websiteProfile";
 
-type ProfileTab = "overview" | "credentials" | "visibility";
+type ProfileTab = "overview" | "credentials" | "ceus" | "visibility";
 
 const TABS: { id: ProfileTab; label: string }[] = [
   { id: "overview", label: "Overview" },
   { id: "credentials", label: "Credentials" },
+  { id: "ceus", label: "CEUs & renewals" },
   { id: "visibility", label: "Visibility & sharing" },
 ];
 
@@ -35,6 +38,8 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
   const [credentials, setCredentials] = useState<MyCredential[]>(initialCredentials);
   const [insurance, setInsurance] = useState<MyInsurance>(initialInsurance);
   const [websiteSharing, setWebsiteSharing] = useState<MyWebsiteSharing[]>(initialWebsiteSharing);
+  // The private CEUs & renewals records load when that tab is first opened, and stay here while switching tabs.
+  const [ceu, setCeu] = useState<CeuData | null>(null);
   // The Overview's "Add your policy document" link opens Credentials already scrolled to Insurance; choosing a tab by hand does not.
   const [revealInsurance, setRevealInsurance] = useState(false);
   const choose = (next: ProfileTab) => {
@@ -106,6 +111,7 @@ export const ProfileTabs = ({ initialProfile, initialCredentials, initialInsuran
               />
             </CredentialsTab>
           )}
+          {tab === "ceus" && <CeuTab data={ceu} onData={setCeu} credentials={credentials.filter((c) => !c.isArchived)} timeZone={profile.timeZone} />}
           {tab === "visibility" && (
             <VisibilitySharingTab profile={profile} sharing={websiteSharing} onSharingChange={setWebsiteSharing} />
           )}
